@@ -1,5 +1,5 @@
-#include "Color_DMS.h"
-#include "defines_DMS.h"
+#include <Colors_DMS/Color_DMS.h>
+#include <defines_DMS/defines_DMS.h>
 #include <Arduino.h>
 #include <stdint.h>
 #include <map>

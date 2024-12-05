@@ -2,8 +2,8 @@
 
 #ifndef COLOR_DMS_H
 #define COLOR_DMS_H
-//#include "defines_DMS.h"
-//#include "Element_DMS.h"
+#include <defines_DMS/defines_DMS.h>
+#include "Element_DMS.h"
 
 /*
  ██████╗ ██████╗ ██╗      ██████╗ ██████╗ ███████╗
