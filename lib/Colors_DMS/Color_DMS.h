@@ -17,15 +17,15 @@
 
 const unsigned int listaColores[36] = 
 {
-    0xFFFFFF, // white_t
-    0xFF9B00, // yellow_t
-    0xFF5900, // orange_t
-    0xFF0000, // red_t
-    0xFF00D2, // violet_t
-    0x0000FF, // blue_t
-    0x00FFC8, // light_blue_t
-    0x00FF00, // green_t
-    0x000000, // black_t
+    0xFFFFFF, // white_t 0
+    0xFF9B00, // yellow_t 1 
+    0xFF5900, // orange_t 2
+    0xFF0000, // red_t 3
+    0xFF00D2, // violet_t 4
+    0x0000FF, // blue_t 5
+    0x00FFC8, // light_blue_t 6
+    0x00FF00, // green_t 7
+    0x000000, // black_t 8
 
     0x806600, // crema_t
     0xFF00D2, // rosa_t
