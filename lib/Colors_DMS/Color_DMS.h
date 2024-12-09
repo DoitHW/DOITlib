@@ -3,7 +3,7 @@
 #ifndef COLOR_DMS_H
 #define COLOR_DMS_H
 #include <defines_DMS/defines_DMS.h>
-#include "Element_DMS.h"
+#include <Element_DMS/Element_DMS.h>
 
 /*
  ██████╗ ██████╗ ██╗      ██████╗ ██████╗ ███████╗
@@ -76,27 +76,44 @@ const unsigned int listaColoresPasivos[16] =
 0x7FFF64 // verde_lima_t (Verde lima para cerrar con un tono brillante)
 };
 
+
+void print_values();
+
 class COLORHANDLER_ {
 public:
     COLORHANDLER_();
     void begin(int numLeds);
-    void do_color_crossFade(CRGB color1, CRGB color2, uint16_t fadeTime);
-    bool update();
-    CRGB getCurrentColor(); // Nueva función para obtener el color actual
-    void showColor(CRGB color);
-    void hacer_color(byte fadein, byte brightnessin, bool colorChangein, byte colorin);
-    void get_color(byte* nextRin, byte* nextGin, byte* nextBin, byte colorin);
+    CRGB get_start_color();
+    void set_start_color(CRGB colorin);
+    CRGB get_current_color();
+    void set_current_color(CRGB colorin);
+    CRGB get_target_color();
+    void set_target_color(CRGB colorin);
+    byte get_target_brightness();
+    void set_current_brightness(uint16_t brightnessin);
+    void set_target_brightness(byte brightnessin);
+    uint16_t get_target_transition_time();
+    void set_target_transition_time(uint16_t timein);
+    uint16_t get_current_transition_time();
+    void set_current_transition_time(uint16_t timein);
+
+    CRGB get_color(byte numColorin);
+
+    void color_action();
 
 private:
     CRGB* leds;
     int numLeds;
-    CRGB colorStart;
-    CRGB colorTarget;
-    CRGB colorCurrent;
-    uint32_t fadeTime;
+    CRGB startColor;
+    CRGB currentColor;
+    CRGB targetColor;
+    byte targetBrightness;
+    uint16_t target_transition_time;
+    uint16_t current_transition_time;
+    uint16_t currentBrightness;
+    uint16_t startBrightness; // Brillo inicial para la transición
     unsigned long startTime;
     bool fadeCompleted;
-
     
 };
 

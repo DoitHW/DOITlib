@@ -1,9 +1,9 @@
-#include "defines_DMS.h"
+#include <defines_DMS/defines_DMS.h>
 #include <Arduino.h>
 #include <EEPROM.h>
-#include "Element_DMS.h"
-#include "info_elements_DMS.h"
-#include "Frame_DMS.h"
+#include <Element_DMS/Element_DMS.h>
+#include <info_elements_DMS/info_elements_DMS.h>
+#include <Frame_DMS/Frame_DMS.h>
 
 uint64_t startTime= 0;
 

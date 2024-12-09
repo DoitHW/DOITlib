@@ -2,7 +2,7 @@
 
 #ifndef INFO_ELEMENTS_DMS_H
 #define INFO_ELEMENTS_DMS_H
-#include "defines_DMS.h"
+#include <defines_DMS/defines_DMS.h>
 #include <Arduino.h>
 #include <String>
 

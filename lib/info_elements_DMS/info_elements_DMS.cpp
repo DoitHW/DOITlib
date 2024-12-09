@@ -1,6 +1,6 @@
-#include "defines_DMS.h"
-#include "info_elements_DMS.h"
-#include "Element_DMS.h"
+#include <defines_DMS/defines_DMS.h>
+#include <info_elements_DMS/info_elements_DMS.h>
+#include <Element_DMS/Element_DMS.h>
 // intentar millorar control de memoria per que el elements no carreguin data inutil, y recorda comprar cafe. Sergi truchilla !!!
 
 uint16_t get_info_num(int count, ...) {

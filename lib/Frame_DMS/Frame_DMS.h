@@ -3,7 +3,7 @@
 #ifndef FRAME_DMS_H
 #define FRAME_DMS_H
 
-#include "defines_DMS.h"
+#include <defines_DMS/defines_DMS.h>
 #include <Arduino.h>
 #include <stdint.h>
 #include <vector>

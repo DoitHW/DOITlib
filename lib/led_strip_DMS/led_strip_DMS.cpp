@@ -1,8 +1,8 @@
-#include "defines_DMS.h"
-#include "Element_DMS.h"
-#include "led_strip_DMS.h"
-#include "Frame_DMS.h"
-#include "Color_DMS.h"
+#include <defines_DMS/defines_DMS.h>
+#include <Element_DMS/Element_DMS.h>
+#include <led_strip_DMS/led_strip_DMS.h>
+#include <Frame_DMS/Frame_DMS.h>
+#include <Colors_DMS/Color_DMS.h>
 #include <vector>
 #include <EEPROM.h>
 
@@ -10,7 +10,7 @@
 void LEDSTRIP_::inic_elem_config(){
 
     CRGB leds[LIGHTSOURCE_NUM_LEDS];
-    FastLED.addLeds<WS2815, LIGHTSOURCE_LED_DATA_PIN, GRB>(leds, LIGHTSOURCE_NUM_LEDS);
+    FastLED.addLeds<WS2811, LIGHTSOURCE_LED_DATA_PIN, GRB>(leds, LIGHTSOURCE_NUM_LEDS);
     delay(10);
 
     byte id= EEPROM.read(EEPROM_ID_ADDRESS);

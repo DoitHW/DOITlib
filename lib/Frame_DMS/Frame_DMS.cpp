@@ -1,7 +1,7 @@
-#include "defines_DMS.h"
-#include "Frame_DMS.h"
-#include "Element_DMS.h"
-#include "column_DMS.h"
+#include <defines_DMS/defines_DMS.h>
+#include <Frame_DMS/Frame_DMS.h>
+#include <Element_DMS/Element_DMS.h>
+#include <column_DMS/column_DMS.h>
 #include <vector>
 #include <Arduino.h>
 

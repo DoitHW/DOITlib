@@ -2,11 +2,11 @@
 #ifndef COLUMN_DMS_H
 #define COLUMN_DMS_H
 
-#include "defines_DMS.h"
-#include "Element_DMS.h"
+#include <defines_DMS/defines_DMS.h>
+#include <Element_DMS/Element_DMS.h>
 #include <FastLED.h>
 #include <Arduino.h>
-#include "Frame_DMS.h"
+#include <Frame_DMS/Frame_DMS.h>
 #include <vector>
 
 

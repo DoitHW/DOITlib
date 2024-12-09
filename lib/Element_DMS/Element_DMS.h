@@ -3,9 +3,9 @@
 #ifndef ELEMENT_DMS_H
 #define ELEMENT_DMS_H
 
-#include "defines_DMS.h"
+#include <defines_DMS/defines_DMS.h>
 #include <stdint.h>
-#include "Frame_DMS.h"
+#include <Frame_DMS/Frame_DMS.h>
 #include <FastLED.h>
 #include <vector>
 

@@ -1,16 +1,17 @@
-#include "defines_DMS.h"
-#include "Element_DMS.h"
-#include "light_source_DMS.h"
-#include "Frame_DMS.h"
-#include "Color_DMS.h"
+#include <defines_DMS/defines_DMS.h>
+#include <Element_DMS/Element_DMS.h>
+#include <light_source_DMS/light_source_DMS.h>
+#include <Frame_DMS/Frame_DMS.h>
+#include <Colors_DMS/Color_DMS.h>
 #include <vector>
 #include <EEPROM.h>
+#include <FastLED.h>
 
 
 void LIGHTSOURCE_::inic_elem_config(){
 
     CRGB leds[NUM_LEDS];
-    FastLED.addLeds<WS2815, LED_DATA_PIN, GRB>(leds, NUM_LEDS);
+    FastLED.addLeds<WS2811, LED_DATA_PIN, GRB>(leds, NUM_LEDS);
     delay(10);
     byte id= EEPROM.read(EEPROM_ID_ADDRESS);
     element->set_ID(id);
