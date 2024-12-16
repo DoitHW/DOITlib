@@ -8,13 +8,11 @@
 #include <stdint.h>
 #include <vector>
 
-
-
-
 extern volatile bool startFrameReceived;
 extern volatile bool frameInProgress;
 extern volatile bool partialFrameReceived;
 extern volatile bool frameReceived;
+extern byte globalID;
 extern std::vector<byte> uartBuffer;
 
 extern volatile unsigned long last_received_time;
@@ -104,12 +102,10 @@ void send_frame                              (const FRAME_T &framein);
 
 byte get_mapped_sensor_value(byte minMSB, byte minLSB, byte maxLSB, byte maxMSB, byte valLSB, byte valMSB);
 
-FRAME_T frameMaker_REQ_ELEM_INFO       (byte targetin, INFO_PACK_T infoPack);
-FRAME_T frameMaker_SEND_COLOR          (std::vector<byte>targetin, byte color);
-FRAME_T frameMaker_RETURN_ELEM_INFO    (byte targetin, INFO_PACK_T infoPack);
-FRAME_T frameMaker_RETURN_ELEM_STATE   (byte targetin, INFO_STATE_T infoState);
-
-
+FRAME_T frameMaker_REQ_ELEM_INFO       (byte targetin, INFO_PACK_T  infoPack);
+FRAME_T frameMaker_SEND_COLOR          (std::vector<byte>targetin,  byte color);
+FRAME_T frameMaker_RETURN_ELEM_INFO    (byte origin, byte targetin, INFO_PACK_T infoPack);
+FRAME_T frameMaker_RETURN_ELEM_STATE   (byte origin, byte targetin, INFO_STATE_T infoState);
 
 
 void sergi_truchilla();
