@@ -35,6 +35,7 @@
 //DELFINES SUPER GLOBALES
                                                 #define COLUMNA 
                       
+                                                #define NORESET_FILE
                                                 #define SERIAL_NUM (uint16_t) 0xF000
                                                 #define DEBUG
                                                 #define DEFAULT_CONFIG    true
@@ -42,13 +43,10 @@
                                                 #define CUSTOM_ID_NUM     0x01
 //
 
-#define EEPROM_SIZE                  0xFF      
-#define EEPROM_ID_ADDRESS            0x00
-#define EEPROM_ID_FLAG_ADDRESS       0x01
-#define EEPROM_ID_PROTECT            0x01
-#define EEPROM_LIFE_TIME_ADDRESS     0x02
-#define EEPROM_WORKING_TIME_ADDRESS  0x20
-#define EEPROM_SAVE_INTERVAL         60000   // 1 minuto
+
+
+#define ELEMENT_CONFIG_FILE_PATH  "/element_config.txt"
+
 #define MAX_EXPECTED_TIME            0xFFFFFFFF
 #define RF_TX_PIN     18 
 #define RF_RX_PIN     17  
@@ -69,6 +67,7 @@
 #define UNDEF_DEVICE_ID       0x00  
 #define DEFAULT_BOTONERA      0xDB  
 #define DEFAULT_CONSOLE       0xDC 
+#define DEFAULT_DICE          0xDA
 #define DEFAULT_DEVICE        0xDD 
 #define DEFAULT_ERROR_ID      0xDE
 #define DEFAULT_NFC           0xDF
@@ -114,9 +113,9 @@
 #define MIN_DEAF_TIME         0x01  
 #define MAX_DEAF_TIME         0x05 
 
-#define NORMAL_FADE           0x10  //0x05 original
+#define NORMAL_FADE           0x3FFF  // original
 #define SLOWEST_FADE          0xC8
-#define FASTEST_FADE          0x01
+#define FASTEST_FADE          0xFF
 #define SLOW_FADE             0x32
 #define SLOWER_FADE           0x64
 

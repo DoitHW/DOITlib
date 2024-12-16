@@ -1,33 +1,288 @@
 #include <defines_DMS/defines_DMS.h>
 #include <Arduino.h>
-#include <EEPROM.h>
+#include <SPIFFS.h>
+#include <FS.h>
 #include <Element_DMS/Element_DMS.h>
 #include <info_elements_DMS/info_elements_DMS.h>
 #include <Frame_DMS/Frame_DMS.h>
 
-uint64_t startTime= 0;
 
-uint32_t ELEMENT_::get_working_time(){
 
-    uint32_t time= 0;
-    EEPROM.get(EEPROM_WORKING_TIME_ADDRESS, time);
-    return time;
+
+ELEMENT_::ELEMENT_(uint16_t serialNumber){
+    
+    serialNum[0] = (serialNumber >> 8) & 0xFF; 
+    serialNum[1] = serialNumber & 0xFF;
+
+
 }
 
 
-void ELEMENT_::register_working_time(uint64_t timein) {
-    uint64_t currentTime = 0;
-    EEPROM.get(EEPROM_WORKING_TIME_ADDRESS, currentTime);
-    if (UINT64_MAX - currentTime < timein) currentTime = UINT64_MAX; // Evita desbordamiento
-    else                                   currentTime += timein;
-    currentTime /= 1000;
-    EEPROM.put(EEPROM_WORKING_TIME_ADDRESS, currentTime);
-    EEPROM.commit();
-                                                                #ifdef DEBUG
-                                                                  Serial.print("Guardado working time en EEPROM: ");
-                                                                  Serial.println(String(currentTime));
-                                                                #endif
+
+void ELEMENT_::begin() {
+    Serial.begin(115200);
+    Serial.println("ATENCION!!!!!!!!!!!!!!!!!!!");
+
+    Serial1.begin(RF_BAUD_RATE, SERIAL_8N1, RF_RX_PIN, RF_TX_PIN);
+    Serial1.onReceive(onUartInterrupt);
+    pinMode(RF_CONFIG_PIN, OUTPUT);
+    digitalWrite(RF_CONFIG_PIN, HIGH);
+    delay(500);
+
+    // Montar SPIFFS
+    if (!SPIFFS.begin(true)) {
+        Serial.println("Error al montar SPIFFS. Reiniciando.");
+        return;
+    }
+
+    // Verificar existencia del archivo de configuración
+    if (SPIFFS.exists(ELEMENT_CONFIG_FILE_PATH)) {
+        File configFile = SPIFFS.open(ELEMENT_CONFIG_FILE_PATH, "r+");
+        if (!configFile) {
+            Serial.println("Error al abrir el archivo de configuración existente.");
+            return;
+        }
+
+        // Leer el protectedID_ para verificar inicialización
+        byte protectedID_ = configFile.readStringUntil('\n').toInt();
+
+        if (protectedID_ == 0) {
+            Serial.println("Archivo no inicializado. Estableciendo valores predeterminados.");
+            configFile.seek(0); // Volver al inicio del archivo
+            configFile.println("1"); // Marcar protectedID_ como 1
+
+            // Manejo de configuración por defecto o personalizada
+            if (DEFAULT_CONFIG) {
+                configFile.println(DEFAULT_DEVICE); // Escribir configuración por defecto
+            } else if (CUSTOM_ID_INIC) {
+                configFile.println(CUSTOM_ID_NUM); // Escribir configuración personalizada
+            }
+
+            // Escribir valores iniciales para tiempo de inicio y trabajo
+            configFile.println("0"); // onStartTime
+            configFile.println("0"); // workedTime
+            configFile.flush();
+        } else {
+            Serial.println("Archivo ya inicializado.");
+        }
+
+        // Leer los valores de configuración
+        ID = configFile.readStringUntil('\n').toInt();
+        onStartTime = configFile.readStringUntil('\n').toInt();
+        workedTime = configFile.readStringUntil('\n').toInt();
+
+        // Depuración de los valores leídos
+        Serial.println("ID en ROM: " + String(ID));
+        Serial.println("Tiempo de vida acumulado: " + String(onStartTime));
+        Serial.println("Tiempo de trabajo acumulado: " + String(workedTime));
+
+        configFile.close();
+    } else {
+        // Crear un archivo nuevo si no existe
+        Serial.println("Archivo no encontrado. Creando nuevo archivo.");
+        File configFile = SPIFFS.open(ELEMENT_CONFIG_FILE_PATH, "w");
+        if (configFile) {
+            configFile.println("1"); // protectedID_
+            if (DEFAULT_CONFIG) {
+                configFile.println(DEFAULT_DEVICE); // Escribir configuración por defecto
+            } else if (CUSTOM_ID_INIC) {
+                configFile.println(CUSTOM_ID_NUM); // Escribir configuración personalizada
+            }
+            configFile.println("0"); // onStartTime
+            configFile.println("0"); // workedTime
+            configFile.flush();
+            configFile.close();
+        } else {
+            Serial.println("Error al crear el archivo de configuración.");
+        }
+    }
+
+    #ifdef DEBUG
+        Serial.println("Configuración inicial completada.");
+    #endif
 }
+
+
+
+void ELEMENT_::reset_config_file() {
+    // Verificar si el archivo de configuración existe
+    if (SPIFFS.exists(ELEMENT_CONFIG_FILE_PATH)) {
+        // Intentar eliminar el archivo
+        if (SPIFFS.remove(ELEMENT_CONFIG_FILE_PATH)) {
+            Serial.println("Archivo de configuración eliminado correctamente.");
+        } else {
+            Serial.println("Error: No se pudo eliminar el archivo de configuración.");
+        }
+    } else {
+        Serial.println("El archivo de configuración no existe, no es necesario eliminarlo.");
+    }
+}
+
+
+
+ELEMENT_::~ELEMENT_() {
+    // Implementación del destructor
+}
+
+void ELEMENT_::start_working_time() {
+    if (!stopwatchRunning && canStartStopwatch) {
+        stopwatchStartTime = millis(); // Guardar el tiempo de inicio
+        stopwatchRunning = true;       // Marcar el cronómetro como activo
+        canStartStopwatch = false;     // Bloquear hasta que se detenga el cronómetro
+                                                #ifdef DEBUG
+                                                    Serial.println("Cronómetro iniciado.");
+                                                #endif
+    } else if (!canStartStopwatch) {
+                                                #ifdef DEBUG
+                                                    Serial.println("Error: No se puede iniciar el cronómetro sin detenerlo previamente.");
+                                                #endif
+    }
+}
+
+
+
+void ELEMENT_::stopAndSave_working_time() {
+    if (stopwatchRunning) {
+        unsigned long elapsedMillis = millis() - stopwatchStartTime; // Calcular el tiempo transcurrido
+        stopwatchRunning = false;       // Detener el cronómetro
+        canStartStopwatch = true;       // Permitir reiniciar el cronómetro
+
+        unsigned long elapsedSeconds = elapsedMillis / 1000; // Convertir a segundos
+
+        File configFile = SPIFFS.open(ELEMENT_CONFIG_FILE_PATH, "r+");
+        if (!configFile) {
+            Serial.println("Error al abrir el archivo de configuración.");
+            return;
+        }
+
+        // Leer las líneas existentes
+        String line1 = configFile.readStringUntil('\n'); // Primera línea
+        String line2 = configFile.readStringUntil('\n'); // Segunda línea
+        String line3 = configFile.readStringUntil('\n'); // Tercera línea
+        String line4 = configFile.readStringUntil('\n'); // Cuarta línea
+
+        // Validar las líneas leídas
+        Serial.println("Línea 1: " + line1);
+        Serial.println("Línea 2: " + line2);
+        Serial.println("Línea 3: " + line3);
+        Serial.println("Línea 4 (workedTime): " + line4);
+
+        // Actualizar el tiempo acumulado en la cuarta línea
+        unsigned long updatedWorkedTime = line4.toInt() + elapsedSeconds;
+        line4 = String(updatedWorkedTime);
+
+        // Sobrescribir el archivo con los valores actualizados
+        configFile.seek(0);
+        configFile.println(line1);
+        configFile.println(line2);
+        configFile.println(line3);
+        configFile.println(line4);
+        configFile.flush();
+        configFile.close();
+
+        Serial.println("Cronómetro detenido. Tiempo acumulado actualizado: " + String(updatedWorkedTime) + " segundos.");
+    } else {
+        Serial.println("Error: No hay cronómetro activo para detener.");
+    }
+
+}
+void ELEMENT_::set_default_ID(){
+    File archivoID = SPIFFS.open("/element_ID.txt", "r+");
+    if (!archivoID) {
+        archivoID = SPIFFS.open("/element_ID.txt", "w");
+        if (archivoID) {
+            archivoID.print(DEFAULT_DEVICE);       
+                                                                    #ifdef DEBUG
+                                                                        Serial.println("ID configurada DEFAULT en SPIFFS.");
+                                                                    #endif
+        }
+    }   
+    archivoID.close();
+}
+
+void ELEMENT_::set_custom_ID(){
+    File archivoID = SPIFFS.open("/element_ID.txt", "r+");
+    if (!archivoID) {
+        archivoID = SPIFFS.open("/element_ID.txt", "w");
+        if (archivoID) {
+            archivoID.print(CUSTOM_ID_NUM);  // ln?
+            archivoID.close();       
+                                                                    #ifdef DEBUG
+                                                                        Serial.println("ID configurada DEFAULT en SPIFFS.");
+                                                                    #endif
+        }
+    }   
+    archivoID.close();
+}
+
+
+void ELEMENT_::set_sinceStart_time(uint64_t timein){
+    onStartTime= timein;
+}
+
+uint64_t ELEMENT_::get_sinceStart_time(){
+    return onStartTime;
+}
+
+void ELEMENT_::lifeTime_update() {
+    static unsigned long lastCheckTime = 0;   // Para actualizar el tiempo acumulado
+    static unsigned long lastPrintTime = 0;  // Para imprimir cada 10 segundos
+    unsigned long currentMillis = millis();
+
+    // Control de impresión cada 10 segundos
+    if (currentMillis - lastPrintTime >= 30000) {
+        // Abrir archivo para leer el valor actual de minutos transcurridos
+        File configFile = SPIFFS.open(ELEMENT_CONFIG_FILE_PATH, "r");
+        if (configFile) {
+            configFile.readStringUntil('\n'); // Saltar protectedID_
+            configFile.readStringUntil('\n'); // Saltar ID
+            String onStartTimeStr = configFile.readStringUntil('\n'); // Leer tiempo acumulado
+            int onStartTime = onStartTimeStr.toInt();
+            Serial.println("Minutos transcurridos: " + String(onStartTime));
+            configFile.close();
+        } else {
+            Serial.println("Error: No se pudo abrir el archivo para leer los minutos transcurridos.");
+        }
+
+        lastPrintTime = currentMillis;
+    }
+
+    // Control de actualización cada minuto
+    if (currentMillis - lastCheckTime < 60000) { // Actualizar solo cada minuto
+        return;
+    }
+    lastCheckTime = currentMillis;
+
+    // Abrir archivo para actualizar los valores
+    File configFile = SPIFFS.open(ELEMENT_CONFIG_FILE_PATH, "r+");
+    if (!configFile) {
+        Serial.println("Error crítico: No se puede abrir el archivo de configuración");
+        return;
+    }
+
+    // Leer las líneas existentes
+    configFile.readStringUntil('\n'); // Saltar protectedID_
+    configFile.readStringUntil('\n'); // Saltar ID
+    String onStartTimeStr = configFile.readStringUntil('\n'); // Leer tiempo acumulado
+    String workedTimeStr = configFile.readStringUntil('\n'); // Leer tiempo trabajado
+
+    int onStartTime = onStartTimeStr.toInt();
+    onStartTime++; // Incrementar en 1 minuto
+
+    // Sobrescribir el archivo con los valores actualizados
+    configFile.seek(0); // Volver al inicio
+    configFile.println("1"); // protectedID_
+    configFile.println(String(ID)); // ID (asumiendo que ID ya está definido en tu clase)
+    configFile.println(String(onStartTime)); // Tiempo acumulado actualizado
+    configFile.println(workedTimeStr); // Tiempo de trabajo acumulado sin cambios
+
+    configFile.close();
+
+    Serial.println("Valor actualizado de minutos transcurridos: " + String(onStartTime));
+}
+
+
+
 
 byte ELEMENT_::get_currentMode(){
     return currentMode;
@@ -46,18 +301,26 @@ byte ELEMENT_::get_manager(){
     return exclusiveIDmanager;
 }
 
+void ELEMENT_::set_ID_protected(){
+    File configFile = SPIFFS.open(ELEMENT_CONFIG_FILE_PATH, "w");
+    configFile.println(1);
+    configFile.close();
+}
+
 uint8_t ELEMENT_::get_ID() {
     return ID;
 }
 
 void ELEMENT_::set_ID(uint8_t deviceID) {
     ID = deviceID;
-    EEPROM.write(EEPROM_ID_FLAG_ADDRESS, EEPROM_ID_PROTECT);
-    EEPROM.write(EEPROM_ID_ADDRESS, deviceID);
+    File configFile = SPIFFS.open(ELEMENT_CONFIG_FILE_PATH, "r+");
+    configFile.readStringUntil('\n');
+    configFile.println(ID);
+    configFile.close();
     delay(1);
-    EEPROM.commit();
+   
                                                                 #ifdef DEBUG
-                                                                  Serial.print("ID cambiada a ");
+                                                                  Serial.print("ID cambiada a "+ String(ID));
                                                                 #endif
 }
 

@@ -20,6 +20,8 @@ extern std::vector<byte> uartBuffer;
 extern volatile unsigned long last_received_time;
 extern int lastReceivedTime;
 
+void IRAM_ATTR onUartInterrupt();
+
 struct LAST_ENTRY_FRAME_T{
 
     byte origin;

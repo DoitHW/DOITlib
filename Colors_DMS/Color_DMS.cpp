@@ -7,7 +7,7 @@
 //testing 2 3 4
 //testing 3
 
-extern COLORHANDLER_ colorHandler;
+
 
 bool color_mix_handler(int color1, int color2, byte *resultado) {
  
@@ -82,18 +82,10 @@ bool color_mix_handler(int color1, int color2, byte *resultado) {
 
 
 
-COLORHANDLER_::COLORHANDLER_()
-    : leds(nullptr), numLeds(0),
-      startColor(CRGB::Black),
-      currentColor(CRGB::Black),
-      targetColor(CRGB::Black),
-      targetBrightness(0),
-      target_transition_time(0),
-      current_transition_time(0),
-      currentBrightness(0),
-      startBrightness(0),
-      startTime(0),
-      fadeCompleted(true) {}
+COLORHANDLER_::COLORHANDLER_() : leds(nullptr), numLeds(0),startColor(CRGB::Black), currentColor(CRGB::Black), 
+                                  targetColor(CRGB::Black), targetBrightness(255),
+                                  currentBrightness(255), targetFade(1000), 
+                                  lastUpdateTime(0), transitionStartTime(0), transitioning(false) {}
 
 void COLORHANDLER_::begin(int numLeds) {
     #ifdef COLUMNA
@@ -113,135 +105,122 @@ void COLORHANDLER_::begin(int numLeds) {
     #endif
 
     this->numLeds = numLeds;
-    this->leds = new (std::nothrow) CRGB[numLeds];
+    //this->leds = new (std::nothrow) CRGB[numLeds];
+    this->leds = new CRGB[numLeds];
     FastLED.addLeds<WS2811, dataPin, RGB>(leds, numLeds);
     FastLED.setBrightness(255);
 }
 
-
-CRGB COLORHANDLER_::get_start_color(){
-    return startColor;
-}
-
-
-void COLORHANDLER_::set_start_color(CRGB colorin){
-    startColor= colorin;
-}
-
-
-CRGB COLORHANDLER_::get_current_color(){
-    return currentColor;
-}
-
-
-void COLORHANDLER_::set_current_color(CRGB colorin){
-    currentColor= colorin;
-}
-
-
-CRGB COLORHANDLER_::get_target_color(){
-    return targetColor;
-}
-
-
-void COLORHANDLER_::set_target_color(CRGB colorin){
-    targetColor= colorin;
-}
-
-
-CRGB COLORHANDLER_::get_color(byte numColorin) {
-    if (numColorin >= 36) { // Validación para evitar desbordamiento
-        #ifdef DEBUG
-        Serial.println("Índice fuera de rango en listaColores");
-        #endif
-        return CRGB::Black; // Retorna negro por defecto si el índice es inválido
+CRGB COLORHANDLER_::get_CRGB_from_colorList(int index) {
+    if (index < 0 || index >= sizeof(listaColores) / sizeof(listaColores[0])) {
+                                                                #ifdef DEBUG
+                                                                  Serial.println("Al intentar crear un CRGB a partir del numero de color, el numero de color se sale de los margenes...");
+                                                                #endif
+        return CRGB::Black;   
     }
-
-    // Extrae los componentes RGB del valor hexadecimal
-    unsigned int colorHex = listaColores[numColorin];
-    byte r = (colorHex >> 16) & 0xFF; // Bits 16-23
-    byte g = (colorHex >> 8) & 0xFF;  // Bits 8-15
-    byte b = colorHex & 0xFF;         // Bits 0-7
-
-    // Crea y retorna el color CRGB
-    return CRGB(r, g, b);
+    return CRGB(listaColores[index]);
 }
 
 
-uint16_t COLORHANDLER_::get_target_transition_time(){
-    return target_transition_time;
+void COLORHANDLER_::action_frank(){
+
+  if(!transitioning) return;
+  unsigned long currentTime= millis();
+  unsigned long elapsedTime= currentTime - transitionStartTime;
+
+  if(elapsedTime >= targetFade){
+    fill_solid(colorHandler.leds, 1, targetColor);
+    FastLED.show();
+    currentColor= targetColor;
+    startColor= currentColor;
+    transitioning= false;
+    return;
+  }
+  else{
+    Serial.println(targetFade);
+    byte progress= map(elapsedTime, 0, targetFade, 0, 255);
+    currentColor= blend(startColor, targetColor, progress);
+    fill_solid(colorHandler.leds, 1, currentColor);
+    FastLED.show();
+  }
+
 }
 
-void COLORHANDLER_::set_target_transition_time(uint16_t timein){
-    target_transition_time= timein;
-}
 
-byte COLORHANDLER_::get_target_brightness(){
-    return targetBrightness;
-}
-
-void COLORHANDLER_::set_current_brightness(uint16_t brightnessin){
-    currentBrightness= brightnessin;
-}
-
-uint16_t COLORHANDLER_::get_current_transition_time(){
-    return current_transition_time;
-}
-
-void COLORHANDLER_::set_current_transition_time(uint16_t timein){
-    current_transition_time= timein;
-}
-
-void COLORHANDLER_::set_target_brightness(byte brightnessin){
-    targetBrightness= brightnessin;
-}
-
-void COLORHANDLER_::color_action() {
-    // Asegura valores válidos
-    if (target_transition_time <= 0) {
-        #ifdef DEBUG
-        Serial.println("Tiempo de transición inválido, ajustando a 1 ms.");
-        #endif
-        target_transition_time = 1;
-    }
-
-    if (targetBrightness > 255) {
-        #ifdef DEBUG
-        Serial.println("Brillo objetivo fuera de rango, ajustando a 255.");
-        #endif
-        targetBrightness = 255;
-    }
-
+void COLORHANDLER_::action() {
     unsigned long currentTime = millis();
 
-    // Verifica si se necesita iniciar una nueva transición
-    if (!fadeCompleted) {
-        unsigned long elapsedTime = currentTime - startTime;
+    // Limit updates to every ~20ms for smoother transitions
+    if (currentTime - lastUpdateTime < 20) {
+        return;
+    }
 
-        // Calcula el progreso
-        float progress = (float)elapsedTime / target_transition_time;
+    lastUpdateTime = currentTime;
 
-        // Si la transición está completa
-        if (elapsedTime >= target_transition_time) {
-            currentColor = targetColor;
-            currentBrightness = targetBrightness;
-            fadeCompleted = true;
-            FastLED.show();
-            #ifdef DEBUG
-            Serial.println("Transición completada.");
-            #endif
-            return;
+    // Check if a transition is needed
+    if (currentColor != targetColor) {
+        if (!transitioning) {
+            // Start a new transition
+            transitionStartTime = currentTime;
+            transitioning = true;
         }
 
-        // Interpolación de color y brillo
-        currentColor = blend(startColor, targetColor, progress * 255);
-        currentColor.nscale8_video(startBrightness + (targetBrightness - startBrightness) * progress);
+        // Calculate progress of the transition
+        unsigned long elapsedTime = currentTime - transitionStartTime;
+        float progress = (float)elapsedTime / (float)targetFade;
 
-        // Actualiza LEDs
+        if (progress >= 1.0f) {
+            // Transition complete
+            currentColor = targetColor;
+            transitioning = false;
+            progress = 1.0f;
+        }
+
+        // Calculate the intermediate color
+        currentColor = blend(currentColor, targetColor, (uint8_t)(progress * 255));
+
+        // Apply the color to all LEDs
         for (int i = 0; i < numLeds; i++) {
             leds[i] = currentColor;
         }
 
         FastLED.show();
+    } else {
+        // No transition needed; ensure LEDs reflect the current color
+        if (transitioning) {
+            for (int i = 0; i < numLeds; i++) {
+                leds[i] = currentColor;
+            }
+            FastLED.show();
+            transitioning = false;
+        }
     }
+}
+
+
+
+void COLORHANDLER_::set_targetColor(CRGB color){
+
+  targetColor= color;
+}
+
+void COLORHANDLER_::set_targetFade(uint16_t fade){
+
+    if (fade > 0 && fade <= UINT16_MAX) targetFade = fade;
+    else {
+      #ifdef DEBUG
+        Serial.println("Algo pasa al hacer set_targetFade");
+      #endif  
+    }
+}
+
+void COLORHANDLER_::set_targetBrightness(byte brightness){
+
+    if (brightness <= 255) targetBrightness = brightness;
+        else {
+      #ifdef DEBUG
+        Serial.println("Algo pasa al hacer set_braitness");
+      #endif  
+    }
+
 }

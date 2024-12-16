@@ -23,7 +23,7 @@ volatile bool uartInterruptTriggered= false;
 
 // LA FUNCION DIOS
 
-void sergi_truchilla() {
+void IRAM_ATTR onUartInterrupt() {
     unsigned long startTime = millis();
     static enum {
         WAITING_START,
@@ -32,23 +32,21 @@ void sergi_truchilla() {
         RECEIVING_FRAME
     } receiveState = WAITING_START;
 
-    static uint16_t expectedFrameLength = 0;  // Longitud del frame (sin NEW_START y LENGTH bytes)
-    static uint16_t totalFrameLength = 0;    // Longitud total (frameLength + 3)
+    static uint16_t expectedFrameLength = 0;    // Longitud del frame (sin NEW_START y LENGTH bytes)
+    static uint16_t totalFrameLength = 0;       // Longitud total (frameLength + 3)
     static uint16_t receivedBytes = 0;          // OJO con los statics, danger.
     static uint16_t calculatedChecksum = 0;
     static uint8_t receivedChecksum = 0;
 
     uint8_t bytesProcessed = 0;
 
-    while (Serial1.available()  /*&& (millis() - startTime) < MAX_INTERRUPT_DURATION*/) {
+    while (Serial1.available()) {
 
         byte receivedByte = Serial1.read();
         Serial.print(receivedByte, HEX);
         Serial.print(" ");
         bytesProcessed++;
         lastReceivedTime = millis();
-
-        // Esperar el byte de inicio (NEW_START)
         if (receiveState == WAITING_START && receivedByte != NEW_START) continue;
 
         switch (receiveState) {
@@ -77,12 +75,12 @@ void sergi_truchilla() {
                 uartBuffer.push_back(receivedByte);
                 calculatedChecksum += receivedByte;
                 while (calculatedChecksum > 0xFF) calculatedChecksum = (calculatedChecksum & 0xFF) + (calculatedChecksum >> 8);
-                expectedFrameLength |= receivedByte;  // Combinamos MSB y LSB para formar el frameLength
-                totalFrameLength = expectedFrameLength + 3;  // Calculamos la longitud total (incluyendo NEW_START, LENGTH_MSB, LENGTH_LSB)
+                expectedFrameLength |= receivedByte;  
+                totalFrameLength = expectedFrameLength + 3;  
 
                 if (totalFrameLength > MAX_FRAME_LENGTH || totalFrameLength < MIN_FRAME_LENGTH) {
                     #ifdef DEBUG
-                    Serial.println("Error: Longitud de trama inválida");
+                        Serial.println("Error: Longitud de trama inv\xE1lida");
                     #endif
                     receiveState = WAITING_START;
                     uartBuffer.clear();
@@ -96,67 +94,70 @@ void sergi_truchilla() {
             case RECEIVING_FRAME:
                 uartBuffer.push_back(receivedByte);
                 receivedBytes++;
-                if(receivedBytes != totalFrameLength -1) calculatedChecksum += receivedByte;
+                if (receivedBytes != totalFrameLength - 1) calculatedChecksum += receivedByte;
                 else receivedChecksum = receivedByte;
                 while (calculatedChecksum > 0xFF) calculatedChecksum = (calculatedChecksum & 0xFF) + (calculatedChecksum >> 8);
+
                 if (receivedBytes == totalFrameLength) {  // Último byte: NEW_END
                     if (receivedByte == NEW_END) {
                         if (calculatedChecksum == receivedChecksum) {
-                            frameReceived= true;
-                            #ifdef DEBUG
-                            Serial.println("Trama recibida correctamente");
-                            #endif
-                            // Aquí procesamos la trama completa
+                            // Verificar destinatarios
+                            uint8_t numTargets = uartBuffer[4];
+                            bool isTarget = false;
+
+                            for (uint8_t i = 0; i < numTargets; i++) {
+                                uint8_t targetID = uartBuffer[5 + i];
+                                if (targetID == element->get_ID() || targetID == BROADCAST) {
+                                    isTarget = true;
+                                    break;
+                                }
+                            }
+
+                            if (isTarget) {
+                                frameReceived = true;
+                                                                #ifdef DEBUG
+                                                                    Serial.println("Trama recibida correctamente y dirigida al dispositivo");
+                                                                #endif
+                            } else {
+                                                                #ifdef DEBUG
+                                                                    Serial.println("Trama recibida correctamente pero no dirigida al dispositivo");
+                                                                #endif
+                            }
                         } else {
-                            #ifdef DEBUG
-                            Serial.println("Error: Checksum inválido");
-                            #endif
+                                                                #ifdef DEBUG
+                                                                    Serial.println("Error: Checksum inv\xE1lido");
+                                                                #endif
                         }
                     } else {
-                        #ifdef DEBUG
-                        Serial.println("Error: Byte de fin incorrecto");
-                        #endif
+                                                                #ifdef DEBUG
+                                                                    Serial.println("Error: Byte de fin incorrecto");
+                                                                #endif
                     }
                     receiveState = WAITING_START;
-                    return; // aqui salimos triunfando creo...
+                    return;
                 } 
 
                 if (uartBuffer.size() >= MAX_BUFFER_SIZE) {
-                    #ifdef DEBUG
-                    Serial.println("Error: Desbordamiento de buffer UART");
-                    #endif
+                                                                #ifdef DEBUG
+                                                                    Serial.println("Error: Desbordamiento de buffer UART");
+                                                                #endif
                     receiveState = WAITING_START;
                     uartBuffer.clear();
                     return;
                 }
 
-                // if (millis() - lastReceivedTime > FRAME_RECEPTION_TIMEOUT) {
-                //     #ifdef DEBUG
-                //     Serial.println("Error: Timeout de recepción");
-                //     #endif
-                //     receiveState = WAITING_START;
-                //     uartBuffer.clear();
-                //     return;
-                // }
                 break;
         }
-
-        // if (millis() - lastReceivedTime > INACTIVITY_TIMEOUT) {
-        //     #ifdef DEBUG
-        //     Serial.println("Error: Inactividad detectada");
-        //     #endif
-        //     receiveState = WAITING_START;
-        //     uartBuffer.clear();
-        // }
     }
 
     if (Serial1.available() && bytesProcessed >= MAX_BYTES_PER_INTERRUPT) {
         partialFrameReceived = true;
-        #ifdef DEBUG
-        Serial.println("Trama parcial recibida"); // esto ya no vale, por que las putas interrupciones no furulan
-        #endif
+                                                            #ifdef DEBUG
+                                                                Serial.println("Trama parcial recibida");
+                                                            #endif
     }
 }
+
 
 
 byte checksum_calc(const FRAME_T &framein) {

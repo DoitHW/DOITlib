@@ -15,6 +15,7 @@
 */
 
 
+
 const unsigned int listaColores[36] = 
 {
     0xFFFFFF, // white_t 0
@@ -76,50 +77,43 @@ const unsigned int listaColoresPasivos[16] =
 0x7FFF64 // verde_lima_t (Verde lima para cerrar con un tono brillante)
 };
 
-
-void print_values();
-
 class COLORHANDLER_ {
-public:
-    COLORHANDLER_();
-    void begin(int numLeds);
-    CRGB get_start_color();
-    void set_start_color(CRGB colorin);
-    CRGB get_current_color();
-    void set_current_color(CRGB colorin);
-    CRGB get_target_color();
-    void set_target_color(CRGB colorin);
-    byte get_target_brightness();
-    void set_current_brightness(uint16_t brightnessin);
-    void set_target_brightness(byte brightnessin);
-    uint16_t get_target_transition_time();
-    void set_target_transition_time(uint16_t timein);
-    uint16_t get_current_transition_time();
-    void set_current_transition_time(uint16_t timein);
 
-    CRGB get_color(byte numColorin);
+    public:
+        COLORHANDLER_();
+        void begin(int numLeds);
+        CRGB get_CRGB_from_colorList(int index);
 
-    void color_action();
+        void set_targetColor      (CRGB color);
+        void set_targetFade       (uint16_t fade);
+        void set_targetBrightness (byte brightness);
 
-private:
-    CRGB* leds;
+        void action_frank();
+        void action();
+        CRGB* leds;
+        bool transitioning; // Indicates if a transition is active
+        unsigned long transitionStartTime;
+        
+    private:
+
     int numLeds;
+
     CRGB startColor;
     CRGB currentColor;
     CRGB targetColor;
+
     byte targetBrightness;
-    uint16_t target_transition_time;
-    uint16_t current_transition_time;
-    uint16_t currentBrightness;
-    uint16_t startBrightness; // Brillo inicial para la transición
-    unsigned long startTime;
-    bool fadeCompleted;
+    byte currentBrightness;
+
+    uint16_t targetFade; // Duration of the fade in milliseconds
+
+    unsigned long lastUpdateTime; // Tracks the last update time
+    // Tracks when the transition started
     
 };
 
 
-
-
+extern COLORHANDLER_ colorHandler;
 
 
 

@@ -42,7 +42,7 @@ enum MODE_CONFIGS{
     ACCEPTS_PATTERNS,
     GUESS_COLOR,
     SIMON_GAME,
-    NOP_1,
+    ACCEPTS_DICE,
     NOP_2,
     NOP_3
 };
@@ -50,8 +50,5 @@ enum MODE_CONFIGS{
 String get_string_from_info_DB(byte typein, byte fieldin, byte languajein);
 uint16_t get_config_flag_mode(byte typein, byte modein);
 uint16_t get_info_num(int count, ...);
-
-
-
 
 #endif
