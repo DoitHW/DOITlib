@@ -6,13 +6,12 @@
 #include <Arduino.h>
 
 
-extern LAST_ENTRY_FRAME_T LEF;
+extern LAST_ENTRY_FRAME_T            LEF;
 
-volatile bool startFrameReceived = false;
-volatile bool frameInProgress = false;
-volatile bool partialFrameReceived = false;
-volatile bool frameReceived = false;
-
+volatile bool startFrameReceived=    false;
+volatile bool frameInProgress=       false;
+volatile bool partialFrameReceived=  false;
+volatile bool frameReceived=         false;
 
 std::vector<byte> uartBuffer;
 
