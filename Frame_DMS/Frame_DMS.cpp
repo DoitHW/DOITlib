@@ -208,6 +208,20 @@ void send_frame(const FRAME_T &framein) {
     Serial1.write(framein.end);
 }
 
+
+byte get_mapped_sensor_value(byte minMSB, byte minLSB, byte maxMSB, byte maxLSB, byte valMSB, byte valLSB) {
+
+    uint16_t minVal = (minMSB << 8) | minLSB;
+    uint16_t maxVal = (maxMSB << 8) | maxLSB;
+    uint16_t currentVal = (valMSB << 8) | valLSB;
+
+    uint16_t totalRange = maxVal - minVal;
+    uint16_t valuePos = currentVal - minVal;
+    uint16_t val = (valuePos * 255UL) / totalRange;
+
+    return (val > 255) ? 255 : val;
+}
+
 byte get_brightness_from_sensorValue(LAST_ENTRY_FRAME_T LEFin) {
 
     byte minMSB= LEFin.data[5];
@@ -245,8 +259,7 @@ byte get_color_from_sensorValue(LAST_ENTRY_FRAME_T LEFin) {
     return val;
 }
 
-
-FRAME_T frameMaker_RETURN_ELEM_STATE(byte originin, byte targetin, INFO_STATE_T infoState){
+FRAME_T frameMaker_RETURN_ELEM_STATE(byte origin, byte targetin, INFO_STATE_T infoState){
 
     FRAME_T frame;
     uint16_t length = 0x06 + 0x01 + L_RETURN_ELEM_STATE;
@@ -369,6 +382,73 @@ FRAME_T frameMaker_SEND_COLOR(std::vector<byte>targetin, byte color){
 
     frame.end= NEW_END;
     
+    return frame;
+}
+
+FRAME_T frameMaker_SET_ELEM_MODE(byte origin, std::vector<byte>targetin, byte mode)
+{
+    FRAME_T frame;
+
+        // implementar cositas
+    memset(&frame, 0, sizeof(FRAME_T));
+    
+    frame.data.resize(L_SET_ELEM_MODE);
+
+    frame.start= NEW_START;
+   
+    uint16_t  frameLength = 0x07 + targetin.size() + L_SET_ELEM_MODE;
+
+    frame.frameLengthLsb = frameLength & 0xFF;        // Máscara para obtener los 8 bits menos significativos
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+   
+    frame.origin= origin;
+
+    frame.numTargets = targetin.size();
+    frame.target= targetin;
+
+    frame.function= F_SET_ELEM_MODE;
+
+    frame.dataLengthMsb = (L_SET_ELEM_MODE >> 8) & 0xFF; // MSB (siempre será 0x00 para valores < 256)
+    frame.dataLengthLsb = L_SET_ELEM_MODE & 0xFF;   
+
+    frame.data[0]= mode;
+    frame.checksum= checksum_calc(frame);
+
+    frame.end= NEW_END;
+
+    return frame;
+}
+
+FRAME_T frameMaker_REQ_ELEM_INFO(byte origin, byte targetin){
+ FRAME_T frame;
+
+        // implementar cositas
+    memset(&frame, 0, sizeof(FRAME_T));
+    
+    frame.data.resize(L_REQ_ELEM_INFO);
+
+    frame.start= NEW_START;
+   
+    uint16_t  frameLength = 0x08 + L_REQ_ELEM_INFO;
+
+    frame.frameLengthLsb = frameLength & 0xFF;        // Máscara para obtener los 8 bits menos significativos
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+   
+    frame.origin= origin;
+
+    frame.numTargets = 0x01;
+    frame.target.push_back(targetin);
+
+    frame.function= F_REQ_ELEM_INFO;
+
+    frame.dataLengthMsb = (L_REQ_ELEM_INFO >> 8) & 0xFF; // MSB (siempre será 0x00 para valores < 256)
+    frame.dataLengthLsb = L_REQ_ELEM_INFO & 0xFF;   
+
+   
+    frame.checksum= checksum_calc(frame);
+
+    frame.end= NEW_END;
+
     return frame;
 }
 
