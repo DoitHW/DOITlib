@@ -84,6 +84,12 @@ class COLORHANDLER_ {
         void begin(int numLeds);
         CRGB get_CRGB_from_colorList(int index);
 
+        void set_is_paused        (bool pau);
+        bool get_is_paused        ();
+
+        void set_passive          (bool pas);
+        bool get_passive          ();
+
         void set_targetColor      (CRGB color);
         void set_targetFade       (uint16_t fade);
         void set_targetBrightness (byte brightness);
@@ -98,6 +104,8 @@ class COLORHANDLER_ {
 
     int numLeds;
 
+    bool paused;
+    bool passive;
     CRGB startColor;
     CRGB currentColor;
     CRGB targetColor;

@@ -115,7 +115,7 @@
 
 #define NORMAL_FADE           0x3FFF  // original
 #define SLOWEST_FADE          0xC8
-#define FASTEST_FADE          0xFF
+#define FASTEST_FADE          0x0F
 #define SLOW_FADE             0x32
 #define SLOWER_FADE           0x64
 

@@ -30,7 +30,9 @@ void ELEMENT_::begin() {
 
     // Montar SPIFFS
     if (!SPIFFS.begin(true)) {
-        Serial.println("Error al montar SPIFFS. Reiniciando.");
+                                                #ifdef DEBUG
+                                                    Serial.println("Error al montar SPIFFS. Reiniciando.");
+                                                #endif
         return;
     }
 
@@ -38,7 +40,9 @@ void ELEMENT_::begin() {
     if (SPIFFS.exists(ELEMENT_CONFIG_FILE_PATH)) {
         File configFile = SPIFFS.open(ELEMENT_CONFIG_FILE_PATH, "r+");
         if (!configFile) {
-            Serial.println("Error al abrir el archivo de configuración existente.");
+                                                #ifdef DEBUG
+                                                Serial.println("Error al abrir el archivo de configuración existente.");
+                                                #endif
             return;
         }
 
@@ -46,7 +50,9 @@ void ELEMENT_::begin() {
         byte protectedID_ = configFile.readStringUntil('\n').toInt();
 
         if (protectedID_ == 0) {
-            Serial.println("Archivo no inicializado. Estableciendo valores predeterminados.");
+                                                #ifdef DEBUG
+                                                Serial.println("Archivo no inicializado. Estableciendo valores predeterminados.");
+                                                #endif
             configFile.seek(0); // Volver al inicio del archivo
             configFile.println("1"); // Marcar protectedID_ como 1
 
@@ -62,23 +68,24 @@ void ELEMENT_::begin() {
             configFile.println("0"); // workedTime
             configFile.flush();
         } else {
-            Serial.println("Archivo ya inicializado.");
+                                                    #ifdef DEBUG
+                                                    Serial.println("Archivo ya inicializado.");
+                                                    #endif
         }
-
-        // Leer los valores de configuración
         ID = configFile.readStringUntil('\n').toInt();
         onStartTime = configFile.readStringUntil('\n').toInt();
         workedTime = configFile.readStringUntil('\n').toInt();
-
-        // Depuración de los valores leídos
-        Serial.println("ID en ROM: " + String(ID));
-        Serial.println("Tiempo de vida acumulado: " + String(onStartTime));
-        Serial.println("Tiempo de trabajo acumulado: " + String(workedTime));
+                                                    #ifdef DEBUG
+                                                    Serial.println("ID en ROM: " + String(ID));
+                                                    Serial.println("Tiempo de vida acumulado: " + String(onStartTime));
+                                                    Serial.println("Tiempo de trabajo acumulado: " + String(workedTime));
+                                                    #endif
 
         configFile.close();
     } else {
-        // Crear un archivo nuevo si no existe
-        Serial.println("Archivo no encontrado. Creando nuevo archivo.");
+                                                    #ifdef DEBUG    
+                                                    Serial.println("Archivo no encontrado. Creando nuevo archivo.");
+                                                    #endif
         File configFile = SPIFFS.open(ELEMENT_CONFIG_FILE_PATH, "w");
         if (configFile) {
             configFile.println("1"); // protectedID_
@@ -92,13 +99,15 @@ void ELEMENT_::begin() {
             configFile.flush();
             configFile.close();
         } else {
-            Serial.println("Error al crear el archivo de configuración.");
+                                                        #ifdef DEBUG
+                                                        Serial.println("Error al crear el archivo de configuración.");
+                                                        #endif
         }
     }
 
-    #ifdef DEBUG
-        Serial.println("Configuración inicial completada.");
-    #endif
+                                                            #ifdef DEBUG
+                                                                Serial.println("Configuración inicial completada.");
+                                                            #endif
 }
 
 
