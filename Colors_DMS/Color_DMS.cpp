@@ -82,7 +82,7 @@ bool color_mix_handler(int color1, int color2, byte *resultado) {
 
 
 
-COLORHANDLER_::COLORHANDLER_() : leds(nullptr), numLeds(0),startColor(CRGB::Black), currentColor(CRGB::Black), 
+COLORHANDLER_::COLORHANDLER_() : leds(nullptr), numLeds(0), paused(false), passive(false), startColor(CRGB::Black), currentColor(CRGB::Black), 
                                   targetColor(CRGB::Black), targetBrightness(255),
                                   currentBrightness(255), targetFade(1000), 
                                   lastUpdateTime(0), transitionStartTime(0), transitioning(false) {}
@@ -121,31 +121,95 @@ CRGB COLORHANDLER_::get_CRGB_from_colorList(int index) {
     return CRGB(listaColores[index]);
 }
 
+void COLORHANDLER_::set_passive(bool pas){
+  passive= pas;
+}
 
-void COLORHANDLER_::action_frank(){
+bool COLORHANDLER_::get_passive(){
+  return passive;
+}
 
-  if(!transitioning) return;
-  unsigned long currentTime= millis();
-  unsigned long elapsedTime= currentTime - transitionStartTime;
+void COLORHANDLER_::set_is_paused(bool pau){
+  paused= pau;
+}
 
-  if(elapsedTime >= targetFade){
+bool COLORHANDLER_::get_is_paused(){
+  return paused;
+}
+
+void COLORHANDLER_::action_frank() {
+  // Check if in passive mode first
+  if (colorHandler.get_passive()) {
+    static int currentPassiveColorIndex = 9; // Start from position 9
+    static unsigned long lastColorChangeTime = 0;
+    static unsigned long pauseStartTime = 0;
+    static bool forcedColorChange = false;
+
+    unsigned long currentTime = millis();
+
+    // Check if color change is paused
+    if (colorHandler.get_is_paused()) {
+      // If not already tracking pause, start pause timing
+      if (pauseStartTime == 0) {
+        pauseStartTime = currentTime;
+      }
+      return; // Exit the function, keeping the current color
+    }
+    else {
+      // If we were previously paused, prepare to change to next color
+      if (pauseStartTime > 0) {
+        pauseStartTime = 0;
+        forcedColorChange = true;
+      }
+    }
+
+    // Check if it's time to change to the next color (5 seconds total transition time)
+    if (forcedColorChange || (currentTime - lastColorChangeTime >= 5000)) {
+      // Move to the next color in the list (stop at position 35)
+      currentPassiveColorIndex++;
+      if (currentPassiveColorIndex > 35) {
+        currentPassiveColorIndex = 9;
+      }
+      
+      // Set start and target colors for transition
+      startColor = currentColor;
+      targetColor = listaColores[currentPassiveColorIndex];
+      
+      // Reset transition parameters
+      transitionStartTime = currentTime;
+      targetFade = 5000; // 5-second transition
+      transitioning = true;
+      
+      // Update last color change time
+      lastColorChangeTime = currentTime;
+      
+      // Reset forced change flag
+      forcedColorChange = false;
+    }
+  }
+
+  // Original transition logic
+  if (!transitioning) return;
+  
+  unsigned long currentTime = millis();
+  unsigned long elapsedTime = currentTime - transitionStartTime;
+
+  if (elapsedTime >= targetFade) {
     fill_solid(colorHandler.leds, 1, targetColor);
     FastLED.show();
-    currentColor= targetColor;
-    startColor= currentColor;
-    transitioning= false;
+    currentColor = targetColor;
+    startColor = currentColor;
+    transitioning = false;
     return;
   }
-  else{
+  else {
     Serial.println(targetFade);
-    byte progress= map(elapsedTime, 0, targetFade, 0, 255);
-    currentColor= blend(startColor, targetColor, progress);
+    byte progress = map(elapsedTime, 0, targetFade, 0, 255);
+    currentColor = blend(startColor, targetColor, progress);
     fill_solid(colorHandler.leds, 1, currentColor);
     FastLED.show();
   }
-
 }
-
 
 void COLORHANDLER_::action() {
     unsigned long currentTime = millis();

@@ -209,9 +209,14 @@ void send_frame(const FRAME_T &framein) {
     Serial1.write(framein.end);
 }
 
+byte get_brightness_from_sensorValue(LAST_ENTRY_FRAME_T LEFin) {
 
-byte get_mapped_sensor_value(byte minMSB, byte minLSB, byte maxMSB, byte maxLSB, byte valMSB, byte valLSB) {
-
+    byte minMSB= LEFin.data[5];
+    byte minLSB= LEFin.data[4];
+    byte maxMSB= LEFin.data[3];
+    byte maxLSB= LEFin.data[2];
+    byte valMSB= LEFin.data[1];
+    byte valLSB= LEFin.data[0];
     uint16_t minVal = (minMSB << 8) | minLSB;
     uint16_t maxVal = (maxMSB << 8) | maxLSB;
     uint16_t currentVal = (valMSB << 8) | valLSB;
@@ -223,7 +228,26 @@ byte get_mapped_sensor_value(byte minMSB, byte minLSB, byte maxMSB, byte maxLSB,
     return (val > 255) ? 255 : val;
 }
 
-FRAME_T frameMaker_RETURN_ELEM_STATE(byte targetin, INFO_STATE_T infoState){
+byte get_color_from_sensorValue(LAST_ENTRY_FRAME_T LEFin) {
+    byte minMSB = LEFin.data[5];
+    byte minLSB = LEFin.data[4];
+    byte maxMSB = LEFin.data[3];
+    byte maxLSB = LEFin.data[2];
+    byte valMSB = LEFin.data[1];
+    byte valLSB = LEFin.data[0];
+    uint16_t minVal = (minMSB << 8) | minLSB;
+    uint16_t maxVal = (maxMSB << 8) | maxLSB;
+    uint16_t currentVal = (valMSB << 8) | valLSB;
+    uint16_t totalRange = maxVal - minVal;
+    uint16_t valuePos = currentVal - minVal;
+    uint16_t val = ((valuePos * 26UL) / totalRange) + 10;
+    if (val < 10) return 10;
+    if (val > 36) return 36;
+    return val;
+}
+
+
+FRAME_T frameMaker_RETURN_ELEM_STATE(byte originin, byte targetin, INFO_STATE_T infoState){
 
     FRAME_T frame;
     uint16_t length = 0x06 + 0x01 + L_RETURN_ELEM_STATE;

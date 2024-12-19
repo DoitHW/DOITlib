@@ -104,6 +104,9 @@ void send_frame                              (const FRAME_T &framein);
 
 byte get_mapped_sensor_value(byte minMSB, byte minLSB, byte maxLSB, byte maxMSB, byte valLSB, byte valMSB);
 
+byte get_brightness_from_sensorValue(LAST_ENTRY_FRAME_T LEFin);
+byte get_color_from_sensorValue(LAST_ENTRY_FRAME_T LEFin);
+
 FRAME_T frameMaker_REQ_ELEM_INFO       (byte targetin, INFO_PACK_T infoPack);
 FRAME_T frameMaker_SEND_COLOR          (std::vector<byte>targetin, byte color);
 FRAME_T frameMaker_RETURN_ELEM_INFO    (byte targetin, INFO_PACK_T infoPack);

@@ -34,7 +34,7 @@ class LEDSTRIP_ : public ELEMENT_{
 
         void inic_elem_config()override;
         void RX_main_handler(LAST_ENTRY_FRAME_T LEF)override;
-        void element_action()override;
+
 
 };
 

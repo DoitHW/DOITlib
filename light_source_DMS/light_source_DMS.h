@@ -30,9 +30,8 @@ class LIGHTSOURCE_ : public ELEMENT_{
             set_type(TYPE_LIGHTSOURCE);
         }
 
-        void inic_elem_config()override;
+
         void RX_main_handler(LAST_ENTRY_FRAME_T LEF)override;
-        void element_action()override;
 };
 
 
