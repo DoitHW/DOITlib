@@ -6,13 +6,12 @@
 #include <Arduino.h>
 
 
-extern LAST_ENTRY_FRAME_T LEF;
+extern LAST_ENTRY_FRAME_T            LEF;
 
-volatile bool startFrameReceived = false;
-volatile bool frameInProgress = false;
-volatile bool partialFrameReceived = false;
-volatile bool frameReceived = false;
-
+volatile bool startFrameReceived=    false;
+volatile bool frameInProgress=       false;
+volatile bool partialFrameReceived=  false;
+volatile bool frameReceived=         false;
 
 std::vector<byte> uartBuffer;
 
@@ -107,7 +106,7 @@ void IRAM_ATTR onUartInterrupt() {
 
                             for (uint8_t i = 0; i < numTargets; i++) {
                                 uint8_t targetID = uartBuffer[5 + i];
-                                if (targetID == element->get_ID() || targetID == BROADCAST) {
+                                if (targetID == globalID || targetID == BROADCAST) {
                                     isTarget = true;
                                     break;
                                 }
@@ -228,6 +227,7 @@ byte get_brightness_from_sensorValue(LAST_ENTRY_FRAME_T LEFin) {
     return (val > 255) ? 255 : val;
 }
 
+<<<<<<< HEAD
 byte get_color_from_sensorValue(LAST_ENTRY_FRAME_T LEFin) {
     byte minMSB = LEFin.data[5];
     byte minLSB = LEFin.data[4];
@@ -248,6 +248,9 @@ byte get_color_from_sensorValue(LAST_ENTRY_FRAME_T LEFin) {
 
 
 FRAME_T frameMaker_RETURN_ELEM_STATE(byte originin, byte targetin, INFO_STATE_T infoState){
+=======
+FRAME_T frameMaker_RETURN_ELEM_STATE(byte origin, byte targetin, INFO_STATE_T infoState){
+>>>>>>> b32d5fb751c354c1982db93e775c869ec7a31f89
 
     FRAME_T frame;
     uint16_t length = 0x06 + 0x01 + L_RETURN_ELEM_STATE;
@@ -256,7 +259,7 @@ FRAME_T frameMaker_RETURN_ELEM_STATE(byte originin, byte targetin, INFO_STATE_T 
     frame.start= NEW_START;
     frame.frameLengthMsb= (length >> 8) & 0xFF;
     frame.frameLengthLsb= length & 0xFF;
-    frame.origin= element->get_ID();
+    frame.origin= origin; //frame.origin= element->get_ID();
     frame.numTargets= 0x01;
     frame.target.push_back(targetin);
     frame.function= F_RETURN_ELEM_STATE;
@@ -291,25 +294,25 @@ FRAME_T frameMaker_RETURN_ELEM_STATE(byte originin, byte targetin, INFO_STATE_T 
 }
 
 
-FRAME_T frameMaker_RETURN_ELEM_INFO(byte targetin, INFO_PACK_T infoPack){
+FRAME_T frameMaker_RETURN_ELEM_INFO(byte origin, byte targetin, INFO_PACK_T infoPack){
 
     FRAME_T frame;
     uint16_t dataLength = L_REQ_ELEM_STATE;
 
     uint16_t length= 0x06 + 0x01 + L_RETURN_ELEM_INFO;
-    frame.start= NEW_START;
+    frame.start=          NEW_START;
     frame.frameLengthMsb= (length >> 8) & 0xFF;
     frame.frameLengthLsb= length & 0xFF;
-    frame.origin= element->get_ID();
-    frame.numTargets= 0x01;
+    frame.origin=         origin; //frame.origin= element->get_ID();
+    frame.numTargets=     0x01;
     frame.target.push_back(targetin);
-    frame.function= F_RETURN_ELEM_INFO;
+    frame.function=       F_RETURN_ELEM_INFO;
     frame.dataLengthMsb = (dataLength >> 8) & 0xFF;
     frame.dataLengthLsb = dataLength & 0xFF;
     frame.data.reserve(sizeof(infoPack));
-    frame.data.insert(frame.data.end(), 
-                     infoPack.name, 
-                     infoPack.name + sizeof(infoPack.name));
+    frame.data.insert(frame.data.end(),
+                      infoPack.name,
+                      infoPack.name + sizeof(infoPack.name));
     frame.data.insert(frame.data.end(), 
                      infoPack.desc, 
                      infoPack.desc + sizeof(infoPack.desc));
@@ -344,6 +347,32 @@ FRAME_T frameMaker_SEND_COLOR(std::vector<byte>targetin, byte color){
 
     FRAME_T frame;
     // implementar cositas
+    memset(&frame, 0, sizeof(FRAME_T));
+    
+    frame.data.resize(L_SEND_COLOR);
+
+    frame.start= NEW_START;
+   
+    uint16_t  frameLength = 0x07 + targetin.size() + L_SEND_COLOR;
+
+    frame.frameLengthLsb = frameLength & 0xFF;        // Máscara para obtener los 8 bits menos significativos
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+   
+    frame.origin= DEFAULT_BOTONERA;
+
+    frame.numTargets = targetin.size();
+    frame.target= targetin;
+
+    frame.function= F_SEND_COLOR;
+
+    frame.dataLengthMsb = (L_SEND_COLOR >> 8) & 0xFF; // MSB (siempre será 0x00 para valores < 256)
+    frame.dataLengthLsb = L_SEND_COLOR & 0xFF;   
+
+    frame.data[0]= color;
+    frame.checksum= checksum_calc(frame);
+
+    frame.end= NEW_END;
+    
     return frame;
 }
 
