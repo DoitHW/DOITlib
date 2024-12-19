@@ -50,7 +50,7 @@ class ELEMENT_ {
     protected:
         virtual void  inic_elem_config(){}
         virtual void  RX_main_handler(LAST_ENTRY_FRAME_T LEF){}
-        virtual void  element_action(){}
+    
 
 
         uint8_t  name[24];      

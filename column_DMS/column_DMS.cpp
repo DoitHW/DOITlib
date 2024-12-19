@@ -162,11 +162,3 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
                                                                 #endif
 }
 
-
-
-
-void COLUMN_::element_action(){
-
-
-
-}

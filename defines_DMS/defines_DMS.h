@@ -236,6 +236,7 @@
 
 #define DEFAULT_BASIC_MODE      0x01
 
+#define TYPE_BOTONERA       0xAB
 #define TYPE_COLUMN         0x01
 #define TYPE_LIGHTSOURCE    0x02
 #define TYPE_LEDSTRIP       0x03
@@ -254,6 +255,13 @@
 #define COLUMN_NUM_LEDS      1
 #define COLUMN_LED_DATA_PIN 21
 #define COLUMN_RELAY_PIN    42
+
+// DEFINES BOTONERA
+#define BOTONERA_NUM_LEDS      9
+#define BOTONERA_LED_DATA_PIN 21
+
+
+
 
 enum COLUMN_MODE_LIST{
     COLUMN_CONTEST_MODE= 0,

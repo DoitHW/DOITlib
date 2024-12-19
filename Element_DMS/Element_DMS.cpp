@@ -21,8 +21,7 @@ ELEMENT_::ELEMENT_(uint16_t serialNumber){
 
 void ELEMENT_::begin() {
     Serial.begin(115200);
-    Serial.println("ATENCION!!!!!!!!!!!!!!!!!!!");
-
+    Serial.println("Iniciando...");
     Serial1.begin(RF_BAUD_RATE, SERIAL_8N1, RF_RX_PIN, RF_TX_PIN);
     Serial1.onReceive(onUartInterrupt);
     pinMode(RF_CONFIG_PIN, OUTPUT);
