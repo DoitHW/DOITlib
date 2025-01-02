@@ -7,6 +7,7 @@
 #include <Arduino.h>
 #include <stdint.h>
 #include <vector>
+#include <FastLED.h>
 
 extern volatile bool startFrameReceived;
 extern volatile bool frameInProgress;
@@ -76,19 +77,17 @@ struct INFO_PACK_T{
     byte ID;
     byte currentMode;
     MODE_T mode[16];
-    uint16_t icono[64][64];
+    // uint16_t icono[64][64];
 };
 
 struct INFO_STATE_T{
     
     byte exclusiveOrigins; // indica si esta configurado para atender exclusivamente a una ID
-    byte protectedID;   // indica si la ID ha sido configurada por botonera
     byte currentMode;   
     byte settedFlags;   // indica que flags / reles estan activados
-    byte colorFlag;     // indica si esta en un color basico
-    byte currentColor;  
-    byte customColorFlag;   // indica si esta en un color RGB
-    COLOR_T customCurrentColor;
+    byte currentRed;
+    byte currentGreen;
+    byte currentBlue; 
     byte serialNum[2]; 
     byte workingTime[4]; 
     byte lifeTime[4];
@@ -102,26 +101,13 @@ void send_frame                              (const FRAME_T &framein);
 
 byte get_mapped_sensor_value(byte minMSB, byte minLSB, byte maxLSB, byte maxMSB, byte valLSB, byte valMSB);
 
-<<<<<<< HEAD
 byte get_brightness_from_sensorValue(LAST_ENTRY_FRAME_T LEFin);
 byte get_color_from_sensorValue(LAST_ENTRY_FRAME_T LEFin);
 
 FRAME_T frameMaker_REQ_ELEM_INFO       (byte targetin, INFO_PACK_T infoPack);
 FRAME_T frameMaker_SEND_COLOR          (std::vector<byte>targetin, byte color);
-FRAME_T frameMaker_RETURN_ELEM_INFO    (byte targetin, INFO_PACK_T infoPack);
-FRAME_T frameMaker_RETURN_ELEM_STATE   (byte targetin, INFO_STATE_T infoState);
-
-
-=======
-FRAME_T frameMaker_REQ_ELEM_INFO       (byte targetin, INFO_PACK_T  infoPack);
-FRAME_T frameMaker_SEND_COLOR          (std::vector<byte>targetin,  byte color);
-FRAME_T frameMaker_RETURN_ELEM_INFO    (byte origin, byte targetin, INFO_PACK_T infoPack);
-FRAME_T frameMaker_RETURN_ELEM_STATE   (byte origin, byte targetin, INFO_STATE_T infoState);
->>>>>>> b32d5fb751c354c1982db93e775c869ec7a31f89
-
-
-void sergi_truchilla();
-
+FRAME_T frameMaker_RETURN_ELEM_INFO    (byte originin, byte targetin, INFO_PACK_T infoPack);
+FRAME_T frameMaker_RETURN_ELEM_STATE   (byte originin, byte targetin, INFO_STATE_T infoState);
 
 
 

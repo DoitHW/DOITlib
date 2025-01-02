@@ -47,8 +47,8 @@ enum MODE_CONFIGS{
     NOP_3
 };
 
-String get_string_from_info_DB(byte typein, byte fieldin, byte languajein);
-uint16_t get_config_flag_mode(byte typein, byte modein);
+String get_string_from_info_DB(byte fieldin, byte languajein);
+uint16_t get_config_flag_mode(byte modein);
 uint16_t get_info_num(int count, ...);
 
 #endif

@@ -33,10 +33,10 @@
 */
 
 //DELFINES SUPER GLOBALES
-                                                #define COLUMNA 
+                                                #define WALLWASHER
                       
                                                 #define NORESET_FILE
-                                                #define SERIAL_NUM (uint16_t) 0xF000
+                                                #define SERIAL_NUM (uint16_t) 0xF001
                                                 #define DEBUG
                                                 #define DEFAULT_CONFIG    true
                                                 #define CUSTOM_ID_INIC    false
@@ -75,7 +75,7 @@
 #define F_REQ_ELEM_INFO       0xA1  
 #define L_REQ_ELEM_INFO       0x00
 #define F_REQ_ELEM_STATE      0xA2
-#define L_REQ_ELEM_STATE      0x00
+#define L_REQ_ELEM_STATE      0x00 // OJO
 
 #define F_SET_ELEM_ID         0xB1
 #define L_SET_ELEM_ID         0x01
@@ -106,15 +106,15 @@
 #define F_RETURN_ELEM_INFO    0xD1    
 #define L_RETURN_ELEM_INFO    0x2E7C  // OJITO que es mas grande que ROCIO JURADO.
 #define F_RETURN_ELEM_STATE   0xD2
-#define L_RETURN_ELEM_STATE   0x17
+#define L_RETURN_ELEM_STATE   0x10
 #define F_RETURN_ELEM_ERROR   0xDE
 #define L_RETURN_ELEM_ERROR   0x60 
 
 #define MIN_DEAF_TIME         0x01  
 #define MAX_DEAF_TIME         0x05 
 
-#define NORMAL_FADE           0x3FFF  // original
-#define SLOWEST_FADE          0xC8
+#define NORMAL_FADE           0x4FF  // original
+#define SLOWEST_FADE          0x13FF
 #define FASTEST_FADE          0x0F
 #define SLOW_FADE             0x32
 #define SLOWER_FADE           0x64
@@ -250,33 +250,47 @@
 #define TYPE_CURTAIN        0x0C
 #define GENERIC_TYPE        0x00 
 
+
+#define RELAY_1_FLAG     0x00
+#define RELAY_2_FLAG     0x01
+// ETC
+
+#define SET_RELAY        0x01
+#define RESET_RELAY      0x00
+
 // DEFINES COLUMNA
 #define COLUMN_NUM_LEDS      1
 #define COLUMN_LED_DATA_PIN 21
 #define COLUMN_RELAY_PIN    42
 
+// DEFINES LEDSTRIPS
+
+#define LEDSTRIP_NUM_LEDS     33
+#define LEDSTRIP_LED_DATA_PIN 21
+
 enum COLUMN_MODE_LIST{
     COLUMN_CONTEST_MODE= 0,
     COLUMN_BASIC_MODE,
-    COLUMN_FAST_MODE,
+    COLUMN_SLOW_MODE,
     COLUMN_MOTION_MODE,
     COLUMN_RB_MOTION_MODE,
     COLUMN_MIX_MODE,
     COLUMN_PASSIVE_MODE
 };
-// 
 
-// DEFINES LIGHTSOURCE
-#define LIGHTSOURCE_LED_DATA_PIN 0x02
-#define LIGHTSOURCE_NUM_STRIPS   0x01
-#define LIGHTSOURCE_LEDS_X_STRIP 0x0C
-#define LIGHTSOURCE_NUM_LEDS    (LIGHTSOURCE_NUM_STRIPS * LIGHTSOURCE_LEDS_X_STRIP)
+enum LEDSTRIP_MODE_LIST{
+    LEDSTRIP_CONTEST_MODE= 0,
+    LEDSTRIP_BASIC_MODE,
+    LEDSTRIP_SLOW_MODE,
+    LEDSTRIP_MOTION_MODE,
+    LEDSTRIP_RB_MOTION_MODE,
+    LEDSTRIP_MIX_MODE,
+    LEDSTRIP_PASSIVE_MODE,
+    LEDSTRIP_TEST_ZONE_MODE // OJO BORRAR
+};
+
 
 //
-
-
-
-
 
 
 
