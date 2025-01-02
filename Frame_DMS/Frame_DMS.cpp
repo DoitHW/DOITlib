@@ -103,10 +103,10 @@ void IRAM_ATTR onUartInterrupt() {
                             // Verificar destinatarios
                             uint8_t numTargets = uartBuffer[4];
                             bool isTarget = false;
-
+                            //byte Xmanager= element->get_manager();
                             for (uint8_t i = 0; i < numTargets; i++) {
                                 uint8_t targetID = uartBuffer[5 + i];
-                                if (targetID == globalID || targetID == BROADCAST) {
+                                if (targetID == globalID || targetID == BROADCAST)  {
                                     isTarget = true;
                                     break;
                                 }
@@ -182,9 +182,7 @@ byte checksum_calc(const FRAME_T &framein) {
 LAST_ENTRY_FRAME_T extract_info_from_frameIn(std::vector<byte> vectorin) {
     LAST_ENTRY_FRAME_T LEF;
     LEF.origin = vectorin[3]; 
-
     LEF.function = vectorin[5 + vectorin[4]];
-
     int dataLength = (vectorin[5 + vectorin[4] + 1] << 8) | vectorin[5 + vectorin[4] + 2];
     for (int i = 0; i < dataLength; i++)  LEF.data.push_back(vectorin[5 + vectorin[4] + 3 + i]);
 
@@ -259,42 +257,38 @@ byte get_color_from_sensorValue(LAST_ENTRY_FRAME_T LEFin) {
     return val;
 }
 
-FRAME_T frameMaker_RETURN_ELEM_STATE(byte origin, byte targetin, INFO_STATE_T infoState){
+
+FRAME_T frameMaker_RETURN_ELEM_STATE(byte originin, byte targetin, INFO_STATE_T infoState){
 
     FRAME_T frame;
     uint16_t length = 0x06 + 0x01 + L_RETURN_ELEM_STATE;
-    uint16_t dataLength = L_REQ_ELEM_STATE;
+    uint16_t dataLength = L_RETURN_ELEM_STATE;
 
     frame.start= NEW_START;
     frame.frameLengthMsb= (length >> 8) & 0xFF;
     frame.frameLengthLsb= length & 0xFF;
-    frame.origin= origin; //frame.origin= element->get_ID();
+    frame.origin= originin; //frame.origin= element->get_ID();
     frame.numTargets= 0x01;
     frame.target.push_back(targetin);
     frame.function= F_RETURN_ELEM_STATE;
     frame.dataLengthMsb = (dataLength >> 8) & 0xFF;
     frame.dataLengthLsb = dataLength & 0xFF;
     frame.data.push_back(infoState.exclusiveOrigins);
-    frame.data.push_back(infoState.protectedID);
     frame.data.push_back(infoState.currentMode);
     frame.data.push_back(infoState.settedFlags);
-    frame.data.push_back(infoState.currentColor);
-    frame.data.push_back(infoState.customColorFlag);
-    frame.data.push_back(infoState.customCurrentColor.fade);
-    frame.data.push_back(infoState.customCurrentColor.brightness);
-    frame.data.push_back(infoState.customCurrentColor.red);
-    frame.data.push_back(infoState.customCurrentColor.green);
-    frame.data.push_back(infoState.customCurrentColor.blue);
+    frame.data.push_back(infoState.currentRed);
+    frame.data.push_back(infoState.currentGreen);
+    frame.data.push_back(infoState.currentBlue);
     frame.data.push_back(infoState.serialNum[0]);
     frame.data.push_back(infoState.serialNum[1]);
-    frame.data.push_back(infoState.workingTime[0]);
-    frame.data.push_back(infoState.workingTime[1]);
-    frame.data.push_back(infoState.workingTime[2]);
-    frame.data.push_back(infoState.workingTime[3]);
     frame.data.push_back(infoState.lifeTime[0]);
     frame.data.push_back(infoState.lifeTime[1]);
     frame.data.push_back(infoState.lifeTime[2]);
     frame.data.push_back(infoState.lifeTime[3]);
+    frame.data.push_back(infoState.workingTime[0]);
+    frame.data.push_back(infoState.workingTime[1]);
+    frame.data.push_back(infoState.workingTime[2]);
+    frame.data.push_back(infoState.workingTime[3]);
     frame.checksum= checksum_calc(frame);  // OJO
     frame.end= NEW_END;
 
@@ -306,9 +300,9 @@ FRAME_T frameMaker_RETURN_ELEM_STATE(byte origin, byte targetin, INFO_STATE_T in
 FRAME_T frameMaker_RETURN_ELEM_INFO(byte origin, byte targetin, INFO_PACK_T infoPack){
 
     FRAME_T frame;
-    uint16_t dataLength = L_REQ_ELEM_STATE;
-
+    uint16_t dataLength = L_RETURN_ELEM_INFO;
     uint16_t length= 0x06 + 0x01 + L_RETURN_ELEM_INFO;
+
     frame.start=          NEW_START;
     frame.frameLengthMsb= (length >> 8) & 0xFF;
     frame.frameLengthLsb= length & 0xFF;
@@ -338,21 +332,21 @@ FRAME_T frameMaker_RETURN_ELEM_INFO(byte origin, byte targetin, INFO_PACK_T info
                         infoPack.mode[i].config, 
                         infoPack.mode[i].config + 2);
     }
-    for (int i = 0; i < 64; i++) {
-        for (int j = 0; j < 60; j++) {
-            byte byteAlto = (infoPack.icono[i][j] >> 8) & 0xFF;
-            byte byteBajo = infoPack.icono[i][j] & 0xFF;
-            frame.data.push_back(byteAlto);
-            frame.data.push_back(byteBajo);
-        }
-    }
-    frame.checksum= checksum_calc(frame);  // OJO
+    // for (int i = 0; i < 64; i++) {
+    //     for (int j = 0; j < 60; j++) {
+    //         byte byteAlto = (infoPack.icono[i][j] >> 8) & 0xFF;
+    //         byte byteBajo = infoPack.icono[i][j] & 0xFF;
+    //         frame.data.push_back(byteAlto);
+    //         frame.data.push_back(byteBajo);
+    //     }
+    // }
+    frame.checksum= checksum_calc(frame); 
     frame.end= NEW_END;
 
     return frame;
 }
 
-FRAME_T frameMaker_SEND_COLOR(std::vector<byte>targetin, byte color){
+FRAME_T frameMaker_SEND_COLOR(byte originin, std::vector<byte>targetin, byte color){
 
     FRAME_T frame;
     // implementar cositas
@@ -367,7 +361,7 @@ FRAME_T frameMaker_SEND_COLOR(std::vector<byte>targetin, byte color){
     frame.frameLengthLsb = frameLength & 0xFF;        // Máscara para obtener los 8 bits menos significativos
     frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
    
-    frame.origin= DEFAULT_BOTONERA;
+    frame.origin= originin;
 
     frame.numTargets = targetin.size();
     frame.target= targetin;
@@ -384,6 +378,39 @@ FRAME_T frameMaker_SEND_COLOR(std::vector<byte>targetin, byte color){
     
     return frame;
 }
+
+FRAME_T frameMaker_SEND_FLAG_BYTE      (byte originin, std::vector<byte>targetin, byte flag){
+   FRAME_T frame;
+    // implementar cositas
+    memset(&frame, 0, sizeof(FRAME_T));
+    
+    frame.data.resize(L_SEND_FLAG_BYTE);
+
+    frame.start= NEW_START;
+   
+    uint16_t  frameLength = 0x07 + targetin.size() + L_SEND_FLAG_BYTE;
+
+    frame.frameLengthLsb = frameLength & 0xFF;        // Máscara para obtener los 8 bits menos significativos
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+   
+    frame.origin= originin;
+
+    frame.numTargets = targetin.size();
+    frame.target= targetin;
+
+    frame.function= F_SEND_FLAG_BYTE;
+
+    frame.dataLengthMsb = (L_SEND_FLAG_BYTE >> 8) & 0xFF; // MSB (siempre será 0x00 para valores < 256)
+    frame.dataLengthLsb = L_SEND_FLAG_BYTE & 0xFF;   
+
+    frame.data[0]= flag;
+    frame.checksum= checksum_calc(frame);
+
+    frame.end= NEW_END;
+    
+    return frame;
+}
+
 
 FRAME_T frameMaker_SET_ELEM_MODE(byte origin, std::vector<byte>targetin, byte mode)
 {

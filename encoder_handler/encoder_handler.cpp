@@ -137,10 +137,10 @@ void handleEncoder() {
                 // Mostrar mensaje en el monitor serial
                 if (selectedStates[currentIndex]) {
                     Serial.printf("Enviando color blanco a la ID %d\n", elementID[0]);
-                    send_frame(frameMaker_SEND_COLOR(elementID, 0x00)); // Enviar color blanco
+                    send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA,elementID, 0x00)); // Enviar color blanco
                 } else {
                     Serial.printf("Enviando color negro a la ID %d\n", elementID[0]);
-                    send_frame(frameMaker_SEND_COLOR(elementID, 0x08)); // Enviar color negro
+                    send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA,elementID, 0x08)); // Enviar color negro
                 }
 
                 drawCurrentElement(); // Redibuja el elemento actual

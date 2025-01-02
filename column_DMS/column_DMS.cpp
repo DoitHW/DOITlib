@@ -52,12 +52,44 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
     Serial.println("Inicio de RX_main_handler");
     UBaseType_t stackSize = uxTaskGetStackHighWaterMark(NULL);
                                                             #ifdef DEBUG
-                                                                Serial.println("Stack restante: " + String(stackSize));
+                                                               Serial.println("Stack restante: " + String(stackSize));
                                                             #endif
 
     byte currentMode_ = element->get_currentMode();
 
     switch (LEF.function) {
+
+       case F_REQ_ELEM_INFO:{
+            INFO_PACK_T info= get_info_pack(LEF.data[0]);
+            FRAME_T frame= frameMaker_RETURN_ELEM_INFO(element->ID, LEF.origin, info);
+            send_frame(frame);
+                                                        #ifdef DEBUG
+                                                            Serial.println("Info devuelta en un Return");
+                                                        #endif
+            break;
+        }
+        
+        case F_REQ_ELEM_STATE:{
+
+
+            break;
+        }
+
+        case F_SET_ELEM_ID:{
+            element->ID= LEF.data[0];
+            File configFile = SPIFFS.open(ELEMENT_CONFIG_FILE_PATH, "r+");
+            configFile.readStringUntil('\n');
+            configFile.seek(configFile.position());
+            configFile.println(element->ID); 
+            configFile.close();
+            break;
+        }
+
+  /*    case F_SEND_TEST:{
+
+
+            break;
+        }*/
 
         case F_SET_ELEM_MODE:{
             byte mode= LEF.data[0];
@@ -98,12 +130,12 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             colorHandler.transitionStartTime= millis();
             colorHandler.transitioning= true;
             }
-        else if(currentMode_ == COLUMN_FAST_MODE){
+        else if(currentMode_ == COLUMN_SLOW_MODE || currentMode_ == COLUMN_MIX_MODE){
                                                             #ifdef DEBUG
                                                                 Serial.println("Manejando en modo BASIC_MODE.");
                                                             #endif
             colorHandler.set_targetColor(colorin);
-            colorHandler.set_targetFade(FASTEST_FADE);
+            colorHandler.set_targetFade(SLOWEST_FADE);
             colorHandler.set_targetBrightness(MAX_BRIGHTNESS);
             colorHandler.transitionStartTime= millis();
             colorHandler.transitioning= true;
@@ -146,6 +178,44 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             }
             break;
         }
+        case F_SEND_SENSOR_VALUE:{
+                                                            #ifdef DEBUG
+                                                            Serial.println("Se ha recibido un sensor value");
+                                                            #endif
+            if(currentMode_ == COLUMN_MOTION_MODE){
+                byte value= get_brightness_from_sensorValue(LEF);
+                colorHandler.set_targetFade(FASTEST_FADE);
+                colorHandler.set_targetBrightness(value);
+                colorHandler.transitionStartTime= millis();
+                colorHandler.transitioning= true;
+            }
+            else if(currentMode_ == COLUMN_RB_MOTION_MODE){
+                byte value= get_color_from_sensorValue(LEF); 
+                colorHandler.set_targetColor(value);
+                colorHandler.set_targetFade(FASTEST_FADE);
+                colorHandler.set_targetBrightness(MAX_BRIGHTNESS);
+                colorHandler.transitionStartTime= millis();
+                colorHandler.transitioning= true;
+            }
+            break;
+        }
+
+        case F_SEND_FLAG_BYTE:{
+                                                                #ifdef DEBUG
+                                                                    Serial.println(" he recibido un flag byte: " );
+                                                                #endif
+            bool bubbles= LEF.data[0] & 0x01;
+            Serial.println(bubbles);
+            if(bubbles){
+                digitalWrite(COLUMN_RELAY_PIN, HIGH);
+                element->set_flag(RELAY_1_FLAG, SET_RELAY);
+            }
+            else{
+                digitalWrite(COLUMN_RELAY_PIN, LOW);
+                element->set_flag(RELAY_1_FLAG, RESET_RELAY);
+            }
+            break;
+        }
 
         default: {
                                                                 #ifdef DEBUG
@@ -156,9 +226,9 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
     }
 
     // Depuración al final de la función
-    stackSize = uxTaskGetStackHighWaterMark(NULL);
+    stackSize = uxTaskGetStackHighWaterMark(NULL);  // ojo que esto no se que hace, pero si lo quitas se mueren 3 gatitos y 1 peruano.
                                                                 #ifdef DEBUG
-                                                                    Serial.println("Stack restante al final: " + String(stackSize));
+                                                                   Serial.println("Stack restante al final: " + String(stackSize));
                                                                 #endif
 }
 

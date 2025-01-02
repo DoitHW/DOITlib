@@ -10,6 +10,7 @@
 #include <Frame_DMS/Frame_DMS.h>
 #include <FastLED.h>
 #include <vector>
+#include <Colors_DMS/Color_DMS.h>
 
 class ELEMENT_ {
 
@@ -40,13 +41,17 @@ class ELEMENT_ {
         void          set_mode(uint8_t mode);
         byte          get_currentMode();
 
+        void          set_flag(byte flagNum, bool state);
+        byte          get_flag();
+
         byte          get_serialNum(byte ml);
-        INFO_PACK_T   get_info_pack(byte typein, byte languajein);
-        INFO_STATE_T  get_state_pack();
+        INFO_PACK_T   get_info_pack(byte languajein);
+        INFO_STATE_T  get_state_pack(ELEMENT_ &elementin, CRGB colorin);
 
         void          set_default_ID();
         void          set_custom_ID();   
 
+        uint8_t  ID;
     protected:
         virtual void  inic_elem_config(){}
         virtual void  RX_main_handler(LAST_ENTRY_FRAME_T LEF){}
@@ -56,7 +61,7 @@ class ELEMENT_ {
 
         uint8_t  name[24];      
         uint8_t  serialNum[2];  
-        uint8_t  ID;            
+        byte     flag;
         uint8_t  currentMode;  
         byte     type;
         byte     exclusiveIDmanager;

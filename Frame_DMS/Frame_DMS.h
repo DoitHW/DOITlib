@@ -7,6 +7,7 @@
 #include <Arduino.h>
 #include <stdint.h>
 #include <vector>
+#include <FastLED.h>
 
 extern volatile bool startFrameReceived;
 extern volatile bool frameInProgress;
@@ -82,13 +83,11 @@ struct INFO_PACK_T{
 struct INFO_STATE_T{
     
     byte exclusiveOrigins; // indica si esta configurado para atender exclusivamente a una ID
-    byte protectedID;   // indica si la ID ha sido configurada por botonera
     byte currentMode;   
     byte settedFlags;   // indica que flags / reles estan activados
-    byte colorFlag;     // indica si esta en un color basico
-    byte currentColor;  
-    byte customColorFlag;   // indica si esta en un color RGB
-    COLOR_T customCurrentColor;
+    byte currentRed;
+    byte currentGreen;
+    byte currentBlue; 
     byte serialNum[2]; 
     byte workingTime[4]; 
     byte lifeTime[4];
@@ -106,11 +105,11 @@ byte get_brightness_from_sensorValue(LAST_ENTRY_FRAME_T LEFin);
 byte get_color_from_sensorValue(LAST_ENTRY_FRAME_T LEFin);
 
 FRAME_T frameMaker_REQ_ELEM_INFO       (byte origin, byte targetin);
-FRAME_T frameMaker_SEND_COLOR          (std::vector<byte>targetin,  byte color);
+FRAME_T frameMaker_SEND_COLOR          (byte originin, std::vector<byte>targetin, byte color);
 FRAME_T frameMaker_RETURN_ELEM_INFO    (byte origin, byte targetin, INFO_PACK_T infoPack);
 FRAME_T frameMaker_RETURN_ELEM_STATE   (byte origin, byte targetin, INFO_STATE_T infoState);
 FRAME_T frameMaker_SET_ELEM_MODE       (byte origin, std::vector<byte>targetin, byte mode);
-
+FRAME_T frameMaker_SEND_FLAG_BYTE      (byte originin, std::vector<byte>targetin, byte flag);
 
 
 
