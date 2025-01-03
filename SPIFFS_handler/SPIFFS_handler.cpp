@@ -18,7 +18,7 @@ bool writeBytesChecked(fs::File &f, const uint8_t* data, size_t length) {
 
 
 void formatSPIFFS() {
-    Serial.println("Formateando SPIFFS...");
+    //Serial.print("Formateando SPIFFS...");
     SPIFFS.end();
     if (SPIFFS.format()) {
         Serial.println("SPIFFS formateado correctamente.");
@@ -256,6 +256,7 @@ void initializeDynamicOptions() {
     // Configuración de la opción "Fichas"
     memset(&fichasOption, 0, sizeof(INFO_PACK_T));
     strncpy((char*)fichasOption.name, "Fichas", 24);
+    Serial.println("Init, fichasOption.name: " + String((char*)fichasOption.name));
     strncpy((char*)fichasOption.desc, "Interacción con fichas NFC.", 192);
     fichasOption.currentMode = 0;
     strncpy((char*)fichasOption.mode[0].name, "Basico", 24);

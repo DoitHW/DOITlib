@@ -110,6 +110,7 @@ FRAME_T frameMaker_RETURN_ELEM_INFO    (byte origin, byte targetin, INFO_PACK_T 
 FRAME_T frameMaker_RETURN_ELEM_STATE   (byte origin, byte targetin, INFO_STATE_T infoState);
 FRAME_T frameMaker_SET_ELEM_MODE       (byte origin, std::vector<byte>targetin, byte mode);
 FRAME_T frameMaker_SEND_FLAG_BYTE      (byte originin, std::vector<byte>targetin, byte flag);
+FRAME_T frameMaker_SEND_SENSOR_VALUE   (byte originin, std::vector<byte> targetin, SENSOR_VALUE_T sensorin);
 
 
 

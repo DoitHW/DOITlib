@@ -13,6 +13,7 @@
 // Declaración de funciones relacionadas con el encoder
 void encoder_init_func();
 void handleEncoder();
+void handleHiddenMenuNavigation(int &hiddenMenuSelection);
 
 // Declaración de funciones externas (forward declarations)
 void animateTransition(int direction);
@@ -28,6 +29,7 @@ extern int currentModeIndex;
 extern bool inModesScreen;
 extern bool modeScreenEnteredByLongPress;
 extern bool isLongPress;
+extern bool hiddenMenuActive;
 
 
 

@@ -204,6 +204,23 @@ void send_frame(const FRAME_T &framein) {
     for (byte dato : framein.data)     Serial1.write(dato);
     Serial1.write(framein.checksum);
     Serial1.write(framein.end);
+    delay(50);
+ 
+Serial.print("Trama enviada: ");
+Serial.print(framein.start, HEX); Serial.print(" ");
+Serial.print(framein.frameLengthMsb, HEX); Serial.print(" ");
+Serial.print(framein.frameLengthLsb, HEX); Serial.print(" ");
+Serial.print(framein.origin, HEX); Serial.print(" ");
+Serial.print(framein.numTargets, HEX); Serial.print(" ");
+for (byte target : framein.target) { Serial.print(target, HEX); Serial.print(" ");}
+Serial.print(framein.function, HEX); Serial.print(" ");
+Serial.print(framein.dataLengthMsb, HEX); Serial.print(" ");
+Serial.print(framein.dataLengthLsb, HEX); Serial.print(" ");
+for (byte dato : framein.data) { Serial.print(dato, HEX); Serial.print(" ");}
+Serial.print(framein.checksum, HEX); Serial.print(" ");
+Serial.print(framein.end, HEX); Serial.print(" ");
+
+
 }
 
 
@@ -478,6 +495,38 @@ FRAME_T frameMaker_REQ_ELEM_INFO(byte origin, byte targetin){
 
     return frame;
 }
+
+FRAME_T frameMaker_SEND_SENSOR_VALUE (byte originin, std::vector<byte> targetin, SENSOR_VALUE_T sensorin){
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+
+    // No necesitas reservar memoria para los vectores target y data
+    // frame.target y frame.data se asignan directamente
+    frame.target = targetin;
+    frame.data.resize(L_SEND_SENSOR_VALUE);
+
+    frame.start=       NEW_START;
+    uint16_t  frameLength = 0x07 + targetin.size() + L_SEND_SENSOR_VALUE;
+
+    frame.frameLengthLsb = frameLength & 0xFF;        // Máscara para obtener los 8 bits menos significativos
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin=      originin;
+    frame.numTargets=  targetin.size();
+    frame.function=    F_SEND_SENSOR_VALUE;
+    frame.dataLengthMsb = (L_SEND_SENSOR_VALUE >> 8) & 0xFF; // MSB (siempre será 0x00 para valores < 256)
+    frame.dataLengthLsb = L_SEND_SENSOR_VALUE & 0xFF;   
+    frame.data[0]=     sensorin.msb_min;
+    frame.data[1]=     sensorin.lsb_min;
+    frame.data[2]=     sensorin.msb_max;
+    frame.data[3]=     sensorin.lsb_max;
+    frame.data[4]=     sensorin.msb_val;
+    frame.data[5]=     sensorin.lsb_val;
+    frame.checksum=    checksum_calc(frame);
+    frame.end=         NEW_END;
+    //print_frame(&frame);
+    return frame;
+}
+
 
 
 

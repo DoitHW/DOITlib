@@ -5,6 +5,7 @@
 // Inicialización de pines y matriz de colores
 int filas[FILAS] = {4, 5, 6, 7};
 int columnas[COLUMNAS] = {1, 2, 3};
+static bool lastState[FILAS][COLUMNAS];
 
 byte pulsadorColor[FILAS][COLUMNAS] = {
     {ORANGE, GREEN, WHITE},
@@ -28,20 +29,25 @@ void PulsadoresHandler::begin() {
     
 }
 
-// Lee la matriz y devuelve el color del pulsador presionado
+// Lee la matriz y devuelve el color del pulsador presionado una sola vez al presionar
 byte PulsadoresHandler::leerPulsador() {
+    lastState[FILAS][COLUMNAS] = {false};  // Estado anterior del botón
+
     for (int i = 0; i < FILAS; i++) {
         digitalWrite(filas[i], LOW); // Activar fila actual
         delayMicroseconds(10);
 
         for (int j = 0; j < COLUMNAS; j++) {
-            if (digitalRead(columnas[j]) == LOW) { // Detectar botón presionado
-                while (digitalRead(columnas[j]) == LOW) {
-                    // Esperar hasta que se libere el botón
-                    delay(10);
-                }
+            bool currentState = (digitalRead(columnas[j]) == LOW);  // Detectar botón presionado
+
+            // Detectar flanco de bajada (presión inicial)
+            if (currentState && !lastState[i][j]) { 
+                lastState[i][j] = true; // Actualizar estado
                 digitalWrite(filas[i], HIGH); // Desactivar fila antes de salir
                 return pulsadorColor[i][j];  // Retornar el color del pulsador presionado
+            } 
+            else if (!currentState) {
+                lastState[i][j] = false;  // Resetear cuando se suelta el botón
             }
         }
 
@@ -51,10 +57,11 @@ byte PulsadoresHandler::leerPulsador() {
     return 0xFF; // Retornar un valor inválido si no se presionó ningún botón
 }
 
+
 // Muestra información sobre el pulsador presionado
 void PulsadoresHandler::mostrarColor(byte color) {
     std::vector<byte> target;
-    target.push_back(0xDD);
+    target.push_back(BROADCAST);
     static bool relay_state = false;
     const char* colorNombre = "";
     switch (color) {
@@ -74,3 +81,13 @@ void PulsadoresHandler::mostrarColor(byte color) {
     Serial.print("Botón presionado: ");
     Serial.println(colorNombre);
 }
+
+void PulsadoresHandler::limpiarEstados() {
+    for (int i = 0; i < FILAS; i++) {
+        for (int j = 0; j < COLUMNAS; j++) {
+            lastState[i][j] = false; 
+        }
+    }
+}
+
+

@@ -115,6 +115,7 @@ void drawCurrentElement() {
         }
 
         // Dibujar nombre y modo
+        Serial.println("nombre elemento: " + String((char*)option->name));
         drawElementName((char*)option->name, selectedStates[currentIndex]);
         drawModeName((char*)option->mode[option->currentMode].name);
 
@@ -254,6 +255,15 @@ void drawModesScreen() {
 
     // Aplicar desplazamiento suave
     scrollOffset += (targetScrollOffset - scrollOffset) / 4;
+}
+
+void drawHiddenMenu(int selection) {
+    uiSprite.fillSprite(BACKGROUND_COLOR);
+    uiSprite.setTextColor(selection == 0 ? HIGHLIGHT_COLOR : TEXT_COLOR, BACKGROUND_COLOR);
+    uiSprite.drawString("1. Idioma", tft.width() / 2, 40);
+    uiSprite.setTextColor(selection == 1 ? HIGHLIGHT_COLOR : TEXT_COLOR, BACKGROUND_COLOR);
+    uiSprite.drawString("2. Volver", tft.width() / 2, 70);
+    uiSprite.pushSprite(0, 0);
 }
 
 

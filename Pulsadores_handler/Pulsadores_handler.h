@@ -17,4 +17,6 @@ public:
     void begin();                      // Inicializa los pines
     byte leerPulsador();               // Lee la matriz y devuelve el color del pulsador presionado
     void mostrarColor(byte color);     // Muestra información del pulsador presionado en el monitor serial
+    static void limpiarEstados();
+    
 };

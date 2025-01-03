@@ -1,6 +1,8 @@
 #include <encoder_handler/encoder_handler.h>
 #include <Frame_DMS/Frame_DMS.h>
 #include <SPIFFS_handler/SPIFFS_handler.h>
+#include <display_handler/display_handler.h>
+#include <Pulsadores_handler/Pulsadores_handler.h>
 
 
 // Variables globales para el manejo del encoder
@@ -48,7 +50,7 @@ void handleEncoder() {
     if (digitalRead(ENC_BUTTON) == LOW) {
         if (buttonPressStart == 0) {
             buttonPressStart = millis(); // Registrar inicio
-        } else if (millis() - buttonPressStart > 2000 && !isLongPress) {
+        } else if (!hiddenMenuActive && millis() - buttonPressStart > 2000 && !isLongPress) {
             isLongPress = true;
             inModesScreen = true;
             modeScreenEnteredByLongPress = true;
@@ -56,7 +58,7 @@ void handleEncoder() {
             drawModesScreen(); // Muestra la pantalla de modos
         }
     } else {
-        if (buttonPressStart > 0 && millis() - buttonPressStart < 2000) {
+        if (!hiddenMenuActive && buttonPressStart > 0 && millis() - buttonPressStart < 2000) {
             std::vector<byte> elementID;
             char elementName[25] = {0};
             String modeName;
@@ -151,3 +153,35 @@ void handleEncoder() {
         isLongPress = false;
     }
 }
+
+void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
+    int32_t newEncoderValue = encoder.getCount();
+    static bool encoderButtonPressed = false;
+
+    // Navegación por el menú con el encoder
+    if (newEncoderValue != lastEncoderValue) {
+        hiddenMenuSelection += (newEncoderValue > lastEncoderValue) ? 1 : -1;
+        hiddenMenuSelection = constrain(hiddenMenuSelection, 0, 1);
+        lastEncoderValue = newEncoderValue;
+        drawHiddenMenu(hiddenMenuSelection);
+    }
+
+    // Confirmación con el botón del encoder (evitar pulsaciones fantasma)
+    if (digitalRead(ENC_BUTTON) == LOW && !encoderButtonPressed) {
+        encoderButtonPressed = true;  // Marcar que está presionado
+
+        if (hiddenMenuSelection == 0) {
+            Serial.println("Opción: Cambiar idioma (sin implementar aún)");
+        } else if (hiddenMenuSelection == 1) {
+            Serial.println("Volviendo al menú principal");
+            hiddenMenuActive = false;
+            PulsadoresHandler::limpiarEstados();  // Reiniciar estado al salir
+            drawCurrentElement();
+        }
+    } else if (digitalRead(ENC_BUTTON) == HIGH) {
+        encoderButtonPressed = false; // Liberar el botón
+    }
+}
+
+
+
