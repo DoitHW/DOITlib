@@ -1,6 +1,7 @@
 #include <Pulsadores_handler/Pulsadores_handler.h>
 #include <defines_DMS/defines_DMS.h>
 #include <Frame_DMS/Frame_DMS.h>
+#include <SPIFFS_handler/SPIFFS_handler.h>
 
 // Inicialización de pines y matriz de colores
 int filas[FILAS] = {4, 5, 6, 7};
@@ -61,11 +62,21 @@ byte PulsadoresHandler::leerPulsador() {
 // Muestra información sobre el pulsador presionado
 void PulsadoresHandler::mostrarColor(byte color) {
     std::vector<byte> target;
-    target.push_back(BROADCAST);
+    
+    // Comprobar si el elemento está seleccionado antes de enviar la trama
+    if (!isCurrentElementSelected()) {
+        Serial.println("El elemento actual no está seleccionado. No se enviará la trama.");
+        return;
+    }
+
+    byte elementID = getCurrentElementID();  // Obtener la ID solo si está seleccionado
+    target.push_back(elementID);  
+
     static bool relay_state = false;
     const char* colorNombre = "";
+
     switch (color) {
-        case WHITE: colorNombre = "Blanco"; break;;
+        case WHITE: colorNombre = "Blanco"; break;
         case YELLOW: colorNombre = "Amarillo"; break;
         case ORANGE: colorNombre = "Naranja"; break;
         case RED: colorNombre = "Rojo"; break;
@@ -74,11 +85,21 @@ void PulsadoresHandler::mostrarColor(byte color) {
         case LIGHT_BLUE: colorNombre = "Azul Claro"; break;
         case GREEN: colorNombre = "Verde"; break;
         case BLACK: colorNombre = "Negro"; break;
-        case RELAY: colorNombre = "Relay"; relay_state = !relay_state; send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, target, relay_state)); break;
-        default: Serial.println("Ningún botón presionado."); return;
+        case RELAY:
+            colorNombre = "Relay";
+            relay_state = !relay_state;
+            send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, target, relay_state));
+            break;
+        default:
+            Serial.println("Ningún botón presionado.");
+            return;
     }
-    if (color != RELAY) send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, color));
-    Serial.print("Botón presionado: ");
+
+    if (color != RELAY) {
+        send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, color));
+    }
+
+    Serial.print("Botón presionado y seleccionado: ");
     Serial.println(colorNombre);
 }
 

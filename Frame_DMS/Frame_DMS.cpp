@@ -7,7 +7,8 @@
 
 
 extern LAST_ENTRY_FRAME_T            LEF;
-
+extern byte globalID;
+extern byte xManager;
 volatile bool startFrameReceived=    false;
 volatile bool frameInProgress=       false;
 volatile bool partialFrameReceived=  false;
@@ -103,10 +104,10 @@ void IRAM_ATTR onUartInterrupt() {
                             // Verificar destinatarios
                             uint8_t numTargets = uartBuffer[4];
                             bool isTarget = false;
-                            //byte Xmanager= element->get_manager();
+                            
                             for (uint8_t i = 0; i < numTargets; i++) {
                                 uint8_t targetID = uartBuffer[5 + i];
-                                if (targetID == globalID || targetID == BROADCAST)  {
+                                if (targetID == globalID || targetID == BROADCAST || targetID == xManager)  {
                                     isTarget = true;
                                     break;
                                 }
@@ -204,23 +205,6 @@ void send_frame(const FRAME_T &framein) {
     for (byte dato : framein.data)     Serial1.write(dato);
     Serial1.write(framein.checksum);
     Serial1.write(framein.end);
-    delay(50);
- 
-Serial.print("Trama enviada: ");
-Serial.print(framein.start, HEX); Serial.print(" ");
-Serial.print(framein.frameLengthMsb, HEX); Serial.print(" ");
-Serial.print(framein.frameLengthLsb, HEX); Serial.print(" ");
-Serial.print(framein.origin, HEX); Serial.print(" ");
-Serial.print(framein.numTargets, HEX); Serial.print(" ");
-for (byte target : framein.target) { Serial.print(target, HEX); Serial.print(" ");}
-Serial.print(framein.function, HEX); Serial.print(" ");
-Serial.print(framein.dataLengthMsb, HEX); Serial.print(" ");
-Serial.print(framein.dataLengthLsb, HEX); Serial.print(" ");
-for (byte dato : framein.data) { Serial.print(dato, HEX); Serial.print(" ");}
-Serial.print(framein.checksum, HEX); Serial.print(" ");
-Serial.print(framein.end, HEX); Serial.print(" ");
-
-
 }
 
 
@@ -239,12 +223,12 @@ byte get_mapped_sensor_value(byte minMSB, byte minLSB, byte maxMSB, byte maxLSB,
 
 byte get_brightness_from_sensorValue(LAST_ENTRY_FRAME_T LEFin) {
 
-    byte minMSB= LEFin.data[5];
-    byte minLSB= LEFin.data[4];
-    byte maxMSB= LEFin.data[3];
-    byte maxLSB= LEFin.data[2];
-    byte valMSB= LEFin.data[1];
-    byte valLSB= LEFin.data[0];
+    byte minMSB= LEFin.data[0];
+    byte minLSB= LEFin.data[1];
+    byte maxMSB= LEFin.data[2];
+    byte maxLSB= LEFin.data[3];
+    byte valMSB= LEFin.data[4];
+    byte valLSB= LEFin.data[5];
     uint16_t minVal = (minMSB << 8) | minLSB;
     uint16_t maxVal = (maxMSB << 8) | maxLSB;
     uint16_t currentVal = (valMSB << 8) | valLSB;
@@ -256,22 +240,366 @@ byte get_brightness_from_sensorValue(LAST_ENTRY_FRAME_T LEFin) {
     return (val > 255) ? 255 : val;
 }
 
-byte get_color_from_sensorValue(LAST_ENTRY_FRAME_T LEFin) {
-    byte minMSB = LEFin.data[5];
-    byte minLSB = LEFin.data[4];
-    byte maxMSB = LEFin.data[3];
-    byte maxLSB = LEFin.data[2];
-    byte valMSB = LEFin.data[1];
-    byte valLSB = LEFin.data[0];
+float get_aux_var_01_from_sensorValue(LAST_ENTRY_FRAME_T LEFin) {
+    byte minMSB = LEFin.data[0];
+    byte minLSB = LEFin.data[1];
+    byte maxMSB = LEFin.data[2];
+    byte maxLSB = LEFin.data[3];
+    byte valMSB = LEFin.data[4];
+    byte valLSB = LEFin.data[5];
+
     uint16_t minVal = (minMSB << 8) | minLSB;
     uint16_t maxVal = (maxMSB << 8) | maxLSB;
     uint16_t currentVal = (valMSB << 8) | valLSB;
+
+    // Asegurarnos de que no haya división por cero
+    if (maxVal <= minVal) {
+        return 0.0f; // Devuelve un valor por defecto si los límites son inválidos
+    }
+
     uint16_t totalRange = maxVal - minVal;
     uint16_t valuePos = currentVal - minVal;
-    uint16_t val = ((valuePos * 26UL) / totalRange) + 10;
-    if (val < 10) return 10;
-    if (val > 36) return 36;
+
+    // Escalar el valor al rango [0, 10]
+    float val = (float(valuePos) / totalRange) * 10.0f;
+
+    // Asegurar que el valor esté dentro del rango [0, 10]
+    if (val < 0.0f) val = 0.0f;
+    if (val > 10.0f) val = 10.0f;
+
     return val;
+}
+
+
+byte get_color_from_sensorValue(LAST_ENTRY_FRAME_T LEFin) {
+    byte minMSB = LEFin.data[0];
+    byte minLSB = LEFin.data[1];
+    byte maxMSB = LEFin.data[2];
+    byte maxLSB = LEFin.data[3];
+    byte valMSB = LEFin.data[4];
+    byte valLSB = LEFin.data[5];
+    uint16_t minVal = (minMSB << 8) | minLSB;
+    uint16_t maxVal = (maxMSB << 8) | maxLSB;
+    uint16_t currentVal = (valMSB << 8) | valLSB;
+    
+    // if (currentVal < minVal) currentVal = minVal;
+    // if (currentVal > maxVal) currentVal = maxVal;
+    
+    float proportion = (float)(currentVal - minVal) / (maxVal - minVal);
+    uint16_t result = (uint16_t)(proportion * 19);
+    if (result < 00) return 0;
+    if (result > 19) return 19;
+    
+    return (byte)result;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+////////////////////////////////////////////////////////////////////////////////////////////
+                                           FRAME MAKERS
+////////////////////////////////////////////////////////////////////////////////////////////
+*/
+
+
+
+
+
+
+
+FRAME_T frameMaker_REQ_ELEM_INFO(byte originin, byte targetin, byte idiomain){
+
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    frame.data.resize(L_REQ_ELEM_INFO);
+    uint16_t  frameLength = 0x08 + L_REQ_ELEM_INFO;
+
+    frame.start= NEW_START;
+    frame.frameLengthLsb = frameLength & 0xFF;      
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin= originin;
+    frame.numTargets = 0x01;
+    frame.target.push_back(targetin);
+    frame.function= F_REQ_ELEM_INFO;
+    frame.dataLengthMsb = (L_REQ_ELEM_INFO >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_REQ_ELEM_INFO & 0xFF;   
+    frame.data[0]= idiomain;
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+
+    return frame;
+}
+
+FRAME_T frameMaker_REQ_ELEM_STATE(byte originin, byte targetin){
+
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    frame.data.resize(L_REQ_ELEM_INFO);
+    uint16_t  frameLength = 0x08 + L_REQ_ELEM_STATE;
+
+    frame.start= NEW_START;
+    frame.frameLengthLsb = frameLength & 0xFF;        
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin= originin;
+    frame.numTargets = 0x01;
+    frame.target.push_back(targetin);
+    frame.function= F_REQ_ELEM_STATE;
+    frame.dataLengthMsb = (L_REQ_ELEM_STATE >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_REQ_ELEM_STATE & 0xFF;   
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+
+    return frame;
+}
+
+FRAME_T frameMaker_SET_ELEM_ID(byte originin, byte targetin, byte IDin){
+
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    frame.data.resize(L_SET_ELEM_ID);
+    uint16_t  frameLength = 0x08 + L_SET_ELEM_ID;
+
+    frame.start= NEW_START;
+    frame.frameLengthLsb = frameLength & 0xFF;        
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin= originin;
+    frame.numTargets = 0x01;
+    frame.target.push_back(targetin);
+    frame.function= F_SET_ELEM_ID;
+    frame.dataLengthMsb = (L_SET_ELEM_ID >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_SET_ELEM_ID & 0xFF; 
+    frame.data[0]= IDin;  
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+
+    return frame;
+}
+
+FRAME_T frameMaker_SET_ELEM_MODE(byte originin, std::vector<byte>targetin, byte modein)
+{
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    frame.data.resize(L_SET_ELEM_MODE);
+    uint16_t  frameLength = 0x07 + targetin.size() + L_SET_ELEM_MODE;
+
+    frame.start= NEW_START;
+    frame.frameLengthLsb = frameLength & 0xFF;        
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin= originin;
+    frame.numTargets = targetin.size();
+    frame.target= targetin;
+    frame.function= F_SET_ELEM_MODE;
+    frame.dataLengthMsb = (L_SET_ELEM_MODE >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_SET_ELEM_MODE & 0xFF;   
+    frame.data[0]= modein;
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+
+    return frame;
+}
+//////////////////////////////////////////////////////////////////////
+
+
+
+FRAME_T frameMaker_SEND_COLOR(byte originin, std::vector<byte>targetin, byte colorin){
+
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    frame.data.resize(L_SEND_COLOR);
+    uint16_t  frameLength = 0x07 + targetin.size() + L_SEND_COLOR;
+
+    frame.start= NEW_START;
+    frame.frameLengthLsb = frameLength & 0xFF;     
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin= originin;
+    frame.numTargets = targetin.size();
+    frame.target= targetin;
+    frame.function= F_SEND_COLOR;
+    frame.dataLengthMsb = (L_SEND_COLOR >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_SEND_COLOR & 0xFF;   
+    frame.data[0]= colorin;
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+
+    return frame;
+}
+
+FRAME_T frameMaker_SEND_SENSOR_VALUE(byte originin, std::vector<byte>targetin, SENSOR_VALUE_T sensorin){
+    
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    frame.data.resize(L_SEND_COLOR);
+    uint16_t  frameLength = 0x07 + targetin.size() + L_SEND_COLOR;
+
+    frame.start= NEW_START;
+    frame.frameLengthLsb = frameLength & 0xFF;     
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin= originin;
+    frame.numTargets = targetin.size();
+    frame.target= targetin;
+    frame.function= F_SEND_COLOR;
+    frame.dataLengthMsb = (L_SEND_COLOR >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_SEND_COLOR & 0xFF;   
+    frame.data[0]= sensorin.msb_min;
+    frame.data[1]= sensorin.lsb_min;
+    frame.data[2]= sensorin.msb_max;
+    frame.data[3]= sensorin.lsb_max;
+    frame.data[4]= sensorin.msb_val;
+    frame.data[5]= sensorin.lsb_val;
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+
+    return frame;
+}
+
+FRAME_T frameMaker_SEND_FLAG_BYTE(byte originin, std::vector<byte>targetin, byte flagin){
+    
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    frame.data.resize(L_SEND_FLAG_BYTE);
+    uint16_t  frameLength = 0x07 + targetin.size() + L_SEND_FLAG_BYTE;
+
+    frame.start= NEW_START;
+    frame.frameLengthLsb = frameLength & 0xFF;     
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin= originin;
+    frame.numTargets = targetin.size();
+    frame.target= targetin;
+    frame.function= F_SEND_FLAG_BYTE;
+    frame.dataLengthMsb = (L_SEND_FLAG_BYTE >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_SEND_FLAG_BYTE & 0xFF;   
+    frame.data[0]= flagin;
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+
+    return frame;
+}
+
+FRAME_T frameMaker_SEND_PATTERN_NUM(byte originin, std::vector<byte>targetin, byte patternin){
+
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    frame.data.resize(L_SEND_PATTERN_NUM);
+    uint16_t  frameLength = 0x07 + targetin.size() + L_SEND_PATTERN_NUM;
+
+    frame.start= NEW_START;
+    frame.frameLengthLsb = frameLength & 0xFF;     
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin= originin;
+    frame.numTargets = targetin.size();
+    frame.target= targetin;
+    frame.function= F_SEND_PATTERN_NUM;
+    frame.dataLengthMsb = (L_SEND_PATTERN_NUM >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_SEND_PATTERN_NUM & 0xFF;   
+    frame.data[0]= patternin;
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+
+    return frame;
+}
+
+FRAME_T frameMaker_SEND_FILE_NUM(byte originin, std::vector<byte>targetin, byte bankin, byte filein){
+    
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    frame.data.resize(L_SEND_FILE_NUM);
+    uint16_t  frameLength = 0x07 + targetin.size() + L_SEND_FILE_NUM;
+
+    frame.start= NEW_START;
+    frame.frameLengthLsb = frameLength & 0xFF;     
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin= originin;
+    frame.numTargets = targetin.size();
+    frame.target= targetin;
+    frame.function= F_SEND_FILE_NUM;
+    frame.dataLengthMsb = (L_SEND_FILE_NUM >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_SEND_FILE_NUM & 0xFF;   
+    frame.data[0]= bankin;
+    frame.data[1]= filein;
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+
+    return frame;
+}
+
+
+FRAME_T frameMaker_SEND_TEST(byte originin, std::vector<byte>targetin, byte testin){
+
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    frame.data.resize(L_SEND_TEST);
+    uint16_t  frameLength = 0x07 + targetin.size() + L_SEND_TEST;
+
+    frame.start= NEW_START;
+    frame.frameLengthLsb = frameLength & 0xFF;     
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin= originin;
+    frame.numTargets = targetin.size();
+    frame.target= targetin;
+    frame.function= F_SEND_TEST;
+    frame.dataLengthMsb = (L_SEND_TEST >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_SEND_TEST & 0xFF;   
+    frame.data[0]= testin;
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+
+    return frame;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+FRAME_T frameMaker_RETURN_ELEM_INFO(byte originin, byte targetin, INFO_PACK_T infoPack) {
+    FRAME_T frame;
+    uint16_t dataLength = L_RETURN_ELEM_INFO;
+    uint16_t length = 0x06 + 0x01 + L_RETURN_ELEM_INFO;
+
+    frame.start = NEW_START;
+    frame.frameLengthMsb = (length >> 8) & 0xFF;
+    frame.frameLengthLsb = length & 0xFF;
+    frame.origin = originin;
+    frame.numTargets = 0x01;
+    frame.target.push_back(targetin);
+    frame.function = F_RETURN_ELEM_INFO;
+    frame.dataLengthMsb = (dataLength >> 8) & 0xFF;
+    frame.dataLengthLsb = dataLength & 0xFF;
+
+    // Añadir datos básicos
+    frame.data.insert(frame.data.end(), infoPack.name, infoPack.name + sizeof(infoPack.name));
+    frame.data.insert(frame.data.end(), infoPack.desc, infoPack.desc + sizeof(infoPack.desc));
+    frame.data.insert(frame.data.end(), infoPack.serialNum, infoPack.serialNum + sizeof(infoPack.serialNum));
+    frame.data.push_back(infoPack.ID);
+    frame.data.push_back(infoPack.currentMode);
+
+    // Añadir modos
+    for (int i = 0; i < 16; i++) {
+        frame.data.insert(frame.data.end(), infoPack.mode[i].name, infoPack.mode[i].name + sizeof(infoPack.mode[i].name));
+        frame.data.insert(frame.data.end(), infoPack.mode[i].desc, infoPack.mode[i].desc + sizeof(infoPack.mode[i].desc));
+        frame.data.insert(frame.data.end(), infoPack.mode[i].config, infoPack.mode[i].config + 2);
+    }
+
+    // Añadir icono bidimensional correctamente
+    for (int row = 0; row < ICON_ROWS; row++) {
+        for (int col = 0; col < ICON_COLUMNS; col++) {
+            // Al ser uint16_t, lo divido en MSB y LSB
+            frame.data.push_back((infoPack.icono[row][col] >> 8) & 0xFF); // MSB
+            frame.data.push_back(infoPack.icono[row][col] & 0xFF);        // LSB
+        }
+    }
+
+    frame.checksum = checksum_calc(frame);
+    frame.end = NEW_END;
+
+    return frame;
 }
 
 
@@ -284,7 +612,7 @@ FRAME_T frameMaker_RETURN_ELEM_STATE(byte originin, byte targetin, INFO_STATE_T 
     frame.start= NEW_START;
     frame.frameLengthMsb= (length >> 8) & 0xFF;
     frame.frameLengthLsb= length & 0xFF;
-    frame.origin= originin; //frame.origin= element->get_ID();
+    frame.origin= originin; 
     frame.numTargets= 0x01;
     frame.target.push_back(targetin);
     frame.function= F_RETURN_ELEM_STATE;
@@ -312,226 +640,6 @@ FRAME_T frameMaker_RETURN_ELEM_STATE(byte originin, byte targetin, INFO_STATE_T 
     return frame;
 
 }
-
-
-FRAME_T frameMaker_RETURN_ELEM_INFO(byte origin, byte targetin, INFO_PACK_T infoPack){
-
-    FRAME_T frame;
-    uint16_t dataLength = L_RETURN_ELEM_INFO;
-    uint16_t length= 0x06 + 0x01 + L_RETURN_ELEM_INFO;
-
-    frame.start=          NEW_START;
-    frame.frameLengthMsb= (length >> 8) & 0xFF;
-    frame.frameLengthLsb= length & 0xFF;
-    frame.origin=         origin; //frame.origin= element->get_ID();
-    frame.numTargets=     0x01;
-    frame.target.push_back(targetin);
-    frame.function=       F_RETURN_ELEM_INFO;
-    frame.dataLengthMsb = (dataLength >> 8) & 0xFF;
-    frame.dataLengthLsb = dataLength & 0xFF;
-    frame.data.reserve(sizeof(infoPack));
-    frame.data.insert(frame.data.end(),
-                      infoPack.name,
-                      infoPack.name + sizeof(infoPack.name));
-    frame.data.insert(frame.data.end(), 
-                     infoPack.desc, 
-                     infoPack.desc + sizeof(infoPack.desc));
-    frame.data.push_back(infoPack.ID);
-    frame.data.push_back(infoPack.currentMode);
-    for (int i = 0; i < 16; i++) {
-        frame.data.insert(frame.data.end(), 
-                         infoPack.mode[i].name, 
-                         infoPack.mode[i].name + sizeof(infoPack.mode[i].name));
-        frame.data.insert(frame.data.end(), 
-                         infoPack.mode[i].desc, 
-                         infoPack.mode[i].desc + sizeof(infoPack.mode[i].desc));
-        frame.data.insert(frame.data.end(), 
-                        infoPack.mode[i].config, 
-                        infoPack.mode[i].config + 2);
-    }
-    // for (int i = 0; i < 64; i++) {
-    //     for (int j = 0; j < 60; j++) {
-    //         byte byteAlto = (infoPack.icono[i][j] >> 8) & 0xFF;
-    //         byte byteBajo = infoPack.icono[i][j] & 0xFF;
-    //         frame.data.push_back(byteAlto);
-    //         frame.data.push_back(byteBajo);
-    //     }
-    // }
-    frame.checksum= checksum_calc(frame); 
-    frame.end= NEW_END;
-
-    return frame;
-}
-
-FRAME_T frameMaker_SEND_COLOR(byte originin, std::vector<byte>targetin, byte color){
-
-    FRAME_T frame;
-    // implementar cositas
-    memset(&frame, 0, sizeof(FRAME_T));
-    
-    frame.data.resize(L_SEND_COLOR);
-
-    frame.start= NEW_START;
-   
-    uint16_t  frameLength = 0x07 + targetin.size() + L_SEND_COLOR;
-
-    frame.frameLengthLsb = frameLength & 0xFF;        // Máscara para obtener los 8 bits menos significativos
-    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
-   
-    frame.origin= originin;
-
-    frame.numTargets = targetin.size();
-    frame.target= targetin;
-
-    frame.function= F_SEND_COLOR;
-
-    frame.dataLengthMsb = (L_SEND_COLOR >> 8) & 0xFF; // MSB (siempre será 0x00 para valores < 256)
-    frame.dataLengthLsb = L_SEND_COLOR & 0xFF;   
-
-    frame.data[0]= color;
-    frame.checksum= checksum_calc(frame);
-
-    frame.end= NEW_END;
-    
-    return frame;
-}
-
-FRAME_T frameMaker_SEND_FLAG_BYTE      (byte originin, std::vector<byte>targetin, byte flag){
-   FRAME_T frame;
-    // implementar cositas
-    memset(&frame, 0, sizeof(FRAME_T));
-    
-    frame.data.resize(L_SEND_FLAG_BYTE);
-
-    frame.start= NEW_START;
-   
-    uint16_t  frameLength = 0x07 + targetin.size() + L_SEND_FLAG_BYTE;
-
-    frame.frameLengthLsb = frameLength & 0xFF;        // Máscara para obtener los 8 bits menos significativos
-    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
-   
-    frame.origin= originin;
-
-    frame.numTargets = targetin.size();
-    frame.target= targetin;
-
-    frame.function= F_SEND_FLAG_BYTE;
-
-    frame.dataLengthMsb = (L_SEND_FLAG_BYTE >> 8) & 0xFF; // MSB (siempre será 0x00 para valores < 256)
-    frame.dataLengthLsb = L_SEND_FLAG_BYTE & 0xFF;   
-
-    frame.data[0]= flag;
-    frame.checksum= checksum_calc(frame);
-
-    frame.end= NEW_END;
-    
-    return frame;
-}
-
-
-FRAME_T frameMaker_SET_ELEM_MODE(byte origin, std::vector<byte>targetin, byte mode)
-{
-    FRAME_T frame;
-
-        // implementar cositas
-    memset(&frame, 0, sizeof(FRAME_T));
-    
-    frame.data.resize(L_SET_ELEM_MODE);
-
-    frame.start= NEW_START;
-   
-    uint16_t  frameLength = 0x07 + targetin.size() + L_SET_ELEM_MODE;
-
-    frame.frameLengthLsb = frameLength & 0xFF;        // Máscara para obtener los 8 bits menos significativos
-    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
-   
-    frame.origin= origin;
-
-    frame.numTargets = targetin.size();
-    frame.target= targetin;
-
-    frame.function= F_SET_ELEM_MODE;
-
-    frame.dataLengthMsb = (L_SET_ELEM_MODE >> 8) & 0xFF; // MSB (siempre será 0x00 para valores < 256)
-    frame.dataLengthLsb = L_SET_ELEM_MODE & 0xFF;   
-
-    frame.data[0]= mode;
-    frame.checksum= checksum_calc(frame);
-
-    frame.end= NEW_END;
-
-    return frame;
-}
-
-FRAME_T frameMaker_REQ_ELEM_INFO(byte origin, byte targetin){
- FRAME_T frame;
-
-        // implementar cositas
-    memset(&frame, 0, sizeof(FRAME_T));
-    
-    frame.data.resize(L_REQ_ELEM_INFO);
-
-    frame.start= NEW_START;
-   
-    uint16_t  frameLength = 0x08 + L_REQ_ELEM_INFO;
-
-    frame.frameLengthLsb = frameLength & 0xFF;        // Máscara para obtener los 8 bits menos significativos
-    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
-   
-    frame.origin= origin;
-
-    frame.numTargets = 0x01;
-    frame.target.push_back(targetin);
-
-    frame.function= F_REQ_ELEM_INFO;
-
-    frame.dataLengthMsb = (L_REQ_ELEM_INFO >> 8) & 0xFF; // MSB (siempre será 0x00 para valores < 256)
-    frame.dataLengthLsb = L_REQ_ELEM_INFO & 0xFF;   
-
-   
-    frame.checksum= checksum_calc(frame);
-
-    frame.end= NEW_END;
-
-    return frame;
-}
-
-FRAME_T frameMaker_SEND_SENSOR_VALUE (byte originin, std::vector<byte> targetin, SENSOR_VALUE_T sensorin){
-    FRAME_T frame;
-    memset(&frame, 0, sizeof(FRAME_T));
-
-    // No necesitas reservar memoria para los vectores target y data
-    // frame.target y frame.data se asignan directamente
-    frame.target = targetin;
-    frame.data.resize(L_SEND_SENSOR_VALUE);
-
-    frame.start=       NEW_START;
-    uint16_t  frameLength = 0x07 + targetin.size() + L_SEND_SENSOR_VALUE;
-
-    frame.frameLengthLsb = frameLength & 0xFF;        // Máscara para obtener los 8 bits menos significativos
-    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
-    frame.origin=      originin;
-    frame.numTargets=  targetin.size();
-    frame.function=    F_SEND_SENSOR_VALUE;
-    frame.dataLengthMsb = (L_SEND_SENSOR_VALUE >> 8) & 0xFF; // MSB (siempre será 0x00 para valores < 256)
-    frame.dataLengthLsb = L_SEND_SENSOR_VALUE & 0xFF;   
-    frame.data[0]=     sensorin.msb_min;
-    frame.data[1]=     sensorin.lsb_min;
-    frame.data[2]=     sensorin.msb_max;
-    frame.data[3]=     sensorin.lsb_max;
-    frame.data[4]=     sensorin.msb_val;
-    frame.data[5]=     sensorin.lsb_val;
-    frame.checksum=    checksum_calc(frame);
-    frame.end=         NEW_END;
-    //print_frame(&frame);
-    return frame;
-}
-
-
-
-
-
-
 
 
 

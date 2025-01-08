@@ -20,15 +20,11 @@ bool writeBytesChecked(fs::File &f, const uint8_t* data, size_t length) {
 void formatSPIFFS() {
     //Serial.print("Formateando SPIFFS...");
     SPIFFS.end();
-    if (SPIFFS.format()) {
-        Serial.println("SPIFFS formateado correctamente.");
-    } else {
+    if (!SPIFFS.format()) {
         Serial.println("Error al formatear SPIFFS.");
     }
     if (!SPIFFS.begin(true)) {
         Serial.println("Error al montar SPIFFS después del formateo.");
-    } else {
-        Serial.println("SPIFFS montado y listo.");
     }
 }
 
@@ -45,7 +41,7 @@ String generateUniqueFileName(const char* baseName) {
 }
 
 bool saveElementFieldByField(const char* baseName, const uint16_t* iconData) {
-    Serial.println("Guardando elemento en SPIFFS...");
+    //Serial.println("Guardando elemento en SPIFFS...");
 
     String uniqueFileName = generateUniqueFileName(baseName);
     String uniqueElementName = uniqueFileName.substring(9, uniqueFileName.length() - 4); 
@@ -61,7 +57,7 @@ bool saveElementFieldByField(const char* baseName, const uint16_t* iconData) {
 
     f.seek(OFFSET_NAME, SeekSet);
     if (!writeBytesChecked(f, (uint8_t*)elementName, 24)) return false;
-    Serial.printf("Nombre único escrito: %s\n", elementName);
+    //Serial.printf("Nombre único escrito: %s\n", elementName);
 
     const char* desc = "Prueba desc elemento mostrando icono correctamente";
     byte descBuf[192];
@@ -69,98 +65,114 @@ bool saveElementFieldByField(const char* baseName, const uint16_t* iconData) {
     strncpy((char*)descBuf, desc, 192);
     f.seek(OFFSET_DESC, SeekSet);
     if (!writeBytesChecked(f, descBuf, 192)) return false;
-    Serial.println("Descripcion escrita.");
+    //Serial.println("Descripcion escrita.");
 
     byte serialBuf[2] = {0x12, 0x34};
     f.seek(OFFSET_SERIAL, SeekSet);
     if (!writeBytesChecked(f, serialBuf, 2)) return false;
-    Serial.println("SerialNum escrito.");
+    //Serial.println("SerialNum escrito.");
 
-    byte id = 0xDD;
-    f.seek(OFFSET_ID, SeekSet);
-    if (!writeBytesChecked(f, &id, 1)) return false;
-    Serial.println("ID escrito.");
+    byte id = BROADCAST;
 
-    byte currentMode = 0;
-    f.seek(OFFSET_CURRENTMODE, SeekSet);
-    if (!writeBytesChecked(f, &currentMode, 1)) return false;
-    Serial.println("CurrentMode escrito.");
+    if (strcmp(baseName, "Columna") == 0) id = 0x04;
+    else if (strcmp(baseName, "LED strip") == 0) id = 0x08;
 
-    // Guardar modos
-    byte modeBuf[SIZE_MODE];
-    memset(modeBuf, 0, SIZE_MODE);
+        f.seek(OFFSET_ID, SeekSet);
+        if (!writeBytesChecked(f, &id, 1))
+            return false;
+        // Serial.println("ID escrito.");
 
-    // Modo Básico
-    const char* modoName1 = "Basico";
-    const char* modoDesc1 = "Descripcion modo basico";
-    strncpy((char*)modeBuf, modoName1, 24);
-    strncpy((char*)(modeBuf + 24), modoDesc1, 192);
-    modeBuf[24 + 192] = 0x00;
-    modeBuf[24 + 192 + 1] = 0x01;
+        byte currentMode = 0;
+        f.seek(OFFSET_CURRENTMODE, SeekSet);
+        if (!writeBytesChecked(f, &currentMode, 1))
+            return false;
+        // Serial.println("CurrentMode escrito.");
 
-    f.seek(OFFSET_MODES, SeekSet);
-    if (!writeBytesChecked(f, modeBuf, SIZE_MODE)) return false;
-    Serial.println("Modo 0 (Básico) escrito.");
+        // Guardar modos
+        byte modeBuf[SIZE_MODE];
+        memset(modeBuf, 0, SIZE_MODE);
 
-    // Si el elemento es "Escalera", añadir modo "Divertido"
-    if (strcmp(baseName, "Escalera") == 0) {
-    // Modo Básico ya añadido arriba
-    memset(modeBuf, 0, SIZE_MODE);
-    const char* modoName2 = "Divertido";
-    const char* modoDesc2 = "Descripcion modo divertido";
-    strncpy((char*)modeBuf, modoName2, 24);
-    strncpy((char*)(modeBuf + 24), modoDesc2, 192);
-    modeBuf[24 + 192] = 0x00;
-    modeBuf[24 + 192 + 1] = 0x02; // Identificador del modo Divertido
-    if (!writeBytesChecked(f, modeBuf, SIZE_MODE)) return false;
-    Serial.println("Modo 1 (Divertido) escrito.");
+        // Modo Básico
+        const char *modoName1 = "Basico";
+        const char *modoDesc1 = "Descripcion modo basico";
+        strncpy((char *)modeBuf, modoName1, 24);
+        strncpy((char *)(modeBuf + 24), modoDesc1, 192);
+        modeBuf[24 + 192] = 0x00;
+        modeBuf[24 + 192 + 1] = 0x01;
 
-    // Añadir espacios vacíos para posiciones 3, 4, y 5
-    byte emptyMode[SIZE_MODE];
-    memset(emptyMode, 0, SIZE_MODE);
-    for (int i = 2; i < 6; i++) {
-        if (!writeBytesChecked(f, emptyMode, SIZE_MODE)) return false;
-    }
-    Serial.println("Huecos vacíos escritos para posiciones 3, 4 y 5.");
+        f.seek(OFFSET_MODES, SeekSet);
+        if (!writeBytesChecked(f, modeBuf, SIZE_MODE))
+            return false;
+        // Serial.println("Modo 0 (Básico) escrito.");
 
-    // Modo Pasivo
-    memset(modeBuf, 0, SIZE_MODE);
-    const char* modoName6 = "Pasivo";
-    const char* modoDesc6 = "Descripcion modo pasivo";
-    strncpy((char*)modeBuf, modoName6, 24);
-    strncpy((char*)(modeBuf + 24), modoDesc6, 192);
-    modeBuf[24 + 192] = 0x00;
-    modeBuf[24 + 192 + 1] = 0x06; // Identificador del modo Pasivo
-    if (!writeBytesChecked(f, modeBuf, SIZE_MODE)) return false;
-    Serial.println("Modo 6 (Pasivo) escrito.");
-}
+        // Si el elemento es "Escalera", añadir modo "Divertido"
+        if (strcmp(baseName, "Escalera") == 0)
+        {
+            // Modo Básico ya añadido arriba
+            memset(modeBuf, 0, SIZE_MODE);
+            const char *modoName2 = "Divertido";
+            const char *modoDesc2 = "Descripcion modo divertido";
+            strncpy((char *)modeBuf, modoName2, 24);
+            strncpy((char *)(modeBuf + 24), modoDesc2, 192);
+            modeBuf[24 + 192] = 0x00;
+            modeBuf[24 + 192 + 1] = 0x02; // Identificador del modo Divertido
+            if (!writeBytesChecked(f, modeBuf, SIZE_MODE))
+                return false;
+            // Serial.println("Modo 1 (Divertido) escrito.");
 
+            // Añadir espacios vacíos para posiciones 3, 4, y 5
+            byte emptyMode[SIZE_MODE];
+            memset(emptyMode, 0, SIZE_MODE);
+            for (int i = 2; i < 6; i++)
+            {
+                if (!writeBytesChecked(f, emptyMode, SIZE_MODE))
+                    return false;
+            }
+            // Serial.println("Huecos vacíos escritos para posiciones 3, 4 y 5.");
 
-    // Modos vacíos para completar los 16
-    byte emptyMode[SIZE_MODE];
-    memset(emptyMode, 0, SIZE_MODE);
-    int startModeIndex = (strcmp(baseName, "Escalera") == 0) ? 2 : 1; // Si es "Escalera", iniciar en el índice 2
-    for (int i = startModeIndex; i < 16; i++) {
-        if (!writeBytesChecked(f, emptyMode, SIZE_MODE)) return false;
-    }
-    Serial.println("Modos vacíos escritos.");
-
-    // Guardar icono
-    f.seek(OFFSET_ICONO, SeekSet);
-    for (int y = 0; y < 64; y++) {
-        for (int x = 0; x < 64; x++) {
-            uint16_t pixel = iconData[y * 64 + x];
-            if (!writeBytesChecked(f, (uint8_t*)&pixel, 2)) return false;
+            // Modo Pasivo
+            memset(modeBuf, 0, SIZE_MODE);
+            const char *modoName6 = "Pasivo";
+            const char *modoDesc6 = "Descripcion modo pasivo";
+            strncpy((char *)modeBuf, modoName6, 24);
+            strncpy((char *)(modeBuf + 24), modoDesc6, 192);
+            modeBuf[24 + 192] = 0x00;
+            modeBuf[24 + 192 + 1] = 0x06; // Identificador del modo Pasivo
+            if (!writeBytesChecked(f, modeBuf, SIZE_MODE))
+                return false;
+            // Serial.println("Modo 6 (Pasivo) escrito.");
         }
-    }
-    Serial.println("Icono escrito en SPIFFS.");
 
-    f.flush();
-    size_t finalSize = f.size();
-    f.close();
-    Serial.printf("Elemento guardado con éxito, archivo: %s, tamaño final: %u bytes\n", uniqueFileName.c_str(), (unsigned)finalSize);
-    return true;
-}
+        // Modos vacíos para completar los 16
+        byte emptyMode[SIZE_MODE];
+        memset(emptyMode, 0, SIZE_MODE);
+        int startModeIndex = (strcmp(baseName, "Escalera") == 0) ? 2 : 1; // Si es "Escalera", iniciar en el índice 2
+        for (int i = startModeIndex; i < 16; i++)
+        {
+            if (!writeBytesChecked(f, emptyMode, SIZE_MODE))
+                return false;
+        }
+        // Serial.println("Modos vacíos escritos.");
+
+        // Guardar icono
+        f.seek(OFFSET_ICONO, SeekSet);
+        for (int y = 0; y < 64; y++)
+        {
+            for (int x = 0; x < 64; x++)
+            {
+                uint16_t pixel = iconData[y * 64 + x];
+                if (!writeBytesChecked(f, (uint8_t *)&pixel, 2))
+                    return false;
+            }
+        }
+        // Serial.println("Icono escrito en SPIFFS.");
+
+        f.flush();
+        size_t finalSize = f.size();
+        f.close();
+        Serial.printf("Elemento guardado con éxito, archivo: %s, tamaño final: %u bytes\n", uniqueFileName.c_str(), (unsigned)finalSize);
+        return true;
+    }
 
 void printElementInfo(const String &fileName) {
     fs::File f = SPIFFS.open(fileName, "r");
@@ -256,7 +268,6 @@ void initializeDynamicOptions() {
     // Configuración de la opción "Fichas"
     memset(&fichasOption, 0, sizeof(INFO_PACK_T));
     strncpy((char*)fichasOption.name, "Fichas", 24);
-    Serial.println("Init, fichasOption.name: " + String((char*)fichasOption.name));
     strncpy((char*)fichasOption.desc, "Interacción con fichas NFC.", 192);
     fichasOption.currentMode = 0;
     strncpy((char*)fichasOption.mode[0].name, "Basico", 24);
@@ -264,6 +275,8 @@ void initializeDynamicOptions() {
     fichasOption.mode[0].config[0] = 0x02;
     fichasOption.mode[0].config[1] = 0x00;
     memcpy(fichasOption.icono, fichas_64x64, sizeof(fichasOption.icono));
+    Serial.println("Nombre de fichasOption.name después de crear el icono: " + String((char*)fichasOption.name));
+
 }
 
 void loadElementsFromSPIFFS() {
@@ -303,3 +316,30 @@ void loadElementsFromSPIFFS() {
     }
     Serial.printf("Total de elementos: %d\n", (int)elementFiles.size());
 }
+
+byte getCurrentElementID() {
+    byte elementID = BROADCAST;  
+    String currentFile = elementFiles[currentIndex];
+
+    if (currentFile == "Ambientes" || currentFile == "Fichas") {
+        INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+        return option->ID;
+    }
+
+    // Leer la ID desde SPIFFS solo si está seleccionado
+    fs::File f = SPIFFS.open(currentFile, "r");
+    if (f) {
+        f.seek(OFFSET_ID, SeekSet);
+        f.read(&elementID, 1);
+        f.close();
+    } else {
+        Serial.println("Error al leer la ID del archivo.");
+    }
+    return elementID;
+}
+
+bool isCurrentElementSelected() {
+    return selectedStates[currentIndex];  // Devuelve true si está seleccionado
+}
+
+

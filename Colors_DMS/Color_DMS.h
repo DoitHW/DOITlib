@@ -16,6 +16,8 @@
 */
 
 
+extern float varaux;
+
 const unsigned int listaColoresPasivos[]=
 {
 
@@ -105,6 +107,7 @@ class COLORHANDLER_ {
         COLORHANDLER_();
         void begin(int numLeds);
         CRGB get_CRGB_from_colorList(int index);
+        CRGB get_CRGB_from_pasiveColorList(int index);
 
         void set_is_paused        (bool pau);
         bool get_is_paused        ();
@@ -125,6 +128,9 @@ class COLORHANDLER_ {
 
         void set_currentBrightness(byte brigthin);
         byte get_currentBrightness();
+
+        void setPatternBotonera(byte mode);
+        void set_botoneraPattern(byte patternin);
 
         void action_frank();
         CRGB* leds;
@@ -147,9 +153,19 @@ class COLORHANDLER_ {
 
         void BouncingBalls(byte red, byte green, byte blue, int BallCount);
 
-        void RunningLights(byte red, byte green, byte blue, int WaveDelay);
+        void RunningLights(byte red, byte green, byte blue, int WaveDelay, float peakFactor, float frequencyFactor);
+
+        void SnowSparkle(byte red, byte green, byte blue, int SparkleDelay, int SpeedDelay);
+
+        void rainbowCycle(int SpeedDelay);
+
+        void FillLEDsFromPaletteColors( uint8_t colorIndex);
+       
     private:
 
+    unsigned long lastUpdate = 0;
+    int position = 0;
+    bool isAnimating = false;
     int numLeds;
 
     bool paused;

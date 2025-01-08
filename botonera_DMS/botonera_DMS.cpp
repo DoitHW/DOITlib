@@ -18,7 +18,7 @@ BOTONERA_::BOTONERA_(uint16_t serialNumber) : ELEMENT_(serialNumber) {
 void BOTONERA_::botonera_begin(){
 
     
-    colorHandler.begin(BOTONERA_NUM_LEDS);           
+    colorHandler.begin(NUM_LEDS);           
 }
 
 

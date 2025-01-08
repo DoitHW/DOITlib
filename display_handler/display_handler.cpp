@@ -1,6 +1,7 @@
 #include <display_handler/display_handler.h>
 #include <SPIFFS_handler/SPIFFS_handler.h>
 #include <encoder_handler/encoder_handler.h>
+#include <Colors_DMS/Color_DMS.h>
 
 
 // Definir dimensiones
@@ -18,14 +19,14 @@ TFT_eSPI tft = TFT_eSPI();
 TFT_eSprite uiSprite = TFT_eSprite(&tft);
 
 void display_init() {
-    Serial.println("Inicializando display...");
+    //Serial.println("Inicializando display...");
     tft.init();
     tft.setRotation(0);
     tft.fillScreen(BACKGROUND_COLOR);
     tft.setSwapBytes(true);
     uiSprite.createSprite(tft.width(), tft.height());
     uiSprite.setSwapBytes(true);
-    Serial.println("Display inicializado.");
+    //Serial.println("Display inicializado.");
 }
 
 void drawNoElementsMessage() {
@@ -98,12 +99,17 @@ void drawCurrentElement() {
 
     // Corregir límites del índice actual
     currentIndex = constrain(currentIndex, 0, (int)elementFiles.size() - 1);
-
     String currentFile = elementFiles[currentIndex];
 
-    // Dibujar opciones dinámicas
+    // Variable para almacenar el modo actual
+    byte currentMode = 0;
+
     if (currentFile == "Ambientes" || currentFile == "Fichas") {
+        // Opciones dinámicas
         INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+
+        // Actualizar el modo actual desde la opción dinámica
+        currentMode = option->currentMode;
 
         int startX = (tft.width() - 64) / 2;
         int startY = (tft.height() - 64) / 2 - 20;
@@ -115,15 +121,14 @@ void drawCurrentElement() {
         }
 
         // Dibujar nombre y modo
-        Serial.println("nombre elemento: " + String((char*)option->name));
+        Serial.println("Nombre elemento: " + String((char*)option->name));
         drawElementName((char*)option->name, selectedStates[currentIndex]);
         drawModeName((char*)option->mode[option->currentMode].name);
 
         // Dibujar círculo de selección si está seleccionado
         drawSelectionCircle(selectedStates[currentIndex], startX, startY);
-    }
-    // Dibujar elementos cargados desde SPIFFS
-    else {
+    } else {
+        // Elementos cargados desde SPIFFS
         fs::File f = SPIFFS.open(currentFile, "r");
         if (!f) {
             drawErrorMessage("Error leyendo elemento");
@@ -140,18 +145,31 @@ void drawCurrentElement() {
             return;
         }
 
-        // Dibujar elementos visuales
+        // Dibujar ícono del elemento
         drawElementIcon(f, startX, startY);
+
+        // Dibujar nombre y modo
         drawElementName(elementName, selectedStates[currentIndex]);
         drawModeName(modeName);
+
+        // Leer el modo actual desde el archivo SPIFFS
+        f.seek(OFFSET_CURRENTMODE, SeekSet);
+        f.read(&currentMode, 1);
+        f.close();
 
         // Dibujar círculo de selección si está seleccionado
         drawSelectionCircle(selectedStates[currentIndex], startX, startY);
     }
 
+    // Actualizar `currentModeIndex` y reflejar el patrón en los LEDs
+    currentModeIndex = currentMode;
+    colorHandler.setPatternBotonera(currentModeIndex);
+
+    Serial.println("Modo actual: " + String(currentModeIndex));
     drawNavigationArrows();
     uiSprite.pushSprite(0, 0);
 }
+
 
 void animateTransition(int direction) {
     if (elementFiles.size() <= 1) return;

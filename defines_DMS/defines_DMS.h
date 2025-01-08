@@ -1,5 +1,3 @@
-
-// DEFINES BOTONERA
 #ifndef DEFINES_DMS_H
 #define DEFINES_DMS_H
 
@@ -35,7 +33,7 @@
 */
 
 //DELFINES SUPER GLOBALES
-                                                #define WALLWASHER
+                                                #define BOTONERA
                       
                                                 #define NORESET_FILE
                                                 #define SERIAL_NUM (uint16_t) 0xF001
@@ -46,12 +44,12 @@
 //
 
 
-
+#define BOTONERA
 #define ELEMENT_CONFIG_FILE_PATH  "/element_config.txt"
 
-#define MAX_EXPECTED_TIME            0xFFFFFFFF
-#define RF_TX_PIN     18 
-#define RF_RX_PIN     17  
+#define MAX_EXPECTED_TIME    0xFFFFFFFF
+#define RF_TX_PIN         18 
+#define RF_RX_PIN       17  
 #define RF_CONFIG_PIN 46
 #define RF_BAUD_RATE 9600
 
@@ -75,7 +73,9 @@
 #define DEFAULT_NFC           0xDF
 
 #define F_REQ_ELEM_INFO       0xA1  
-#define L_REQ_ELEM_INFO       0x00
+#define L_REQ_ELEM_INFO       0x01
+#define F_REQ_ELEM_ICON       0xA3
+#define L_REQ_ELEM_ICON       0x01
 #define F_REQ_ELEM_STATE      0xA2
 #define L_REQ_ELEM_STATE      0x00 // OJO
 
@@ -103,10 +103,12 @@
 #define F_SEND_FLAG_BYTE      0xCE
 #define L_SEND_FLAG_BYTE      0x01
 #define F_SEND_TEST           0xCF
-#define L_SEND_TEST           0x00
+#define L_SEND_TEST           0x01
 
 #define F_RETURN_ELEM_INFO    0xD1    
-#define L_RETURN_ELEM_INFO    0x2E7C  // OJITO que es mas grande que ROCIO JURADO.
+#define L_RETURN_ELEM_INFO    0xE7E  // OJITO que es mas grande que ROCIO JURADO.
+#define F_RETURN_ELEM_ICON    0xD3
+#define L_RETURN_ELEM_ICON    0x00 // OJO
 #define F_RETURN_ELEM_STATE   0xD2
 #define L_RETURN_ELEM_STATE   0x10
 #define F_RETURN_ELEM_ERROR   0xDE
@@ -117,9 +119,10 @@
 
 #define NORMAL_FADE           0x4FF  // original
 #define SLOWEST_FADE          0x13FF
-#define FASTEST_FADE          0x0F
+#define FASTEST_FADE          0x0A
 #define SLOW_FADE             0x32
-#define SLOWER_FADE           0x64
+#define RB_MOTION_VAL_FADE    0xFF
+#define MOTION_VAL_FADE       0x1FF
 
 #define MAX_BRIGHTNESS        0xFF
 #define MID_BRIGHTNESS        0x7F
@@ -182,6 +185,10 @@
 #define VERDE_OLIVA_CLARO        0x22 //0x7FA300
 #define SALMON                   0x23 //0xe73410
 //
+
+#define ICON_COLUMNS      64
+#define ICON_ROWS         64
+#define ICON_LENGTH      ICON_COLUMNS*ICON_ROWS
 
 // DEFINES INFO_ELEMENTS
 #define SPANISH_LANG        0x01
@@ -262,19 +269,27 @@
 #define RESET_RELAY      0x00
 
 // DEFINES COLUMNA
+
 #define COLUMN_NUM_LEDS      1
 #define COLUMN_LED_DATA_PIN 21
 #define COLUMN_RELAY_PIN    42
 
 // DEFINES LEDSTRIPS
 
-#define LEDSTRIP_NUM_LEDS    100
 #define LEDSTRIP_LED_DATA_PIN 45 // 21= oficial
 
 // DEFINES BOTONERA
 
-#define BOTONERA_NUM_LEDS     9
 #define BOTONERA_DATA_PIN     21
+
+#if   defined (COLUMNA)
+  #define NUM_LEDS 0x01
+#elif defined (WALLWASHER)
+  #define NUM_LEDS 299
+#elif defined (BOTONERA)
+  #define NUM_LEDS 9
+#endif
+
 
 enum COLUMN_MODE_LIST{
     COLUMN_CONTEST_MODE= 0,
@@ -283,7 +298,8 @@ enum COLUMN_MODE_LIST{
     COLUMN_MOTION_MODE,
     COLUMN_RB_MOTION_MODE,
     COLUMN_MIX_MODE,
-    COLUMN_PASSIVE_MODE
+    COLUMN_PASSIVE_MODE,
+    COLUMN_PATTERN_MODE
 };
 
 enum LEDSTRIP_MODE_LIST{
@@ -300,10 +316,13 @@ enum LEDSTRIP_MODE_LIST{
 
 enum PATTERN_LIST{
     NO_PATTERN= 0,
-    FADE_COLORS,
-    FIRE_COLORS,
-    METEOR_COLORS,
-    BOUNCINGBALLS_COLORS
+    COLOR_PATT,
+    FIRE_PATT,
+    METEOR_PATT,
+    BOUNCING_PATT, 
+    RAINBOW_PATT,
+    SNOW_PATT,
+    CLOUD_PATT
 };
 
 

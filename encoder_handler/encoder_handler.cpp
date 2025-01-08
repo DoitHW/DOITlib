@@ -3,6 +3,7 @@
 #include <SPIFFS_handler/SPIFFS_handler.h>
 #include <display_handler/display_handler.h>
 #include <Pulsadores_handler/Pulsadores_handler.h>
+#include <Colors_DMS/Color_DMS.h>
 
 
 // Variables globales para el manejo del encoder
@@ -21,14 +22,14 @@ std::vector<String> elementFiles;
 std::vector<bool> selectedStates;
 
 void encoder_init_func() {
-    Serial.println("Inicializando encoder...");
+    //Serial.println("Inicializando encoder...");
     pinMode(ENC_BUTTON, INPUT_PULLUP);
     ESP32Encoder::useInternalWeakPullResistors = UP;
     encoder.attachSingleEdge(ENC_A, ENC_B);
     encoder.clearCount();
     encoder.setCount(0);
     encoder.setFilter(1023);
-    Serial.println("Encoder inicializado.");
+    //Serial.println("Encoder inicializado.");
 }
 
 
@@ -40,10 +41,15 @@ void handleEncoder() {
 
         if (!inModesScreen && elementFiles.size() > 1) {
             Serial.println("Encoder girado, cambiando de elemento...");
-            animateTransition(direction); // Llama a la función externa para animar la transición
+            currentIndex = (currentIndex + direction + elementFiles.size()) % elementFiles.size();
+
+            // Actualizar el elemento actual y el modo actual
+            drawCurrentElement();  // Llama a `setPatternBotonera` con el modo actualizado
         } else if (inModesScreen && totalModes > 0) {
+            // Navegar entre modos en la pantalla de modos
             currentModeIndex = (currentModeIndex + direction + totalModes) % totalModes;
-            drawModesScreen(); // Actualiza la pantalla de modos
+            colorHandler.setPatternBotonera(currentModeIndex); // Actualizar patrones con el modo actual
+            drawModesScreen();
         }
     }
 
@@ -59,10 +65,6 @@ void handleEncoder() {
         }
     } else {
         if (!hiddenMenuActive && buttonPressStart > 0 && millis() - buttonPressStart < 2000) {
-            std::vector<byte> elementID;
-            char elementName[25] = {0};
-            String modeName;
-
             if (inModesScreen) {
                 // Seleccionar modo actual
                 String currentFile = elementFiles[currentIndex];
@@ -107,15 +109,14 @@ void handleEncoder() {
                 // Mostrar información por Serial
                 Serial.printf("Nombre del elemento: %s\n", elementName[0] ? elementName : currentFile.c_str());
                 Serial.printf("ID del elemento: %d\n", elementID[0]);
-                if (modeNumber == 3) currentModeIndex =5;
                 Serial.printf("Modo seleccionado: %s (Modo %d)\n", modeName.c_str(), modeNumber);
-                send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA,elementID,currentModeIndex+1));
+                send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, elementID, currentModeIndex + 1));
                 inModesScreen = false;
-                drawCurrentElement(); // Redibuja el elemento actual
-            }
-            else {
+                drawCurrentElement(); // Redibuja el elemento actual con el nuevo modo
+            } else {
+                // Cambiar selección del elemento actual
                 selectedStates[currentIndex] = !selectedStates[currentIndex];
-                
+
                 // Obtener la ID del elemento como std::vector<byte>
                 std::vector<byte> elementID;
                 String currentFile = elementFiles[currentIndex];
@@ -136,13 +137,13 @@ void handleEncoder() {
                     elementID.push_back(0); // Valor por defecto para opciones dinámicas
                 }
 
-                // Mostrar mensaje en el monitor serial
+                // Enviar el estado del color basado en la selección
                 if (selectedStates[currentIndex]) {
                     Serial.printf("Enviando color blanco a la ID %d\n", elementID[0]);
-                    send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA,elementID, 0x00)); // Enviar color blanco
+                    send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, elementID, 0x00)); // Enviar color blanco
                 } else {
                     Serial.printf("Enviando color negro a la ID %d\n", elementID[0]);
-                    send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA,elementID, 0x08)); // Enviar color negro
+                    send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, elementID, 0x08)); // Enviar color negro
                 }
 
                 drawCurrentElement(); // Redibuja el elemento actual

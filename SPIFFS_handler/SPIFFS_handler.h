@@ -31,4 +31,6 @@ bool readElementData(fs::File& f, char* elementName, char* modeName, int& startX
 void loadElementsFromSPIFFS();
 void initializeDynamicOptions();
 void loadElementsFromSPIFFS();
+byte getCurrentElementID();
+bool isCurrentElementSelected();
 
