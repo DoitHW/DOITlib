@@ -74,7 +74,7 @@ struct INFO_PACK_T{
 
     byte name[24];
     byte desc[192];
-    byte serialNum[2];
+    byte serialNum[5];
     byte ID;
     byte currentMode;
     MODE_T mode[16];
@@ -110,7 +110,10 @@ byte get_brightness_from_sensorValue(LAST_ENTRY_FRAME_T LEFin);
 byte get_color_from_sensorValue(LAST_ENTRY_FRAME_T LEFin);
 float get_aux_var_01_from_sensorValue(LAST_ENTRY_FRAME_T LEFin);
 
+void  get_sector_data(byte *sector_data, byte lang, byte sector);
+
 FRAME_T frameMaker_REQ_ELEM_INFO       (byte originin, byte targetin, byte idiomain);
+FRAME_T frameMaker_REQ_ELEM_SECTOR     (byte originin, byte targetin, byte idiomain, byte sectorin);
 //FRAME_T frameMaker_REQ_ELEM_ICON       (byte origin, byte targetin);
 FRAME_T frameMaker_REQ_ELEM_STATE      (byte originin, byte targetin);
 
@@ -124,8 +127,10 @@ FRAME_T frameMaker_SEND_FLAG_BYTE      (byte originin, std::vector<byte>targetin
 FRAME_T frameMaker_SEND_PATTERN_NUM    (byte irigin, std::vector<byte>targetin, byte patternin);
 FRAME_T frameMaker_SEND_FILE_NUM       (byte originin, std::vector<byte>targetin, byte bankin, byte filein);
 
-FRAME_T frameMaker_RETURN_ELEM_INFO    (byte originin, byte targetin, INFO_PACK_T infoPack);
+//FRAME_T frameMaker_RETURN_ELEM_INFO(byte originin, byte targetin, INFO_PACK_T* infoPack);
 //FRAME_T frameMaker_RETURN_ELEM_ICON    (byte origin, byte targetin, ICON_PACK_T iconPack);
+FRAME_T frameMaker_RETURN_ELEM_SECTOR  (byte originin, byte targetin, byte *sector_data, byte sectorin);
+FRAME_T frameMaker_RETURN_ELEM_INFO(byte originin, byte targetin, INFO_PACK_T* infoPack);
 FRAME_T frameMaker_RETURN_ELEM_STATE   (byte originin, byte targetin, INFO_STATE_T infoState);
 
 

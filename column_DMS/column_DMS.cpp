@@ -15,14 +15,14 @@ COLUMN_::COLUMN_(uint16_t serialNumber) : ELEMENT_(serialNumber) {
         }
 
 void COLUMN_::column_begin(){
-            colorHandler.begin(COLUMN_NUM_LEDS);
+            colorHandler.begin(NUM_LEDS);
             delay(10);
             pinMode(COLUMN_RELAY_PIN, OUTPUT);
 }
 
 void COLUMN_::inic_elem_config(){
 
-    colorHandler.begin(COLUMN_NUM_LEDS);
+    colorHandler.begin(NUM_LEDS);
     delay(10);
     pinMode(COLUMN_RELAY_PIN, OUTPUT);
     element->set_mode(DEFAULT_BASIC_MODE);
@@ -51,9 +51,11 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
     // Depuración del estado de la pila
     Serial.println("Inicio de RX_main_handler");
     UBaseType_t stackSize = uxTaskGetStackHighWaterMark(NULL);
+                                                            /*
                                                             #ifdef DEBUG
                                                                Serial.println("Stack restante: " + String(stackSize));
                                                             #endif
+                                                            */
 
     byte currentMode_ = element->get_currentMode();
 
@@ -61,11 +63,13 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
 
        case F_REQ_ELEM_INFO:{
             INFO_PACK_T info= get_info_pack(LEF.data[0]);
-            FRAME_T frame= frameMaker_RETURN_ELEM_INFO(element->ID, LEF.origin, info);
+            FRAME_T frame= frameMaker_RETURN_ELEM_INFO(element->ID, LEF.origin, &info);
             send_frame(frame);
+                                                        /*
                                                         #ifdef DEBUG
                                                             Serial.println("Info devuelta en un Return");
                                                         #endif
+                                                        */
             break;
         }
         

@@ -2,6 +2,7 @@
 #include <Frame_DMS/Frame_DMS.h>
 #include <Element_DMS/Element_DMS.h>
 #include <column_DMS/column_DMS.h>
+#include <info_elements_DMS/info_elements_DMS.h>
 #include <vector>
 #include <Arduino.h>
 
@@ -37,14 +38,16 @@ void IRAM_ATTR onUartInterrupt() {
     static uint16_t receivedBytes = 0;          // OJO con los statics, danger.
     static uint16_t calculatedChecksum = 0;
     static uint8_t receivedChecksum = 0;
+    
 
     uint8_t bytesProcessed = 0;
-
+    static int count = 0;
+    
     while (Serial1.available()) {
-
         byte receivedByte = Serial1.read();
         Serial.print(receivedByte, HEX);
         Serial.print(" ");
+        count ++;
         bytesProcessed++;
         lastReceivedTime = millis();
         if (receiveState == WAITING_START && receivedByte != NEW_START) continue;
@@ -52,6 +55,7 @@ void IRAM_ATTR onUartInterrupt() {
         switch (receiveState) {
             case WAITING_START:
                 if (receivedByte == NEW_START) {
+                    
                     uartBuffer.reserve(MAX_FRAME_LENGTH);
                     uartBuffer.clear();
                     uartBuffer.push_back(receivedByte);
@@ -79,8 +83,9 @@ void IRAM_ATTR onUartInterrupt() {
                 totalFrameLength = expectedFrameLength + 3;  
 
                 if (totalFrameLength > MAX_FRAME_LENGTH || totalFrameLength < MIN_FRAME_LENGTH) {
+                    
                     #ifdef DEBUG
-                        Serial.println("Error: Longitud de trama inv\xE1lida");
+                        Serial.println("❌ Error: Longitud de trama inv\xE1lida");
                     #endif
                     receiveState = WAITING_START;
                     uartBuffer.clear();
@@ -116,23 +121,28 @@ void IRAM_ATTR onUartInterrupt() {
                             if (isTarget) {
                                 frameReceived = true;
                                                                 #ifdef DEBUG
-                                                                    Serial.println("Trama recibida correctamente y dirigida al dispositivo");
+                                                                    Serial.println("✅ Trama recibida correctamente y dirigida al dispositivo");
                                                                 #endif
                             } else {
                                                                 #ifdef DEBUG
-                                                                    Serial.println("Trama recibida correctamente pero no dirigida al dispositivo");
+                                                                    Serial.println("❌ Trama recibida correctamente pero no dirigida al dispositivo");
                                                                 #endif
                             }
                         } else {
+                            
                                                                 #ifdef DEBUG
-                                                                    Serial.println("Error: Checksum inv\xE1lido");
+                                                                    Serial.println("❌ Error: Checksum inv\xE1lido");
                                                                 #endif
                         }
                     } else {
+                    
                                                                 #ifdef DEBUG
-                                                                    Serial.println("Error: Byte de fin incorrecto");
+                                                                    Serial.println("❌ Error: Byte de fin incorrecto");
                                                                 #endif
                     }
+            
+                    Serial.println("Total de bytes recibidos: " + String(count));
+                    count = 0;
                     receiveState = WAITING_START;
                     return;
                 } 
@@ -192,19 +202,31 @@ LAST_ENTRY_FRAME_T extract_info_from_frameIn(std::vector<byte> vectorin) {
 
 
 void send_frame(const FRAME_T &framein) {
-    
-    Serial1.write(framein.start);
-    Serial1.write(framein.frameLengthMsb);
-    Serial1.write(framein.frameLengthLsb);
-    Serial1.write(framein.origin);
-    Serial1.write(framein.numTargets);
-    for (byte target : framein.target) Serial1.write(target);
-    Serial1.write(framein.function);
-    Serial1.write(framein.dataLengthMsb);
-    Serial1.write(framein.dataLengthLsb);
-    for (byte dato : framein.data)     Serial1.write(dato);
-    Serial1.write(framein.checksum);
-    Serial1.write(framein.end);
+    int i = 0;
+    byte dTime = 5;
+
+    Serial.println(" #### Trama enviada ####");
+    Serial1.write(framein.start);           Serial.println("[" + String(++i) + "] START = " + String(framein.start, HEX)); delay(dTime);
+    Serial1.write(framein.frameLengthMsb);  Serial.println("[" + String(++i) + "] Frame Length Msb = " + String(framein.frameLengthMsb, HEX)); delay(dTime);
+    Serial1.write(framein.frameLengthLsb);  Serial.println("[" + String(++i) + "] Frame Length Lsb = " + String(framein.frameLengthLsb, HEX)); delay(dTime);
+    Serial1.write(framein.origin);          Serial.println("[" + String(++i) + "] Origen = " + String(framein.origin, HEX)); delay(dTime);
+    Serial1.write(framein.numTargets);      Serial.println("[" + String(++i) + "] numTargets = " + String(framein.numTargets, HEX)); delay(dTime);
+    int dataIndex = 0;
+    for (byte target : framein.target) {
+        Serial1.write(target); Serial.println("[" + String(++i) + "] Target[" + String(dataIndex++) + "] = " + String(target, HEX)); delay(dTime);
+    }
+    Serial1.write(framein.function);        Serial.println("[" + String(++i) + "] Function = " + String(framein.function, HEX)); delay(dTime);
+    Serial1.write(framein.dataLengthMsb);   Serial.println("[" + String(++i) + "] Data Length Msb = " + String(framein.dataLengthMsb, HEX)); delay(dTime);
+    Serial1.write(framein.dataLengthLsb);   Serial.println("[" + String(++i) + "] Data Length Lsb = " + String(framein.dataLengthLsb, HEX)); delay(dTime);
+    dataIndex = 0;
+    for (byte dato : framein.data) {
+        Serial1.write(dato); Serial.println("[" + String(++i) + "] Data[" + String(dataIndex++) + "] = " + String(dato, HEX)); delay(dTime);
+    }
+    Serial1.write(framein.checksum);        Serial.println("[" + String(++i) + "] Checksum = " + String(framein.checksum, HEX)); delay(dTime);
+    Serial1.write(framein.end);             Serial.println("[" + String(++i) + "] End = " + String(framein.end, HEX)); delay(dTime);
+    Serial.println("======================================");
+
+    //Serial.println("Trama enviada, bytes: " + String(i));
 }
 
 
@@ -296,7 +318,21 @@ byte get_color_from_sensorValue(LAST_ENTRY_FRAME_T LEFin) {
 
 
 
+void  get_sector_data(byte *sector_data, byte lang, byte sector){
 
+    String data;
+    switch(sector){
+        case ELEM_NAME_SECTOR:
+            data = get_string_from_info_DB(ELEM_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;
+
+        case ELEM_DESC_SECTOR:
+            data = get_string_from_info_DB(ELEM_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;
+    }
+}
 
 
 
@@ -314,9 +350,32 @@ byte get_color_from_sensorValue(LAST_ENTRY_FRAME_T LEFin) {
 
 
 
+FRAME_T frameMaker_REQ_ELEM_SECTOR(byte originin, byte targetin, byte idiomain, byte sectorin){
+
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    frame.data.resize(L_REQ_ELEM_SECTOR);
+    uint16_t  frameLength = 0x08 + L_REQ_ELEM_SECTOR;
+
+    frame.start= NEW_START;
+    frame.frameLengthLsb = frameLength & 0xFF;      
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin= originin;
+    frame.numTargets = 0x01;
+    frame.target.push_back(targetin);
+    frame.function= F_REQ_ELEM_SECTOR;
+    frame.dataLengthMsb = (L_REQ_ELEM_SECTOR >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_REQ_ELEM_SECTOR & 0xFF;   
+    frame.data[0]= idiomain;
+    frame.data[1]= sectorin;
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+
+    return frame;
+}
 
 
-FRAME_T frameMaker_REQ_ELEM_INFO(byte originin, byte targetin, byte idiomain){
+FRAME_T frameMaker_REQ_ELEM_INFO(byte originin, byte targetin, byte idiomain, byte sectorin){
 
     FRAME_T frame;
     memset(&frame, 0, sizeof(FRAME_T));
@@ -333,11 +392,13 @@ FRAME_T frameMaker_REQ_ELEM_INFO(byte originin, byte targetin, byte idiomain){
     frame.dataLengthMsb = (L_REQ_ELEM_INFO >> 8) & 0xFF; 
     frame.dataLengthLsb = L_REQ_ELEM_INFO & 0xFF;   
     frame.data[0]= idiomain;
+    frame.data[1]= sectorin;
     frame.checksum= checksum_calc(frame);
     frame.end= NEW_END;
 
     return frame;
 }
+
 
 FRAME_T frameMaker_REQ_ELEM_STATE(byte originin, byte targetin){
 
@@ -558,49 +619,48 @@ FRAME_T frameMaker_SEND_TEST(byte originin, std::vector<byte>targetin, byte test
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-FRAME_T frameMaker_RETURN_ELEM_INFO(byte originin, byte targetin, INFO_PACK_T infoPack) {
-    FRAME_T frame;
-    uint16_t dataLength = L_RETURN_ELEM_INFO;
-    uint16_t length = 0x06 + 0x01 + L_RETURN_ELEM_INFO;
+FRAME_T frameMaker_RETURN_ELEM_SECTOR (byte originin, byte targetin, byte *sector_data, byte sectorin){
 
-    frame.start = NEW_START;
-    frame.frameLengthMsb = (length >> 8) & 0xFF;
-    frame.frameLengthLsb = length & 0xFF;
-    frame.origin = originin;
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    uint16_t  frameLength= 0;
+    frame.start= NEW_START;
+    frame.origin= originin;
     frame.numTargets = 0x01;
     frame.target.push_back(targetin);
-    frame.function = F_RETURN_ELEM_INFO;
-    frame.dataLengthMsb = (dataLength >> 8) & 0xFF;
-    frame.dataLengthLsb = dataLength & 0xFF;
 
-    // Añadir datos básicos
-    frame.data.insert(frame.data.end(), infoPack.name, infoPack.name + sizeof(infoPack.name));
-    frame.data.insert(frame.data.end(), infoPack.desc, infoPack.desc + sizeof(infoPack.desc));
-    frame.data.insert(frame.data.end(), infoPack.serialNum, infoPack.serialNum + sizeof(infoPack.serialNum));
-    frame.data.push_back(infoPack.ID);
-    frame.data.push_back(infoPack.currentMode);
+    switch(sectorin){
+        case ELEM_NAME_SECTOR:
+            frame.data.resize(L_RETURN_ELEM_SECTOR_24 +1);
+            frameLength = 0x08 + L_RETURN_ELEM_SECTOR_24 +1;
+            frame.frameLengthLsb = frameLength & 0xFF;     
+            frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+            frame.function= F_RETURN_ELEM_SECTOR;
+            frame.dataLengthMsb = (L_RETURN_ELEM_SECTOR_24 +1 >> 8) & 0xFF; 
+            frame.dataLengthLsb = L_RETURN_ELEM_SECTOR_24 +1 & 0xFF;
+            frame.data.push_back(sectorin);   
+            for (int i = 0; i < L_RETURN_ELEM_SECTOR_24; i++) frame.data.push_back(sector_data[i]);
+            break;
 
-    // Añadir modos
-    for (int i = 0; i < 16; i++) {
-        frame.data.insert(frame.data.end(), infoPack.mode[i].name, infoPack.mode[i].name + sizeof(infoPack.mode[i].name));
-        frame.data.insert(frame.data.end(), infoPack.mode[i].desc, infoPack.mode[i].desc + sizeof(infoPack.mode[i].desc));
-        frame.data.insert(frame.data.end(), infoPack.mode[i].config, infoPack.mode[i].config + 2);
+        case ELEM_DESC_SECTOR:
+            frame.data.resize(L_RETURN_ELEM_SECTOR_192 +1);
+            frameLength = 0x08 + L_RETURN_ELEM_SECTOR_192 +1;
+            frame.frameLengthLsb = frameLength & 0xFF;     
+            frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+            frame.function= F_RETURN_ELEM_SECTOR;
+            frame.dataLengthMsb = (L_RETURN_ELEM_SECTOR_192 +1 >> 8) & 0xFF; 
+            frame.dataLengthLsb = L_RETURN_ELEM_SECTOR_192 +1 & 0xFF;
+            frame.data.push_back(sectorin);   
+            for (int i = 0; i < L_RETURN_ELEM_SECTOR_192; i++) frame.data.push_back(sector_data[i]);
+            break;
     }
 
-    // Añadir icono bidimensional correctamente
-    for (int row = 0; row < ICON_ROWS; row++) {
-        for (int col = 0; col < ICON_COLUMNS; col++) {
-            // Al ser uint16_t, lo divido en MSB y LSB
-            frame.data.push_back((infoPack.icono[row][col] >> 8) & 0xFF); // MSB
-            frame.data.push_back(infoPack.icono[row][col] & 0xFF);        // LSB
-        }
-    }
-
-    frame.checksum = checksum_calc(frame);
-    frame.end = NEW_END;
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
 
     return frame;
 }
+
 
 
 FRAME_T frameMaker_RETURN_ELEM_STATE(byte originin, byte targetin, INFO_STATE_T infoState){
@@ -662,6 +722,104 @@ FRAME_T frameMaker_RETURN_ELEM_STATE(byte originin, byte targetin, INFO_STATE_T 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////
+
+
+FRAME_T frameMaker_RETURN_ELEM_INFO(byte originin, byte targetin, INFO_PACK_T* infoPack) {
+    FRAME_T frame;
+    uint16_t dataLength = L_RETURN_ELEM_INFO;
+    uint16_t length = 0x08 + L_RETURN_ELEM_INFO;
+
+    frame.start = NEW_START;
+    frame.frameLengthMsb = (length >> 8) & 0xFF;
+    frame.frameLengthLsb = length & 0xFF;
+    frame.origin = originin;
+    frame.numTargets = 0x01;
+    frame.target.push_back(targetin);
+    frame.function = F_RETURN_ELEM_INFO;
+    frame.dataLengthMsb = (dataLength >> 8) & 0xFF;
+    frame.dataLengthLsb = dataLength & 0xFF;
+    frame.data.reserve(sizeof(*infoPack));
+    // Ahora usamos el operador -> para acceder a los miembros del puntero
+    frame.data.insert(frame.data.end(),                          // NAME
+                     infoPack->name,
+                     infoPack->name + sizeof(infoPack->name));
+    frame.data.insert(frame.data.end(),                         // DESC
+                     infoPack->desc,
+                     infoPack->desc + sizeof(infoPack->desc));
+    frame.data.insert(frame.data.end(),                        // SERIALNUM
+                     infoPack->serialNum,
+                     infoPack->serialNum + sizeof(infoPack->serialNum));
+    frame.data.push_back(infoPack->ID);                        // ID
+    frame.data.push_back(infoPack->currentMode);               // CURRENTMODE
+    for (int i = 0; i < 16; i++) {
+        frame.data.insert(frame.data.end(),
+                         infoPack->mode[i].name,
+                         infoPack->mode[i].name + sizeof(infoPack->mode[i].name));
+        frame.data.insert(frame.data.end(),
+                         infoPack->mode[i].desc,
+                         infoPack->mode[i].desc + sizeof(infoPack->mode[i].desc));
+        frame.data.insert(frame.data.end(),
+                         infoPack->mode[i].config,
+                         infoPack->mode[i].config + 2);
+    }
+    const uint8_t* iconPtr = reinterpret_cast<const uint8_t*>(infoPack->icono);
+    size_t iconSize = sizeof(infoPack->icono); // = 8192
+    frame.data.insert(frame.data.end(), iconPtr, iconPtr + iconSize);
+        
+    frame.checksum = checksum_calc(frame);
+    frame.end = NEW_END;
+
+    return frame;
+}
 
 
 

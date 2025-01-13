@@ -30,6 +30,7 @@ extern bool inModesScreen;
 extern bool modeScreenEnteredByLongPress;
 extern bool isLongPress;
 extern bool hiddenMenuActive;
+extern unsigned long buttonPressStart;
 
 
 

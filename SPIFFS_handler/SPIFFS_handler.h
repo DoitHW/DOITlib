@@ -8,7 +8,7 @@
 const size_t OFFSET_NAME = 0;                              
 const size_t OFFSET_DESC = OFFSET_NAME + 24;               // 24+192 =216
 const size_t OFFSET_SERIAL = OFFSET_DESC + 192;            // 216+2=218
-const size_t OFFSET_ID = OFFSET_SERIAL + 2;                // 218+1=219
+const size_t OFFSET_ID = OFFSET_SERIAL + 5;                // 218+1=219
 const size_t OFFSET_CURRENTMODE = OFFSET_ID + 1;           // 219+1=220
 const size_t SIZE_MODE = 24 + 192 + 2; // 218 bytes por modo
 const size_t SIZE_MODES = SIZE_MODE * 16; // 3488 bytes

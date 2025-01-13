@@ -19,6 +19,13 @@ class BOTONERA_ : public ELEMENT_{
 
         void botonera_begin();
         void RX_main_handler(LAST_ENTRY_FRAME_T LEF)override;
+        void sectorIn_handler(std::vector<byte> data, byte tragetin);
+        byte buscar_elemento_nuevo();
+        byte anadir_elemento_nuevo(const INFO_PACK_T *infoPack);
+        void print_info_pack(const INFO_PACK_T *infoPack);
+        bool serialExistsInSPIFFS(byte serialNum[2]);
+        
+
 };
 
 

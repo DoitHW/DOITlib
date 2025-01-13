@@ -110,7 +110,7 @@ void COLORHANDLER_::begin(int numLeds) {
     }
     this->leds = new CRGB[numLeds];
     
-    FastLED.addLeds<WS2812, dataPin>(leds, numLeds);
+    FastLED.addLeds<WS2812, dataPin, RGB>(leds, numLeds);
     FastLED.setBrightness(255);
 }
 
@@ -554,10 +554,10 @@ void COLORHANDLER_::set_botoneraPattern (byte patternin){
 }
 
 void COLORHANDLER_::setPatternBotonera(byte mode) {
-  Serial.println("setPatternBotonera: " + String(mode));
+  //Serial.println("setPatternBotonera: " + String(mode));
     switch (mode) {
         case 0: {
-          Serial.println("Basico");
+         // Serial.println("Basico");
             // Patrón básico: Colores específicos para cada LED
             for (int i = 0; i < numLeds; i++) {
                 switch (i) {
@@ -576,22 +576,43 @@ void COLORHANDLER_::setPatternBotonera(byte mode) {
             break;
         }
         case 1: {
-          Serial.println("Calientes");
-            // Patrón gradiente de colores cálidos
-            for (int i = 0; i < numLeds; i++) {
-                int warmGradient = map(i, 0, numLeds - 1, 0xFF0000, 0xFFFF00); // De rojo a amarillo
-                leds[i] = CRGB(warmGradient);
-            }
-            break;
+          //Serial.println("Calientes");
+          // leds[0] = CRGB(0xFF, 0x00, 0x00); // Rojo
+          // leds[1] = CRGB(0xFF, 0x1E, 0x14); 
+          // leds[2] = CRGB(0xFF, 0x3C, 0x28); 
+          // leds[3] = CRGB(0xFF, 0x5A, 0x1E); 
+          // leds[4] = CRGB(0xFF, 0x78, 0x14); 
+          // leds[5] = CRGB(0xFF, 0x96, 0x0A);
+          // leds[6] = CRGB(0xFF, 0xB4, 0x05); 
+          // leds[7] = CRGB(0xFF, 0xD2, 0x03);
+          // leds[8] = CRGB(0xFF, 0xF0, 0x00); 
+
+          leds[0] = CRGB::Black;               // Negro (equivalente al "rojo" inicial apagado)
+leds[1] = CRGB(0x80, 0x00, 0x00);   // Rojo oscuro (borgoña)
+leds[2] = CRGB(0xFF, 0x00, 0x00);   // Rojo puro
+leds[3] = CRGB(0xFF, 0x66, 0x00);   // Naranja brillante
+leds[4] = CRGB(0xFF, 0xA5, 0x00);   // Naranja cálido (ámbar)
+leds[5] = CRGB(0xFF, 0xFF, 0x00);   // Amarillo puro
+leds[6] = CRGB(0xFF, 0xE6, 0x33);   // Amarillo dorado (mostaza)
+leds[7] = CRGB(0xFF, 0xF2, 0xCC);   // Blanco cálido con tinte crema
+leds[8] = CRGB(0xFF, 0xFA, 0xE6);   // Blanco marfil (ligeramente más claro)
+
+
+        break;
         }
         case 2: {
-          Serial.println("Frios");
+          //Serial.println("Frios");
             // Patrón gradiente de colores fríos
-            for (int i = 0; i < numLeds; i++) {
-                int coolGradient = map(i, 0, numLeds - 1, 0x0000FF, 0x00FFFF); // De azul a cian
-                leds[i] = CRGB(coolGradient);
-            }
-            break;
+          leds[0] = CRGB::Black; // Rojo  
+          leds[1] = CRGB(0x33, 0x00, 0x66); // Morado oscuro
+          leds[2] = CRGB(0x66, 0x00, 0xCC); // Morado brillante
+          leds[3] = CRGB(0x00, 0x00, 0xFF); // Azul puro
+          leds[4] = CRGB(0x33, 0x66, 0xFF); // Azul cielo
+          leds[5] = CRGB(0x00, 0xCC, 0xFF); // Turquesa intenso
+          leds[6] = CRGB(0x33, 0xFF, 0xFF); // Turquesa brillante
+          leds[7] = CRGB(0x99, 0xCC, 0xFF); // Azul claro con blanco
+          leds[8] = CRGB(0xFF, 0xFF, 0xFF); // Blanco puro
+        break;
         }
         default: {
             // Sin patrón: Apagar todos los LEDs

@@ -327,6 +327,7 @@ void ELEMENT_::set_ID(uint8_t deviceID) {
     configFile.readStringUntil('\n');
     configFile.println(ID);
     configFile.close();
+    globalID= ID;
     delay(1);
    
                                                                 #ifdef DEBUG
@@ -412,6 +413,8 @@ INFO_STATE_T ELEMENT_::get_state_pack(ELEMENT_ &elementin, CRGB colorin){
     SPIFFS.end();
     return state;
 }
+
+
 
 INFO_PACK_T ELEMENT_::get_info_pack(byte languajein){
 

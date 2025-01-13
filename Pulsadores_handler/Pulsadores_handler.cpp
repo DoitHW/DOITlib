@@ -2,6 +2,7 @@
 #include <defines_DMS/defines_DMS.h>
 #include <Frame_DMS/Frame_DMS.h>
 #include <SPIFFS_handler/SPIFFS_handler.h>
+#include <botonera_DMS/botonera_DMS.h>
 
 // Inicialización de pines y matriz de colores
 int filas[FILAS] = {4, 5, 6, 7};
@@ -89,6 +90,7 @@ void PulsadoresHandler::mostrarColor(byte color) {
             colorNombre = "Relay";
             relay_state = !relay_state;
             send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, target, relay_state));
+            send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA, 0xFF, SPANISH_LANG, ELEM_SERIAL_SECTOR));
             break;
         default:
             Serial.println("Ningún botón presionado.");

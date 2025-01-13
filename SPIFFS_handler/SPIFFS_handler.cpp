@@ -75,7 +75,7 @@ bool saveElementFieldByField(const char* baseName, const uint16_t* iconData) {
     byte id = BROADCAST;
 
     if (strcmp(baseName, "Columna") == 0) id = 0x04;
-    else if (strcmp(baseName, "LED strip") == 0) id = 0x08;
+    else if (strcmp(baseName, "LED strip") == 0) id = 0xDD;
 
         f.seek(OFFSET_ID, SeekSet);
         if (!writeBytesChecked(f, &id, 1))

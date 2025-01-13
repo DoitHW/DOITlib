@@ -12,6 +12,8 @@
 #include <vector>
 #include <Colors_DMS/Color_DMS.h>
 
+extern byte globalID;
+
 class ELEMENT_ {
 
     public: 
@@ -22,6 +24,7 @@ class ELEMENT_ {
         void          reset_config_file();
         void          start_working_time(); 
         void          stopAndSave_working_time();  
+        void          work_time_handler(byte colorin);
         void          set_sinceStart_time(uint64_t);
         uint64_t      get_sinceStart_time();
         unsigned long read_lifeTime_from_file();
@@ -45,6 +48,7 @@ class ELEMENT_ {
         byte          get_flag();
 
         byte          get_serialNum(byte ml);
+
         INFO_PACK_T   get_info_pack(byte languajein);
         INFO_STATE_T  get_state_pack(ELEMENT_ &elementin, CRGB colorin);
 
