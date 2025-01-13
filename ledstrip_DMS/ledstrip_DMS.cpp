@@ -213,7 +213,7 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
 
         default: {
                                                                 #ifdef DEBUG
-                                                                    Serial.println("Se ha recibido una función desconocida.");
+                                                                    Serial.println(" LEDSTRIP Se ha recibido una función desconocida.");
                                                                 #endif
             break;
         }

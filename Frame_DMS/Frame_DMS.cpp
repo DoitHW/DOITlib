@@ -6,6 +6,7 @@
 #include <icons_64x64_DMS/icons_64x64_DMS.h>
 #include <vector>
 #include <Arduino.h>
+#include <WiFi.h>
 
 
 extern LAST_ENTRY_FRAME_T            LEF;
@@ -125,18 +126,19 @@ void IRAM_ATTR onUartInterrupt() {
                                                                 #endif
                             } else {
                                                                 #ifdef DEBUG
+                                                                    Serial.println("🚫 Trama recibida correctamente pero no dirigida al dispositivo");
                                                                     Serial.println();
                                                                     Serial.println("✅ Trama recibida correctamente pero ❌ no dirigida al dispositivo");
                                                                 #endif
                             }
                         } else {
                                                                 #ifdef DEBUG
-                                                                    Serial.println("❌ Error: Checksum inv\xE1lido");
+                                                                    Serial.println("❗ Error: Checksum inv\xE1lido");
                                                                 #endif
                         }
                     } else {
                                                                 #ifdef DEBUG
-                                                                    Serial.println("❌ Error: Byte de fin incorrecto");
+                                                                    Serial.println("❗ Error: Byte de fin incorrecto");
                                                                 #endif
                     }
                     receiveState = WAITING_START;
@@ -199,7 +201,7 @@ LAST_ENTRY_FRAME_T extract_info_from_frameIn(std::vector<byte> vectorin) {
 
 void send_frame(const FRAME_T &framein) {
     int i = 0;
-    byte dTime = 4;
+    byte dTime = 6;
                                                                                                 #ifdef DEBUG
                                                                                                     Serial.println(" #### Trama enviada ####");
                                                                                                 #endif
@@ -402,16 +404,26 @@ void  get_sector_data(byte *sector_data, byte lang, byte sector){
             data.toCharArray((char*)sector_data, 192);
             break;
 
-        case ELEM_SERIAL_SECTOR:
-            data = element->get_serial_from_file();
-            data.trim();
-            for (int i = 0; i < 5; i++) {
-            String byteStr = data.substring(i * 2, i * 2 + 2);
-            sector_data[i] = (uint8_t)strtol(byteStr.c_str(), NULL, 16);
+        case ELEM_SERIAL_SECTOR: {
+            String macNumbers = WiFi.macAddress();
+            macNumbers = macNumbers.substring(9);
+            macNumbers.replace(":", "");
+            File file = SPIFFS.open(ELEMENT_SERIALNUM_FILE_PATH, "r");
+            String fileContent = "";
+            if (file) {
+                fileContent = file.readString();
+                file.close();
             }
-            Serial.println("Data DATADATADTAATDATDATDATDA: " + String(data));
-            Serial.println("Data DATADATADTAATDATDATDATDA: " + String(sector_data[0]));
+            while (fileContent.length() < 4) fileContent += "0";
+            sector_data[0] = strtoul(fileContent.substring(0, 2).c_str(), nullptr, 16);
+            sector_data[1] = strtoul(fileContent.substring(2, 4).c_str(), nullptr, 16);
+            sector_data[2] = strtoul(macNumbers.substring(0, 2).c_str(), nullptr, 16);
+            sector_data[3] = strtoul(macNumbers.substring(2, 4).c_str(), nullptr, 16);
+            sector_data[4] = strtoul(macNumbers.substring(4, 6).c_str(), nullptr, 16);
+
             break;
+        }
+
 
         case ELEM_ID_SECTOR:
             sector_data[0] = globalID;
@@ -1197,8 +1209,20 @@ FRAME_T frameMaker_RETURN_ELEM_SECTOR (byte originin, byte targetin, byte *secto
                 }
                 break;
 
+            case ELEM_WORK_TIME_SECTOR:
+            case ELEM_LIFE_TIME_SECTOR:
+                frameLength = 0x08 + L_RETURN_ELEM_SECTOR_04 + 1;
+                frame.frameLengthLsb = frameLength & 0xFF;     
+                frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+                frame.dataLengthMsb = ((L_RETURN_ELEM_SECTOR_04+ 1) >> 8) & 0xFF; 
+                frame.dataLengthLsb = (L_RETURN_ELEM_SECTOR_04+ 1) & 0xFF;
+                for (int i = 0; i < L_RETURN_ELEM_SECTOR_04; i++) {
+                    frame.data.push_back(sector_data[i]);
+                }
+                break;
+
         default: Serial.println("Sector no valido");
-            break;
+                break;
     }
     frame.checksum= checksum_calc(frame);
     frame.end= NEW_END;
