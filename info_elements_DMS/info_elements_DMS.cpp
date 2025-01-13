@@ -16,7 +16,6 @@ uint16_t get_info_num(int count, ...) {
     return result;
 }
 
-
 #ifdef COLUMNA
 
         uint16_t get_config_flag_mode(byte modein){
@@ -53,8 +52,7 @@ uint16_t get_info_num(int count, ...) {
                                                                 Serial.print(config, BIN);
                                                                 Serial.print(" para el modo ");
                                                                 Serial.print(modein);
-                                                                Serial.print(" para el elemento ");
-                                                             
+                                                                Serial.print(" para el elemento ");      
                                                         #endif
         return config;
         }
@@ -645,39 +643,44 @@ uint16_t get_info_num(int count, ...) {
 
         uint16_t get_config_flag_mode(byte modein){
                 uint16_t config= 0;
-                if(modein == COLUMN_BASIC_MODE) config= get_info_num(2, 
+                if(modein == LEDSTRIP_BASIC_MODE) config= get_info_num(2, 
                                                                         ACCEPTS_BASIC_COLOR,
-                                                                        HAS_RELAY_1);
+                                                                        SITUATED_HIGH);
 
-                else if(modein == COLUMN_SLOW_MODE) config= get_info_num(2, 
+                else if(modein == LEDSTRIP_SLOW_MODE) config= get_info_num(2, 
                                                                         ACCEPTS_BASIC_COLOR,
-                                                                        HAS_RELAY_1);
+                                                                        SITUATED_HIGH);
 
-                else if(modein == COLUMN_MOTION_MODE) config= get_info_num(3, 
+                else if(modein == LEDSTRIP_MOTION_MODE) config= get_info_num(3, 
                                                                         ACCEPTS_BASIC_COLOR,
-                                                                        HAS_RELAY_1,
+                                                                        SITUATED_HIGH,
                                                                         ACCEPTS_SENS_VAL_1);
 
-                else if(modein == COLUMN_RB_MOTION_MODE) config= get_info_num(3, 
+                else if(modein == LEDSTRIP_RB_MOTION_MODE) config= get_info_num(3, 
                                                                         ACCEPTS_BASIC_COLOR,
-                                                                        HAS_RELAY_1,
+                                                                        SITUATED_HIGH,
                                                                         ACCEPTS_SENS_VAL_1);
 
-                else if(modein == COLUMN_MIX_MODE) config= get_info_num(2, 
+                else if(modein == LEDSTRIP_MIX_MODE) config= get_info_num(2, 
                                                                         ACCEPTS_ADVANCED_COLOR,
-                                                                        HAS_RELAY_1);
+                                                                        SITUATED_HIGH);
 
-                else if(modein == COLUMN_PASSIVE_MODE) config= get_info_num(2, 
+                else if(modein == LEDSTRIP_PASSIVE_MODE) config= get_info_num(2, 
                                                                         HAS_PASSIVE,
-                                                                        HAS_RELAY_1);
+                                                                        SITUATED_HIGH);
+
+                else if(modein == LEDSTRIP_PATTERN_MODE) config= get_info_num(3, 
+                                                                        ACCEPTS_BASIC_COLOR,
+                                                                        ACCEPTS_PATTERNS,
+                                                                        SITUATED_HIGH);
+
 
                                                         #ifdef DEBUG
                                                                 Serial.print("Se devuelve un 16bit config -> " );
-                                                                Serial.print(config, BIN);
+                                                                Serial.println(config, BIN);
                                                                 Serial.print(" para el modo ");
                                                                 Serial.print(modein);
-                                                                Serial.print(" para el elemento FIBRAS");
-                                                                
+                                                                Serial.println(" para el elemento Wallwasher");     
                                                         #endif
                 return config;
                 }
@@ -688,51 +691,51 @@ uint16_t get_info_num(int count, ...) {
                 switch(languajein){
 
                         case SPANISH_LANG:
-                                if     (fieldin == ELEM_NAME)           info= "FIBRAS";
-                                else if(fieldin == ELEM_DESC)           info= " ";
-                                else if(fieldin == ELEM_MODE_0_NAME)    info= " "; // modo oculto
-                                else if(fieldin == ELEM_MODE_0_DESC)    info= " "; // 
-                                else if(fieldin == ELEM_MODE_1_NAME)    info= " ";
-                                else if(fieldin == ELEM_MODE_1_DESC)    info= " ";
-                                else if(fieldin == ELEM_MODE_2_NAME)    info= " ";
-                                else if(fieldin == ELEM_MODE_2_DESC)    info= " ";
-                                else if(fieldin == ELEM_MODE_3_NAME)    info= " ";
-                                else if(fieldin == ELEM_MODE_3_DESC)    info= " ";
-                                else if(fieldin == ELEM_MODE_4_NAME)    info= " ";
-                                else if(fieldin == ELEM_MODE_4_DESC)    info= " ";
-                                else if(fieldin == ELEM_MODE_5_NAME)    info= " ";
-                                else if(fieldin == ELEM_MODE_5_DESC)    info= " ";
-                                else if(fieldin == ELEM_MODE_6_NAME)    info= " ";
-                                else if(fieldin == ELEM_MODE_6_DESC)    info= " ";
-                                else if(fieldin == ELEM_MODE_7_NAME)    info= " ";
-                                else if(fieldin == ELEM_MODE_7_DESC)    info= " ";
-                                else if(fieldin == ELEM_MODE_8_NAME)    info= " ";
-                                else if(fieldin == ELEM_MODE_8_DESC)    info= " ";
-                                else if(fieldin == ELEM_MODE_9_NAME)    info= " ";
-                                else if(fieldin == ELEM_MODE_9_DESC)    info= " ";
-                                else if(fieldin == ELEM_MODE_10_NAME)   info= " ";
-                                else if(fieldin == ELEM_MODE_10_DESC)   info= " ";
-                                else if(fieldin == ELEM_MODE_11_NAME)   info= " ";
-                                else if(fieldin == ELEM_MODE_11_DESC)   info= " ";
-                                else if(fieldin == ELEM_MODE_12_NAME)   info= " ";
-                                else if(fieldin == ELEM_MODE_12_DESC)   info= " ";
-                                else if(fieldin == ELEM_MODE_13_NAME)   info= " ";
-                                else if(fieldin == ELEM_MODE_13_DESC)   info= " ";
-                                else if(fieldin == ELEM_MODE_14_NAME)   info= " ";
-                                else if(fieldin == ELEM_MODE_14_DESC)   info= " ";
-                                else if(fieldin == ELEM_MODE_15_NAME)   info= " ";
-                                else if(fieldin == ELEM_MODE_15_DESC)   info= " ";
+                                if     (fieldin == ELEM_NAME)           info= "ILLOSTRIPS";
+                                else if(fieldin == ELEM_DESC)           info= "HOLA TESTING THE BEST OF THE BESTES SWITCHS";
+                                else if(fieldin == ELEM_MODE_0_NAME)    info= ""; // modo oculto
+                                else if(fieldin == ELEM_MODE_0_DESC)    info= ""; // 
+                                else if(fieldin == ELEM_MODE_1_NAME)    info= "MODO GIGACHAD";
+                                else if(fieldin == ELEM_MODE_1_DESC)    info= "ERAN TRES MOTORISTAS QUE ERAN MOTOS MIENTRAS QUE CHOCABAN CON UN BANCO.";
+                                else if(fieldin == ELEM_MODE_2_NAME)    info= "MODO GITANO";
+                                else if(fieldin == ELEM_MODE_2_DESC)    info= "ESTE AÑO NO HAY REYES POR MALOS Y POR FUMAR ";
+                                else if(fieldin == ELEM_MODE_3_NAME)    info= "";
+                                else if(fieldin == ELEM_MODE_3_DESC)    info= "ESTO NO ES UN JUEGO EH";
+                                else if(fieldin == ELEM_MODE_4_NAME)    info= "";
+                                else if(fieldin == ELEM_MODE_4_DESC)    info= "";
+                                else if(fieldin == ELEM_MODE_5_NAME)    info= "";
+                                else if(fieldin == ELEM_MODE_5_DESC)    info= "";
+                                else if(fieldin == ELEM_MODE_6_NAME)    info= "";
+                                else if(fieldin == ELEM_MODE_6_DESC)    info= "";
+                                else if(fieldin == ELEM_MODE_7_NAME)    info= "";
+                                else if(fieldin == ELEM_MODE_7_DESC)    info= "SABES NO?";
+                                else if(fieldin == ELEM_MODE_8_NAME)    info= "";
+                                else if(fieldin == ELEM_MODE_8_DESC)    info= "";
+                                else if(fieldin == ELEM_MODE_9_NAME)    info= "";
+                                else if(fieldin == ELEM_MODE_9_DESC)    info= "HEMOS VUELTO HIJOS DE LA GRAN PUTAAAAAAAA";
+                                else if(fieldin == ELEM_MODE_10_NAME)   info= "";
+                                else if(fieldin == ELEM_MODE_10_DESC)   info= "";
+                                else if(fieldin == ELEM_MODE_11_NAME)   info= "";
+                                else if(fieldin == ELEM_MODE_11_DESC)   info= "PERO LA QUERIA TANTO";
+                                else if(fieldin == ELEM_MODE_12_NAME)   info= "";
+                                else if(fieldin == ELEM_MODE_12_DESC)   info= "";
+                                else if(fieldin == ELEM_MODE_13_NAME)   info= "";
+                                else if(fieldin == ELEM_MODE_13_DESC)   info= "";
+                                else if(fieldin == ELEM_MODE_14_NAME)   info= "";
+                                else if(fieldin == ELEM_MODE_14_DESC)   info= "CALLATE LA BOCA TONTITOOO";
+                                else if(fieldin == ELEM_MODE_15_NAME)   info= "";
+                                else if(fieldin == ELEM_MODE_15_DESC)   info= "";
                                 break;
 
                         case ENGLISH_LANG:
-                                if     (fieldin == ELEM_NAME)           info= " ";
-                                else if(fieldin == ELEM_DESC)           info= " ";
+                                if     (fieldin == ELEM_NAME)           info= "Doit LED Strip";
+                                else if(fieldin == ELEM_DESC)           info= "Lights your room and create an immersive Fx!";
                                 else if(fieldin == ELEM_MODE_0_NAME)    info= " "; // modo oculto
                                 else if(fieldin == ELEM_MODE_0_DESC)    info= " "; // 
-                                else if(fieldin == ELEM_MODE_1_NAME)    info= " ";
-                                else if(fieldin == ELEM_MODE_1_DESC)    info= " ";
-                                else if(fieldin == ELEM_MODE_2_NAME)    info= " ";
-                                else if(fieldin == ELEM_MODE_2_DESC)    info= " ";
+                                else if(fieldin == ELEM_MODE_1_NAME)    info= "Basic";
+                                else if(fieldin == ELEM_MODE_1_DESC)    info= "Changes the color.";
+                                else if(fieldin == ELEM_MODE_2_NAME)    info= "Slow";
+                                else if(fieldin == ELEM_MODE_2_DESC)    info= "Changes the color slowly";
                                 else if(fieldin == ELEM_MODE_3_NAME)    info= " ";
                                 else if(fieldin == ELEM_MODE_3_DESC)    info= " ";
                                 else if(fieldin == ELEM_MODE_4_NAME)    info= " ";
@@ -986,8 +989,7 @@ uint16_t get_info_num(int count, ...) {
                                                                 Serial.print(config, BIN);
                                                                 Serial.print(" para el modo ");
                                                                 Serial.print(modein);
-                                                                Serial.print(" para el elemento ");
-                                                            
+                                                                Serial.print(" para el elemento ");       
                                                         #endif
                 return config;
                 }

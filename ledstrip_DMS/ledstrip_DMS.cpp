@@ -7,17 +7,40 @@
 #include <EEPROM.h>
 
 
+extern float varaux;
+INFO_PACK_T info;
 
-LEDSTRIP_::LEDSTRIP_(uint16_t serialNumber) : ELEMENT_(serialNumber) {
-            set_type(TYPE_LEDSTRIP);
-            currentMode= DEFAULT_BASIC_MODE;
-        }
+LEDSTRIP_::LEDSTRIP_() {
+    set_type(TYPE_LEDSTRIP);
+    currentMode = DEFAULT_BASIC_MODE;
+    activePattern = NO_PATTERN;
+}
 
 void LEDSTRIP_::ledstrip_begin(){
-            colorHandler.begin(LEDSTRIP_NUM_LEDS);
+            colorHandler.begin(NUM_LEDS);
             delay(10);
 
             element->set_mode(DEFAULT_BASIC_MODE);
+}
+
+void ELEMENT_::work_time_handler(byte colorin){
+    if (colorin != 8) {
+        if (!stopwatchRunning) {
+            start_working_time();
+        } else {
+                                                                                                    #ifdef DEBUG
+                                                                                                        Serial.println("El cronómetro ya está activo.");
+                                                                                                    #endif
+        }
+    } else {
+        if (stopwatchRunning) {
+            stopAndSave_working_time();
+        } else {
+                                                                                                    #ifdef DEBUG
+                                                                                                    Serial.println("El cronómetro ya está detenido.");
+                                                                                                    #endif
+        }
+    }
 }
 
 void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
@@ -28,7 +51,7 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
         return;
     }
                                                             #ifdef DEBUG
-                                                                Serial.println("Inicio de RX_main_handler");
+                                                                Serial.println("Inicio de RX_main_handler, provando F_RQ_NFO");
                                                             #endif
     UBaseType_t stackSize = uxTaskGetStackHighWaterMark(NULL);
                                                             #ifdef DEBUG
@@ -38,77 +61,57 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
     byte currentMode_ = element->get_currentMode();
 
     switch (LEF.function) {
-/*
-       case F_REQ_ELEM_INFO:{
-            INFO_PACK_T info= get_info_pack(TYPE_COLUMN, LEF.data[0]);
-            FRAME_T frame= frameMaker_RETURN_ELEM_INFO(element->ID, LEF.origin, info);
+
+        case F_REQ_ELEM_SECTOR:{
+            byte lang= LEF.data[0];
+            byte sector= LEF.data[1];
+            Serial.println("lenguaje pedido: " + String(lang));   
+            Serial.println("sector pedido: " + String(sector));   
+            byte sector_data[192];
+            get_sector_data(sector_data, lang, sector);
+            Serial.println("Sector data: " + String(sector_data[0], HEX));
+            FRAME_T frame= frameMaker_RETURN_ELEM_SECTOR(element->ID, LEF.origin, sector_data, sector);
             send_frame(frame);
-                                                        #ifdef DEBUG
-                                                            Serial.println("Info devuelta en un Return");
-                                                        #endif
+                                                            #ifdef DEBUG
+                                                             Serial.println("Info devuelta en un Return");
+                                                             Serial.println("Recibido F_REQ_ELEM_INFO, lang= " +String(lang));
+                                                             Serial.println("Recibido F_REQ_ELEM_INFO, sector= " +String(sector));
+                                                            #endif
             break;
         }
-        */
+        
+
         case F_REQ_ELEM_STATE:{
-
-
             break;
         }
 
         case F_SET_ELEM_ID:{
-            element->ID= LEF.data[0];
-            File configFile = SPIFFS.open(ELEMENT_CONFIG_FILE_PATH, "r+");
-            configFile.readStringUntil('\n');
-            configFile.seek(configFile.position());
-            configFile.println(element->ID); 
-            configFile.close();
+            element->set_ID(LEF.data[0]);
+            globalID= LEF.data[0];
             break;
         }
 
-  /*    case F_SEND_TEST:{
-
-
-            break;
-        }*/
-
         case F_SET_ELEM_MODE:{
             byte mode= LEF.data[0];
-            element->currentMode= mode;
+                                                                        #ifdef DEBUG
+                                                                        Serial.println("OJUU, LEF.data[0]= " +String(mode));
+                                                                        #endif
+            if(mode != LEDSTRIP_PATTERN_MODE) colorHandler.set_activePattern(NO_PATTERN);
+            element->set_mode(mode);
             if(element->get_currentMode() == LEDSTRIP_PASSIVE_MODE) colorHandler.set_passive(true);
-            else                                                  colorHandler.set_passive(false);
+            else                                                    colorHandler.set_passive(false);
+                                                                        #ifdef DEBUG
+                                                                        Serial.println("OJITO, que passem a modo: " +String(element->get_currentMode()));
+                                                                        #endif
             break;
         }
         case F_SEND_COLOR: {
             byte color = LEF.data[0];
+            element->work_time_handler(color);
             CRGB colorin= colorHandler.get_CRGB_from_colorList(color);
                                                             #ifdef DEBUG
                                                                 Serial.println("Color recibido: " + String(color));
                                                             #endif
-
-                if (color != 8) {
-                if (!stopwatchRunning) {
-                                                            #ifdef DEBUG
-                                                                Serial.println("Iniciando cronómetro.");
-                                                            #endif
-                    start_working_time();
-                } else {
-                                                            #ifdef DEBUG
-                                                                Serial.println("El cronómetro ya está activo.");
-                                                            #endif
-                }
-            } else {
-                if (stopwatchRunning) {
-                                                            #ifdef DEBUG
-                                                                Serial.println("Deteniendo y guardando el cronómetro.");
-                                                            #endif
-                    stopAndSave_working_time();
-                } else {
-                                                            #ifdef DEBUG
-                                                                Serial.println("El cronómetro ya está detenido.");
-                                                            #endif
-                }
-            }
-
             if (currentMode_ == LEDSTRIP_BASIC_MODE) {
                                                             #ifdef DEBUG
                                                                 Serial.println("Manejando en modo BASIC_MODE.");
@@ -119,8 +122,9 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             colorHandler.set_targetBrightness(MAX_BRIGHTNESS);
             colorHandler.transitionStartTime= millis();
             colorHandler.transitioning= true;
+            break;
             }
-        else if(currentMode_ == LEDSTRIP_SLOW_MODE || currentMode_ == LEDSTRIP_MIX_MODE){
+        else if(currentMode_ == LEDSTRIP_SLOW_MODE){
                                                             #ifdef DEBUG
                                                                 Serial.println("Manejando en modo COLUMN_FAST_MODE. o mix");
                                                             #endif
@@ -129,6 +133,7 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             colorHandler.set_targetBrightness(MAX_BRIGHTNESS);
             colorHandler.transitionStartTime= millis();
             colorHandler.transitioning= true;
+            break;
             }
         else if(currentMode_ == LEDSTRIP_MOTION_MODE){
                                                             #ifdef DEBUG
@@ -139,6 +144,18 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             colorHandler.set_targetBrightness(MAX_BRIGHTNESS);
             colorHandler.transitionStartTime= millis();
             colorHandler.transitioning= true;
+            break;
+            }
+        else if(currentMode_ == LEDSTRIP_MIX_MODE){
+                                                            #ifdef DEBUG
+                                                                Serial.println("Manejando en modo BASIC_MODE.");
+                                                            #endif
+            colorHandler.set_targetColor(colorin);
+            colorHandler.set_targetFade(FASTEST_FADE);
+            colorHandler.set_targetBrightness(MAX_BRIGHTNESS);
+            colorHandler.transitionStartTime= millis();
+            colorHandler.transitioning= true;
+            break;
             }
         else if(currentMode_ == LEDSTRIP_PASSIVE_MODE){
 
@@ -149,11 +166,15 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
                                                             #endif
             
             break;
-        }
-        else if(currentMode_ == LEDSTRIP_TEST_ZONE_MODE){
-
+            }
+        else if(currentMode_ == LEDSTRIP_PATTERN_MODE){
+            // OJO de moment, no fer res.
             break;
-        }
+            }
+        else if(currentMode_ == LEDSTRIP_TEST_ZONE_MODE){
+            break;
+            }
+        break;
         }
         
         case F_SEND_SENSOR_VALUE:{
@@ -162,24 +183,31 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
                                                             #endif
             if(currentMode_ == LEDSTRIP_MOTION_MODE){
                 byte value= get_brightness_from_sensorValue(LEF);
-                colorHandler.set_targetFade(FASTEST_FADE);
+                colorHandler.set_targetFade(MOTION_VAL_FADE);
                 colorHandler.set_targetBrightness(value);
                 colorHandler.transitionStartTime= millis();
                 colorHandler.transitioning= true;
             }
             else if(currentMode_ == LEDSTRIP_RB_MOTION_MODE){
                 byte value= get_color_from_sensorValue(LEF); 
-                colorHandler.set_targetColor(value);
-                colorHandler.set_targetFade(FASTEST_FADE);
+                CRGB colorin= colorHandler.get_CRGB_from_pasiveColorList(value);
+                colorHandler.set_targetColor(colorin);
+                colorHandler.set_targetFade(RB_MOTION_VAL_FADE);
                 colorHandler.set_targetBrightness(MAX_BRIGHTNESS);
                 colorHandler.transitionStartTime= millis();
                 colorHandler.transitioning= true;
             }
+            else if(currentMode_ == LEDSTRIP_PATTERN_MODE){
+                varaux= get_aux_var_01_from_sensorValue(LEF);
+            }
             break;
         }
 
-        case F_SEND_FLAG_BYTE:{
-                                                              
+        case F_SEND_PATTERN_NUM:{
+                byte numPattern= LEF.data[0];
+                if(numPattern != NO_PATTERN) element->work_time_handler(1);
+                else                         element->work_time_handler(8);
+                colorHandler.set_activePattern(numPattern);                                           
             break;
         }
 

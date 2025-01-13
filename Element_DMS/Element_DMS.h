@@ -12,26 +12,39 @@
 #include <vector>
 #include <Colors_DMS/Color_DMS.h>
 
+extern byte globalID;
+
 class ELEMENT_ {
 
     public: 
-        ELEMENT_(uint16_t serialNumber);
+        ELEMENT_();
         virtual ~ELEMENT_();
 
         void begin(); 
-        void          reset_config_file();
+
+        unsigned long lastLifeTimeUpdate = 0;
+        unsigned long workTimeStart = 0;
+        bool workTimerRunning = false;
+        bool stopwatchRunning = false;
+
         void          start_working_time(); 
         void          stopAndSave_working_time();  
-        void          set_sinceStart_time(uint64_t);
-        uint64_t      get_sinceStart_time();
-        unsigned long read_lifeTime_from_file();
-        void          write_lifeTime_to_file(unsigned long uptimeInSeconds);
+        void          work_time_handler(byte colorin);
         void          lifeTime_update();
+        int           get_lifeTime();
+        void          set_lifeTime(int lifeTime);
 
-        void          set_ID_protected();
-        void          set_ID(uint8_t deviceID);
-        uint8_t       get_ID();
+        int           get_workTime();
+        void          set_workTime(int workTime);
 
+        String        get_serial_from_file();
+
+        byte          get_ID_from_file();
+        void          set_ID_to_file(byte ID);
+
+        void          set_ID(byte IDin);
+        byte          get_ID();
+  
         void          set_type(byte typein);
         byte          get_type();
 
@@ -45,16 +58,15 @@ class ELEMENT_ {
         byte          get_flag();
 
         byte          get_serialNum(byte ml);
-        INFO_PACK_T   get_info_pack(byte languajein);
-        INFO_STATE_T  get_state_pack(ELEMENT_ &elementin, CRGB colorin);
+        INFO_PACK_T   get_info_pack(byte typein, byte languajein);
+        INFO_STATE_T  get_state_pack();
 
-        void          set_default_ID();
-        void          set_custom_ID();   
 
         uint8_t  ID;
     protected:
         virtual void  inic_elem_config(){}
         virtual void  RX_main_handler(LAST_ENTRY_FRAME_T LEF){}
+    
 
 
 
@@ -68,7 +80,6 @@ class ELEMENT_ {
         uint64_t workedTime;
         uint64_t onStartTime;
 
-        bool stopwatchRunning = false;  
         unsigned long stopwatchStartTime = 0; // Variable para almacenar el tiempo de inicio del cronómetro
         bool canStartStopwatch = true;       // Controla si se permite iniciar el cronómetro     
 

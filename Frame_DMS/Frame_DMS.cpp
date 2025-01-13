@@ -2,12 +2,15 @@
 #include <Frame_DMS/Frame_DMS.h>
 #include <Element_DMS/Element_DMS.h>
 #include <column_DMS/column_DMS.h>
+#include <info_elements_DMS/info_elements_DMS.h>
+#include <icons_64x64_DMS/icons_64x64_DMS.h>
 #include <vector>
 #include <Arduino.h>
 
 
 extern LAST_ENTRY_FRAME_T            LEF;
-
+extern byte globalID;
+extern byte xManager;
 volatile bool startFrameReceived=    false;
 volatile bool frameInProgress=       false;
 volatile bool partialFrameReceived=  false;
@@ -42,8 +45,11 @@ void IRAM_ATTR onUartInterrupt() {
     while (Serial1.available()) {
 
         byte receivedByte = Serial1.read();
-        Serial.print(receivedByte, HEX);
-        Serial.print(" ");
+                                                                                                    #ifdef DEBUG
+                                                                                                        Serial.print("0x");
+                                                                                                        Serial.print(receivedByte, HEX);
+                                                                                                        Serial.print(" ");
+                                                                                                    #endif
         bytesProcessed++;
         lastReceivedTime = millis();
         if (receiveState == WAITING_START && receivedByte != NEW_START) continue;
@@ -78,9 +84,9 @@ void IRAM_ATTR onUartInterrupt() {
                 totalFrameLength = expectedFrameLength + 3;  
 
                 if (totalFrameLength > MAX_FRAME_LENGTH || totalFrameLength < MIN_FRAME_LENGTH) {
-                    #ifdef DEBUG
-                        Serial.println("Error: Longitud de trama inv\xE1lida");
-                    #endif
+                                                                                                #ifdef DEBUG
+                                                                                                    Serial.println("Error: Longitud de trama inv\xE1lida");
+                                                                                                #endif
                     receiveState = WAITING_START;
                     uartBuffer.clear();
                     return;
@@ -103,10 +109,10 @@ void IRAM_ATTR onUartInterrupt() {
                             // Verificar destinatarios
                             uint8_t numTargets = uartBuffer[4];
                             bool isTarget = false;
-                            byte Xmanager= element->get_manager();
+                            
                             for (uint8_t i = 0; i < numTargets; i++) {
                                 uint8_t targetID = uartBuffer[5 + i];
-                                if (targetID == element->ID || targetID == BROADCAST || targetID == Xmanager)  {
+                                if (targetID == globalID || targetID == BROADCAST || targetID == xManager)  {
                                     isTarget = true;
                                     break;
                                 }
@@ -191,29 +197,84 @@ LAST_ENTRY_FRAME_T extract_info_from_frameIn(std::vector<byte> vectorin) {
 
 
 void send_frame(const FRAME_T &framein) {
-    
+    int i = 0;
+    byte dTime = 4;
+                                                                                                #ifdef DEBUG
+                                                                                                    Serial.println(" #### Trama enviada ####");
+                                                                                                #endif
     Serial1.write(framein.start);
+    delay(dTime);
+                                                                                                #ifdef DEBUG
+                                                                                                Serial.println("[" + String(++i) + "] START = " + String(framein.start, HEX));
+                                                                                                #endif
     Serial1.write(framein.frameLengthMsb);
-    Serial1.write(framein.frameLengthLsb);
-    Serial1.write(framein.origin);
-    Serial1.write(framein.numTargets);
-    for (byte target : framein.target) Serial1.write(target);
-    Serial1.write(framein.function);
-    Serial1.write(framein.dataLengthMsb);
-    Serial1.write(framein.dataLengthLsb);
-    for (byte dato : framein.data)     Serial1.write(dato);
-    Serial1.write(framein.checksum);
-    Serial1.write(framein.end);
+    delay(dTime);
+                                                                                                #ifdef DEBUG  
+                                                                                                Serial.println("[" + String(++i) + "] Frame Length Msb = " + String(framein.frameLengthMsb, HEX)); 
+                                                                                                #endif
+    Serial1.write(framein.frameLengthLsb); 
+    delay(dTime);
+                                                                                                #ifdef DEBUG
+                                                                                                Serial.println("[" + String(++i) + "] Frame Length Lsb = " + String(framein.frameLengthLsb, HEX)); 
+                                                                                                #endif
+    Serial1.write(framein.origin);          
+    delay(dTime);
+                                                                                                #ifdef DEBUG
+                                                                                                Serial.println("[" + String(++i) + "] Origen = " + String(framein.origin, HEX)); 
+                                                                                                #endif
+    Serial1.write(framein.numTargets);      
+    delay(dTime);
+                                                                                                #ifdef DEBUG
+                                                                                                Serial.println("[" + String(++i) + "] numTargets = " + String(framein.numTargets, HEX)); 
+                                                                                                #endif
+    int dataIndex = 0;
+    for (byte target : framein.target) {
+        Serial1.write(target); 
+        delay(dTime);
+                                                                                                #ifdef DEBUG
+                                                                                                Serial.println("[" + String(++i) + "] Target[" + String(dataIndex++) + "] = " + String(target, HEX)); 
+                                                                                                #endif
+    }
+    Serial1.write(framein.function);        
+    delay(dTime);
+                                                                                                #ifdef DEBUG
+                                                                                                Serial.println("[" + String(++i) + "] Function = " + String(framein.function, HEX)); 
+                                                                                                #endif
+    Serial1.write(framein.dataLengthMsb);   
+    delay(dTime);
+                                                                                                #ifdef DEBUG
+                                                                                                Serial.println("[" + String(++i) + "] Data Length Msb = " + String(framein.dataLengthMsb, HEX)); 
+                                                                                                #endif
+    Serial1.write(framein.dataLengthLsb);   
+    delay(dTime);
+                                                                                                #ifdef DEBUG
+                                                                                                Serial.println("[" + String(++i) + "] Data Length Lsb = " + String(framein.dataLengthLsb, HEX)); 
+                                                                                                #endif
+    dataIndex = 0;
+    for (byte dato : framein.data) {
+        Serial1.write(dato); 
+        delay(dTime);
+                                                                                                #ifdef DEBUG
+                                                                                                Serial.println("[" + String(++i) + "] Data[" + String(dataIndex++) + "] = " + String(dato, HEX)); 
+                                                                                                #endif
+    }
+    Serial1.write(framein.checksum);        
+    delay(dTime);
+                                                                                                #ifdef DEBUG
+                                                                                                Serial.println("[" + String(++i) + "] Checksum = " + String(framein.checksum, HEX)); 
+                                                                                                #endif
+    Serial1.write(framein.end);             
+    delay(dTime);
+                                                                                                #ifdef DEBUG
+                                                                                                Serial.println("[" + String(++i) + "] End = " + String(framein.end, HEX)); 
+                                                                                                Serial.println("======================================");
+                                                                                                #endif
 }
 
-byte get_brightness_from_sensorValue(LAST_ENTRY_FRAME_T LEFin) {
 
-    byte minMSB= LEFin.data[5];
-    byte minLSB= LEFin.data[4];
-    byte maxMSB= LEFin.data[3];
-    byte maxLSB= LEFin.data[2];
-    byte valMSB= LEFin.data[1];
-    byte valLSB= LEFin.data[0];
+
+byte get_mapped_sensor_value(byte minMSB, byte minLSB, byte maxMSB, byte maxLSB, byte valMSB, byte valLSB) {
+
     uint16_t minVal = (minMSB << 8) | minLSB;
     uint16_t maxVal = (maxMSB << 8) | maxLSB;
     uint16_t currentVal = (valMSB << 8) | valLSB;
@@ -225,23 +286,932 @@ byte get_brightness_from_sensorValue(LAST_ENTRY_FRAME_T LEFin) {
     return (val > 255) ? 255 : val;
 }
 
-byte get_color_from_sensorValue(LAST_ENTRY_FRAME_T LEFin) {
-    byte minMSB = LEFin.data[5];
-    byte minLSB = LEFin.data[4];
-    byte maxMSB = LEFin.data[3];
-    byte maxLSB = LEFin.data[2];
-    byte valMSB = LEFin.data[1];
-    byte valLSB = LEFin.data[0];
+byte get_brightness_from_sensorValue(LAST_ENTRY_FRAME_T LEFin) {
+
+    byte minMSB= LEFin.data[0];
+    byte minLSB= LEFin.data[1];
+    byte maxMSB= LEFin.data[2];
+    byte maxLSB= LEFin.data[3];
+    byte valMSB= LEFin.data[4];
+    byte valLSB= LEFin.data[5];
     uint16_t minVal = (minMSB << 8) | minLSB;
     uint16_t maxVal = (maxMSB << 8) | maxLSB;
     uint16_t currentVal = (valMSB << 8) | valLSB;
+
     uint16_t totalRange = maxVal - minVal;
     uint16_t valuePos = currentVal - minVal;
-    uint16_t val = ((valuePos * 26UL) / totalRange) + 10;
-    if (val < 10) return 10;
-    if (val > 36) return 36;
+    uint16_t val = (valuePos * 255UL) / totalRange;
+
+    return (val > 255) ? 255 : val;
+}
+
+float get_aux_var_01_from_sensorValue(LAST_ENTRY_FRAME_T LEFin) {
+    byte minMSB = LEFin.data[0];
+    byte minLSB = LEFin.data[1];
+    byte maxMSB = LEFin.data[2];
+    byte maxLSB = LEFin.data[3];
+    byte valMSB = LEFin.data[4];
+    byte valLSB = LEFin.data[5];
+
+    uint16_t minVal = (minMSB << 8) | minLSB;
+    uint16_t maxVal = (maxMSB << 8) | maxLSB;
+    uint16_t currentVal = (valMSB << 8) | valLSB;
+
+    // Asegurarnos de que no haya división por cero
+    if (maxVal <= minVal) {
+        return 0.0f; // Devuelve un valor por defecto si los límites son inválidos
+    }
+
+    uint16_t totalRange = maxVal - minVal;
+    uint16_t valuePos = currentVal - minVal;
+
+    // Escalar el valor al rango [0, 10]
+    float val = (float(valuePos) / totalRange) * 10.0f;
+
+    // Asegurar que el valor esté dentro del rango [0, 10]
+    if (val < 0.0f) val = 0.0f;
+    if (val > 10.0f) val = 10.0f;
+
     return val;
 }
+
+
+byte get_color_from_sensorValue(LAST_ENTRY_FRAME_T LEFin) {
+    byte minMSB = LEFin.data[0];
+    byte minLSB = LEFin.data[1];
+    byte maxMSB = LEFin.data[2];
+    byte maxLSB = LEFin.data[3];
+    byte valMSB = LEFin.data[4];
+    byte valLSB = LEFin.data[5];
+    uint16_t minVal = (minMSB << 8) | minLSB;
+    uint16_t maxVal = (maxMSB << 8) | maxLSB;
+    uint16_t currentVal = (valMSB << 8) | valLSB;
+    
+    // if (currentVal < minVal) currentVal = minVal;
+    // if (currentVal > maxVal) currentVal = maxVal;
+    
+    float proportion = (float)(currentVal - minVal) / (maxVal - minVal);
+    uint16_t result = (uint16_t)(proportion * 19);
+    if (result < 00) return 0;
+    if (result > 19) return 19;
+    
+    return (byte)result;
+}
+
+#define SIZE 64
+
+uint16_t unidimensional_table[SIZE * SIZE];
+
+// void fillTable() {
+//     for (int row = 0; row < SIZE; row++) {
+//         for (int col = 0; col < SIZE; col++) {
+//             unidimensional_table[row * SIZE + col] = row + 1;
+//         }
+//     }
+// }
+
+
+void  get_sector_data(byte *sector_data, byte lang, byte sector){
+                                                                                            #ifdef DEBUG
+                                                                                            Serial.println("Aqui hem entrat a get_sector_data.");
+                                                                                            Serial.println(("GSD_Lang: " + String(lang)));
+                                                                                            Serial.println(("GSD_Sector: " + String(sector)));
+                                                                                            #endif
+    memset(sector_data, 0, 192);
+
+    if (sector >= ELEM_ICON_ROW_0_SECTOR && sector <= ELEM_ICON_ROW_63_SECTOR) {
+        int startIndex = (sector - ELEM_ICON_ROW_0_SECTOR) * 64;
+       
+        for (int i = 0; i < 64; i++) {
+            sector_data[i * 2] = elem_icon[startIndex + i] >> 8;     // MSB
+            sector_data[i * 2 + 1] = elem_icon[startIndex + i] & 0xFF; // LSB
+        }
+    }
+    
+    String data;
+    switch(sector){
+        case ELEM_NAME_SECTOR:
+            data = get_string_from_info_DB(ELEM_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;
+
+        case ELEM_DESC_SECTOR:
+            data = get_string_from_info_DB(ELEM_DESC, lang);
+            Serial.println("Data: " + String(data));
+            data.toCharArray((char*)sector_data, 192);
+            break;
+
+        case ELEM_SERIAL_SECTOR:
+            data = element->get_serial_from_file();
+            data.trim();
+            for (int i = 0; i < 5; i++) {
+            String byteStr = data.substring(i * 2, i * 2 + 2);
+            sector_data[i] = (uint8_t)strtol(byteStr.c_str(), NULL, 16);
+            }
+            Serial.println("Data DATADATADTAATDATDATDATDA: " + String(data));
+            Serial.println("Data DATADATADTAATDATDATDATDA: " + String(sector_data[0]));
+            break;
+
+        case ELEM_ID_SECTOR:
+            sector_data[0] = globalID;
+            break;
+
+        case ELEM_CMODE_SECTOR:
+            sector_data[0] = element->get_currentMode();
+            break;
+
+        case ELEM_MODE_0_NAME_SECTOR:   
+            data = get_string_from_info_DB(ELEM_MODE_0_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;      
+        
+        case ELEM_MODE_0_DESC_SECTOR:   
+            data = get_string_from_info_DB(ELEM_MODE_0_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;  
+
+        case ELEM_MODE_0_FLAG_SECTOR:   
+            sector_data[0]= (get_config_flag_mode(0) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(0) & 0xFF;
+            break;  
+
+        case ELEM_MODE_1_NAME_SECTOR:   
+            data = get_string_from_info_DB(ELEM_MODE_1_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;  
+
+        case ELEM_MODE_1_DESC_SECTOR:   
+            data = get_string_from_info_DB(ELEM_MODE_1_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;      
+
+        case ELEM_MODE_1_FLAG_SECTOR:  
+            sector_data[0]= (get_config_flag_mode(1) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(1) & 0xFF;
+            break;  
+
+        case ELEM_MODE_2_NAME_SECTOR:       
+            data = get_string_from_info_DB(ELEM_MODE_2_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;                                                          
+
+        case ELEM_MODE_2_DESC_SECTOR:    
+            data = get_string_from_info_DB(ELEM_MODE_2_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;  
+
+        case ELEM_MODE_2_FLAG_SECTOR:   
+            sector_data[0]= (get_config_flag_mode(2) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(2) & 0xFF;
+            break;      
+
+        case ELEM_MODE_3_NAME_SECTOR:   
+            data = get_string_from_info_DB(ELEM_MODE_3_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;
+
+        case ELEM_MODE_3_DESC_SECTOR:       
+            data = get_string_from_info_DB(ELEM_MODE_3_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;      
+
+        case ELEM_MODE_3_FLAG_SECTOR:   
+            sector_data[0]= (get_config_flag_mode(3) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(3) & 0xFF;
+            break;  
+
+        case ELEM_MODE_4_NAME_SECTOR:   
+            data = get_string_from_info_DB(ELEM_MODE_4_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;      
+
+        case ELEM_MODE_4_DESC_SECTOR:   
+            data = get_string_from_info_DB(ELEM_MODE_4_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;  
+
+        case ELEM_MODE_4_FLAG_SECTOR:   
+            sector_data[0]= (get_config_flag_mode(4) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(4) & 0xFF;
+            break;
+
+        case ELEM_MODE_5_NAME_SECTOR:   
+            data = get_string_from_info_DB(ELEM_MODE_5_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;
+
+        case ELEM_MODE_5_DESC_SECTOR:   
+            data = get_string_from_info_DB(ELEM_MODE_5_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;  
+
+            sector_data[0]= (get_config_flag_mode(5) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(5) & 0xFF;
+            break;  
+
+        case ELEM_MODE_6_NAME_SECTOR:   
+            data = get_string_from_info_DB(ELEM_MODE_6_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;  
+
+        case ELEM_MODE_6_DESC_SECTOR:   
+            data = get_string_from_info_DB(ELEM_MODE_6_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;
+
+        case ELEM_MODE_6_FLAG_SECTOR:       
+            sector_data[0]= (get_config_flag_mode(6) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(6) & 0xFF;
+            break;
+
+        case ELEM_MODE_7_NAME_SECTOR:   
+            data = get_string_from_info_DB(ELEM_MODE_7_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;
+
+        case ELEM_MODE_7_DESC_SECTOR:   
+            data = get_string_from_info_DB(ELEM_MODE_7_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;
+
+        case ELEM_MODE_7_FLAG_SECTOR:       
+            sector_data[0]= (get_config_flag_mode(7) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(7) & 0xFF;
+            break;  
+
+        case ELEM_MODE_8_NAME_SECTOR:               
+            data = get_string_from_info_DB(ELEM_MODE_8_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;      
+
+        case ELEM_MODE_8_DESC_SECTOR:               
+            data = get_string_from_info_DB(ELEM_MODE_8_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;      
+
+        case ELEM_MODE_8_FLAG_SECTOR:        
+            sector_data[0]= (get_config_flag_mode(8) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(8) & 0xFF;
+            break;  
+
+        case ELEM_MODE_9_NAME_SECTOR:        
+            data = get_string_from_info_DB(ELEM_MODE_9_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;      
+
+        case ELEM_MODE_9_DESC_SECTOR:               
+            data = get_string_from_info_DB(ELEM_MODE_9_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;  
+
+        case ELEM_MODE_9_FLAG_SECTOR:        
+            sector_data[0]= (get_config_flag_mode(9) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(9) & 0xFF;
+            break;
+
+        case ELEM_MODE_10_NAME_SECTOR:               
+            data = get_string_from_info_DB(ELEM_MODE_10_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;  
+
+        case ELEM_MODE_10_DESC_SECTOR:         
+            data = get_string_from_info_DB(ELEM_MODE_10_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;  
+
+        case ELEM_MODE_10_FLAG_SECTOR:          
+            sector_data[0]= (get_config_flag_mode(10) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(10) & 0xFF;
+            break;      
+
+        case ELEM_MODE_11_NAME_SECTOR:      
+            data = get_string_from_info_DB(ELEM_MODE_11_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;  
+
+        case ELEM_MODE_11_DESC_SECTOR:       
+            data = get_string_from_info_DB(ELEM_MODE_11_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;      
+
+        case ELEM_MODE_11_FLAG_SECTOR:      
+            sector_data[0]= (get_config_flag_mode(11) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(11) & 0xFF;
+            break;  
+
+        case ELEM_MODE_12_NAME_SECTOR:    
+            data = get_string_from_info_DB(ELEM_MODE_12_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;      
+
+        case ELEM_MODE_12_DESC_SECTOR:     
+            data = get_string_from_info_DB(ELEM_MODE_12_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;  
+
+        case ELEM_MODE_12_FLAG_SECTOR:      
+            sector_data[0]= (get_config_flag_mode(12) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(12) & 0xFF;
+            break;
+
+        case ELEM_MODE_13_NAME_SECTOR:       
+            data = get_string_from_info_DB(ELEM_MODE_13_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;      
+
+        case ELEM_MODE_13_DESC_SECTOR:       
+            data = get_string_from_info_DB(ELEM_MODE_13_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;  
+
+        case ELEM_MODE_13_FLAG_SECTOR:       
+            sector_data[0]= (get_config_flag_mode(13) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(13) & 0xFF;
+            break;  
+
+        case ELEM_MODE_14_NAME_SECTOR:               
+            data = get_string_from_info_DB(ELEM_MODE_14_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;  
+
+        case ELEM_MODE_14_DESC_SECTOR:         
+            data = get_string_from_info_DB(ELEM_MODE_14_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;  
+
+        case ELEM_MODE_14_FLAG_SECTOR:          
+            sector_data[0]= (get_config_flag_mode(14) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(14) & 0xFF;
+            break;      
+
+        case ELEM_MODE_15_NAME_SECTOR:         
+            data = get_string_from_info_DB(ELEM_MODE_15_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;  
+
+        case ELEM_MODE_15_DESC_SECTOR:       
+            data = get_string_from_info_DB(ELEM_MODE_15_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;  
+
+        case ELEM_MODE_15_FLAG_SECTOR:      
+            sector_data[0]= (get_config_flag_mode(15) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(15) & 0xFF;
+            break;
+
+     case ELEM_WORK_TIME_SECTOR:
+            sector_data[0] = (element->get_workTime() >> 24) & 0xFF;  // MSB
+            sector_data[1] = (element->get_workTime() >> 16) & 0xFF;  
+            sector_data[2] = (element->get_workTime() >> 8)  & 0xFF;   
+            sector_data[3] = (element->get_workTime())       & 0xFF;       
+            break;
+
+    case ELEM_LIFE_TIME_SECTOR:
+            sector_data[0] = (element->get_lifeTime() >> 24) & 0xFF;  
+            sector_data[1] = (element->get_lifeTime() >> 16) & 0xFF;  
+            sector_data[2] = (element->get_lifeTime() >> 8)  & 0xFF;   
+            sector_data[3] = (element->get_lifeTime())       & 0xFF;      
+            break;
+    
+    // case ELEM_CURRENT_COLOR_SECTOR:
+    //         sector_data[0] = element->get_currentRed();
+    //         sector_data[1] = element->get_currentGreen();
+    //         sector_data[2] = element->get_currentBlue();
+    //         break;
+
+    // case ELEM_CURRENT_BRIGHTNESS_SECTOR:
+    //         sector_data[0] = element->get_currentBrightness();
+    //         break;  
+
+    // case ELEM_CURRENT_PATTERN_SECTOR:
+    //         sector_data[0] = element->get_currentPattern();
+    //         break;      
+        
+    // case ELEM_CURRENT_FLAGS_SECTOR:
+    //         sector_data[0] =  element->get_currentFlags()       & 0xFF;
+    //         sector_data[1] = (element->get_currentFlags() >> 8) & 0xFF;
+    //         break;      
+
+    // case ELEM_CURRENT_FILE_SECTOR:
+    //         sector_data[0] = element->get_currentFile()        & 0xFF;
+    //         sector_data[1] = (element->get_currentFile() >> 8) & 0xFF;
+    //         break; 
+
+    // case ELEM_CURRENT_XMANAGER_SECTOR:
+    //         sector_data[0] = xManager;
+    //         break;
+    
+    
+        default: break;
+    }
+}
+
+
+
+
+
+
+
+/*
+////////////////////////////////////////////////////////////////////////////////////////////
+                                           FRAME MAKERS
+////////////////////////////////////////////////////////////////////////////////////////////
+*/
+
+
+
+
+
+
+
+FRAME_T frameMaker_REQ_ELEM_INFO(byte originin, byte targetin, byte idiomain, byte sectorin){
+
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    frame.data.resize(L_REQ_ELEM_INFO);
+    uint16_t  frameLength = 0x08 + L_REQ_ELEM_INFO;
+
+    frame.start= NEW_START;
+    frame.frameLengthLsb = frameLength & 0xFF;      
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin= originin;
+    frame.numTargets = 0x01;
+    frame.target.push_back(targetin);
+    frame.function= F_REQ_ELEM_INFO;
+    frame.dataLengthMsb = (L_REQ_ELEM_INFO >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_REQ_ELEM_INFO & 0xFF;   
+    frame.data[0]= idiomain;
+    frame.data[1]= sectorin;
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+
+    return frame;
+}
+
+
+FRAME_T frameMaker_REQ_ELEM_SECTOR(byte originin, byte targetin, byte idiomain, byte sectorin){
+
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    frame.data.resize(L_REQ_ELEM_SECTOR);
+    uint16_t  frameLength = 0x08 + L_REQ_ELEM_SECTOR;
+
+    frame.start= NEW_START;
+    frame.frameLengthLsb = frameLength & 0xFF;      
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin= originin;
+    frame.numTargets = 0x01;
+    frame.target.push_back(targetin);
+    frame.function= F_REQ_ELEM_SECTOR;
+    frame.dataLengthMsb = (L_REQ_ELEM_SECTOR >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_REQ_ELEM_SECTOR & 0xFF;   
+    frame.data[0]= idiomain;
+    frame.data[1]= sectorin;
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+
+    return frame;
+}
+
+FRAME_T frameMaker_REQ_ELEM_STATE(byte originin, byte targetin){
+
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    frame.data.resize(L_REQ_ELEM_INFO);
+    uint16_t  frameLength = 0x08 + L_REQ_ELEM_STATE;
+
+    frame.start= NEW_START;
+    frame.frameLengthLsb = frameLength & 0xFF;        
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin= originin;
+    frame.numTargets = 0x01;
+    frame.target.push_back(targetin);
+    frame.function= F_REQ_ELEM_STATE;
+    frame.dataLengthMsb = (L_REQ_ELEM_STATE >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_REQ_ELEM_STATE & 0xFF;   
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+
+    return frame;
+}
+
+FRAME_T frameMaker_SET_ELEM_ID(byte originin, byte targetin, byte IDin){
+
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    frame.data.resize(L_SET_ELEM_ID);
+    uint16_t  frameLength = 0x08 + L_SET_ELEM_ID;
+
+    frame.start= NEW_START;
+    frame.frameLengthLsb = frameLength & 0xFF;        
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin= originin;
+    frame.numTargets = 0x01;
+    frame.target.push_back(targetin);
+    frame.function= F_SET_ELEM_ID;
+    frame.dataLengthMsb = (L_SET_ELEM_ID >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_SET_ELEM_ID & 0xFF; 
+    frame.data[0]= IDin;  
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+
+    return frame;
+}
+
+FRAME_T frameMaker_SET_ELEM_MODE(byte originin, std::vector<byte>targetin, byte modein)
+{
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    frame.data.resize(L_SET_ELEM_MODE);
+    uint16_t  frameLength = 0x07 + targetin.size() + L_SET_ELEM_MODE;
+
+    frame.start= NEW_START;
+    frame.frameLengthLsb = frameLength & 0xFF;        
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin= originin;
+    frame.numTargets = targetin.size();
+    frame.target= targetin;
+    frame.function= F_SET_ELEM_MODE;
+    frame.dataLengthMsb = (L_SET_ELEM_MODE >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_SET_ELEM_MODE & 0xFF;   
+    frame.data[0]= modein;
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+
+    return frame;
+}
+//////////////////////////////////////////////////////////////////////
+
+
+
+FRAME_T frameMaker_SEND_COLOR(byte originin, std::vector<byte>targetin, byte colorin){
+
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    frame.data.resize(L_SEND_COLOR);
+    uint16_t  frameLength = 0x07 + targetin.size() + L_SEND_COLOR;
+
+    frame.start= NEW_START;
+    frame.frameLengthLsb = frameLength & 0xFF;     
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin= originin;
+    frame.numTargets = targetin.size();
+    frame.target= targetin;
+    frame.function= F_SEND_COLOR;
+    frame.dataLengthMsb = (L_SEND_COLOR >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_SEND_COLOR & 0xFF;   
+    frame.data[0]= colorin;
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+
+    return frame;
+}
+
+FRAME_T frameMaker_SEND_SENSOR_VALUE(byte originin, std::vector<byte>targetin, SENSOR_VALUE_T sensorin){
+    
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    frame.data.resize(L_SEND_COLOR);
+    uint16_t  frameLength = 0x07 + targetin.size() + L_SEND_COLOR;
+
+    frame.start= NEW_START;
+    frame.frameLengthLsb = frameLength & 0xFF;     
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin= originin;
+    frame.numTargets = targetin.size();
+    frame.target= targetin;
+    frame.function= F_SEND_COLOR;
+    frame.dataLengthMsb = (L_SEND_COLOR >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_SEND_COLOR & 0xFF;   
+    frame.data[0]= sensorin.msb_min;
+    frame.data[1]= sensorin.lsb_min;
+    frame.data[2]= sensorin.msb_max;
+    frame.data[3]= sensorin.lsb_max;
+    frame.data[4]= sensorin.msb_val;
+    frame.data[5]= sensorin.lsb_val;
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+
+    return frame;
+}
+
+FRAME_T frameMaker_SEND_FLAG_BYTE(byte originin, std::vector<byte>targetin, byte flagin){
+    
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    frame.data.resize(L_SEND_FLAG_BYTE);
+    uint16_t  frameLength = 0x07 + targetin.size() + L_SEND_FLAG_BYTE;
+
+    frame.start= NEW_START;
+    frame.frameLengthLsb = frameLength & 0xFF;     
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin= originin;
+    frame.numTargets = targetin.size();
+    frame.target= targetin;
+    frame.function= F_SEND_FLAG_BYTE;
+    frame.dataLengthMsb = (L_SEND_FLAG_BYTE >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_SEND_FLAG_BYTE & 0xFF;   
+    frame.data[0]= flagin;
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+
+    return frame;
+}
+
+FRAME_T frameMaker_SEND_PATTERN_NUM(byte originin, std::vector<byte>targetin, byte patternin){
+
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    frame.data.resize(L_SEND_PATTERN_NUM);
+    uint16_t  frameLength = 0x07 + targetin.size() + L_SEND_PATTERN_NUM;
+
+    frame.start= NEW_START;
+    frame.frameLengthLsb = frameLength & 0xFF;     
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin= originin;
+    frame.numTargets = targetin.size();
+    frame.target= targetin;
+    frame.function= F_SEND_PATTERN_NUM;
+    frame.dataLengthMsb = (L_SEND_PATTERN_NUM >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_SEND_PATTERN_NUM & 0xFF;   
+    frame.data[0]= patternin;
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+
+    return frame;
+}
+
+FRAME_T frameMaker_SEND_FILE_NUM(byte originin, std::vector<byte>targetin, byte bankin, byte filein){
+    
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    frame.data.resize(L_SEND_FILE_NUM);
+    uint16_t  frameLength = 0x07 + targetin.size() + L_SEND_FILE_NUM;
+
+    frame.start= NEW_START;
+    frame.frameLengthLsb = frameLength & 0xFF;     
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin= originin;
+    frame.numTargets = targetin.size();
+    frame.target= targetin;
+    frame.function= F_SEND_FILE_NUM;
+    frame.dataLengthMsb = (L_SEND_FILE_NUM >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_SEND_FILE_NUM & 0xFF;   
+    frame.data[0]= bankin;
+    frame.data[1]= filein;
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+
+    return frame;
+}
+
+
+FRAME_T frameMaker_SEND_TEST(byte originin, std::vector<byte>targetin, byte testin){
+
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    frame.data.resize(L_SEND_TEST);
+    uint16_t  frameLength = 0x07 + targetin.size() + L_SEND_TEST;
+
+    frame.start= NEW_START;
+    frame.frameLengthLsb = frameLength & 0xFF;     
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin= originin;
+    frame.numTargets = targetin.size();
+    frame.target= targetin;
+    frame.function= F_SEND_TEST;
+    frame.dataLengthMsb = (L_SEND_TEST >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_SEND_TEST & 0xFF;   
+    frame.data[0]= testin;
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+
+    return frame;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+FRAME_T frameMaker_RETURN_ELEM_SECTOR (byte originin, byte targetin, byte *sector_data, byte sectorin){
+
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    uint16_t  frameLength= 0;
+    frame.start= NEW_START;
+    frame.origin= originin;
+    frame.numTargets = 0x01;
+    frame.target.push_back(targetin);
+    frame.data.resize(0);
+    frame.function= F_RETURN_ELEM_SECTOR;
+    Serial.println("Sectorin: " + String(sectorin, HEX));
+    frame.data.push_back(sectorin);
+    switch (sectorin) {
+            
+             case ELEM_SERIAL_SECTOR:
+                frameLength = 0x08 + L_RETURN_ELEM_SECTOR_05 + 1;
+                frame.frameLengthLsb = frameLength & 0xFF;     
+                frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+                frame.dataLengthMsb = ((L_RETURN_ELEM_SECTOR_05 + 1) >> 8) & 0xFF; 
+                frame.dataLengthLsb = (L_RETURN_ELEM_SECTOR_05 + 1) & 0xFF;
+                for (int i = 0; i < L_RETURN_ELEM_SECTOR_05; i++) {
+                    frame.data.push_back(sector_data[i]);
+                }
+                break;
+
+            case ELEM_ID_SECTOR:
+            case ELEM_CMODE_SECTOR:
+                frameLength = 0x08 + L_RETURN_ELEM_SECTOR_01 + 1;
+                frame.frameLengthLsb = frameLength & 0xFF;     
+                frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+                frame.dataLengthMsb = ((L_RETURN_ELEM_SECTOR_01 + 1) >> 8) & 0xFF; 
+                frame.dataLengthLsb = (L_RETURN_ELEM_SECTOR_01 + 1) & 0xFF;
+                for (int i = 0; i < L_RETURN_ELEM_SECTOR_01; i++) {
+                    frame.data.push_back(sector_data[i]);
+                }
+                break;
+// serial falta
+            case ELEM_DESC_SECTOR:
+                Serial.println("Se ha pedido una descripción del elemento. ");
+                frameLength = 0x08 + L_RETURN_ELEM_SECTOR_192 + 1;
+                frame.frameLengthLsb = frameLength & 0xFF;     
+                frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+                frame.dataLengthMsb = ((L_RETURN_ELEM_SECTOR_192 + 1) >> 8) & 0xFF; 
+                frame.dataLengthLsb = (L_RETURN_ELEM_SECTOR_192 + 1) & 0xFF;
+                for (int i = 0; i < L_RETURN_ELEM_SECTOR_192; i++) {
+                    frame.data.push_back(sector_data[i]);
+                }
+                break;
+
+            case ELEM_NAME_SECTOR:
+            case ELEM_MODE_0_NAME_SECTOR:
+            case ELEM_MODE_1_NAME_SECTOR:
+            case ELEM_MODE_2_NAME_SECTOR:
+            case ELEM_MODE_3_NAME_SECTOR:
+            case ELEM_MODE_4_NAME_SECTOR:
+            case ELEM_MODE_5_NAME_SECTOR:
+            case ELEM_MODE_6_NAME_SECTOR:
+            case ELEM_MODE_7_NAME_SECTOR:
+            case ELEM_MODE_8_NAME_SECTOR:
+            case ELEM_MODE_9_NAME_SECTOR:
+            case ELEM_MODE_10_NAME_SECTOR:
+            case ELEM_MODE_11_NAME_SECTOR:
+            case ELEM_MODE_12_NAME_SECTOR:
+            case ELEM_MODE_13_NAME_SECTOR:
+            case ELEM_MODE_14_NAME_SECTOR:
+            case ELEM_MODE_15_NAME_SECTOR:
+                frameLength = 0x08 + L_RETURN_ELEM_SECTOR_24 + 1;
+                frame.frameLengthLsb = frameLength & 0xFF;     
+                frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+                frame.dataLengthMsb = ((L_RETURN_ELEM_SECTOR_24 + 1) >> 8) & 0xFF; 
+                frame.dataLengthLsb = (L_RETURN_ELEM_SECTOR_24 + 1) & 0xFF;
+                for (int i = 0; i < L_RETURN_ELEM_SECTOR_24; i++) {
+                    frame.data.push_back(sector_data[i]);
+                }
+                break;
+
+            case ELEM_MODE_0_DESC_SECTOR: 
+            case ELEM_MODE_1_DESC_SECTOR:
+            case ELEM_MODE_2_DESC_SECTOR: 
+            case ELEM_MODE_3_DESC_SECTOR:
+            case ELEM_MODE_4_DESC_SECTOR: 
+            case ELEM_MODE_5_DESC_SECTOR:
+            case ELEM_MODE_6_DESC_SECTOR: 
+            case ELEM_MODE_7_DESC_SECTOR:
+            case ELEM_MODE_8_DESC_SECTOR: 
+            case ELEM_MODE_9_DESC_SECTOR:
+            case ELEM_MODE_10_DESC_SECTOR: 
+            case ELEM_MODE_11_DESC_SECTOR:
+            case ELEM_MODE_12_DESC_SECTOR: 
+            case ELEM_MODE_13_DESC_SECTOR:
+            case ELEM_MODE_14_DESC_SECTOR: 
+            case ELEM_MODE_15_DESC_SECTOR:
+                frameLength = 0x08 + L_RETURN_ELEM_SECTOR_192 + 1;
+                frame.frameLengthLsb = frameLength & 0xFF;     
+                frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+                frame.dataLengthMsb = ((L_RETURN_ELEM_SECTOR_192 + 1) >> 8) & 0xFF; 
+                frame.dataLengthLsb = (L_RETURN_ELEM_SECTOR_192 + 1) & 0xFF;
+                for (int i = 0; i < L_RETURN_ELEM_SECTOR_192; i++) {
+                    frame.data.push_back(sector_data[i]);
+                }
+                break;
+
+           
+            case ELEM_MODE_0_FLAG_SECTOR: 
+            case ELEM_MODE_1_FLAG_SECTOR:
+            case ELEM_MODE_2_FLAG_SECTOR: 
+            case ELEM_MODE_3_FLAG_SECTOR:
+            case ELEM_MODE_4_FLAG_SECTOR: 
+            case ELEM_MODE_5_FLAG_SECTOR:
+            case ELEM_MODE_6_FLAG_SECTOR: 
+            case ELEM_MODE_7_FLAG_SECTOR:
+            case ELEM_MODE_8_FLAG_SECTOR: 
+            case ELEM_MODE_9_FLAG_SECTOR:
+            case ELEM_MODE_10_FLAG_SECTOR: 
+            case ELEM_MODE_11_FLAG_SECTOR:
+            case ELEM_MODE_12_FLAG_SECTOR: 
+            case ELEM_MODE_13_FLAG_SECTOR:
+            case ELEM_MODE_14_FLAG_SECTOR: 
+            case ELEM_MODE_15_FLAG_SECTOR:
+                frameLength = 0x08 + L_RETURN_ELEM_SECTOR_02 + 1;
+                frame.frameLengthLsb = frameLength & 0xFF;     
+                frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+                frame.dataLengthMsb = ((L_RETURN_ELEM_SECTOR_02 + 1) >> 8) & 0xFF; 
+                frame.dataLengthLsb = (L_RETURN_ELEM_SECTOR_02 + 1) & 0xFF;
+                for (int i = 0; i < L_RETURN_ELEM_SECTOR_02; i++) {
+                    frame.data.push_back(sector_data[i]);
+                }
+                break;
+
+            case ELEM_ICON_ROW_0_SECTOR:
+            case ELEM_ICON_ROW_1_SECTOR:
+            case ELEM_ICON_ROW_2_SECTOR:
+            case ELEM_ICON_ROW_3_SECTOR:
+            case ELEM_ICON_ROW_4_SECTOR:
+            case ELEM_ICON_ROW_5_SECTOR:
+            case ELEM_ICON_ROW_6_SECTOR:
+            case ELEM_ICON_ROW_7_SECTOR:
+            case ELEM_ICON_ROW_8_SECTOR:
+            case ELEM_ICON_ROW_9_SECTOR:
+            case ELEM_ICON_ROW_10_SECTOR:
+            case ELEM_ICON_ROW_11_SECTOR:
+            case ELEM_ICON_ROW_12_SECTOR:
+            case ELEM_ICON_ROW_13_SECTOR:
+            case ELEM_ICON_ROW_14_SECTOR:
+            case ELEM_ICON_ROW_15_SECTOR:
+            case ELEM_ICON_ROW_16_SECTOR:
+            case ELEM_ICON_ROW_17_SECTOR:   
+            case ELEM_ICON_ROW_18_SECTOR:
+            case ELEM_ICON_ROW_19_SECTOR:
+            case ELEM_ICON_ROW_20_SECTOR:
+            case ELEM_ICON_ROW_21_SECTOR:
+            case ELEM_ICON_ROW_22_SECTOR:
+            case ELEM_ICON_ROW_23_SECTOR:
+            case ELEM_ICON_ROW_24_SECTOR:
+            case ELEM_ICON_ROW_25_SECTOR:
+            case ELEM_ICON_ROW_26_SECTOR:
+            case ELEM_ICON_ROW_27_SECTOR:
+            case ELEM_ICON_ROW_28_SECTOR:
+            case ELEM_ICON_ROW_29_SECTOR:
+            case ELEM_ICON_ROW_30_SECTOR:
+            case ELEM_ICON_ROW_31_SECTOR:
+            case ELEM_ICON_ROW_32_SECTOR:
+            case ELEM_ICON_ROW_33_SECTOR:
+            case ELEM_ICON_ROW_34_SECTOR:
+            case ELEM_ICON_ROW_35_SECTOR:
+            case ELEM_ICON_ROW_36_SECTOR:
+            case ELEM_ICON_ROW_37_SECTOR:
+            case ELEM_ICON_ROW_38_SECTOR:
+            case ELEM_ICON_ROW_39_SECTOR:
+            case ELEM_ICON_ROW_40_SECTOR:
+            case ELEM_ICON_ROW_41_SECTOR:
+            case ELEM_ICON_ROW_42_SECTOR:
+            case ELEM_ICON_ROW_43_SECTOR:
+            case ELEM_ICON_ROW_44_SECTOR:
+            case ELEM_ICON_ROW_45_SECTOR:
+            case ELEM_ICON_ROW_46_SECTOR:
+            case ELEM_ICON_ROW_47_SECTOR:
+            case ELEM_ICON_ROW_48_SECTOR:
+            case ELEM_ICON_ROW_49_SECTOR:
+            case ELEM_ICON_ROW_50_SECTOR:
+            case ELEM_ICON_ROW_51_SECTOR:
+            case ELEM_ICON_ROW_52_SECTOR:
+            case ELEM_ICON_ROW_53_SECTOR:
+            case ELEM_ICON_ROW_54_SECTOR:
+            case ELEM_ICON_ROW_55_SECTOR:
+            case ELEM_ICON_ROW_56_SECTOR:
+            case ELEM_ICON_ROW_57_SECTOR:
+            case ELEM_ICON_ROW_58_SECTOR:
+            case ELEM_ICON_ROW_59_SECTOR:
+            case ELEM_ICON_ROW_60_SECTOR:
+            case ELEM_ICON_ROW_61_SECTOR:
+            case ELEM_ICON_ROW_62_SECTOR:
+            case ELEM_ICON_ROW_63_SECTOR:
+                frameLength = 0x08 + L_RETURN_ELEM_SECTOR_128 + 1;
+                frame.frameLengthLsb = frameLength & 0xFF;     
+                frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+                frame.dataLengthMsb = ((L_RETURN_ELEM_SECTOR_128 + 1) >> 8) & 0xFF; 
+                frame.dataLengthLsb = (L_RETURN_ELEM_SECTOR_128 + 1) & 0xFF;
+                for (int i = 0; i < L_RETURN_ELEM_SECTOR_128; i++) {
+                    frame.data.push_back(sector_data[i]);
+                }
+                break;
+
+        default: Serial.println("Sector no valido");
+            break;
+    }
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+    return frame;
+}
+
+
+
+
+
+
+
+
+
 
 
 FRAME_T frameMaker_RETURN_ELEM_STATE(byte originin, byte targetin, INFO_STATE_T infoState){
@@ -253,7 +1223,7 @@ FRAME_T frameMaker_RETURN_ELEM_STATE(byte originin, byte targetin, INFO_STATE_T 
     frame.start= NEW_START;
     frame.frameLengthMsb= (length >> 8) & 0xFF;
     frame.frameLengthLsb= length & 0xFF;
-    frame.origin= originin; //frame.origin= element->get_ID();
+    frame.origin= originin; 
     frame.numTargets= 0x01;
     frame.target.push_back(targetin);
     frame.function= F_RETURN_ELEM_STATE;
@@ -283,114 +1253,126 @@ FRAME_T frameMaker_RETURN_ELEM_STATE(byte originin, byte targetin, INFO_STATE_T 
 }
 
 
-FRAME_T frameMaker_RETURN_ELEM_INFO(byte origin, byte targetin, INFO_PACK_T infoPack){
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////
+
+/*
+FRAME_T frameMaker_RETURN_ELEM_INFO(byte originin, byte targetin, INFO_PACK_T* infoPack) {
     FRAME_T frame;
     uint16_t dataLength = L_RETURN_ELEM_INFO;
-    uint16_t length= 0x06 + 0x01 + L_RETURN_ELEM_INFO;
+    uint16_t length = 0x08 + L_RETURN_ELEM_INFO;
 
-    frame.start=          NEW_START;
-    frame.frameLengthMsb= (length >> 8) & 0xFF;
-    frame.frameLengthLsb= length & 0xFF;
-    frame.origin=         origin; //frame.origin= element->get_ID();
-    frame.numTargets=     0x01;
+    frame.start = NEW_START;
+    frame.frameLengthMsb = (length >> 8) & 0xFF;
+    frame.frameLengthLsb = length & 0xFF;
+    frame.origin = originin;
+    frame.numTargets = 0x01;
     frame.target.push_back(targetin);
-    frame.function=       F_RETURN_ELEM_INFO;
+    frame.function = F_RETURN_ELEM_INFO;
     frame.dataLengthMsb = (dataLength >> 8) & 0xFF;
     frame.dataLengthLsb = dataLength & 0xFF;
-    frame.data.reserve(sizeof(infoPack));
-    frame.data.insert(frame.data.end(),
-                      infoPack.name,
-                      infoPack.name + sizeof(infoPack.name));
-    frame.data.insert(frame.data.end(), 
-                     infoPack.desc, 
-                     infoPack.desc + sizeof(infoPack.desc));
-    frame.data.push_back(infoPack.ID);
-    frame.data.push_back(infoPack.currentMode);
+    frame.data.reserve(sizeof(*infoPack));
+    // Ahora usamos el operador -> para acceder a los miembros del puntero
+    frame.data.insert(frame.data.end(),                          // NAME
+                     infoPack->name,
+                     infoPack->name + sizeof(infoPack->name));
+    frame.data.insert(frame.data.end(),                         // DESC
+                     infoPack->desc,
+                     infoPack->desc + sizeof(infoPack->desc));
+    frame.data.insert(frame.data.end(),                        // SERIALNUM
+                     infoPack->serialNum,
+                     infoPack->serialNum + sizeof(infoPack->serialNum));
+    frame.data.push_back(infoPack->ID);                        // ID
+    frame.data.push_back(infoPack->currentMode);               // CURRENTMODE
     for (int i = 0; i < 16; i++) {
-        frame.data.insert(frame.data.end(), 
-                         infoPack.mode[i].name, 
-                         infoPack.mode[i].name + sizeof(infoPack.mode[i].name));
-        frame.data.insert(frame.data.end(), 
-                         infoPack.mode[i].desc, 
-                         infoPack.mode[i].desc + sizeof(infoPack.mode[i].desc));
-        frame.data.insert(frame.data.end(), 
-                        infoPack.mode[i].config, 
-                        infoPack.mode[i].config + 2);
+        frame.data.insert(frame.data.end(),
+                         infoPack->mode[i].name,
+                         infoPack->mode[i].name + sizeof(infoPack->mode[i].name));
+        frame.data.insert(frame.data.end(),
+                         infoPack->mode[i].desc,
+                         infoPack->mode[i].desc + sizeof(infoPack->mode[i].desc));
+        frame.data.insert(frame.data.end(),
+                         infoPack->mode[i].config,
+                         infoPack->mode[i].config + 2);
     }
-    // for (int i = 0; i < 64; i++) {
-    //     for (int j = 0; j < 60; j++) {
-    //         byte byteAlto = (infoPack.icono[i][j] >> 8) & 0xFF;
-    //         byte byteBajo = infoPack.icono[i][j] & 0xFF;
-    //         frame.data.push_back(byteAlto);
-    //         frame.data.push_back(byteBajo);
-    //     }
-    // }
-    frame.checksum= checksum_calc(frame); 
-    frame.end= NEW_END;
+    const uint8_t* iconPtr = reinterpret_cast<const uint8_t*>(infoPack->icono);
+    size_t iconSize = sizeof(infoPack->icono); // = 8192
+    frame.data.insert(frame.data.end(), iconPtr, iconPtr + iconSize);
+        
+    frame.checksum = checksum_calc(frame);
+    frame.end = NEW_END;
 
     return frame;
 }
 
-FRAME_T frameMaker_SEND_COLOR(std::vector<byte>targetin, byte color){
-
-    FRAME_T frame;
-
-    memset(&frame, 0, sizeof(FRAME_T));
-    frame.data.resize(L_SEND_COLOR);
-    frame.start= NEW_START;
-   
-    uint16_t  frameLength = 0x07 + targetin.size() + L_SEND_COLOR;
-
-    frame.frameLengthLsb = frameLength & 0xFF;        // Máscara para obtener los 8 bits menos significativos
-    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
-   
-    frame.origin= element->ID;
-
-    frame.numTargets = targetin.size();
-    frame.target= targetin;
-
-    frame.function= F_SEND_COLOR;
-
-    frame.dataLengthMsb = (L_SEND_COLOR >> 8) & 0xFF; // MSB (siempre será 0x00 para valores < 256)
-    frame.dataLengthLsb = L_SEND_COLOR & 0xFF;   
-
-    frame.data[0]= color;
-    frame.checksum= checksum_calc(frame);
-
-    frame.end= NEW_END;
-    
-    return frame;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+*/
 
 
 

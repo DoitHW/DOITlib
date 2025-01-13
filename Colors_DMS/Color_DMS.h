@@ -16,6 +16,8 @@
 */
 
 
+extern float varaux;
+
 const unsigned int listaColoresPasivos[]=
 {
 
@@ -105,6 +107,7 @@ class COLORHANDLER_ {
         COLORHANDLER_();
         void begin(int numLeds);
         CRGB get_CRGB_from_colorList(int index);
+        CRGB get_CRGB_from_pasiveColorList(int index);
 
         void set_is_paused        (bool pau);
         bool get_is_paused        ();
@@ -120,8 +123,14 @@ class COLORHANDLER_ {
         void set_targetBrightness (byte brigthin);
         byte get_targetBrightness ();
 
+        void set_activePattern (byte patternin);
+        byte get_activePattern ();
+
         void set_currentBrightness(byte brigthin);
         byte get_currentBrightness();
+
+        void setPatternBotonera(byte mode);
+        void set_botoneraPattern(byte patternin);
 
         void action_frank();
         CRGB* leds;
@@ -129,21 +138,39 @@ class COLORHANDLER_ {
         unsigned long transitionStartTime;
 
         //T4A FastLed FX
-        void showStrip();
-        void setPixel(int Pixel, byte red, byte green, byte blue);
-        void setAll(byte red, byte green, byte blue);
+        void showStrip ();
+        void setPixel  (int Pixel, byte red, byte green, byte blue);
+        void setAll    (byte red, byte green, byte blue);
 
         void Fire(int Cooling, int Sparking, int SpeedDelay);
         void setPixelHeatColor (int Pixel, byte temperature);
 
         void meteorRain(byte red, byte green, byte blue, byte meteorSize, byte meteorTrailDecay, boolean meteorRandomDecay, int SpeedDelay);
         void fadeToBlack(int ledNo, byte fadeValue);
+
+        void theaterChaseRainbow(int SpeedDelay);
+        byte * Wheel(byte WheelPos);
+
+        void BouncingBalls(byte red, byte green, byte blue, int BallCount);
+
+        void RunningLights(byte red, byte green, byte blue, int WaveDelay, float peakFactor, float frequencyFactor);
+
+        void SnowSparkle(byte red, byte green, byte blue, int SparkleDelay, int SpeedDelay);
+
+        void rainbowCycle(int SpeedDelay);
+
+        void FillLEDsFromPaletteColors( uint8_t colorIndex);
+       
     private:
 
+    unsigned long lastUpdate = 0;
+    int position = 0;
+    bool isAnimating = false;
     int numLeds;
 
     bool paused;
     bool passive;
+    byte activePattern;
     CRGB startColor;
     CRGB currentColor;
     CRGB targetColor;
