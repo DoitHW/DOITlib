@@ -150,7 +150,7 @@
 #define NO_COLOR              0x00
 // Definiciones de cosas del manejo de los tramadoles jajalolxd
 #define MAX_BYTES_PER_INTERRUPT 0xFF
-#define MAX_FRAME_LENGTH        0x90
+#define MAX_FRAME_LENGTH        0xFFFF
 #define MIN_FRAME_LENGTH        0x05
 #define MAX_BUFFER_SIZE         0xFF
 #define MAX_ALLOWED_TARGETS     0xFF

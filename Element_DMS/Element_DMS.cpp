@@ -18,7 +18,6 @@ void ELEMENT_::begin() {
                                                         Serial.begin(115200);
                                                         Serial.println("ATENCION!!!!!!!!!!!!!!!!!!!");
                                                     #endif
-
     Serial1.begin(RF_BAUD_RATE, SERIAL_8N1, RF_RX_PIN, RF_TX_PIN);
     Serial1.onReceive(onUartInterrupt);
     pinMode(RF_CONFIG_PIN, OUTPUT);
@@ -43,7 +42,9 @@ String ELEMENT_::get_serial_from_file(){
     String serial= "";
     File file = SPIFFS.open(ELEMENT_SERIALNUM_FILE_PATH, "r");
     if (!file) {
-        Serial.println("Error al abrir el archivo");
+                                                                                        #ifdef DEBUG
+                                                                                        Serial.println("Error al abrir el archivo");
+                                                                                        #endif
         return serial;
     }
     serial = file.readStringUntil('\n');
@@ -57,7 +58,9 @@ String ELEMENT_::get_serial_from_file(){
 void ELEMENT_::set_lifeTime(int lifeTime){
     File file = SPIFFS.open(ELEMENT_LIFETIME_FILE_PATH, "w");
     if (!file) {
-        Serial.println("Error al abrir el archivo lifetime");
+                                                                                        #ifdef DEBUG
+                                                                                            Serial.println("Error al abrir el archivo lifetime");
+                                                                                        #endif
         return;
     }
     file.print(lifeTime);
@@ -68,7 +71,9 @@ int ELEMENT_::get_lifeTime(){
 
     File file = SPIFFS.open(ELEMENT_LIFETIME_FILE_PATH, "r");
     if (!file) {
-        Serial.println("Error al abrir el archivo lifetime");
+                                                                                        #ifdef DEBUG
+                                                                                            Serial.println("Error al abrir el archivo lifetime");
+                                                                                        #endif
         return -1;
     }
     int value = file.parseInt();
@@ -79,7 +84,9 @@ int ELEMENT_::get_lifeTime(){
 void ELEMENT_::set_workTime(int workTime){
     File file = SPIFFS.open(ELEMENT_WORKTIME_FILE_PATH, "w");
     if (!file) {
-        Serial.println("Error al abrir el archivo worktime");
+                                                                                            #ifdef DEBUG
+                                                                                                Serial.println("Error al abrir el archivo worktime");
+                                                                                            #endif
         return;
     }
     file.print(workTime);
@@ -90,7 +97,9 @@ int ELEMENT_::get_workTime(){
     
     File file = SPIFFS.open(ELEMENT_WORKTIME_FILE_PATH, "r");
     if (!file) {
-        Serial.println("Error al abrir el archivo worktime");
+                                                                            #ifdef DEBUG
+                                                                                Serial.println("Error al abrir el archivo worktime");
+                                                                            #endif
         return -1;
     }
     int value = file.parseInt();
@@ -101,7 +110,9 @@ int ELEMENT_::get_workTime(){
 byte ELEMENT_::get_ID_from_file(){
     File file = SPIFFS.open(ELEMENT_ID_FILE_PATH, "r");
     if (!file) {
-        Serial.println("Error al abrir el archivo worktime");
+                                                                                    #ifdef DEBUG
+                                                                                        Serial.println("Error al abrir el archivo");
+                                                                                    #endif
         return -1;
     }
     int value = file.parseInt();
@@ -112,11 +123,15 @@ byte ELEMENT_::get_ID_from_file(){
 void ELEMENT_::set_ID_to_file(byte IDin){
     File file = SPIFFS.open(ELEMENT_ID_FILE_PATH, "w");
     if (!file) {
-        Serial.println("Error al abrir el archivo");
+                                                                                #ifdef DEBUG
+                                                                                    Serial.println("Error al abrir el archivo");
+                                                                                #endif
         return;
     }
     file.println(IDin);
-    Serial.println("ID guardado: " + String(IDin));
+                                                                                #ifdef DEBUG
+                                                                                Serial.println("ID guardado: " + String(IDin));
+                                                                                #endif
     file.close();
 }
 
@@ -152,8 +167,10 @@ void ELEMENT_::stopAndSave_working_time() {
         int currentWorkTime = ELEMENT_::get_workTime();
         ELEMENT_::set_workTime(currentWorkTime + elapsedTime);
         workTimerRunning = false;
-        Serial.print("WorkTime actualizado: ");
-        Serial.println(ELEMENT_::get_workTime());
+                                                                                            #ifdef DEBUG
+                                                                                            Serial.print("WorkTime actualizado: ");
+                                                                                            Serial.println(ELEMENT_::get_workTime());
+                                                                                            #endif
     }
 
 }
@@ -163,7 +180,9 @@ void ELEMENT_::lifeTime_update() {
         lastLifeTimeUpdate = millis();
         int currentLifeTime = ELEMENT_::get_lifeTime();
         ELEMENT_::set_lifeTime(currentLifeTime + 1);
-        Serial.println("LifeTime incrementado");
+                                                                                            #ifdef DEBUG
+                                                                                            Serial.println("LifeTime incrementado");
+                                                                                            #endif  
     }
 }
 
