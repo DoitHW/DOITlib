@@ -90,6 +90,7 @@ void PulsadoresHandler::mostrarColor(byte color) {
             colorNombre = "Relay";
             relay_state = !relay_state;
             send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, target, relay_state));
+            delay(5);
             send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA, 0xFF, SPANISH_LANG, ELEM_SERIAL_SECTOR));
             break;
         default:

@@ -85,7 +85,7 @@ void IRAM_ATTR onUartInterrupt() {
 
                 if (totalFrameLength > MAX_FRAME_LENGTH || totalFrameLength < MIN_FRAME_LENGTH) {
                                                                                                 #ifdef DEBUG
-                                                                                                    Serial.println("Error: Longitud de trama inv\xE1lida");
+                                                                                                    Serial.println("❌ Error: Longitud de trama inv\xE1lida");
                                                                                                 #endif
                     receiveState = WAITING_START;
                     uartBuffer.clear();
@@ -121,21 +121,22 @@ void IRAM_ATTR onUartInterrupt() {
                             if (isTarget) {
                                 frameReceived = true;
                                                                 #ifdef DEBUG
-                                                                    Serial.println("Trama recibida correctamente y dirigida al dispositivo");
+                                                                    Serial.println("✅ Trama recibida correctamente y ✅ dirigida al dispositivo");
                                                                 #endif
                             } else {
                                                                 #ifdef DEBUG
-                                                                    Serial.println("Trama recibida correctamente pero no dirigida al dispositivo");
+                                                                    Serial.println();
+                                                                    Serial.println("✅ Trama recibida correctamente pero ❌ no dirigida al dispositivo");
                                                                 #endif
                             }
                         } else {
                                                                 #ifdef DEBUG
-                                                                    Serial.println("Error: Checksum inv\xE1lido");
+                                                                    Serial.println("❌ Error: Checksum inv\xE1lido");
                                                                 #endif
                         }
                     } else {
                                                                 #ifdef DEBUG
-                                                                    Serial.println("Error: Byte de fin incorrecto");
+                                                                    Serial.println("❌ Error: Byte de fin incorrecto");
                                                                 #endif
                     }
                     receiveState = WAITING_START;
@@ -144,7 +145,7 @@ void IRAM_ATTR onUartInterrupt() {
 
                 if (uartBuffer.size() >= MAX_BUFFER_SIZE) {
                                                                 #ifdef DEBUG
-                                                                    Serial.println("Error: Desbordamiento de buffer UART");
+                                                                    Serial.println("❌ Error: Desbordamiento de buffer UART");
                                                                 #endif
                     receiveState = WAITING_START;
                     uartBuffer.clear();
