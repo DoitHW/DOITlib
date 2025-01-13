@@ -126,14 +126,13 @@ void IRAM_ATTR onUartInterrupt() {
                                                                 #endif
                             } else {
                                                                 #ifdef DEBUG
-                                                                    Serial.println("🚫 Trama recibida correctamente pero no dirigida al dispositivo");
                                                                     Serial.println();
                                                                     Serial.println("✅ Trama recibida correctamente pero ❌ no dirigida al dispositivo");
                                                                 #endif
                             }
                         } else {
                                                                 #ifdef DEBUG
-                                                                    Serial.println("❗ Error: Checksum inv\xE1lido");
+                                                                    Serial.println("❗ Error: Checksum inválido");
                                                                 #endif
                         }
                     } else {

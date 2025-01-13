@@ -35,7 +35,7 @@
 */
 
 //DELFINES SUPER GLOBALES
-                                                
+                                                #define NO_ELEM
                                                 #define SERIAL_NUM 0xF001
                                                 #define SHOW_MAC    
                                                 #define DEBUG
