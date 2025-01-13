@@ -1,6 +1,8 @@
 #ifndef DEFINES_DMS_H
 #define DEFINES_DMS_H
 
+#include <Arduino.h>
+
 /*                                                                                                  
                                      .-+***+-:....                                                  
                                       .+@@@@@@@@@+:......:::.....                                   
@@ -33,26 +35,29 @@
 */
 
 //DELFINES SUPER GLOBALES
-                                                #define BOTONERA
-                      
-                                                #define NORESET_FILE
-                                                #define SERIAL_NUM (uint16_t) 0xF001
+                                                #define NO_ELEMENT
+                    
+                                                #define SHOW_MAC    
                                                 #define DEBUG
-                                                #define DEFAULT_CONFIG    true
-                                                #define CUSTOM_ID_INIC    false
-                                                #define CUSTOM_ID_NUM     0x01
+                                                
 //
 
 
 #define BOTONERA
-#define ELEMENT_CONFIG_FILE_PATH  "/element_config.txt"
-#define ELEMENT_INFO_FILE_PATH    "/element_info.txt"     // OJO CHEINCH 
+    // OJO CHEINCH 
+
+#define ELEMENT_WORKTIME_FILE_PATH   "/WORKINGTIME_FILE.txt"
+#define ELEMENT_LIFETIME_FILE_PATH   "/LIFETIME_FILE.txt"
+#define ELEMENT_ID_FILE_PATH         "/ID_FILE.txt"
+#define ELEMENT_SERIALNUM_FILE_PATH  "/SERIALNUM_FILE.txt"
+
+#define LIFETIME_UPDATE_INTERVAL  3600000
 
 #define MAX_EXPECTED_TIME    0xFFFFFFFF
-#define RF_TX_PIN         18 
+#define RF_TX_PIN       18 
 #define RF_RX_PIN       17  
-#define RF_CONFIG_PIN 46
-#define RF_BAUD_RATE 9600
+#define RF_CONFIG_PIN   46
+#define RF_BAUD_RATE    9600
 
 #define UART_RX_BUFFER_SIZE 1024
 
@@ -112,15 +117,19 @@
 #define F_RETURN_ELEM_SECTOR     0xD0
 #define L_RETURN_ELEM_SECTOR_01  0x01
 #define L_RETURN_ELEM_SECTOR_02  0x02
+#define L_RETURN_ELEM_SECTOR_03  0x03
+#define L_RETURN_ELEM_SECTOR_04  0x04
+#define L_RETURN_ELEM_SECTOR_05  0x05
 #define L_RETURN_ELEM_SECTOR_24  0x18
 #define L_RETURN_ELEM_SECTOR_64  0x40
+#define L_RETURN_ELEM_SECTOR_128 0x80
 #define L_RETURN_ELEM_SECTOR_192 0xC0
 #define F_RETURN_ELEM_INFO       0xD1    
 #define L_RETURN_ELEM_INFO       0x2E7C   //          0xE7E  // OJITO que es mas grande que ROCIO JURADO.
 #define F_RETURN_ELEM_ICON       0xD3
 #define L_RETURN_ELEM_ICON       0x00 // OJO
 #define F_RETURN_ELEM_STATE      0xD2
-#define L_RETURN_ELEM_STATE      0x10
+#define L_RETURN_ELEM_STATE       0x10
 #define F_RETURN_ELEM_ERROR      0xDE
 #define L_RETURN_ELEM_ERROR      0x60 
 
@@ -141,7 +150,7 @@
 #define NO_COLOR              0x00
 // Definiciones de cosas del manejo de los tramadoles jajalolxd
 #define MAX_BYTES_PER_INTERRUPT 0xFF
-#define MAX_FRAME_LENGTH        0xFFFF
+#define MAX_FRAME_LENGTH        0x90
 #define MIN_FRAME_LENGTH        0x05
 #define MAX_BUFFER_SIZE         0xFF
 #define MAX_ALLOWED_TARGETS     0xFF
@@ -280,7 +289,6 @@
 
 // DEFINES COLUMNA
 
-
 #define COLUMN_LED_DATA_PIN 21
 #define COLUMN_RELAY_PIN    42
 
@@ -290,7 +298,6 @@
 
 // DEFINES BOTONERA
 
-#define BOTONERA_NUM_LEDS     9
 #define BOTONERA_DATA_PIN     21
 
 #if   defined (COLUMNA)
@@ -300,6 +307,7 @@
 #elif defined (BOTONERA)
   #define NUM_LEDS 9
 #endif
+
 
 enum COLUMN_MODE_LIST{
     COLUMN_CONTEST_MODE= 0,
@@ -453,7 +461,15 @@ enum SECTOR_LIST{
   ELEM_ICON_ROW_60_SECTOR,
   ELEM_ICON_ROW_61_SECTOR,
   ELEM_ICON_ROW_62_SECTOR,
-  ELEM_ICON_ROW_63_SECTOR
+  ELEM_ICON_ROW_63_SECTOR,
+  ELEM_WORK_TIME_SECTOR,
+  ELEM_LIFE_TIME_SECTOR,
+  ELEM_CURRENT_COLOR_SECTOR,
+  ELEM_CURRENT_BRIGHTNESS_SECTOR,
+  ELEM_CURRENT_FLAGS_SECTOR,
+  ELEM_CURRENT_PATTERN_SECTOR,
+  ELEM_CURRENT_FILE_SECTOR,
+  ELEM_CURRENT_XMANAGER_SECTOR
 };
 
 

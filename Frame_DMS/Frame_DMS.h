@@ -112,8 +112,7 @@ float get_aux_var_01_from_sensorValue(LAST_ENTRY_FRAME_T LEFin);
 
 void  get_sector_data(byte *sector_data, byte lang, byte sector);
 
-FRAME_T frameMaker_REQ_ELEM_INFO       (byte originin, byte targetin, byte idiomain);
-FRAME_T frameMaker_REQ_ELEM_SECTOR     (byte originin, byte targetin, byte idiomain, byte sectorin);
+FRAME_T frameMaker_REQ_ELEM_INFO       (byte originin, byte targetin, byte idiomain, byte sectorin);
 //FRAME_T frameMaker_REQ_ELEM_ICON       (byte origin, byte targetin);
 FRAME_T frameMaker_REQ_ELEM_STATE      (byte originin, byte targetin);
 
@@ -130,9 +129,8 @@ FRAME_T frameMaker_SEND_FILE_NUM       (byte originin, std::vector<byte>targetin
 //FRAME_T frameMaker_RETURN_ELEM_INFO(byte originin, byte targetin, INFO_PACK_T* infoPack);
 //FRAME_T frameMaker_RETURN_ELEM_ICON    (byte origin, byte targetin, ICON_PACK_T iconPack);
 FRAME_T frameMaker_RETURN_ELEM_SECTOR  (byte originin, byte targetin, byte *sector_data, byte sectorin);
-FRAME_T frameMaker_RETURN_ELEM_INFO(byte originin, byte targetin, INFO_PACK_T* infoPack);
 FRAME_T frameMaker_RETURN_ELEM_STATE   (byte originin, byte targetin, INFO_STATE_T infoState);
-
+FRAME_T frameMaker_REQ_ELEM_SECTOR(byte originin, byte targetin, byte idiomain, byte sectorin);
 
 
 

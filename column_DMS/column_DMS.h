@@ -13,7 +13,7 @@
 class COLUMN_ : public ELEMENT_{
 
     public:
-        COLUMN_(uint16_t serialNumber);
+        COLUMN_();
 
         void column_begin();
         void inic_elem_config()override;

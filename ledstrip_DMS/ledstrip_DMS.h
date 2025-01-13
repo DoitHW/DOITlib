@@ -13,7 +13,7 @@
 class LEDSTRIP_ : public ELEMENT_{
 
     public:
-        LEDSTRIP_(uint16_t serialNumber);
+        LEDSTRIP_();
 
         void ledstrip_begin();
         void RX_main_handler(LAST_ENTRY_FRAME_T LEF)override;

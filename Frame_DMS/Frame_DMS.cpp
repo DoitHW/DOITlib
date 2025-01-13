@@ -3,6 +3,7 @@
 #include <Element_DMS/Element_DMS.h>
 #include <column_DMS/column_DMS.h>
 #include <info_elements_DMS/info_elements_DMS.h>
+#include <icons_64x64_DMS/icons_64x64_DMS.h>
 #include <vector>
 #include <Arduino.h>
 
@@ -38,16 +39,14 @@ void IRAM_ATTR onUartInterrupt() {
     static uint16_t receivedBytes = 0;          // OJO con los statics, danger.
     static uint16_t calculatedChecksum = 0;
     static uint8_t receivedChecksum = 0;
-    
 
     uint8_t bytesProcessed = 0;
-    static int count = 0;
-    
+
     while (Serial1.available()) {
+
         byte receivedByte = Serial1.read();
         Serial.print(receivedByte, HEX);
         Serial.print(" ");
-        count ++;
         bytesProcessed++;
         lastReceivedTime = millis();
         if (receiveState == WAITING_START && receivedByte != NEW_START) continue;
@@ -55,7 +54,6 @@ void IRAM_ATTR onUartInterrupt() {
         switch (receiveState) {
             case WAITING_START:
                 if (receivedByte == NEW_START) {
-                    
                     uartBuffer.reserve(MAX_FRAME_LENGTH);
                     uartBuffer.clear();
                     uartBuffer.push_back(receivedByte);
@@ -83,9 +81,8 @@ void IRAM_ATTR onUartInterrupt() {
                 totalFrameLength = expectedFrameLength + 3;  
 
                 if (totalFrameLength > MAX_FRAME_LENGTH || totalFrameLength < MIN_FRAME_LENGTH) {
-                    
                     #ifdef DEBUG
-                        Serial.println("❌ Error: Longitud de trama inv\xE1lida");
+                        Serial.println("Error: Longitud de trama inv\xE1lida");
                     #endif
                     receiveState = WAITING_START;
                     uartBuffer.clear();
@@ -121,28 +118,23 @@ void IRAM_ATTR onUartInterrupt() {
                             if (isTarget) {
                                 frameReceived = true;
                                                                 #ifdef DEBUG
-                                                                    Serial.println("✅ Trama recibida correctamente y dirigida al dispositivo");
+                                                                    Serial.println("Trama recibida correctamente y dirigida al dispositivo");
                                                                 #endif
                             } else {
                                                                 #ifdef DEBUG
-                                                                    Serial.println("❌ Trama recibida correctamente pero no dirigida al dispositivo");
+                                                                    Serial.println("Trama recibida correctamente pero no dirigida al dispositivo");
                                                                 #endif
                             }
                         } else {
-                            
                                                                 #ifdef DEBUG
-                                                                    Serial.println("❌ Error: Checksum inv\xE1lido");
+                                                                    Serial.println("Error: Checksum inv\xE1lido");
                                                                 #endif
                         }
                     } else {
-                    
                                                                 #ifdef DEBUG
-                                                                    Serial.println("❌ Error: Byte de fin incorrecto");
+                                                                    Serial.println("Error: Byte de fin incorrecto");
                                                                 #endif
                     }
-            
-                    Serial.println("Total de bytes recibidos: " + String(count));
-                    count = 0;
                     receiveState = WAITING_START;
                     return;
                 } 
@@ -203,7 +195,7 @@ LAST_ENTRY_FRAME_T extract_info_from_frameIn(std::vector<byte> vectorin) {
 
 void send_frame(const FRAME_T &framein) {
     int i = 0;
-    byte dTime = 5;
+    byte dTime = 4;
 
     Serial.println(" #### Trama enviada ####");
     Serial1.write(framein.start);           Serial.println("[" + String(++i) + "] START = " + String(framein.start, HEX)); delay(dTime);
@@ -226,7 +218,9 @@ void send_frame(const FRAME_T &framein) {
     Serial1.write(framein.end);             Serial.println("[" + String(++i) + "] End = " + String(framein.end, HEX)); delay(dTime);
     Serial.println("======================================");
 
-    //Serial.println("Trama enviada, bytes: " + String(i));
+
+    // Serial.println("checksum: " + String(framein.checksum, HEX));
+    // Serial.println("Trama enviada, bytes: " + String(i));
 }
 
 
@@ -315,11 +309,35 @@ byte get_color_from_sensorValue(LAST_ENTRY_FRAME_T LEFin) {
     return (byte)result;
 }
 
+#define SIZE 64
 
+uint16_t unidimensional_table[SIZE * SIZE];
+
+// void fillTable() {
+//     for (int row = 0; row < SIZE; row++) {
+//         for (int col = 0; col < SIZE; col++) {
+//             unidimensional_table[row * SIZE + col] = row + 1;
+//         }
+//     }
+// }
 
 
 void  get_sector_data(byte *sector_data, byte lang, byte sector){
 
+    Serial.println("Aqui hem entrat a get_sector_data.");
+    Serial.println(("GSD_Lang: " + String(lang)));
+    Serial.println(("GSD_Sector: " + String(sector)));
+    memset(sector_data, 0, 192);
+
+    if (sector >= ELEM_ICON_ROW_0_SECTOR && sector <= ELEM_ICON_ROW_63_SECTOR) {
+        int startIndex = (sector - ELEM_ICON_ROW_0_SECTOR) * 64;
+       
+        for (int i = 0; i < 64; i++) {
+            sector_data[i * 2] = elem_icon[startIndex + i] >> 8;     // MSB
+            sector_data[i * 2 + 1] = elem_icon[startIndex + i] & 0xFF; // LSB
+        }
+    }
+    
     String data;
     switch(sector){
         case ELEM_NAME_SECTOR:
@@ -329,8 +347,312 @@ void  get_sector_data(byte *sector_data, byte lang, byte sector){
 
         case ELEM_DESC_SECTOR:
             data = get_string_from_info_DB(ELEM_DESC, lang);
+            Serial.println("Data: " + String(data));
             data.toCharArray((char*)sector_data, 192);
             break;
+
+        case ELEM_SERIAL_SECTOR:
+            data = element->get_serial_from_file();
+            data.trim();
+            for (int i = 0; i < 5; i++) {
+            String byteStr = data.substring(i * 2, i * 2 + 2);
+            sector_data[i] = (uint8_t)strtol(byteStr.c_str(), NULL, 16);
+            }
+            Serial.println("Data DATADATADTAATDATDATDATDA: " + String(data));
+            Serial.println("Data DATADATADTAATDATDATDATDA: " + String(sector_data[0]));
+            break;
+
+        case ELEM_ID_SECTOR:
+            sector_data[0] = globalID;
+            break;
+
+        case ELEM_CMODE_SECTOR:
+            sector_data[0] = element->get_currentMode();
+            break;
+
+        case ELEM_MODE_0_NAME_SECTOR:   
+            data = get_string_from_info_DB(ELEM_MODE_0_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;      
+        
+        case ELEM_MODE_0_DESC_SECTOR:   
+            data = get_string_from_info_DB(ELEM_MODE_0_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;  
+
+        case ELEM_MODE_0_FLAG_SECTOR:   
+            sector_data[0]= (get_config_flag_mode(0) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(0) & 0xFF;
+            break;  
+
+        case ELEM_MODE_1_NAME_SECTOR:   
+            data = get_string_from_info_DB(ELEM_MODE_1_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;  
+
+        case ELEM_MODE_1_DESC_SECTOR:   
+            data = get_string_from_info_DB(ELEM_MODE_1_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;      
+
+        case ELEM_MODE_1_FLAG_SECTOR:  
+            sector_data[0]= (get_config_flag_mode(1) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(1) & 0xFF;
+            break;  
+
+        case ELEM_MODE_2_NAME_SECTOR:       
+            data = get_string_from_info_DB(ELEM_MODE_2_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;                                                          
+
+        case ELEM_MODE_2_DESC_SECTOR:    
+            data = get_string_from_info_DB(ELEM_MODE_2_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;  
+
+        case ELEM_MODE_2_FLAG_SECTOR:   
+            sector_data[0]= (get_config_flag_mode(2) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(2) & 0xFF;
+            break;      
+
+        case ELEM_MODE_3_NAME_SECTOR:   
+            data = get_string_from_info_DB(ELEM_MODE_3_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;
+
+        case ELEM_MODE_3_DESC_SECTOR:       
+            data = get_string_from_info_DB(ELEM_MODE_3_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;      
+
+        case ELEM_MODE_3_FLAG_SECTOR:   
+            sector_data[0]= (get_config_flag_mode(3) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(3) & 0xFF;
+            break;  
+
+        case ELEM_MODE_4_NAME_SECTOR:   
+            data = get_string_from_info_DB(ELEM_MODE_4_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;      
+
+        case ELEM_MODE_4_DESC_SECTOR:   
+            data = get_string_from_info_DB(ELEM_MODE_4_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;  
+
+        case ELEM_MODE_4_FLAG_SECTOR:   
+            sector_data[0]= (get_config_flag_mode(4) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(4) & 0xFF;
+            break;
+
+        case ELEM_MODE_5_NAME_SECTOR:   
+            data = get_string_from_info_DB(ELEM_MODE_5_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;
+
+        case ELEM_MODE_5_DESC_SECTOR:   
+            data = get_string_from_info_DB(ELEM_MODE_5_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;  
+
+            sector_data[0]= (get_config_flag_mode(5) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(5) & 0xFF;
+            break;  
+
+        case ELEM_MODE_6_NAME_SECTOR:   
+            data = get_string_from_info_DB(ELEM_MODE_6_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;  
+
+        case ELEM_MODE_6_DESC_SECTOR:   
+            data = get_string_from_info_DB(ELEM_MODE_6_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;
+
+        case ELEM_MODE_6_FLAG_SECTOR:       
+            sector_data[0]= (get_config_flag_mode(6) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(6) & 0xFF;
+            break;
+
+        case ELEM_MODE_7_NAME_SECTOR:   
+            data = get_string_from_info_DB(ELEM_MODE_7_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;
+
+        case ELEM_MODE_7_DESC_SECTOR:   
+            data = get_string_from_info_DB(ELEM_MODE_7_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;
+
+        case ELEM_MODE_7_FLAG_SECTOR:       
+            sector_data[0]= (get_config_flag_mode(7) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(7) & 0xFF;
+            break;  
+
+        case ELEM_MODE_8_NAME_SECTOR:               
+            data = get_string_from_info_DB(ELEM_MODE_8_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;      
+
+        case ELEM_MODE_8_DESC_SECTOR:               
+            data = get_string_from_info_DB(ELEM_MODE_8_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;      
+
+        case ELEM_MODE_8_FLAG_SECTOR:        
+            sector_data[0]= (get_config_flag_mode(8) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(8) & 0xFF;
+            break;  
+
+        case ELEM_MODE_9_NAME_SECTOR:        
+            data = get_string_from_info_DB(ELEM_MODE_9_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;      
+
+        case ELEM_MODE_9_DESC_SECTOR:               
+            data = get_string_from_info_DB(ELEM_MODE_9_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;  
+
+        case ELEM_MODE_9_FLAG_SECTOR:        
+            sector_data[0]= (get_config_flag_mode(9) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(9) & 0xFF;
+            break;
+
+        case ELEM_MODE_10_NAME_SECTOR:               
+            data = get_string_from_info_DB(ELEM_MODE_10_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;  
+
+        case ELEM_MODE_10_DESC_SECTOR:         
+            data = get_string_from_info_DB(ELEM_MODE_10_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;  
+
+        case ELEM_MODE_10_FLAG_SECTOR:          
+            sector_data[0]= (get_config_flag_mode(10) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(10) & 0xFF;
+            break;      
+
+        case ELEM_MODE_11_NAME_SECTOR:      
+            data = get_string_from_info_DB(ELEM_MODE_11_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;  
+
+        case ELEM_MODE_11_DESC_SECTOR:       
+            data = get_string_from_info_DB(ELEM_MODE_11_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;      
+
+        case ELEM_MODE_11_FLAG_SECTOR:      
+            sector_data[0]= (get_config_flag_mode(11) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(11) & 0xFF;
+            break;  
+
+        case ELEM_MODE_12_NAME_SECTOR:    
+            data = get_string_from_info_DB(ELEM_MODE_12_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;      
+
+        case ELEM_MODE_12_DESC_SECTOR:     
+            data = get_string_from_info_DB(ELEM_MODE_12_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;  
+
+        case ELEM_MODE_12_FLAG_SECTOR:      
+            sector_data[0]= (get_config_flag_mode(12) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(12) & 0xFF;
+            break;
+
+        case ELEM_MODE_13_NAME_SECTOR:       
+            data = get_string_from_info_DB(ELEM_MODE_13_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;      
+
+        case ELEM_MODE_13_DESC_SECTOR:       
+            data = get_string_from_info_DB(ELEM_MODE_13_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;  
+
+        case ELEM_MODE_13_FLAG_SECTOR:       
+            sector_data[0]= (get_config_flag_mode(13) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(13) & 0xFF;
+            break;  
+
+        case ELEM_MODE_14_NAME_SECTOR:               
+            data = get_string_from_info_DB(ELEM_MODE_14_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;  
+
+        case ELEM_MODE_14_DESC_SECTOR:         
+            data = get_string_from_info_DB(ELEM_MODE_14_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;  
+
+        case ELEM_MODE_14_FLAG_SECTOR:          
+            sector_data[0]= (get_config_flag_mode(14) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(14) & 0xFF;
+            break;      
+
+        case ELEM_MODE_15_NAME_SECTOR:         
+            data = get_string_from_info_DB(ELEM_MODE_15_NAME, lang);
+            data.toCharArray((char*)sector_data, 24);
+            break;  
+
+        case ELEM_MODE_15_DESC_SECTOR:       
+            data = get_string_from_info_DB(ELEM_MODE_15_DESC, lang);
+            data.toCharArray((char*)sector_data, 192);
+            break;  
+
+        case ELEM_MODE_15_FLAG_SECTOR:      
+            sector_data[0]= (get_config_flag_mode(15) >> 8) & 0xFF;
+            sector_data[1]=  get_config_flag_mode(15) & 0xFF;
+            break;
+
+     case ELEM_WORK_TIME_SECTOR:
+            sector_data[0] = (element->get_workTime() >> 24) & 0xFF;  // MSB
+            sector_data[1] = (element->get_workTime() >> 16) & 0xFF;  
+            sector_data[2] = (element->get_workTime() >> 8)  & 0xFF;   
+            sector_data[3] = (element->get_workTime())       & 0xFF;       
+            break;
+
+    case ELEM_LIFE_TIME_SECTOR:
+            sector_data[0] = (element->get_lifeTime() >> 24) & 0xFF;  
+            sector_data[1] = (element->get_lifeTime() >> 16) & 0xFF;  
+            sector_data[2] = (element->get_lifeTime() >> 8)  & 0xFF;   
+            sector_data[3] = (element->get_lifeTime())       & 0xFF;      
+            break;
+    
+    // case ELEM_CURRENT_COLOR_SECTOR:
+    //         sector_data[0] = element->get_currentRed();
+    //         sector_data[1] = element->get_currentGreen();
+    //         sector_data[2] = element->get_currentBlue();
+    //         break;
+
+    // case ELEM_CURRENT_BRIGHTNESS_SECTOR:
+    //         sector_data[0] = element->get_currentBrightness();
+    //         break;  
+
+    // case ELEM_CURRENT_PATTERN_SECTOR:
+    //         sector_data[0] = element->get_currentPattern();
+    //         break;      
+        
+    // case ELEM_CURRENT_FLAGS_SECTOR:
+    //         sector_data[0] =  element->get_currentFlags()       & 0xFF;
+    //         sector_data[1] = (element->get_currentFlags() >> 8) & 0xFF;
+    //         break;      
+
+    // case ELEM_CURRENT_FILE_SECTOR:
+    //         sector_data[0] = element->get_currentFile()        & 0xFF;
+    //         sector_data[1] = (element->get_currentFile() >> 8) & 0xFF;
+    //         break; 
+
+    // case ELEM_CURRENT_XMANAGER_SECTOR:
+    //         sector_data[0] = xManager;
+    //         break;
+    
+    
+        default: break;
     }
 }
 
@@ -350,29 +672,6 @@ void  get_sector_data(byte *sector_data, byte lang, byte sector){
 
 
 
-FRAME_T frameMaker_REQ_ELEM_SECTOR(byte originin, byte targetin, byte idiomain, byte sectorin){
-
-    FRAME_T frame;
-    memset(&frame, 0, sizeof(FRAME_T));
-    frame.data.resize(L_REQ_ELEM_SECTOR);
-    uint16_t  frameLength = 0x08 + L_REQ_ELEM_SECTOR;
-
-    frame.start= NEW_START;
-    frame.frameLengthLsb = frameLength & 0xFF;      
-    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
-    frame.origin= originin;
-    frame.numTargets = 0x01;
-    frame.target.push_back(targetin);
-    frame.function= F_REQ_ELEM_SECTOR;
-    frame.dataLengthMsb = (L_REQ_ELEM_SECTOR >> 8) & 0xFF; 
-    frame.dataLengthLsb = L_REQ_ELEM_SECTOR & 0xFF;   
-    frame.data[0]= idiomain;
-    frame.data[1]= sectorin;
-    frame.checksum= checksum_calc(frame);
-    frame.end= NEW_END;
-
-    return frame;
-}
 
 
 FRAME_T frameMaker_REQ_ELEM_INFO(byte originin, byte targetin, byte idiomain, byte sectorin){
@@ -399,6 +698,30 @@ FRAME_T frameMaker_REQ_ELEM_INFO(byte originin, byte targetin, byte idiomain, by
     return frame;
 }
 
+
+FRAME_T frameMaker_REQ_ELEM_SECTOR(byte originin, byte targetin, byte idiomain, byte sectorin){
+
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    frame.data.resize(L_REQ_ELEM_SECTOR);
+    uint16_t  frameLength = 0x08 + L_REQ_ELEM_SECTOR;
+
+    frame.start= NEW_START;
+    frame.frameLengthLsb = frameLength & 0xFF;      
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin= originin;
+    frame.numTargets = 0x01;
+    frame.target.push_back(targetin);
+    frame.function= F_REQ_ELEM_SECTOR;
+    frame.dataLengthMsb = (L_REQ_ELEM_SECTOR >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_REQ_ELEM_SECTOR & 0xFF;   
+    frame.data[0]= idiomain;
+    frame.data[1]= sectorin;
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+
+    return frame;
+}
 
 FRAME_T frameMaker_REQ_ELEM_STATE(byte originin, byte targetin){
 
@@ -628,38 +951,216 @@ FRAME_T frameMaker_RETURN_ELEM_SECTOR (byte originin, byte targetin, byte *secto
     frame.origin= originin;
     frame.numTargets = 0x01;
     frame.target.push_back(targetin);
+    frame.data.resize(0);
+    frame.function= F_RETURN_ELEM_SECTOR;
+    Serial.println("Sectorin: " + String(sectorin, HEX));
+    frame.data.push_back(sectorin);
+    switch (sectorin) {
+            
+             case ELEM_SERIAL_SECTOR:
+                frameLength = 0x08 + L_RETURN_ELEM_SECTOR_05 + 1;
+                frame.frameLengthLsb = frameLength & 0xFF;     
+                frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+                frame.dataLengthMsb = ((L_RETURN_ELEM_SECTOR_05 + 1) >> 8) & 0xFF; 
+                frame.dataLengthLsb = (L_RETURN_ELEM_SECTOR_05 + 1) & 0xFF;
+                for (int i = 0; i < L_RETURN_ELEM_SECTOR_05; i++) {
+                    frame.data.push_back(sector_data[i]);
+                }
+                break;
 
-    switch(sectorin){
-        case ELEM_NAME_SECTOR:
-            frame.data.resize(L_RETURN_ELEM_SECTOR_24 +1);
-            frameLength = 0x08 + L_RETURN_ELEM_SECTOR_24 +1;
-            frame.frameLengthLsb = frameLength & 0xFF;     
-            frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
-            frame.function= F_RETURN_ELEM_SECTOR;
-            frame.dataLengthMsb = (L_RETURN_ELEM_SECTOR_24 +1 >> 8) & 0xFF; 
-            frame.dataLengthLsb = L_RETURN_ELEM_SECTOR_24 +1 & 0xFF;
-            frame.data.push_back(sectorin);   
-            for (int i = 0; i < L_RETURN_ELEM_SECTOR_24; i++) frame.data.push_back(sector_data[i]);
-            break;
+            case ELEM_ID_SECTOR:
+            case ELEM_CMODE_SECTOR:
+                frameLength = 0x08 + L_RETURN_ELEM_SECTOR_01 + 1;
+                frame.frameLengthLsb = frameLength & 0xFF;     
+                frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+                frame.dataLengthMsb = ((L_RETURN_ELEM_SECTOR_01 + 1) >> 8) & 0xFF; 
+                frame.dataLengthLsb = (L_RETURN_ELEM_SECTOR_01 + 1) & 0xFF;
+                for (int i = 0; i < L_RETURN_ELEM_SECTOR_01; i++) {
+                    frame.data.push_back(sector_data[i]);
+                }
+                break;
+// serial falta
+            case ELEM_DESC_SECTOR:
+                Serial.println("Se ha pedido una descripción del elemento. ");
+                frameLength = 0x08 + L_RETURN_ELEM_SECTOR_192 + 1;
+                frame.frameLengthLsb = frameLength & 0xFF;     
+                frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+                frame.dataLengthMsb = ((L_RETURN_ELEM_SECTOR_192 + 1) >> 8) & 0xFF; 
+                frame.dataLengthLsb = (L_RETURN_ELEM_SECTOR_192 + 1) & 0xFF;
+                for (int i = 0; i < L_RETURN_ELEM_SECTOR_192; i++) {
+                    frame.data.push_back(sector_data[i]);
+                }
+                break;
 
-        case ELEM_DESC_SECTOR:
-            frame.data.resize(L_RETURN_ELEM_SECTOR_192 +1);
-            frameLength = 0x08 + L_RETURN_ELEM_SECTOR_192 +1;
-            frame.frameLengthLsb = frameLength & 0xFF;     
-            frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
-            frame.function= F_RETURN_ELEM_SECTOR;
-            frame.dataLengthMsb = (L_RETURN_ELEM_SECTOR_192 +1 >> 8) & 0xFF; 
-            frame.dataLengthLsb = L_RETURN_ELEM_SECTOR_192 +1 & 0xFF;
-            frame.data.push_back(sectorin);   
-            for (int i = 0; i < L_RETURN_ELEM_SECTOR_192; i++) frame.data.push_back(sector_data[i]);
+            case ELEM_NAME_SECTOR:
+            case ELEM_MODE_0_NAME_SECTOR:
+            case ELEM_MODE_1_NAME_SECTOR:
+            case ELEM_MODE_2_NAME_SECTOR:
+            case ELEM_MODE_3_NAME_SECTOR:
+            case ELEM_MODE_4_NAME_SECTOR:
+            case ELEM_MODE_5_NAME_SECTOR:
+            case ELEM_MODE_6_NAME_SECTOR:
+            case ELEM_MODE_7_NAME_SECTOR:
+            case ELEM_MODE_8_NAME_SECTOR:
+            case ELEM_MODE_9_NAME_SECTOR:
+            case ELEM_MODE_10_NAME_SECTOR:
+            case ELEM_MODE_11_NAME_SECTOR:
+            case ELEM_MODE_12_NAME_SECTOR:
+            case ELEM_MODE_13_NAME_SECTOR:
+            case ELEM_MODE_14_NAME_SECTOR:
+            case ELEM_MODE_15_NAME_SECTOR:
+                frameLength = 0x08 + L_RETURN_ELEM_SECTOR_24 + 1;
+                frame.frameLengthLsb = frameLength & 0xFF;     
+                frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+                frame.dataLengthMsb = ((L_RETURN_ELEM_SECTOR_24 + 1) >> 8) & 0xFF; 
+                frame.dataLengthLsb = (L_RETURN_ELEM_SECTOR_24 + 1) & 0xFF;
+                for (int i = 0; i < L_RETURN_ELEM_SECTOR_24; i++) {
+                    frame.data.push_back(sector_data[i]);
+                }
+                break;
+
+            case ELEM_MODE_0_DESC_SECTOR: 
+            case ELEM_MODE_1_DESC_SECTOR:
+            case ELEM_MODE_2_DESC_SECTOR: 
+            case ELEM_MODE_3_DESC_SECTOR:
+            case ELEM_MODE_4_DESC_SECTOR: 
+            case ELEM_MODE_5_DESC_SECTOR:
+            case ELEM_MODE_6_DESC_SECTOR: 
+            case ELEM_MODE_7_DESC_SECTOR:
+            case ELEM_MODE_8_DESC_SECTOR: 
+            case ELEM_MODE_9_DESC_SECTOR:
+            case ELEM_MODE_10_DESC_SECTOR: 
+            case ELEM_MODE_11_DESC_SECTOR:
+            case ELEM_MODE_12_DESC_SECTOR: 
+            case ELEM_MODE_13_DESC_SECTOR:
+            case ELEM_MODE_14_DESC_SECTOR: 
+            case ELEM_MODE_15_DESC_SECTOR:
+                frameLength = 0x08 + L_RETURN_ELEM_SECTOR_192 + 1;
+                frame.frameLengthLsb = frameLength & 0xFF;     
+                frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+                frame.dataLengthMsb = ((L_RETURN_ELEM_SECTOR_192 + 1) >> 8) & 0xFF; 
+                frame.dataLengthLsb = (L_RETURN_ELEM_SECTOR_192 + 1) & 0xFF;
+                for (int i = 0; i < L_RETURN_ELEM_SECTOR_192; i++) {
+                    frame.data.push_back(sector_data[i]);
+                }
+                break;
+
+           
+            case ELEM_MODE_0_FLAG_SECTOR: 
+            case ELEM_MODE_1_FLAG_SECTOR:
+            case ELEM_MODE_2_FLAG_SECTOR: 
+            case ELEM_MODE_3_FLAG_SECTOR:
+            case ELEM_MODE_4_FLAG_SECTOR: 
+            case ELEM_MODE_5_FLAG_SECTOR:
+            case ELEM_MODE_6_FLAG_SECTOR: 
+            case ELEM_MODE_7_FLAG_SECTOR:
+            case ELEM_MODE_8_FLAG_SECTOR: 
+            case ELEM_MODE_9_FLAG_SECTOR:
+            case ELEM_MODE_10_FLAG_SECTOR: 
+            case ELEM_MODE_11_FLAG_SECTOR:
+            case ELEM_MODE_12_FLAG_SECTOR: 
+            case ELEM_MODE_13_FLAG_SECTOR:
+            case ELEM_MODE_14_FLAG_SECTOR: 
+            case ELEM_MODE_15_FLAG_SECTOR:
+                frameLength = 0x08 + L_RETURN_ELEM_SECTOR_02 + 1;
+                frame.frameLengthLsb = frameLength & 0xFF;     
+                frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+                frame.dataLengthMsb = ((L_RETURN_ELEM_SECTOR_02 + 1) >> 8) & 0xFF; 
+                frame.dataLengthLsb = (L_RETURN_ELEM_SECTOR_02 + 1) & 0xFF;
+                for (int i = 0; i < L_RETURN_ELEM_SECTOR_02; i++) {
+                    frame.data.push_back(sector_data[i]);
+                }
+                break;
+
+            case ELEM_ICON_ROW_0_SECTOR:
+            case ELEM_ICON_ROW_1_SECTOR:
+            case ELEM_ICON_ROW_2_SECTOR:
+            case ELEM_ICON_ROW_3_SECTOR:
+            case ELEM_ICON_ROW_4_SECTOR:
+            case ELEM_ICON_ROW_5_SECTOR:
+            case ELEM_ICON_ROW_6_SECTOR:
+            case ELEM_ICON_ROW_7_SECTOR:
+            case ELEM_ICON_ROW_8_SECTOR:
+            case ELEM_ICON_ROW_9_SECTOR:
+            case ELEM_ICON_ROW_10_SECTOR:
+            case ELEM_ICON_ROW_11_SECTOR:
+            case ELEM_ICON_ROW_12_SECTOR:
+            case ELEM_ICON_ROW_13_SECTOR:
+            case ELEM_ICON_ROW_14_SECTOR:
+            case ELEM_ICON_ROW_15_SECTOR:
+            case ELEM_ICON_ROW_16_SECTOR:
+            case ELEM_ICON_ROW_17_SECTOR:   
+            case ELEM_ICON_ROW_18_SECTOR:
+            case ELEM_ICON_ROW_19_SECTOR:
+            case ELEM_ICON_ROW_20_SECTOR:
+            case ELEM_ICON_ROW_21_SECTOR:
+            case ELEM_ICON_ROW_22_SECTOR:
+            case ELEM_ICON_ROW_23_SECTOR:
+            case ELEM_ICON_ROW_24_SECTOR:
+            case ELEM_ICON_ROW_25_SECTOR:
+            case ELEM_ICON_ROW_26_SECTOR:
+            case ELEM_ICON_ROW_27_SECTOR:
+            case ELEM_ICON_ROW_28_SECTOR:
+            case ELEM_ICON_ROW_29_SECTOR:
+            case ELEM_ICON_ROW_30_SECTOR:
+            case ELEM_ICON_ROW_31_SECTOR:
+            case ELEM_ICON_ROW_32_SECTOR:
+            case ELEM_ICON_ROW_33_SECTOR:
+            case ELEM_ICON_ROW_34_SECTOR:
+            case ELEM_ICON_ROW_35_SECTOR:
+            case ELEM_ICON_ROW_36_SECTOR:
+            case ELEM_ICON_ROW_37_SECTOR:
+            case ELEM_ICON_ROW_38_SECTOR:
+            case ELEM_ICON_ROW_39_SECTOR:
+            case ELEM_ICON_ROW_40_SECTOR:
+            case ELEM_ICON_ROW_41_SECTOR:
+            case ELEM_ICON_ROW_42_SECTOR:
+            case ELEM_ICON_ROW_43_SECTOR:
+            case ELEM_ICON_ROW_44_SECTOR:
+            case ELEM_ICON_ROW_45_SECTOR:
+            case ELEM_ICON_ROW_46_SECTOR:
+            case ELEM_ICON_ROW_47_SECTOR:
+            case ELEM_ICON_ROW_48_SECTOR:
+            case ELEM_ICON_ROW_49_SECTOR:
+            case ELEM_ICON_ROW_50_SECTOR:
+            case ELEM_ICON_ROW_51_SECTOR:
+            case ELEM_ICON_ROW_52_SECTOR:
+            case ELEM_ICON_ROW_53_SECTOR:
+            case ELEM_ICON_ROW_54_SECTOR:
+            case ELEM_ICON_ROW_55_SECTOR:
+            case ELEM_ICON_ROW_56_SECTOR:
+            case ELEM_ICON_ROW_57_SECTOR:
+            case ELEM_ICON_ROW_58_SECTOR:
+            case ELEM_ICON_ROW_59_SECTOR:
+            case ELEM_ICON_ROW_60_SECTOR:
+            case ELEM_ICON_ROW_61_SECTOR:
+            case ELEM_ICON_ROW_62_SECTOR:
+            case ELEM_ICON_ROW_63_SECTOR:
+                frameLength = 0x08 + L_RETURN_ELEM_SECTOR_128 + 1;
+                frame.frameLengthLsb = frameLength & 0xFF;     
+                frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+                frame.dataLengthMsb = ((L_RETURN_ELEM_SECTOR_128 + 1) >> 8) & 0xFF; 
+                frame.dataLengthLsb = (L_RETURN_ELEM_SECTOR_128 + 1) & 0xFF;
+                for (int i = 0; i < L_RETURN_ELEM_SECTOR_128; i++) {
+                    frame.data.push_back(sector_data[i]);
+                }
+                break;
+
+        default: Serial.println("Sector no valido");
             break;
     }
-
     frame.checksum= checksum_calc(frame);
     frame.end= NEW_END;
-
     return frame;
 }
+
+
+
+
+
+
+
+
 
 
 
@@ -772,7 +1273,7 @@ FRAME_T frameMaker_RETURN_ELEM_STATE(byte originin, byte targetin, INFO_STATE_T 
 
 //////////////////////////////////////////////////////////////////////////////////////
 
-
+/*
 FRAME_T frameMaker_RETURN_ELEM_INFO(byte originin, byte targetin, INFO_PACK_T* infoPack) {
     FRAME_T frame;
     uint16_t dataLength = L_RETURN_ELEM_INFO;
@@ -821,7 +1322,7 @@ FRAME_T frameMaker_RETURN_ELEM_INFO(byte originin, byte targetin, INFO_PACK_T* i
     return frame;
 }
 
-
+*/
 
 
 

@@ -15,7 +15,7 @@
 class BOTONERA_ : public ELEMENT_{
 
     public:
-        BOTONERA_(uint16_t serialNumber);
+        BOTONERA_();
 
         void botonera_begin();
         void RX_main_handler(LAST_ENTRY_FRAME_T LEF)override;

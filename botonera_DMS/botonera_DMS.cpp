@@ -11,7 +11,7 @@
 
 
 
-BOTONERA_::BOTONERA_(uint16_t serialNumber) : ELEMENT_(serialNumber) {
+BOTONERA_::BOTONERA_() : ELEMENT_() {
             set_type(TYPE_BOTONERA);
         }
 
@@ -242,7 +242,7 @@ byte BOTONERA_::anadir_elemento_nuevo(const INFO_PACK_T *infoPack){
     INFO_PACK_T *aux = new INFO_PACK_T;
 
     
-   
+   return 0;
 }
 
 void BOTONERA_::print_info_pack(const INFO_PACK_T *infoPack) {

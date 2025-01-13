@@ -6,13 +6,15 @@
 #include <vector>
 #include <EEPROM.h>
 
-extern float varaux;
 
-LEDSTRIP_::LEDSTRIP_(uint16_t serialNumber) : ELEMENT_(serialNumber) {
-            set_type(TYPE_LEDSTRIP);
-            currentMode= DEFAULT_BASIC_MODE;
-            activePattern = NO_PATTERN;
-        }
+extern float varaux;
+INFO_PACK_T info;
+
+LEDSTRIP_::LEDSTRIP_() {
+    set_type(TYPE_LEDSTRIP);
+    currentMode = DEFAULT_BASIC_MODE;
+    activePattern = NO_PATTERN;
+}
 
 void LEDSTRIP_::ledstrip_begin(){
             colorHandler.begin(NUM_LEDS);
@@ -23,28 +25,18 @@ void LEDSTRIP_::ledstrip_begin(){
 
 void ELEMENT_::work_time_handler(byte colorin){
     if (colorin != 8) {
-                if (!stopwatchRunning) {
-                                                            #ifdef DEBUG
-                                                                Serial.println("Iniciando cronómetro.");
-                                                            #endif
-                    start_working_time();
-                } else {
-                                                            #ifdef DEBUG
-                                                                Serial.println("El cronómetro ya está activo.");
-                                                            #endif
-                }
-            } else {
-                if (stopwatchRunning) {
-                                                            #ifdef DEBUG
-                                                                Serial.println("Deteniendo y guardando el cronómetro.");
-                                                            #endif
-                    stopAndSave_working_time();
-                } else {
-                                                            #ifdef DEBUG
-                                                                Serial.println("El cronómetro ya está detenido.");
-                                                            #endif
-                }
-            }
+        if (!stopwatchRunning) {
+            start_working_time();
+        } else {
+            Serial.println("El cronómetro ya está activo.");
+        }
+    } else {
+        if (stopwatchRunning) {
+            stopAndSave_working_time();
+        } else {
+            Serial.println("El cronómetro ya está detenido.");
+        }
+    }
 }
 
 void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
@@ -66,16 +58,20 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
 
     switch (LEF.function) {
 
-        case F_REQ_ELEM_INFO:{
+        case F_REQ_ELEM_SECTOR:{
             byte lang= LEF.data[0];
-            
-            Serial.println("Recibido F_REQ_ELEM_INFO, lang= " +String(lang));
-            
-            Serial.println("Info obtenida, creado en infopack.");
-           // FRAME_T frame= frameMaker_RETURN_ELEM_INFO(element->ID, LEF.origin, info);
-           // send_frame(frame);
+            byte sector= LEF.data[1];
+            Serial.println("lenguaje pedido: " + String(lang));   
+            Serial.println("sector pedido: " + String(sector));   
+            byte sector_data[192];
+            get_sector_data(sector_data, lang, sector);
+            Serial.println("Sector data: " + String(sector_data[0], HEX));
+            FRAME_T frame= frameMaker_RETURN_ELEM_SECTOR(element->ID, LEF.origin, sector_data, sector);
+            send_frame(frame);
                                                             #ifdef DEBUG
-                                                                Serial.println("Info devuelta en un Return");
+                                                             Serial.println("Info devuelta en un Return");
+                                                             Serial.println("Recibido F_REQ_ELEM_INFO, lang= " +String(lang));
+                                                             Serial.println("Recibido F_REQ_ELEM_INFO, sector= " +String(sector));
                                                             #endif
             break;
         }
@@ -86,12 +82,8 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
         }
 
         case F_SET_ELEM_ID:{
-            element->ID= LEF.data[0];
-            File configFile = SPIFFS.open(ELEMENT_CONFIG_FILE_PATH, "r+");
-            configFile.readStringUntil('\n');
-            configFile.seek(configFile.position());
-            configFile.println(element->ID); 
-            configFile.close();
+            element->set_ID(LEF.data[0]);
+            globalID= LEF.data[0];
             break;
         }
 

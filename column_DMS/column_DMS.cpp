@@ -6,12 +6,13 @@
 #include <vector>
 #include <EEPROM.h>
 
+extern float varaux;
 
 
-
-COLUMN_::COLUMN_(uint16_t serialNumber) : ELEMENT_(serialNumber) {
+COLUMN_::COLUMN_() : ELEMENT_() {
             set_type(TYPE_COLUMN);
             currentMode= DEFAULT_BASIC_MODE;
+            
         }
 
 void COLUMN_::column_begin(){
@@ -51,78 +52,59 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
     // Depuración del estado de la pila
     Serial.println("Inicio de RX_main_handler");
     UBaseType_t stackSize = uxTaskGetStackHighWaterMark(NULL);
-                                                            /*
                                                             #ifdef DEBUG
                                                                Serial.println("Stack restante: " + String(stackSize));
                                                             #endif
-                                                            */
 
     byte currentMode_ = element->get_currentMode();
 
     switch (LEF.function) {
 
-       case F_REQ_ELEM_INFO:{
+       /*case F_REQ_ELEM_INFO:{
             INFO_PACK_T info= get_info_pack(LEF.data[0]);
-            FRAME_T frame= frameMaker_RETURN_ELEM_INFO(element->ID, LEF.origin, &info);
+            FRAME_T frame= frameMaker_RETURN_ELEM_INFO(element->ID, LEF.origin, info);
             send_frame(frame);
-                                                        /*
                                                         #ifdef DEBUG
                                                             Serial.println("Info devuelta en un Return");
                                                         #endif
-                                                        */
             break;
         }
-        
+        */
         case F_REQ_ELEM_STATE:{
-
-
             break;
         }
 
         case F_SET_ELEM_ID:{
-            element->ID= LEF.data[0];
-            File configFile = SPIFFS.open(ELEMENT_CONFIG_FILE_PATH, "r+");
-            configFile.readStringUntil('\n');
-            configFile.seek(configFile.position());
-            configFile.println(element->ID); 
-            configFile.close();
+
             break;
         }
 
-  /*    case F_SEND_TEST:{
-
-
+      /*case F_SEND_TEST:{
             break;
         }*/
 
         case F_SET_ELEM_MODE:{
+            
             byte mode= LEF.data[0];
-            element->currentMode= mode;
+                                                                        #ifdef DEBUG
+                                                                        Serial.println("OJUU, LEF.data[0]= " +String(mode));
+                                                                        #endif
+            if(mode != COLUMN_PATTERN_MODE) colorHandler.set_activePattern(NO_PATTERN);
+            element->set_mode(mode);
+            if(element->get_currentMode() == COLUMN_PASSIVE_MODE) colorHandler.set_passive(true);
+            else                                                  colorHandler.set_passive(false);
+                                                                        #ifdef DEBUG
+                                                                        Serial.println("OJITO, que passem a modo: " +String(element->get_currentMode()));
+                                                                        #endif
             break;
         }
-        case F_SEND_COLOR: {
+        case F_SEND_COLOR:{
             byte color = LEF.data[0];
+            element->work_time_handler(color);
             CRGB colorin= colorHandler.get_CRGB_from_colorList(color);
                                                             #ifdef DEBUG
                                                                 Serial.println("Color recibido: " + String(color));
                                                             #endif
-
-                if (color != 8) {
-                if (!stopwatchRunning) {
-                    Serial.println("Iniciando cronómetro.");
-                    start_working_time();
-                } else {
-                    Serial.println("El cronómetro ya está activo.");
-                }
-            } else {
-                if (stopwatchRunning) {
-                    Serial.println("Deteniendo y guardando el cronómetro.");
-                    stopAndSave_working_time();
-                } else {
-                    Serial.println("El cronómetro ya está detenido.");
-                }
-            }
-
             if (currentMode_ == COLUMN_BASIC_MODE) {
                                                             #ifdef DEBUG
                                                                 Serial.println("Manejando en modo BASIC_MODE.");
@@ -133,70 +115,76 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             colorHandler.set_targetBrightness(MAX_BRIGHTNESS);
             colorHandler.transitionStartTime= millis();
             colorHandler.transitioning= true;
+            break;
             }
-        else if(currentMode_ == COLUMN_SLOW_MODE || currentMode_ == COLUMN_MIX_MODE){
+        else if(currentMode_ == COLUMN_SLOW_MODE){
                                                             #ifdef DEBUG
-                                                                Serial.println("Manejando en modo BASIC_MODE.");
+                                                                Serial.println("Manejando en modo COLUMN_FAST_MODE. o mix");
                                                             #endif
             colorHandler.set_targetColor(colorin);
             colorHandler.set_targetFade(SLOWEST_FADE);
             colorHandler.set_targetBrightness(MAX_BRIGHTNESS);
             colorHandler.transitionStartTime= millis();
             colorHandler.transitioning= true;
+            break;
             }
         else if(currentMode_ == COLUMN_MOTION_MODE){
                                                             #ifdef DEBUG
-                                                                Serial.println("Manejando en modo BASIC_MODE.");
+                                                                Serial.println("Manejando en modo COLUMN_MOTION_MODE.");
                                                             #endif
             colorHandler.set_targetColor(colorin);
             colorHandler.set_targetFade(NORMAL_FADE);
             colorHandler.set_targetBrightness(MAX_BRIGHTNESS);
             colorHandler.transitionStartTime= millis();
             colorHandler.transitioning= true;
+            break;
             }
-        else if(currentMode_ == COLUMN_RB_MOTION_MODE){   // OJO
+        else if (currentMode_ == COLUMN_RB_MOTION_MODE) {
                                                             #ifdef DEBUG
-                                                                Serial.println("Manejando en modo BASIC_MODE.");
+                                                            Serial.println("Ignorando SEND_COLOR en COLUMN_RB_MOTION_MODE");
                                                             #endif
-            colorHandler.set_targetColor(colorin);
-            colorHandler.set_targetFade(NORMAL_FADE);
-            colorHandler.set_targetBrightness(MAX_BRIGHTNESS);
-            colorHandler.transitionStartTime= millis();
-            colorHandler.transitioning= true;
-            }
+            break;
+        }
         else if(currentMode_ == COLUMN_MIX_MODE){
                                                             #ifdef DEBUG
                                                                 Serial.println("Manejando en modo BASIC_MODE.");
                                                             #endif
             colorHandler.set_targetColor(colorin);
-            colorHandler.set_targetFade(NORMAL_FADE);
+            colorHandler.set_targetFade(FASTEST_FADE);
             colorHandler.set_targetBrightness(MAX_BRIGHTNESS);
             colorHandler.transitionStartTime= millis();
             colorHandler.transitioning= true;
+            break;
             }
         else if(currentMode_ == COLUMN_PASSIVE_MODE){
+            if(colorHandler.get_is_paused()) colorHandler.set_is_paused(false);
+            else                             colorHandler.set_is_paused(true);
                                                             #ifdef DEBUG
-                                                                Serial.println("Manejando en modo BASIC_MODE.");
+                                                                Serial.println("Manejando en modo COLUMN_PASSIVE_MODE.");
                                                             #endif
-/* OJITO*/
-            }
             break;
         }
+        else if(currentMode_ == COLUMN_PATTERN_MODE){
+            break;
+            }
+        }
+       
         case F_SEND_SENSOR_VALUE:{
                                                             #ifdef DEBUG
                                                             Serial.println("Se ha recibido un sensor value");
                                                             #endif
             if(currentMode_ == COLUMN_MOTION_MODE){
                 byte value= get_brightness_from_sensorValue(LEF);
-                colorHandler.set_targetFade(FASTEST_FADE);
+                colorHandler.set_targetFade(MOTION_VAL_FADE);
                 colorHandler.set_targetBrightness(value);
                 colorHandler.transitionStartTime= millis();
                 colorHandler.transitioning= true;
             }
             else if(currentMode_ == COLUMN_RB_MOTION_MODE){
                 byte value= get_color_from_sensorValue(LEF); 
-                colorHandler.set_targetColor(value);
-                colorHandler.set_targetFade(FASTEST_FADE);
+                CRGB colorin= colorHandler.get_CRGB_from_pasiveColorList(value);
+                colorHandler.set_targetColor(colorin);
+                colorHandler.set_targetFade(RB_MOTION_VAL_FADE);
                 colorHandler.set_targetBrightness(MAX_BRIGHTNESS);
                 colorHandler.transitionStartTime= millis();
                 colorHandler.transitioning= true;
@@ -221,7 +209,7 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             break;
         }
 
-        default: {
+        default:{
                                                                 #ifdef DEBUG
                                                                     Serial.println("Se ha recibido una función desconocida.");
                                                                 #endif
