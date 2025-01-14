@@ -11,6 +11,7 @@
 
 
 
+
 BOTONERA_::BOTONERA_() : ELEMENT_() {
             set_type(TYPE_BOTONERA);
         }
@@ -112,8 +113,10 @@ byte BOTONERA_::buscar_elemento_nuevo() {
     }
     memset(aux, 0, sizeof(INFO_PACK_T));  // ✅ Memoria completamente inicializada
 
+    iniciarEscaneoElemento("Escaneando ...");
+
     // ✅ Petición inicial del serial antes del bucle principal
-    send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA, DEFAULT_DEVICE, SPANISH_LANG, ELEM_SERIAL_SECTOR));
+    send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA, 0x01, SPANISH_LANG, ELEM_SERIAL_SECTOR));
     frameReceived = false;
     unsigned long startTime = millis();
 
@@ -152,7 +155,7 @@ byte BOTONERA_::buscar_elemento_nuevo() {
         bool sector_completado = false;
 
         while (intentos < max_reintentos && !sector_completado) {
-            send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA, DEFAULT_DEVICE, SPANISH_LANG, sector));
+            send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA, 0x01, SPANISH_LANG, sector));
             frameReceived = false;
             startTime = millis();
 
@@ -209,6 +212,8 @@ byte BOTONERA_::buscar_elemento_nuevo() {
                             }
                             break;
                     }
+                    float progreso = (sector * 100.0) / ELEM_ICON_ROW_63_SECTOR;
+                    actualizarBarraProgreso(progreso);
                     Serial.printf("✅ Datos correctamente recibidos y guardados para sector: %d\n", sector);
                     sector_completado = true;  // ✅ Salir sin esperar más
                 }
@@ -229,6 +234,7 @@ byte BOTONERA_::buscar_elemento_nuevo() {
         delete aux;
         return 0;
     } else {
+        finalizarEscaneoElemento();
         print_info_pack(aux);
         delete aux;
         return 1;
@@ -353,6 +359,188 @@ bool BOTONERA_::serialExistsInSPIFFS(byte serialNum[2]) {
     delete tempPack;
     return false;
 }
+
+void BOTONERA_::iniciarEscaneoElemento(const char* mensajeInicial) {
+    tft.fillScreen(TFT_BLACK);
+    dibujarMarco(TFT_WHITE);
+    
+    tft.setTextColor(TFT_WHITE);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextFont(2); // Usa Font 2
+    tft.drawString(mensajeInicial, 64, 30);
+    
+    actualizarBarraProgreso(0);
+}
+
+void BOTONERA_::actualizarBarraProgreso(float progreso) {
+    int barraAnchoMax = 100;
+    int barraAlto = 10;
+    int barraProgreso = (int)(barraAnchoMax * progreso / 100.0);
+
+    // Dibujar barra de fondo
+    tft.fillRoundRect(14, 60, barraAnchoMax, barraAlto, 5, TFT_DARKGREY);
+    
+    // Dibujar barra de progreso
+    tft.fillRoundRect(14, 60, barraProgreso, barraAlto, 5, TFT_BLUE);
+
+    // Mostrar porcentaje
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextFont(2); // Usa Font 2
+    tft.drawFloat(progreso, 0, 64, 90);
+    tft.drawString("%", 90, 90);
+}
+
+void BOTONERA_::finalizarEscaneoElemento() {
+    tft.fillScreen(TFT_BLACK);
+    dibujarMarco(TFT_WHITE);
+    
+    tft.setTextColor(TFT_GREEN);
+    tft.setTextDatum(MC_DATUM);
+    
+    tft.setTextFont(4); // Usa Font 4 para "Escaneo"
+    tft.drawString("Escaneo", 64, 40);
+    
+    tft.setTextFont(2); // Vuelve a Font 2 para "completado"
+    tft.drawString("completado", 64, 60);
+    
+    // Dibujar un icono de verificación
+    tft.fillCircle(64, 90, 10, TFT_GREEN);
+    tft.drawLine(58, 90, 62, 94, TFT_WHITE);
+    tft.drawLine(62, 94, 70, 86, TFT_WHITE);
+    
+    delay(3000);
+    drawCurrentElement();  // Volver a la pantalla principal
+}
+
+void BOTONERA_::dibujarMarco(uint16_t color) {
+    tft.drawRoundRect(2, 2, 124, 124, 10, color);
+    tft.drawRoundRect(4, 4, 120, 120, 8, color);
+}
+
+void BOTONERA_::mostrarMensajeTemporal(int respuesta, int dTime) {
+    // Borrar la pantalla y dibujar el marco
+    tft.fillScreen(TFT_BLACK);
+    //dibujarMarco(TFT_WHITE);
+
+    // Determinar color y mensajes
+    uint32_t colorTexto;
+    const char* mensajePrincipal;
+    const char* mensajeSecundario;
+
+    if (respuesta == 0) {
+        colorTexto = TFT_RED;
+        mensajePrincipal = "ERROR";
+        mensajeSecundario = "No se ha obtenido respuesta";
+    } else if (respuesta == 1) {
+        colorTexto = TFT_GREEN;
+        mensajePrincipal = "NUEVO";
+        mensajeSecundario = "Elemento no existe Agregando...";
+    } else if (respuesta == 2) {
+        colorTexto = TFT_YELLOW;
+        mensajePrincipal = "ADVERTENCIA";
+        mensajeSecundario = "Elemento ya existe Reasignando ID";
+    } else {
+        colorTexto = TFT_RED;
+        mensajePrincipal = "ERROR";
+        mensajeSecundario = "Error desconocido";
+    }
+
+    // Mostrar mensaje principal centrado
+    tft.setTextFont(4);
+    if (respuesta == 2) tft.setTextFont(2);  // Fuente aún más pequeña
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(colorTexto);
+    tft.drawString(mensajePrincipal, 64, 30);
+
+    // Configurar fuente pequeña para texto secundario
+    tft.setTextFont(2);
+    tft.setTextColor(TFT_WHITE);
+
+    // Dividir el texto secundario en líneas automáticamente
+    const int maxCharsPerLine = 18;
+    const int lineHeight = 20;
+    char buffer[maxCharsPerLine + 1];
+    int textLength = strlen(mensajeSecundario);
+    int yPos = 60;
+
+    for (int i = 0; i < textLength; i += maxCharsPerLine) {
+        strncpy(buffer, mensajeSecundario + i, maxCharsPerLine);
+        buffer[maxCharsPerLine] = '\0'; // Finalizar correctamente
+        tft.drawString(buffer, 65, yPos);
+        yPos += lineHeight;
+    }
+
+    // Dibujar icono correspondiente
+    int iconCenterX = 64;
+    int iconCenterY = 110;
+    int iconSize = 10;
+
+    if (respuesta == 0 || respuesta == 3) {  // Error
+        tft.fillCircle(iconCenterX, iconCenterY, iconSize, TFT_RED);
+        tft.drawLine(58, 104, 70, 116, TFT_WHITE);
+        tft.drawLine(70, 104, 58, 116, TFT_WHITE);
+    } 
+    else if (respuesta == 1) {  // Éxito
+        tft.fillCircle(iconCenterX, iconCenterY, iconSize, TFT_GREEN);
+        tft.drawLine(58, 110, 62, 114, TFT_WHITE);
+        tft.drawLine(62, 114, 70, 106, TFT_WHITE);
+    } 
+    else if (respuesta == 2) {  // Advertencia
+
+    // === Triángulo amarillo ===
+    // 'iconSize' representará aproximadamente la "mitad" de la base del triángulo.
+    // Para un triángulo equilátero, la altura es base * (√3 / 2) ≈ base * 0.866
+    // Si 'iconSize' es 10, entonces la base es 20, y la altura ~17.
+    
+    int triangleSize   = iconSize * 2;           // base del triángulo
+    float triangleHeight = triangleSize * 0.866; // altura (base * √3/2)
+    
+    tft.fillTriangle(
+        iconCenterX,                        // Vértice superior (X)
+        iconCenterY - (triangleHeight / 2), // Vértice superior (Y)
+        iconCenterX - (triangleSize / 2),   // Vértice inferior izquierdo (X)
+        iconCenterY + (triangleHeight / 2), // Vértice inferior izquierdo (Y)
+        iconCenterX + (triangleSize / 2),   // Vértice inferior derecho (X)
+        iconCenterY + (triangleHeight / 2), // Vértice inferior derecho (Y)
+        TFT_YELLOW
+    );
+
+    // === Símbolo de exclamación (!) en negro ===
+    // Lo dividimos en 2 partes: la barra y el punto.
+    // Ajustamos la posición para que quede centrada en el triángulo.
+    
+    // Altura total del signo de exclamación (ajusta a tu gusto):
+    int exclamationHeight = (int)(triangleHeight * 0.5); 
+    // Coordenada Y donde comienza la barra vertical
+    int barY = iconCenterY - (exclamationHeight / 2);
+    
+    // 1) Barra vertical (2 px de ancho)
+    tft.fillRect(
+        iconCenterX - 1,   // Para centrar la barra en X
+        barY, 
+        2,                 // Ancho de la barra
+        exclamationHeight - 4,  // Alto de la barra (reservamos espacio para el punto)
+        TFT_BLACK
+    );
+
+    // 2) Punto (pequeño rectángulo o círculo)
+    // Lo situamos debajo de la barra, dejando 2 px de separación
+    int dotSize = 3; 
+    tft.fillRect(
+        iconCenterX - 1, 
+        barY + (exclamationHeight - 4) + 2, 
+        dotSize, 
+        dotSize, 
+        TFT_BLACK
+    );
+}
+
+    // Esperar y regresar al menú
+    delay(dTime);
+    drawCurrentElement();
+}
+
 
 
 

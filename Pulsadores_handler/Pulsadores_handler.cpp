@@ -89,9 +89,10 @@ void PulsadoresHandler::mostrarColor(byte color) {
         case RELAY:
             colorNombre = "Relay";
             relay_state = !relay_state;
+            target.push_back(0xFF);
             send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, target, relay_state));
             delay(5);
-            send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA, 0xFF, SPANISH_LANG, ELEM_SERIAL_SECTOR));
+            send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA, 0x01, SPANISH_LANG, ELEM_LIFE_TIME_SECTOR));
             break;
         default:
             Serial.println("Ningún botón presionado.");
