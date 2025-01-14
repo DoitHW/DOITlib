@@ -122,6 +122,7 @@ void IRAM_ATTR onUartInterrupt() {
                             if (isTarget) {
                                 frameReceived = true;
                                                                 #ifdef DEBUG
+                                                                    Serial.println();
                                                                     Serial.println("✅ Trama recibida correctamente y ✅ dirigida al dispositivo");
                                                                 #endif
                             } else {
