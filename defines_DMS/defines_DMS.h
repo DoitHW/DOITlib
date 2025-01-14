@@ -35,10 +35,14 @@
 */
 
 //DELFINES SUPER GLOBALES
-                                                #define COLUMNA
-                                                #define SERIAL_NUM 0xF001
-                                                #define SHOW_MAC    
-                                                #define DEBUG
+                                                #define FIBRAS
+                                                /*COLUMNA, FIBRAS, WALLWASHER, ETC*/
+
+                                                #define DEBUG                      // Desactivar en produccion 
+                                                #define SERIAL_NUM 0xF002          // VERSION + MES
+                                                #define SERIAL_BY_FILE             // Activar Serial por FileSystem
+                                                #define SHOW_MAC                   // Opcional disparar MAC al inicio
+
                                                 
 //
 
@@ -49,7 +53,7 @@
 #define ELEMENT_ID_FILE_PATH         "/ID_FILE.txt"
 #define ELEMENT_SERIALNUM_FILE_PATH  "/SERIALNUM_FILE.txt"
 
-#define LIFETIME_UPDATE_INTERVAL  3600000
+#define LIFETIME_UPDATE_INTERVAL  60000
 #define MAX_EXPECTED_TIME    0xFFFFFFFF
 #define RF_TX_PIN       18 
 #define RF_RX_PIN       17  
@@ -275,6 +279,14 @@
 #define TYPE_CURTAIN        0x0C
 #define GENERIC_TYPE        0x00 
 
+// TESTS
+
+enum TESTS_{
+  BLACKOUT= 0,
+  HELLO_TEST,
+  COLOR_TEST
+  // añadir mas tiestos
+};
 
 #define RELAY_1_FLAG     0x00
 #define RELAY_2_FLAG     0x01
