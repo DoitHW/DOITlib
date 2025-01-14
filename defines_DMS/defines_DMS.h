@@ -2,7 +2,14 @@
 #define DEFINES_DMS_H
 
 #include <Arduino.h>
+//DELFINES GLOBALES
+                                                #define FIBRAS
+                                                /*COLUMNA, FIBRAS, WALLWASHER, ETC*/
 
+                                                #define DEBUG                    // -> Desactivar en produccion 
+                                                #define SERIAL_NUM      0xCACA   // -> 0xVV00= VERSION + 0x00MM= MES
+                                                #define NOSERIAL_BY_FILE         // -> NOSERIAL_BY_FILE / SERIAL_BY_FILE --> Activar Serial por FileSystem, si esta definido, ignora el SERIAL_NUM.
+                                                #define SHOW_MAC                 // -> Opcional disparar MAC al inicio  (No sirve pa ná...)                      
 /*                                                                                                  
                                      .-+***+-:....                                                  
                                       .+@@@@@@@@@+:......:::.....                                   
@@ -34,16 +41,11 @@
            ..                .:=.                                                                                                                                                                  
 */
 
-//DELFINES SUPER GLOBALES
-                                                #define FIBRAS
-                                                /*COLUMNA, FIBRAS, WALLWASHER, ETC*/
 
-                                                #define DEBUG                      // Desactivar en produccion 
-                                                #define SERIAL_NUM 0xF002          // VERSION + MES
-                                                #define SERIAL_BY_FILE             // Activar Serial por FileSystem
-                                                #define SHOW_MAC                   // Opcional disparar MAC al inicio
 
-                                                
+
+
+
 //
 
 #define BOTONERA
@@ -148,7 +150,9 @@
 #define OLD_COLOR_FUNCTION    0xCB
 #define OLD_RELAY_FUNCTION    0xD3
 #define NO_COLOR              0x00
-// Definiciones de cosas del manejo de los tramadoles jajalolxd
+
+// Definiciones de cosas del manejo de los tramas y esas cosas
+// NO AGREGAR RES sense consultar a los dioses del Olimpo
 #define MAX_BYTES_PER_INTERRUPT 0xFF
 #define MAX_FRAME_LENGTH        0xFFFF
 #define MIN_FRAME_LENGTH        0x05

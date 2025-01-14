@@ -417,11 +417,15 @@ void  get_sector_data(byte *sector_data, byte lang, byte sector){
                     serialPrefix = file.readString();
                     file.close();
                 }
-                while (serialPrefix.length() < 4) serialPrefix += "0";
             #else
-                serialPrefix = SERIAL_NUM;
-                while (serialPrefix.length() < 4) serialPrefix += "0";
+                // Convertir el valor hexadecimal a una cadena de 4 caracteres
+                uint16_t serialHex = SERIAL_NUM;
+                char buffer[5];
+                snprintf(buffer, sizeof(buffer), "%04X", serialHex);
+                serialPrefix = String(buffer);
             #endif
+
+            while (serialPrefix.length() < 4) serialPrefix = "0" + serialPrefix;
 
             sector_data[0] = strtoul(serialPrefix.substring(0, 2).c_str(), nullptr, 16);
             sector_data[1] = strtoul(serialPrefix.substring(2, 4).c_str(), nullptr, 16);
@@ -431,6 +435,7 @@ void  get_sector_data(byte *sector_data, byte lang, byte sector){
 
             break;
         }
+
 
 
 
