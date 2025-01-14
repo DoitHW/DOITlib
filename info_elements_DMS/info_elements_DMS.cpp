@@ -333,29 +333,29 @@ uint16_t get_info_num(int count, ...) {
         uint16_t get_config_flag_mode(byte modein){
 
                 uint16_t config= 0;
-                if(modein == COLUMN_BASIC_MODE) config= get_info_num(2, 
+                if(modein == LIGHTSOURCE_BASIC_MODE) config= get_info_num(2, 
                                                                         ACCEPTS_BASIC_COLOR,
                                                                         HAS_RELAY_1);
 
-                else if(modein == COLUMN_SLOW_MODE) config= get_info_num(2, 
+                else if(modein == LIGHTSOURCE_SLOW_MODE) config= get_info_num(2, 
                                                                         ACCEPTS_BASIC_COLOR,
                                                                         HAS_RELAY_1);
 
-                else if(modein == COLUMN_MOTION_MODE) config= get_info_num(3, 
+                else if(modein == LIGHTSOURCE_MOTION_MODE) config= get_info_num(3, 
                                                                         ACCEPTS_BASIC_COLOR,
                                                                         HAS_RELAY_1,
                                                                         ACCEPTS_SENS_VAL_1);
 
-                else if(modein == COLUMN_RB_MOTION_MODE) config= get_info_num(3, 
+                else if(modein == LIGHTSOURCE_RB_MOTION_MODE) config= get_info_num(3, 
                                                                         ACCEPTS_BASIC_COLOR,
                                                                         HAS_RELAY_1,
                                                                         ACCEPTS_SENS_VAL_1);
 
-                else if(modein == COLUMN_MIX_MODE) config= get_info_num(2, 
+                else if(modein == LIGHTSOURCE_MIX_MODE) config= get_info_num(2, 
                                                                         ACCEPTS_ADVANCED_COLOR,
                                                                         HAS_RELAY_1);
 
-                else if(modein == COLUMN_PASSIVE_MODE) config= get_info_num(2, 
+                else if(modein == LIGHTSOURCE_PASSIVE_MODE) config= get_info_num(2, 
                                                                         HAS_PASSIVE,
                                                                         HAS_RELAY_1);
 

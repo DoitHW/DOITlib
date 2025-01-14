@@ -160,20 +160,32 @@ void COLORHANDLER_::action_frank() {
     static CRGB targetColorPrev = CRGB::Black;
 
     if (activePattern != NO_PATTERN) {
-        // Manejar patrones activos
+        
         switch (activePattern) {
-            case COLOR_PATT:    colorHandler.RunningLights(0x40, 0x02, 0xFF, 30, 0.1, 5.0); break;
-            case FIRE_PATT:     colorHandler.Fire(40, 90, 1); break;
-            case METEOR_PATT:   colorHandler.meteorRain(0xFF, 0x30, 0x10, 4, 70, true, 1); break;
-            case BOUNCING_PATT: colorHandler.BouncingBalls(0x00, 0x50, 0xFF, 1); break;
-            case RAINBOW_PATT:  colorHandler.rainbowCycle(10); break;
-            case SNOW_PATT:     colorHandler.SnowSparkle(0x04, 0x05, 0x06, 80, random(60, 600)); break;
-            case CLOUD_PATT:   static uint8_t startIndex = 0;
-                                startIndex = startIndex + 1; colorHandler.FillLEDsFromPaletteColors(startIndex); FastLED.show(); break;
+            case COLOR_PATT:    colorHandler.RunningLights(0x40, 0x02, 0xFF, 30, 0.1, 5.0); 
+                                break;
+
+            case FIRE_PATT:     colorHandler.Fire(40, 90, 1); 
+                                break;
+
+            case METEOR_PATT:   colorHandler.meteorRain(0xFF, 0x30, 0x10, 4, 70, true, 1); 
+                                break;
+
+            case BOUNCING_PATT: colorHandler.BouncingBalls(0x00, 0x50, 0xFF, 1); 
+                                break;
+
+            case RAINBOW_PATT:  colorHandler.rainbowCycle(10); 
+                                break;
+
+            case SNOW_PATT:     colorHandler.SnowSparkle(0x04, 0x05, 0x06, 80, random(60, 600)); 
+                                break;
+
+            case CLOUD_PATT:    static uint8_t startIndex = 0;
+                                startIndex = startIndex + 1; colorHandler.FillLEDsFromPaletteColors(startIndex); FastLED.show(); 
+                                break;
         }
         return;
     }
-
     // Modo pasivo (ciclo automático de colores)
     if (passive) {
         static unsigned long lastColorChangeTime = 0;
@@ -186,7 +198,6 @@ void COLORHANDLER_::action_frank() {
         }
         if (paused) return;
     }
-
     // Iniciar nueva transición de color si es necesario
     if (targetColor != currentColor && (targetColor != targetColorPrev || !transitioning)) {
         startColor = currentColor;
@@ -194,7 +205,6 @@ void COLORHANDLER_::action_frank() {
         transitioning = true;
         targetColorPrev = targetColor;
     }
-
     // Iniciar nueva transición de brillo si es necesario
     if (targetBrightness != currentBrightness && (targetBrightness != targetBrightnessPrev || !brightnessTransitioning)) {
         startBrightness = currentBrightness;
@@ -202,7 +212,6 @@ void COLORHANDLER_::action_frank() {
         brightnessTransitioning = true;
         targetBrightnessPrev = targetBrightness;
     }
-
     // Calcular progreso de la transición de color
     float colorProgress = min(1.0f, float(currentTime - colorTransitionStartTime) / fadeTime);
     if (colorProgress >= 1.0f) {
@@ -214,7 +223,6 @@ void COLORHANDLER_::action_frank() {
         currentColor.g = startColor.g + ((targetColor.g - startColor.g) * colorProgress);
         currentColor.b = startColor.b + ((targetColor.b - startColor.b) * colorProgress);
     }
-
     // Calcular progreso de la transición de brillo
     float brightnessProgress = min(1.0f, float(currentTime - brightnessTransitionStartTime) / fadeTime);
     if (brightnessProgress >= 1.0f) {
@@ -224,7 +232,6 @@ void COLORHANDLER_::action_frank() {
         // Interpolación de brillo
         currentBrightness = startBrightness + ((targetBrightness - startBrightness) * brightnessProgress);
     }
-
     // Aplicar color y brillo actuales
     CRGB outputColor = currentColor;
     outputColor.nscale8(currentBrightness);
@@ -247,24 +254,19 @@ void COLORHANDLER_::SnowSparkle(byte red, byte green, byte blue, int SparkleDela
 
 void COLORHANDLER_::meteorRain(byte red, byte green, byte blue, byte meteorSize, byte meteorTrailDecay, boolean meteorRandomDecay, int SpeedDelay) {  
   setAll(0,0,0);
- 
   for(int i = 0; i < NUM_LEDS + NUM_LEDS; i++) {
-   
-   
-    // fade brightness all LEDs one step
+    // fade brightness 
     for(int j=0; j<NUM_LEDS; j++) {
       if( (!meteorRandomDecay) || (random(10)>5) ) {
         fadeToBlack(j, meteorTrailDecay );        
       }
     }
-   
     // draw meteor
     for(int j = 0; j < meteorSize; j++) {
       if( ( i-j <NUM_LEDS) && (i-j>=0) ) {
         setPixel(i-j, red, green, blue);
       }
     }
-   
     showStrip();
     delay(SpeedDelay);
   }
@@ -276,8 +278,8 @@ void COLORHANDLER_::fadeToBlack(int ledNo, byte fadeValue) {
 }
 
 void COLORHANDLER_::theaterChaseRainbow(int SpeedDelay) {
+
   byte *c;
- 
   for (int j=0; j < 256; j++) {     // cycle all 256 colors in the wheel
     for (int q=0; q < 3; q++) {
         for (int i=0; i < NUM_LEDS; i=i+3) {
@@ -285,9 +287,7 @@ void COLORHANDLER_::theaterChaseRainbow(int SpeedDelay) {
           setPixel(i+q, *c, *(c+1), *(c+2));    //turn every third pixel on
         }
         showStrip();
-       
         delay(SpeedDelay);
-       
         for (int i=0; i < NUM_LEDS; i=i+3) {
           setPixel(i+q, 0,0,0);        //turn every third pixel off
         }
@@ -488,11 +488,9 @@ void COLORHANDLER_::setAll(byte red, byte green, byte blue) {
 void COLORHANDLER_::Fire(int Cooling, int Sparking, int SpeedDelay) {
   static byte heat[NUM_LEDS];
   int cooldown;
- 
   // Step 1.  Cool down every cell a little
   for( int i = 0; i < NUM_LEDS; i++) {
     cooldown = random(0, ((Cooling * 10) / NUM_LEDS) + 2);
-   
     if(cooldown>heat[i]) {
       heat[i]=0;
     } else {
@@ -504,19 +502,16 @@ void COLORHANDLER_::Fire(int Cooling, int Sparking, int SpeedDelay) {
   for( int k= NUM_LEDS - 1; k >= 2; k--) {
     heat[k] = (heat[k - 1] + heat[k - 2] + heat[k - 2]) / 3;
   }
-   
   // Step 3.  Randomly ignite new 'sparks' near the bottom
   if( random(255) < Sparking ) {
     int y = random(7);
     heat[y] = heat[y] + random(160,255);
     //heat[y] = random(160,255);
   }
-
   // Step 4.  Convert heat to LED colors
   for( int j = 0; j < NUM_LEDS; j++) {
     setPixelHeatColor(j, heat[j] );
   }
-
   showStrip();
   delay(SpeedDelay);
 }

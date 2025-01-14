@@ -12,7 +12,7 @@ extern float varaux;
 COLUMN_::COLUMN_() : ELEMENT_() {
             set_type(TYPE_COLUMN);
             currentMode= DEFAULT_BASIC_MODE;
-            
+            activePattern = NO_PATTERN;
         }
 
 void COLUMN_::column_begin(){
@@ -21,19 +21,7 @@ void COLUMN_::column_begin(){
             pinMode(COLUMN_RELAY_PIN, OUTPUT);
 }
 
-void COLUMN_::inic_elem_config(){
 
-    colorHandler.begin(NUM_LEDS);
-    delay(10);
-    pinMode(COLUMN_RELAY_PIN, OUTPUT);
-    element->set_mode(DEFAULT_BASIC_MODE);
-                                                                #ifdef DEBUG
-                                                                  Serial.println("Se inicializa FASTLED.");
-                                                                  Serial.println("RELAY pin configurado como salida.");
-                                                                  Serial.println("Se lee EEPROM para asignar element->ID.");
-                                                                  Serial.println("currentMode = BASIC MODE.");
-                                                                #endif
-}
 
 void COLUMN_::relay_handler(bool actionin){
 
@@ -48,41 +36,36 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
                                                             #endif
         return;
     }
-
-    // Depuración del estado de la pila
-    Serial.println("Inicio de RX_main_handler");
     UBaseType_t stackSize = uxTaskGetStackHighWaterMark(NULL);
                                                             #ifdef DEBUG
                                                                Serial.println("Stack restante: " + String(stackSize));
                                                             #endif
-
     byte currentMode_ = element->get_currentMode();
 
     switch (LEF.function) {
 
-       /*case F_REQ_ELEM_INFO:{
-            INFO_PACK_T info= get_info_pack(LEF.data[0]);
-            FRAME_T frame= frameMaker_RETURN_ELEM_INFO(element->ID, LEF.origin, info);
+        case F_REQ_ELEM_SECTOR:{
+            byte lang= LEF.data[0];
+            byte sector= LEF.data[1];
+            Serial.println("lenguaje pedido: " + String(lang));   
+            Serial.println("sector pedido: " + String(sector));   
+            byte sector_data[192];
+            get_sector_data(sector_data, lang, sector);
+            Serial.println("Sector data: " + String(sector_data[0], HEX));
+            FRAME_T frame= frameMaker_RETURN_ELEM_SECTOR(element->ID, LEF.origin, sector_data, sector);
             send_frame(frame);
-                                                        #ifdef DEBUG
-                                                            Serial.println("Info devuelta en un Return");
-                                                        #endif
+                                                            #ifdef DEBUG
+                                                             Serial.println("Info devuelta en un Return");
+                                                             Serial.println("Recibido F_REQ_ELEM_INFO, lang= " +String(lang));
+                                                             Serial.println("Recibido F_REQ_ELEM_INFO, sector= " +String(sector));
+                                                            #endif
             break;
         }
-        */
-        case F_REQ_ELEM_STATE:{
-            break;
-        }
-
         case F_SET_ELEM_ID:{
-
+            element->set_ID(LEF.data[0]);
+            globalID= LEF.data[0];
             break;
         }
-
-      /*case F_SEND_TEST:{
-            break;
-        }*/
-
         case F_SET_ELEM_MODE:{
             
             byte mode= LEF.data[0];
@@ -139,12 +122,6 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             colorHandler.transitioning= true;
             break;
             }
-        else if (currentMode_ == COLUMN_RB_MOTION_MODE) {
-                                                            #ifdef DEBUG
-                                                            Serial.println("Ignorando SEND_COLOR en COLUMN_RB_MOTION_MODE");
-                                                            #endif
-            break;
-        }
         else if(currentMode_ == COLUMN_MIX_MODE){
                                                             #ifdef DEBUG
                                                                 Serial.println("Manejando en modo BASIC_MODE.");
@@ -162,9 +139,6 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
                                                             #ifdef DEBUG
                                                                 Serial.println("Manejando en modo COLUMN_PASSIVE_MODE.");
                                                             #endif
-            break;
-        }
-        else if(currentMode_ == COLUMN_PATTERN_MODE){
             break;
             }
         }
@@ -189,11 +163,19 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
                 colorHandler.transitionStartTime= millis();
                 colorHandler.transitioning= true;
             }
+            else if(currentMode_ == LEDSTRIP_PATTERN_MODE){
+                varaux= get_aux_var_01_from_sensorValue(LEF);
+            }
             break;
         }
-
+        case F_SEND_PATTERN_NUM:{
+                byte numPattern= LEF.data[0];
+                if(numPattern != NO_PATTERN) element->work_time_handler(1);
+                else                         element->work_time_handler(8);
+                colorHandler.set_activePattern(numPattern);                                           
+            break;
+        }
         case F_SEND_FLAG_BYTE:{
-
             bool bubbles= LEF.data[0] & 0x01;
                                                                 #ifdef DEBUG
                                                                     Serial.println(" he recibido un flag byte: " );

@@ -38,6 +38,26 @@ void ELEMENT_::begin() {
    
     }
 
+void ELEMENT_::work_time_handler(byte colorin){
+    if (colorin != 8) {
+        if (!stopwatchRunning) {
+            start_working_time();
+        } else {
+                                                                                                    #ifdef DEBUG
+                                                                                                        Serial.println("El cronómetro ya está activo.");
+                                                                                                    #endif
+        }
+    } else {
+        if (stopwatchRunning) {
+            stopAndSave_working_time();
+        } else {
+                                                                                                    #ifdef DEBUG
+                                                                                                    Serial.println("El cronómetro ya está detenido.");
+                                                                                                    #endif
+        }
+    }
+}
+
 String ELEMENT_::get_serial_from_file(){
     String serial= "";
     File file = SPIFFS.open(ELEMENT_SERIALNUM_FILE_PATH, "r");
@@ -158,7 +178,6 @@ void ELEMENT_::start_working_time() {
         workTimerRunning = true;
     }
 }
-
 
 
 void ELEMENT_::stopAndSave_working_time() {

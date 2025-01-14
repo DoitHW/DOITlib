@@ -35,30 +35,26 @@
 */
 
 //DELFINES SUPER GLOBALES
-                                                #define WALLWASHER
+                                                #define FIBRAS
                                                 #define SERIAL_NUM 0xF001
                                                 #define SHOW_MAC    
                                                 #define DEBUG
                                                 
 //
 
-
 #define BOTONERA
     // OJO CHEINCH 
-
 #define ELEMENT_WORKTIME_FILE_PATH   "/WORKINGTIME_FILE.txt"
 #define ELEMENT_LIFETIME_FILE_PATH   "/LIFETIME_FILE.txt"
 #define ELEMENT_ID_FILE_PATH         "/ID_FILE.txt"
 #define ELEMENT_SERIALNUM_FILE_PATH  "/SERIALNUM_FILE.txt"
 
 #define LIFETIME_UPDATE_INTERVAL  3600000
-
 #define MAX_EXPECTED_TIME    0xFFFFFFFF
 #define RF_TX_PIN       18 
 #define RF_RX_PIN       17  
 #define RF_CONFIG_PIN   46
 #define RF_BAUD_RATE    9600
-
 #define UART_RX_BUFFER_SIZE 1024
 
 // DEFINES FRAME
@@ -288,20 +284,26 @@
 #define RESET_RELAY      0x00
 
 // DEFINES COLUMNA
-
 #define COLUMN_LED_DATA_PIN 21
 #define COLUMN_RELAY_PIN    42
 
-// DEFINES LEDSTRIPS
+// DEFINES FIBRAS
+#define LIGHTSOURCE_LED_DATA_PIN    21 
+#define LIGHTSOURCE_FAN_RELAY_PIN   42
 
+// DEFINES LEDSTRIPS
 #define LEDSTRIP_LED_DATA_PIN 45 // 21= oficial
 
 // DEFINES BOTONERA
-
 #define BOTONERA_DATA_PIN     21
 
+
+
+
 #if   defined (COLUMNA)
-  #define NUM_LEDS 0x01
+  #define NUM_LEDS 1
+#elif defined (FIBRAS)
+  #define NUM_LEDS 1
 #elif defined (WALLWASHER)
   #define NUM_LEDS 299
 #elif defined (BOTONERA)
@@ -320,6 +322,17 @@ enum COLUMN_MODE_LIST{
     COLUMN_PATTERN_MODE
 };
 
+enum LIGHTSOURCE_MODE_LIST{
+    LIGHTSOURCE_CONTEST_MODE= 0,
+    LIGHTSOURCE_BASIC_MODE,
+    LIGHTSOURCE_SLOW_MODE,
+    LIGHTSOURCE_MOTION_MODE,
+    LIGHTSOURCE_RB_MOTION_MODE,
+    LIGHTSOURCE_MIX_MODE,
+    LIGHTSOURCE_PASSIVE_MODE,
+    LIGHTSOURCE_PATTERN_MODE
+};
+
 enum LEDSTRIP_MODE_LIST{
     LEDSTRIP_CONTEST_MODE= 0,
     LEDSTRIP_BASIC_MODE,
@@ -329,7 +342,6 @@ enum LEDSTRIP_MODE_LIST{
     LEDSTRIP_MIX_MODE,
     LEDSTRIP_PASSIVE_MODE,
     LEDSTRIP_PATTERN_MODE,
-    LEDSTRIP_TEST_ZONE_MODE // OJO BORRAR
 };
 
 enum PATTERN_LIST{

@@ -23,25 +23,7 @@ void LEDSTRIP_::ledstrip_begin(){
             element->set_mode(DEFAULT_BASIC_MODE);
 }
 
-void ELEMENT_::work_time_handler(byte colorin){
-    if (colorin != 8) {
-        if (!stopwatchRunning) {
-            start_working_time();
-        } else {
-                                                                                                    #ifdef DEBUG
-                                                                                                        Serial.println("El cronómetro ya está activo.");
-                                                                                                    #endif
-        }
-    } else {
-        if (stopwatchRunning) {
-            stopAndSave_working_time();
-        } else {
-                                                                                                    #ifdef DEBUG
-                                                                                                    Serial.println("El cronómetro ya está detenido.");
-                                                                                                    #endif
-        }
-    }
-}
+
 
 void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
     if (!element) {
@@ -57,7 +39,6 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
                                                             #ifdef DEBUG
                                                                Serial.println("Stack restante: " + String(stackSize));
                                                             #endif
-
     byte currentMode_ = element->get_currentMode();
 
     switch (LEF.function) {
@@ -79,12 +60,6 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
                                                             #endif
             break;
         }
-        
-
-        case F_REQ_ELEM_STATE:{
-            break;
-        }
-
         case F_SET_ELEM_ID:{
             element->set_ID(LEF.data[0]);
             globalID= LEF.data[0];
@@ -167,16 +142,8 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             
             break;
             }
-        else if(currentMode_ == LEDSTRIP_PATTERN_MODE){
-            // OJO de moment, no fer res.
-            break;
-            }
-        else if(currentMode_ == LEDSTRIP_TEST_ZONE_MODE){
-            break;
-            }
-        break;
         }
-        
+    
         case F_SEND_SENSOR_VALUE:{
                                                             #ifdef DEBUG
                                                             Serial.println("Se ha recibido un sensor value");

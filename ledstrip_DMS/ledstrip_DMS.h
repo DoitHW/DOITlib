@@ -18,7 +18,7 @@ class LEDSTRIP_ : public ELEMENT_{
         void ledstrip_begin();
         void RX_main_handler(LAST_ENTRY_FRAME_T LEF)override;
 
-        byte activePattern;
+        
 };
 
 

@@ -16,7 +16,6 @@ class COLUMN_ : public ELEMENT_{
         COLUMN_();
 
         void column_begin();
-        void inic_elem_config()override;
         void RX_main_handler(LAST_ENTRY_FRAME_T LEF)override;
         void relay_handler(bool actionin);
 };

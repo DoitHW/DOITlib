@@ -19,13 +19,13 @@ class ELEMENT_ {
     public: 
         ELEMENT_();
         virtual ~ELEMENT_();
-
         void begin(); 
 
         unsigned long lastLifeTimeUpdate = 0;
         unsigned long workTimeStart = 0;
         bool workTimerRunning = false;
         bool stopwatchRunning = false;
+        byte activePattern;
 
         void          start_working_time(); 
         void          stopAndSave_working_time();  
@@ -57,21 +57,13 @@ class ELEMENT_ {
         void          set_flag(byte flagNum, bool state);
         byte          get_flag();
 
-        byte          get_serialNum(byte ml);
-        INFO_PACK_T   get_info_pack(byte typein, byte languajein);
-        INFO_STATE_T  get_state_pack();
-
-
         uint8_t  ID;
+
     protected:
-        virtual void  inic_elem_config(){}
         virtual void  RX_main_handler(LAST_ENTRY_FRAME_T LEF){}
     
-
-
-
         uint8_t  name[24];      
-        uint8_t  serialNum[2];  
+        uint8_t  serialNum[5];  
         byte     flag;
         uint8_t  currentMode;  
         byte     type;
@@ -84,7 +76,6 @@ class ELEMENT_ {
         bool canStartStopwatch = true;       // Controla si se permite iniciar el cronómetro     
 
     private:
-
 
 };
 
