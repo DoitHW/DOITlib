@@ -85,7 +85,11 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             byte testin= LEF.data[0];
             if     (testin == HELLO_TEST) delay(1);// fer algo}
             else if(testin == COLOR_TEST) delay(1);// fer algo}
-            else if(testin == BLACKOUT) ESP.restart();// fer algo}
+            else if(testin == BLACKOUT){
+                element->work_time_handler(8);
+                delay(300);
+                ESP.restart();
+            } // fer algo}
             break;
         }
         case F_SEND_COLOR:{

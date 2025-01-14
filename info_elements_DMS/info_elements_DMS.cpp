@@ -358,6 +358,8 @@ uint16_t get_info_num(int count, ...) {
                 else if(modein == LIGHTSOURCE_PASSIVE_MODE) config= get_info_num(2, 
                                                                         HAS_PASSIVE,
                                                                         HAS_RELAY_1);
+                else if(modein == LIGHTSOURCE_PATTERN_MODE) config= get_info_num(1, 
+                                                                        ACCEPTS_PATTERNS);
 
                                                         #ifdef DEBUG
                                                                 Serial.print("Se devuelve un 16bit config -> " );
@@ -380,35 +382,36 @@ uint16_t get_info_num(int count, ...) {
                                 else if(fieldin == ELEM_MODE_0_NAME)    info= " "; // modo oculto
                                 else if(fieldin == ELEM_MODE_0_DESC)    info= " "; // 
                                 else if(fieldin == ELEM_MODE_1_NAME)    info= " ";
-                                else if(fieldin == ELEM_MODE_1_DESC)    info= "UN DESALOJO OTRA OKUPACION";
+                                else if(fieldin == ELEM_MODE_1_DESC)    info= "UN DESALOJO, OTRA OKUPACION";
                                 else if(fieldin == ELEM_MODE_2_NAME)    info= " ";
-                                else if(fieldin == ELEM_MODE_2_DESC)    info= " ";
+                                else if(fieldin == ELEM_MODE_2_DESC)    info= "SIN ANIMO DE LUCRO TU QUE PREFIERE";
                                 else if(fieldin == ELEM_MODE_3_NAME)    info= "NOS COMEN LOS CHINOS";
-                                else if(fieldin == ELEM_MODE_3_DESC)    info= " ";
+                                else if(fieldin == ELEM_MODE_3_DESC)    info= "DONDE ESTA LA CALIDAD JAVIER";
                                 else if(fieldin == ELEM_MODE_4_NAME)    info= " ";
-                                else if(fieldin == ELEM_MODE_4_DESC)    info= " ";
+                                else if(fieldin == ELEM_MODE_4_DESC)    info= "LA TALLA 38 ME APRIETA EL CHOCHO";
                                 else if(fieldin == ELEM_MODE_5_NAME)    info= " ";
-                                else if(fieldin == ELEM_MODE_5_DESC)    info= " ";
+                                else if(fieldin == ELEM_MODE_5_DESC)    info= "MIRA VERAS, A MI EDAD YA NO ME GUSTA TU PAREJA, ME GUSTA TU PUTA MADRE.";
                                 else if(fieldin == ELEM_MODE_6_NAME)    info= " ";
-                                else if(fieldin == ELEM_MODE_6_DESC)    info= " ";
+                                else if(fieldin == ELEM_MODE_6_DESC)    info= "SUPERCALIFRAJILISTICOESPIALIDOSO";
                                 else if(fieldin == ELEM_MODE_7_NAME)    info= " ";
-                                else if(fieldin == ELEM_MODE_7_DESC)    info= " ";
-                                else if(fieldin == ELEM_MODE_8_NAME)    info= "SERGI TRUCHI";
-                                else if(fieldin == ELEM_MODE_8_DESC)    info= " ";
+                                else if(fieldin == ELEM_MODE_7_DESC)    info= "LA DEL HOTEL EL ANCLA ME LA PONE COMO EL CUELLO DE THANOS";
+                                else if(fieldin == ELEM_MODE_8_NAME)    info= " ";
+                                else if(fieldin == ELEM_MODE_8_DESC)    info= "EN MI EPOCA NO LLEVABAN MAQUILLAJE, LLEVABAN MORATONES";
                                 else if(fieldin == ELEM_MODE_9_NAME)    info= " ";
-                                else if(fieldin == ELEM_MODE_9_DESC)    info= " ";
+                                else if(fieldin == ELEM_MODE_9_DESC)    info= "EL QUE TENGA MIEDO A MORIR QUE NO NAZCA";
                                 else if(fieldin == ELEM_MODE_10_NAME)   info= " ";
-                                else if(fieldin == ELEM_MODE_10_DESC)   info= " ";
+                                else if(fieldin == ELEM_MODE_10_DESC)   info= "LOS BORBONES A LOS TIBURONES";
                                 else if(fieldin == ELEM_MODE_11_NAME)   info= " ";
-                                else if(fieldin == ELEM_MODE_11_DESC)   info= " ";
-                                else if(fieldin == ELEM_MODE_12_NAME)   info= " ";
-                                else if(fieldin == ELEM_MODE_12_DESC)   info= " ";
+                                else if(fieldin == ELEM_MODE_11_DESC)   info= "LA PISTOLA SI SE SACA ES PARA DISPARAR, EL QUE LA SACA PA ENSENYARLA ES UN PARGUELA";
+                                else if(fieldin == ELEM_MODE_12_NAME)   info= "";
+                                else if(fieldin == ELEM_MODE_12_DESC)   info= "Miro a mi derecha, croasan, miro a mi derecha, cafe con leche, panza, panza, mileurista. Es como faaak, yo no puedo a durar mucho aqui.";
                                 else if(fieldin == ELEM_MODE_13_NAME)   info= " ";
-                                else if(fieldin == ELEM_MODE_13_DESC)   info= " ";
+                                else if(fieldin == ELEM_MODE_13_DESC)   info= "AHORA AHORA... QUE VIENE... LEIRE... AH NO.";
                                 else if(fieldin == ELEM_MODE_14_NAME)   info= " ";
                                 else if(fieldin == ELEM_MODE_14_DESC)   info= " ";
                                 else if(fieldin == ELEM_MODE_15_NAME)   info= " ";
                                 else if(fieldin == ELEM_MODE_15_DESC)   info= " ";
+
                                 break;
 
                         case ENGLISH_LANG:

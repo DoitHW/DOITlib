@@ -35,10 +35,14 @@
 */
 
 //DELFINES SUPER GLOBALES
-                                                #define COLUMNA
-                                                #define SERIAL_NUM 0xF002
-                                                #define SHOW_MAC    
-                                                #define DEBUG
+                                                #define FIBRAS
+                                                /*COLUMNA, FIBRAS, WALLWASHER, ETC*/
+
+                                                #define DEBUG                      // Desactivar en produccion 
+                                                #define SERIAL_NUM 0xF002          // VERSION + MES
+                                                #define SERIAL_BY_FILE             // Activar Serial por FileSystem
+                                                #define SHOW_MAC                   // Opcional disparar MAC al inicio
+
                                                 
 //
 

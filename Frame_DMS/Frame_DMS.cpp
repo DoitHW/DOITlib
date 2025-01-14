@@ -407,21 +407,30 @@ void  get_sector_data(byte *sector_data, byte lang, byte sector){
             String macNumbers = WiFi.macAddress();
             macNumbers = macNumbers.substring(9);
             macNumbers.replace(":", "");
-            File file = SPIFFS.open(ELEMENT_SERIALNUM_FILE_PATH, "r");
-            String fileContent = "";
-            if (file) {
-                fileContent = file.readString();
-                file.close();
-            }
-            while (fileContent.length() < 4) fileContent += "0";
-            sector_data[0] = strtoul(fileContent.substring(0, 2).c_str(), nullptr, 16);
-            sector_data[1] = strtoul(fileContent.substring(2, 4).c_str(), nullptr, 16);
+
+            String serialPrefix = "";
+
+            #ifdef SERIAL_BY_FILE
+                File file = SPIFFS.open(ELEMENT_SERIALNUM_FILE_PATH, "r");
+                if (file) {
+                    serialPrefix = file.readString();
+                    file.close();
+                }
+                while (serialPrefix.length() < 4) serialPrefix += "0";
+            #else
+                serialPrefix = SERIAL_NUM;
+                while (serialPrefix.length() < 4) serialPrefix += "0";
+            #endif
+
+            sector_data[0] = strtoul(serialPrefix.substring(0, 2).c_str(), nullptr, 16);
+            sector_data[1] = strtoul(serialPrefix.substring(2, 4).c_str(), nullptr, 16);
             sector_data[2] = strtoul(macNumbers.substring(0, 2).c_str(), nullptr, 16);
             sector_data[3] = strtoul(macNumbers.substring(2, 4).c_str(), nullptr, 16);
             sector_data[4] = strtoul(macNumbers.substring(4, 6).c_str(), nullptr, 16);
 
             break;
         }
+
 
 
         case ELEM_ID_SECTOR:
@@ -672,17 +681,17 @@ void  get_sector_data(byte *sector_data, byte lang, byte sector){
             break;
 
      case ELEM_WORK_TIME_SECTOR:
-            sector_data[3] = (element->get_workTime() >> 24) & 0xFF;  // MSB
-            sector_data[2] = (element->get_workTime() >> 16) & 0xFF;  
-            sector_data[1] = (element->get_workTime() >> 8)  & 0xFF;   
-            sector_data[0] = (element->get_workTime())       & 0xFF;       
+            sector_data[0] = (element->get_workTime() >> 24) & 0xFF;  // MSB
+            sector_data[1] = (element->get_workTime() >> 16) & 0xFF;  
+            sector_data[2] = (element->get_workTime() >> 8)  & 0xFF;   
+            sector_data[3] = (element->get_workTime())       & 0xFF;       
             break;
 
     case ELEM_LIFE_TIME_SECTOR:
-            sector_data[3] = (element->get_lifeTime() >> 24) & 0xFF;  
-            sector_data[2] = (element->get_lifeTime() >> 16) & 0xFF;  
-            sector_data[1] = (element->get_lifeTime() >> 8)  & 0xFF;   
-            sector_data[0] = (element->get_lifeTime())       & 0xFF;      
+            sector_data[0] = (element->get_lifeTime() >> 24) & 0xFF;  
+            sector_data[1] = (element->get_lifeTime() >> 16) & 0xFF;  
+            sector_data[2] = (element->get_lifeTime() >> 8)  & 0xFF;   
+            sector_data[3] = (element->get_lifeTime())       & 0xFF;      
             break;
     
     // case ELEM_CURRENT_COLOR_SECTOR:

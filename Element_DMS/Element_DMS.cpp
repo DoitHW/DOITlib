@@ -38,22 +38,22 @@ void ELEMENT_::begin() {
    
     }
 
-void ELEMENT_::work_time_handler(byte colorin){
+void ELEMENT_::work_time_handler(byte colorin) {
     if (colorin != 8) {
-        if (!stopwatchRunning) {
+        if (!workTimerRunning) {  // Usar workTimerRunning en lugar de stopwatchRunning
             start_working_time();
         } else {
-                                                                                                    #ifdef DEBUG
-                                                                                                        Serial.println("El cronómetro ya está activo.");
-                                                                                                    #endif
+            #ifdef DEBUG
+                Serial.println("El cronómetro ya está activo.");
+            #endif
         }
     } else {
-        if (stopwatchRunning) {
+        if (workTimerRunning) {  // Usar workTimerRunning en lugar de stopwatchRunning
             stopAndSave_working_time();
         } else {
-                                                                                                    #ifdef DEBUG
-                                                                                                    Serial.println("El cronómetro ya está detenido.");
-                                                                                                    #endif
+            #ifdef DEBUG
+                Serial.println("El cronómetro ya está detenido.");
+            #endif
         }
     }
 }
@@ -187,8 +187,9 @@ void ELEMENT_::stopAndSave_working_time() {
         ELEMENT_::set_workTime(currentWorkTime + elapsedTime);
         workTimerRunning = false;
                                                                                             #ifdef DEBUG
-                                                                                            Serial.print("WorkTime actualizado: ");
-                                                                                            Serial.println(ELEMENT_::get_workTime());
+                                                                                            Serial.print("⏳ WorkTime actualizado: ");
+                                                                                            Serial.print(ELEMENT_::get_workTime());
+                                                                                            Serial.println(" segundos.");
                                                                                             #endif
     }
 
@@ -200,7 +201,7 @@ void ELEMENT_::lifeTime_update() {
         unsigned long currentLifeTime = ELEMENT_::get_lifeTime();
         ELEMENT_::set_lifeTime(currentLifeTime + 1);
                                                                                             #ifdef DEBUG
-                                                                                            Serial.print("LifeTime incrementado: ");
+                                                                                            Serial.print("⏳ LifeTime incrementado: ");
                                                                                             Serial.print(ELEMENT_::get_lifeTime());
                                                                                             Serial.println(" minutos.");
                                                                                             #endif  
