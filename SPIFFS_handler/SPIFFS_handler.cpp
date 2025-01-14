@@ -69,7 +69,7 @@ bool saveElementFieldByField(const char* baseName, const uint16_t* iconData) {
 
     byte serialBuf[2] = {0x12, 0x34};
     f.seek(OFFSET_SERIAL, SeekSet);
-    if (!writeBytesChecked(f, serialBuf, 2)) return false;
+    if (!writeBytesChecked(f, serialBuf, 5)) return false;
     //Serial.println("SerialNum escrito.");
 
     byte id = BROADCAST;

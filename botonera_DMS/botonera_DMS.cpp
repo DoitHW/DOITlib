@@ -107,13 +107,13 @@ byte BOTONERA_::buscar_elemento_nuevo() {
     // Crear la estructura en el heap de forma segura
     INFO_PACK_T *aux = new INFO_PACK_T;
     if (!aux) {
-        Serial.println("Error: Memoria insuficiente.");
+        Serial.println("❌ Error: Memoria insuficiente.");
         return 0;
     }
     memset(aux, 0, sizeof(INFO_PACK_T));  // ✅ Memoria completamente inicializada
 
     // ✅ Petición inicial del serial antes del bucle principal
-    send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA, 0x45, SPANISH_LANG, ELEM_SERIAL_SECTOR));
+    send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA, DEFAULT_DEVICE, SPANISH_LANG, ELEM_SERIAL_SECTOR));
     frameReceived = false;
     unsigned long startTime = millis();
 
@@ -152,7 +152,7 @@ byte BOTONERA_::buscar_elemento_nuevo() {
         bool sector_completado = false;
 
         while (intentos < max_reintentos && !sector_completado) {
-            send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA, 0x45, SPANISH_LANG, sector));
+            send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA, DEFAULT_DEVICE, SPANISH_LANG, sector));
             frameReceived = false;
             startTime = millis();
 
@@ -209,7 +209,7 @@ byte BOTONERA_::buscar_elemento_nuevo() {
                             }
                             break;
                     }
-                    Serial.printf("Datos correctamente recibidos y guardados para sector: %d\n", sector);
+                    Serial.printf("✅ Datos correctamente recibidos y guardados para sector: %d\n", sector);
                     sector_completado = true;  // ✅ Salir sin esperar más
                 }
             }
@@ -229,8 +229,6 @@ byte BOTONERA_::buscar_elemento_nuevo() {
         delete aux;
         return 0;
     } else {
-        Serial.println("✅ Elemento nuevo encontrado. Almacenando.");
-        //anadir_elemento_nuevo(aux);  // Guardar en memoria SPIFFS
         print_info_pack(aux);
         delete aux;
         return 1;
@@ -257,8 +255,8 @@ void BOTONERA_::print_info_pack(const INFO_PACK_T *infoPack) {
     Serial.print("Número de Serie: ");
     Serial.printf("0x%02X%02X%02X%02X%02X\n", infoPack->serialNum[0], infoPack->serialNum[1], infoPack->serialNum[2], infoPack->serialNum[3], infoPack->serialNum[4]);
 
-    Serial.print("ID: ");
-    Serial.println(infoPack->ID);
+    Serial.print("ID: 0x");
+    Serial.println(infoPack->ID, HEX);
 
     Serial.print("Modo Actual: ");
     Serial.println(infoPack->currentMode);
