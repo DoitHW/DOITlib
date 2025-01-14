@@ -52,7 +52,7 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             byte sector_data[192];
             get_sector_data(sector_data, lang, sector);
             Serial.println("Sector data: " + String(sector_data[0], HEX));
-            FRAME_T frame= frameMaker_RETURN_ELEM_SECTOR(element->ID, LEF.origin, sector_data, sector);
+            FRAME_T frame= frameMaker_RETURN_ELEM_SECTOR(globalID, LEF.origin, sector_data, sector);
             send_frame(frame);
                                                             #ifdef DEBUG
                                                              Serial.println("Info devuelta en un Return");
@@ -79,6 +79,13 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
                                                                         #ifdef DEBUG
                                                                         Serial.println("OJITO, que passem a modo: " +String(element->get_currentMode()));
                                                                         #endif
+            break;
+        }
+        case F_SEND_TEST:{
+            byte testin= LEF.data[0];
+            if     (testin == HELLO_TEST) delay(1);// fer algo}
+            else if(testin == COLOR_TEST) delay(1);// fer algo}
+            else if(testin == BLACKOUT) ESP.restart();// fer algo}
             break;
         }
         case F_SEND_COLOR:{

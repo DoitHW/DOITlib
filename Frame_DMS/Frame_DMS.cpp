@@ -672,17 +672,17 @@ void  get_sector_data(byte *sector_data, byte lang, byte sector){
             break;
 
      case ELEM_WORK_TIME_SECTOR:
-            sector_data[0] = (element->get_workTime() >> 24) & 0xFF;  // MSB
-            sector_data[1] = (element->get_workTime() >> 16) & 0xFF;  
-            sector_data[2] = (element->get_workTime() >> 8)  & 0xFF;   
-            sector_data[3] = (element->get_workTime())       & 0xFF;       
+            sector_data[3] = (element->get_workTime() >> 24) & 0xFF;  // MSB
+            sector_data[2] = (element->get_workTime() >> 16) & 0xFF;  
+            sector_data[1] = (element->get_workTime() >> 8)  & 0xFF;   
+            sector_data[0] = (element->get_workTime())       & 0xFF;       
             break;
 
     case ELEM_LIFE_TIME_SECTOR:
-            sector_data[0] = (element->get_lifeTime() >> 24) & 0xFF;  
-            sector_data[1] = (element->get_lifeTime() >> 16) & 0xFF;  
-            sector_data[2] = (element->get_lifeTime() >> 8)  & 0xFF;   
-            sector_data[3] = (element->get_lifeTime())       & 0xFF;      
+            sector_data[3] = (element->get_lifeTime() >> 24) & 0xFF;  
+            sector_data[2] = (element->get_lifeTime() >> 16) & 0xFF;  
+            sector_data[1] = (element->get_lifeTime() >> 8)  & 0xFF;   
+            sector_data[0] = (element->get_lifeTime())       & 0xFF;      
             break;
     
     // case ELEM_CURRENT_COLOR_SECTOR:

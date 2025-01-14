@@ -31,8 +31,8 @@ class ELEMENT_ {
         void          stopAndSave_working_time();  
         void          work_time_handler(byte colorin);
         void          lifeTime_update();
-        int           get_lifeTime();
-        void          set_lifeTime(int lifeTime);
+        unsigned long get_lifeTime();
+        void          set_lifeTime(unsigned long lifeTime);
 
         int           get_workTime();
         void          set_workTime(int workTime);

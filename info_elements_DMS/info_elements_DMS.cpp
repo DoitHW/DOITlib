@@ -380,10 +380,10 @@ uint16_t get_info_num(int count, ...) {
                                 else if(fieldin == ELEM_MODE_0_NAME)    info= " "; // modo oculto
                                 else if(fieldin == ELEM_MODE_0_DESC)    info= " "; // 
                                 else if(fieldin == ELEM_MODE_1_NAME)    info= " ";
-                                else if(fieldin == ELEM_MODE_1_DESC)    info= " ";
+                                else if(fieldin == ELEM_MODE_1_DESC)    info= "UN DESALOJO OTRA OKUPACION";
                                 else if(fieldin == ELEM_MODE_2_NAME)    info= " ";
                                 else if(fieldin == ELEM_MODE_2_DESC)    info= " ";
-                                else if(fieldin == ELEM_MODE_3_NAME)    info= " ";
+                                else if(fieldin == ELEM_MODE_3_NAME)    info= "NOS COMEN LOS CHINOS";
                                 else if(fieldin == ELEM_MODE_3_DESC)    info= " ";
                                 else if(fieldin == ELEM_MODE_4_NAME)    info= " ";
                                 else if(fieldin == ELEM_MODE_4_DESC)    info= " ";
@@ -393,7 +393,7 @@ uint16_t get_info_num(int count, ...) {
                                 else if(fieldin == ELEM_MODE_6_DESC)    info= " ";
                                 else if(fieldin == ELEM_MODE_7_NAME)    info= " ";
                                 else if(fieldin == ELEM_MODE_7_DESC)    info= " ";
-                                else if(fieldin == ELEM_MODE_8_NAME)    info= " ";
+                                else if(fieldin == ELEM_MODE_8_NAME)    info= "SERGI TRUCHI";
                                 else if(fieldin == ELEM_MODE_8_DESC)    info= " ";
                                 else if(fieldin == ELEM_MODE_9_NAME)    info= " ";
                                 else if(fieldin == ELEM_MODE_9_DESC)    info= " ";

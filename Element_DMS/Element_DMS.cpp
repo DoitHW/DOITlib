@@ -75,7 +75,7 @@ String ELEMENT_::get_serial_from_file(){
 }
 
 
-void ELEMENT_::set_lifeTime(int lifeTime){
+void ELEMENT_::set_lifeTime(unsigned long lifeTime){
     File file = SPIFFS.open(ELEMENT_LIFETIME_FILE_PATH, "w");
     if (!file) {
                                                                                         #ifdef DEBUG
@@ -87,7 +87,7 @@ void ELEMENT_::set_lifeTime(int lifeTime){
     file.close();
 }
 
-int ELEMENT_::get_lifeTime(){
+unsigned long ELEMENT_::get_lifeTime(){
 
     File file = SPIFFS.open(ELEMENT_LIFETIME_FILE_PATH, "r");
     if (!file) {
@@ -197,10 +197,12 @@ void ELEMENT_::stopAndSave_working_time() {
 void ELEMENT_::lifeTime_update() {
         if (millis() - lastLifeTimeUpdate >= LIFETIME_UPDATE_INTERVAL) {    
         lastLifeTimeUpdate = millis();
-        int currentLifeTime = ELEMENT_::get_lifeTime();
+        unsigned long currentLifeTime = ELEMENT_::get_lifeTime();
         ELEMENT_::set_lifeTime(currentLifeTime + 1);
                                                                                             #ifdef DEBUG
-                                                                                            Serial.println("LifeTime incrementado");
+                                                                                            Serial.print("LifeTime incrementado: ");
+                                                                                            Serial.print(ELEMENT_::get_lifeTime());
+                                                                                            Serial.println(" minutos.");
                                                                                             #endif  
     }
 }

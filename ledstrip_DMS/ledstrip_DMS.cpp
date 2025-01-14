@@ -51,7 +51,7 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             byte sector_data[192];
             get_sector_data(sector_data, lang, sector);
             Serial.println("Sector data: " + String(sector_data[0], HEX));
-            FRAME_T frame= frameMaker_RETURN_ELEM_SECTOR(element->ID, LEF.origin, sector_data, sector);
+            FRAME_T frame= frameMaker_RETURN_ELEM_SECTOR(globalID, LEF.origin, sector_data, sector);
             send_frame(frame);
                                                             #ifdef DEBUG
                                                              Serial.println("Info devuelta en un Return");
@@ -80,6 +80,13 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
                                                                         #endif
             break;
         }
+        case F_SEND_TEST:{
+            byte testin= LEF.data[0];
+            if     (testin == HELLO_TEST) delay(1);// fer algo}
+            else if(testin == COLOR_TEST) delay(1);// fer algo}
+            else if(testin == BLACKOUT) ESP.restart();// fer algo}
+            break;
+        }
         case F_SEND_COLOR: {
             byte color = LEF.data[0];
             element->work_time_handler(color);
@@ -91,7 +98,6 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
                                                             #ifdef DEBUG
                                                                 Serial.println("Manejando en modo BASIC_MODE.");
                                                             #endif
-
             colorHandler.set_targetColor(colorin);
             colorHandler.set_targetFade(NORMAL_FADE);
             colorHandler.set_targetBrightness(MAX_BRIGHTNESS);
@@ -139,11 +145,9 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
                                                             #ifdef DEBUG
                                                                 Serial.println("Manejando en modo COLUMN_PASSIVE_MODE.");
                                                             #endif
-            
             break;
             }
         }
-    
         case F_SEND_SENSOR_VALUE:{
                                                             #ifdef DEBUG
                                                             Serial.println("Se ha recibido un sensor value");
