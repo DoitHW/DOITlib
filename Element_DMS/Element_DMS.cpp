@@ -13,33 +13,34 @@
 
 ELEMENT_::ELEMENT_(){}
 
-    void ELEMENT_::begin() {
-                                                        #ifdef DEBUG
-                                                            Serial.begin(115200);
-                                                            Serial.println("ATENCION!!!!!!!!!!!!!!!!!!!");
-                                                        #endif
-    Serial1.begin(RF_BAUD_RATE, SERIAL_8N1, RF_RX_PIN, RF_TX_PIN);
-    pinMode(RF_CONFIG_PIN, OUTPUT);
-    digitalWrite(RF_CONFIG_PIN, HIGH);
 
-    delay(100);
 
-    Serial1.onReceive(onUartInterrupt);
-    delay(100);
-    if (!SPIFFS.begin(true)) {
-                                                #ifdef DEBUG
-                                                    Serial.println("Error al montar SPIFFS.");
-                                                #endif
-        return;
-    }
-    delay(100);
 
-    // if (!SPIFFS.exists(ELEMENT_WORKTIME_FILE_PATH))  ELEMENT_::set_workTime(0);
-    // if (!SPIFFS.exists(ELEMENT_LIFETIME_FILE_PATH))  ELEMENT_::set_lifeTime(0);
-    // if (!SPIFFS.exists(ELEMENT_SERIALNUM_FILE_PATH)) 
-    // if (!SPIFFS.exists(ELEMENT_ID_FILE_PATH))       
-   
-    }
+
+
+void ELEMENT_::begin() {
+                                                    #ifdef DEBUG
+                                                        Serial.begin(115200);
+                                                        Serial.println("ATENCION!!!!!!!!!!!!!!!!!!!");
+                                                    #endif
+ELEMENT_::configurar_RF(RF_FAST_BAUD_RATE);
+delay(100);
+Serial1.onReceive(onUartInterrupt);
+delay(100);
+if (!SPIFFS.begin(true)) {
+                                            #ifdef DEBUG
+                                                Serial.println("Error al montar SPIFFS.");
+                                            #endif
+    return;
+}
+delay(100);
+
+// if (!SPIFFS.exists(ELEMENT_WORKTIME_FILE_PATH))  ELEMENT_::set_workTime(0);
+// if (!SPIFFS.exists(ELEMENT_LIFETIME_FILE_PATH))  ELEMENT_::set_lifeTime(0);
+// if (!SPIFFS.exists(ELEMENT_SERIALNUM_FILE_PATH)) 
+// if (!SPIFFS.exists(ELEMENT_ID_FILE_PATH))       
+
+}
 
 String ELEMENT_::get_word_from_eventNum(int eventNumber){
 
@@ -354,15 +355,13 @@ byte ELEMENT_::get_flag(){
     return flag;
 }
 
-void ELEMENT_::configurarRF(int baudRate) {
+void ELEMENT_::configurar_RF(int baudRate) {
     pinMode(RF_CONFIG_PIN, OUTPUT);
     digitalWrite(RF_CONFIG_PIN, LOW);  // Entrar en modo configuración
     delay(500);
 
     // Intentar comunicarse con ambas velocidades por seguridad
     Serial1.begin(RF_FAST_BAUD_RATE, SERIAL_8N1, RF_RX_PIN, RF_TX_PIN);
-    Serial.begin(115200);
-
     // Intentar enviar un comando de reset a valores de fábrica
     byte comandoReset[] = {0xAA, 0xFA, 0xF0};  
     Serial1.write(comandoReset, sizeof(comandoReset));

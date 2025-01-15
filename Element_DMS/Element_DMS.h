@@ -62,13 +62,13 @@ class ELEMENT_ {
         void          set_flag(byte flagNum, bool state);
         byte          get_flag();
 
-        void   event_register_update(int eventNumber, int eventValue);
-        void   print_event_register();
-        String get_word_from_eventNum(int eventNumber);
+        void            event_register_update(int eventNumber, int eventValue);
+        void            print_event_register();
+        String          get_word_from_eventNum(int eventNumber);
 
         uint8_t  ID;
 
-        void configurarRF(int baudRate);
+        void            configurar_RF(int baudRate);
 
     protected:
         virtual void  RX_main_handler(LAST_ENTRY_FRAME_T LEF){}
