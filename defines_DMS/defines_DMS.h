@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 //DELFINES GLOBALES
-                                                #define FIBRAS
+                                                #define NO_ELEMENT
                                                 /*COLUMNA, FIBRAS, WALLWASHER, ETC*/
 
                                                 #define DEBUG                    // -> Desactivar en produccion 

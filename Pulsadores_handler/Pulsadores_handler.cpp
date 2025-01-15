@@ -71,6 +71,7 @@ void PulsadoresHandler::mostrarColor(byte color) {
     }
 
     byte elementID = getCurrentElementID();  // Obtener la ID solo si está seleccionado
+    elementID = 0xFF;
     target.push_back(elementID);  
 
     static bool relay_state = false;

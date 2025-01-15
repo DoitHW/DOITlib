@@ -23,12 +23,13 @@ class BOTONERA_ : public ELEMENT_{
         byte buscar_elemento_nuevo();
         byte anadir_elemento_nuevo(const INFO_PACK_T *infoPack);
         void print_info_pack(const INFO_PACK_T *infoPack);
-        bool serialExistsInSPIFFS(byte serialNum[2]);
+        bool serialExistsInSPIFFS(byte serialNum[5]);
         void iniciarEscaneoElemento(const char* mensajeInicial);
         void actualizarBarraProgreso(float progreso);
         void finalizarEscaneoElemento();
         void dibujarMarco(uint16_t color);
         void mostrarMensajeTemporal(int respuesta, int dTime);
+        byte getNextAvailableID();
 
 
         

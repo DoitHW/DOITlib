@@ -4,6 +4,7 @@
 #include <display_handler/display_handler.h>
 #include <Pulsadores_handler/Pulsadores_handler.h>
 #include <Colors_DMS/Color_DMS.h>
+#include <botonera_DMS/botonera_DMS.h>
 
 
 // Variables globales para el manejo del encoder
@@ -158,6 +159,16 @@ void handleEncoder() {
 void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
     int32_t newEncoderValue = encoder.getCount();
     static bool encoderButtonPressed = false;
+    static bool initialEntry = true;
+    static bool menuJustOpened = true;  // Nueva variable para controlar la confirmación automática
+
+    // Al entrar al menú oculto por primera vez, resalta la primera opción sin confirmarla
+    if (initialEntry) {
+        hiddenMenuSelection = 0;  // Preselección visual sin confirmar
+        drawHiddenMenu(hiddenMenuSelection);
+        initialEntry = false;
+        menuJustOpened = true;  // Bloquea la confirmación inmediata
+    }
 
     // Navegación por el menú con el encoder
     if (newEncoderValue != lastEncoderValue) {
@@ -167,20 +178,27 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
         drawHiddenMenu(hiddenMenuSelection);
     }
 
-    // Confirmación con el botón del encoder (evitar pulsaciones fantasma)
-    if (digitalRead(ENC_BUTTON) == LOW && !encoderButtonPressed) {
-        encoderButtonPressed = true;  // Marcar que está presionado
+    // Confirmación con el botón del encoder
+    if (digitalRead(ENC_BUTTON) == HIGH) {
+        menuJustOpened = false;  // Solo ahora permite confirmaciones
+        encoderButtonPressed = false;
+    }
+
+    if (digitalRead(ENC_BUTTON) == LOW && !encoderButtonPressed && !menuJustOpened) {
+        encoderButtonPressed = true;  
 
         if (hiddenMenuSelection == 0) {
             Serial.println("Opción: Cambiar idioma (sin implementar aún)");
-        } else if (hiddenMenuSelection == 1) {
+            byte respuesta = element->buscar_elemento_nuevo();
+            element->mostrarMensajeTemporal(respuesta, 3000);
+        } 
+        else if (hiddenMenuSelection == 1) {
             Serial.println("Volviendo al menú principal");
             hiddenMenuActive = false;
-            PulsadoresHandler::limpiarEstados();  // Reiniciar estado al salir
+            initialEntry = true;  // Restablecer para la próxima vez
+            PulsadoresHandler::limpiarEstados();
             drawCurrentElement();
         }
-    } else if (digitalRead(ENC_BUTTON) == HIGH) {
-        encoderButtonPressed = false; // Liberar el botón
     }
 }
 
