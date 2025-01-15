@@ -274,8 +274,6 @@ void send_frame(const FRAME_T &framein) {
                                                                                                 #endif
 }
 
-
-
 byte get_mapped_sensor_value(byte minMSB, byte minLSB, byte maxMSB, byte maxLSB, byte valMSB, byte valLSB) {
 
     uint16_t minVal = (minMSB << 8) | minLSB;

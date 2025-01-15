@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 //DELFINES GLOBALES
-                                                #define WALLWASHER
+                                                #define FIBRAS
                                                 /*COLUMNA, FIBRAS, WALLWASHER, ETC*/
 
                                                 #define DEBUG                    // -> Desactivar en produccion 
