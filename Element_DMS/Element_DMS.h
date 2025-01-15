@@ -68,6 +68,8 @@ class ELEMENT_ {
 
         uint8_t  ID;
 
+        void configurarRF(int baudRate);
+
     protected:
         virtual void  RX_main_handler(LAST_ENTRY_FRAME_T LEF){}
     
