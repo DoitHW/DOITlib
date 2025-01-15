@@ -21,6 +21,7 @@ void LEDSTRIP_::ledstrip_begin(){
             delay(10);
 
             element->set_mode(DEFAULT_BASIC_MODE);
+         //   element->event_register_update(EV_START, 0x00);
 }
 
 
@@ -46,6 +47,7 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
         case F_REQ_ELEM_SECTOR:{
             byte lang= LEF.data[0];
             byte sector= LEF.data[1];
+            //element->event_register_update(EV_SECTOR_REQ, sector);
             Serial.println("lenguaje pedido: " + String(lang));   
             Serial.println("sector pedido: " + String(sector));   
             byte sector_data[192];
@@ -71,6 +73,7 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
                                                                         #ifdef DEBUG
                                                                         Serial.println("OJUU, LEF.data[0]= " +String(mode));
                                                                         #endif
+          //  element->event_register_update(EV_MODE_CHANGE, mode);
             if(mode != LEDSTRIP_PATTERN_MODE) colorHandler.set_activePattern(NO_PATTERN);
             element->set_mode(mode);
             if(element->get_currentMode() == LEDSTRIP_PASSIVE_MODE) colorHandler.set_passive(true);
@@ -86,6 +89,7 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             else if(testin == COLOR_TEST) delay(1);// fer algo}
             else if(testin == BLACKOUT){
                 element->work_time_handler(8);
+                //element->event_register_update(EV_END, 0x00);
                 delay(300);
                 ESP.restart();
             } // fer algo}
@@ -94,6 +98,7 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
         case F_SEND_COLOR: {
             byte color = LEF.data[0];
             element->work_time_handler(color);
+           // element->event_register_update(EV_COLOR_CHANGE, color);
             CRGB colorin= colorHandler.get_CRGB_from_colorList(color);
                                                             #ifdef DEBUG
                                                                 Serial.println("Color recibido: " + String(color));

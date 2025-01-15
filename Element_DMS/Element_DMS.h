@@ -26,6 +26,11 @@ class ELEMENT_ {
         bool workTimerRunning = false;
         bool stopwatchRunning = false;
         byte activePattern;
+        static const int MAX_EVENTS = 1000;
+        //static unsigned long lastEventTime;
+        static int currentEventIndex;
+        unsigned long lastEventTime[100] = {0};
+        int lastEventValue[100] = {-1};
 
         void          start_working_time(); 
         void          stopAndSave_working_time();  
@@ -56,6 +61,10 @@ class ELEMENT_ {
 
         void          set_flag(byte flagNum, bool state);
         byte          get_flag();
+
+        void   event_register_update(int eventNumber, int eventValue);
+        void   print_event_register();
+        String get_word_from_eventNum(int eventNumber);
 
         uint8_t  ID;
 

@@ -13,16 +13,19 @@
 
 ELEMENT_::ELEMENT_(){}
 
-void ELEMENT_::begin() {
-                                                    #ifdef DEBUG
-                                                        Serial.begin(115200);
-                                                        Serial.println("ATENCION!!!!!!!!!!!!!!!!!!!");
-                                                    #endif
+    void ELEMENT_::begin() {
+                                                        #ifdef DEBUG
+                                                            Serial.begin(115200);
+                                                            Serial.println("ATENCION!!!!!!!!!!!!!!!!!!!");
+                                                        #endif
     Serial1.begin(RF_BAUD_RATE, SERIAL_8N1, RF_RX_PIN, RF_TX_PIN);
-    Serial1.onReceive(onUartInterrupt);
     pinMode(RF_CONFIG_PIN, OUTPUT);
     digitalWrite(RF_CONFIG_PIN, HIGH);
-    delay(400);
+
+    delay(100);
+
+    Serial1.onReceive(onUartInterrupt);
+    delay(100);
     if (!SPIFFS.begin(true)) {
                                                 #ifdef DEBUG
                                                     Serial.println("Error al montar SPIFFS.");
@@ -37,6 +40,101 @@ void ELEMENT_::begin() {
     // if (!SPIFFS.exists(ELEMENT_ID_FILE_PATH))       
    
     }
+
+String ELEMENT_::get_word_from_eventNum(int eventNumber){
+
+    String frase;
+    switch(eventNumber){
+        case 0: frase=   "DISPOSITIVO INICIADO EN MODO BASICO"; break;
+        case 1: frase=   "APAGANDO DISPOSITIVO"; break;
+        case 2: frase=   "PETICION DE SECTOR";   break;
+        case 3: frase=   "CAMBIO DE MODO";       break;
+        case 4: frase=   "CAMBIO DE COLOR";      break;
+        default: frase=   "ERROR"; break;
+    }
+    return frase;
+}
+void   ELEMENT_::print_event_register(){
+
+    File file = SPIFFS.open(ELEMENT_EVENT_REGISTER_FILE_PATH, FILE_READ);
+    if (!file) {
+        Serial.println("Error al abrir el archivo para lectura");
+        return;
+    }
+    Serial.println("Contenido del archivo:");
+    while (file.available()) {
+        Serial.println(file.readStringUntil('\n'));
+    }
+    file.close();
+}
+
+
+
+
+void ELEMENT_::event_register_update(int eventNumber, int eventValue) {
+    static int currentLine = 0;  // Mantener el índice global de línea
+    static bool isFileInitialized = false;
+    // Inicializar SPIFFS si no está iniciado
+
+    unsigned long currentTime = millis() / 1000;
+    unsigned long elapsedTime = currentTime - lastEventTime[eventNumber];
+
+    // Abrir el archivo en modo lectura y escritura
+    File file = SPIFFS.open(ELEMENT_EVENT_REGISTER_FILE_PATH, FILE_APPEND);
+    if (!file) {
+        Serial.println("Error al abrir el archivo para escritura");
+        return;
+    }
+
+    // Si es la primera vez, contar las líneas para saber dónde empezar
+    if (!isFileInitialized) {
+        File tempFile = SPIFFS.open(ELEMENT_EVENT_REGISTER_FILE_PATH, FILE_READ);
+        if (tempFile) {
+            int lineCount = 0;
+            while (tempFile.available()) {
+                tempFile.readStringUntil('\n');
+                lineCount++;
+            }
+            currentLine = lineCount % MAX_REG_EVENTS;
+            tempFile.close();
+        }
+        isFileInitialized = true;
+    }
+
+    // Crear un archivo temporal para sobrescribir la línea deseada
+    File tempFile = SPIFFS.open("/temp_log.txt", FILE_WRITE);
+    File readFile = SPIFFS.open(ELEMENT_EVENT_REGISTER_FILE_PATH, FILE_READ);
+
+    int lineCounter = 0;
+    while (readFile.available()) {
+        String line = readFile.readStringUntil('\n');
+        tempFile.println(line);
+        lineCounter++;
+    }
+
+    // Si el evento es el mismo pero con valor diferente, actualizar la línea anterior
+    if (lastEventValue[eventNumber] != -1 && lastEventValue[eventNumber] != eventValue) {
+        tempFile.printf("%s -> %d   durante %lu segundos\n", get_word_from_eventNum(eventNumber).c_str(), lastEventValue[eventNumber], elapsedTime);
+    }
+
+    // Registrar el nuevo evento
+    tempFile.printf("%s -> %d comenzando ahora\n", get_word_from_eventNum(eventNumber).c_str(), eventValue);
+
+    lastEventTime[eventNumber] = currentTime;
+    lastEventValue[eventNumber] = eventValue;
+
+    readFile.close();
+    tempFile.close();
+
+    // Reemplazar el archivo original
+    SPIFFS.remove(ELEMENT_EVENT_REGISTER_FILE_PATH);
+    SPIFFS.rename("/temp_log.txt", ELEMENT_EVENT_REGISTER_FILE_PATH);
+
+    Serial.println("Evento registrado correctamente");
+}
+
+
+
 
 void ELEMENT_::work_time_handler(byte colorin) {
     if (colorin != 8) {
@@ -196,7 +294,8 @@ void ELEMENT_::stopAndSave_working_time() {
 }
 
 void ELEMENT_::lifeTime_update() {
-        if (millis() - lastLifeTimeUpdate >= LIFETIME_UPDATE_INTERVAL) {    
+        if (millis() - lastLifeTimeUpdate >= LIFETIME_UPDATE_INTERVAL) {   
+            //ELEMENT_::print_event_register(); 
         lastLifeTimeUpdate = millis();
         unsigned long currentLifeTime = ELEMENT_::get_lifeTime();
         ELEMENT_::set_lifeTime(currentLifeTime + 1);

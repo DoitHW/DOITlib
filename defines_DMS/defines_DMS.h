@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 //DELFINES GLOBALES
-                                                #define FIBRAS
+                                                #define WALLWASHER
                                                 /*COLUMNA, FIBRAS, WALLWASHER, ETC*/
 
                                                 #define DEBUG                    // -> Desactivar en produccion 
@@ -50,17 +50,21 @@
 
 #define BOTONERA
     // OJO CHEINCH 
-#define ELEMENT_WORKTIME_FILE_PATH   "/WORKINGTIME_FILE.txt"
-#define ELEMENT_LIFETIME_FILE_PATH   "/LIFETIME_FILE.txt"
-#define ELEMENT_ID_FILE_PATH         "/ID_FILE.txt"
-#define ELEMENT_SERIALNUM_FILE_PATH  "/SERIALNUM_FILE.txt"
+#define ELEMENT_WORKTIME_FILE_PATH       "/WORKINGTIME_FILE.txt"
+#define ELEMENT_LIFETIME_FILE_PATH       "/LIFETIME_FILE.txt"
+#define ELEMENT_ID_FILE_PATH             "/ID_FILE.txt"
+#define ELEMENT_SERIALNUM_FILE_PATH      "/SERIALNUM_FILE.txt"
+#define ELEMENT_EVENT_REGISTER_FILE_PATH "/EVENT_REG_FILE.txt"
 
+
+#define MAX_REG_EVENTS    1000
 #define LIFETIME_UPDATE_INTERVAL  60000
 #define MAX_EXPECTED_TIME    0xFFFFFFFF
-#define RF_TX_PIN       18 
-#define RF_RX_PIN       17  
-#define RF_CONFIG_PIN   46
-#define RF_BAUD_RATE    9600
+#define RF_TX_PIN         18 
+#define RF_RX_PIN         17  
+#define RF_CONFIG_PIN     46
+#define RF_BAUD_RATE      9600
+#define RF_FAST_BAUD_RATE 115200
 #define UART_RX_BUFFER_SIZE 1024
 
 // DEFINES FRAME
@@ -325,6 +329,14 @@ enum TESTS_{
 #elif defined (BOTONERA)
   #define NUM_LEDS 9
 #endif
+
+enum EVENTS_{
+  EV_START,
+  EV_END,
+  EV_SECTOR_REQ,
+  EV_MODE_CHANGE,
+  EV_COLOR_CHANGE
+};
 
 
 enum COLUMN_MODE_LIST{
