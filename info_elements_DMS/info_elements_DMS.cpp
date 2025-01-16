@@ -646,36 +646,48 @@ uint16_t get_info_num(int count, ...) {
 
         uint16_t get_config_flag_mode(byte modein){
                 uint16_t config= 0;
-                if(modein == LEDSTRIP_BASIC_MODE) config= get_info_num(2, 
+
+                 if(modein == LEDSTRIP_HIDDEN_MODE) config= get_info_num(2, 
                                                                         ACCEPTS_BASIC_COLOR,
                                                                         SITUATED_HIGH);
 
-                else if(modein == LEDSTRIP_SLOW_MODE) config= get_info_num(2, 
-                                                                        ACCEPTS_BASIC_COLOR,
-                                                                        SITUATED_HIGH);
-
-                else if(modein == LEDSTRIP_MOTION_MODE) config= get_info_num(3, 
+                else if(modein == LEDSTRIP_BASIC_MODE) config= get_info_num(3, 
                                                                         ACCEPTS_BASIC_COLOR,
                                                                         SITUATED_HIGH,
-                                                                        ACCEPTS_SENS_VAL_1);
+                                                                        MODE_EXIST);
 
-                else if(modein == LEDSTRIP_RB_MOTION_MODE) config= get_info_num(3, 
+                else if(modein == LEDSTRIP_SLOW_MODE) config= get_info_num(3, 
                                                                         ACCEPTS_BASIC_COLOR,
                                                                         SITUATED_HIGH,
-                                                                        ACCEPTS_SENS_VAL_1);
+                                                                        MODE_EXIST);
 
-                else if(modein == LEDSTRIP_MIX_MODE) config= get_info_num(2, 
+                else if(modein == LEDSTRIP_MOTION_MODE) config= get_info_num(4, 
+                                                                        ACCEPTS_BASIC_COLOR,
+                                                                        SITUATED_HIGH,
+                                                                        ACCEPTS_SENS_VAL_1,
+                                                                        MODE_EXIST);
+
+                else if(modein == LEDSTRIP_RB_MOTION_MODE) config= get_info_num(4, 
+                                                                        ACCEPTS_BASIC_COLOR,
+                                                                        SITUATED_HIGH,
+                                                                        ACCEPTS_SENS_VAL_1,
+                                                                        MODE_EXIST);
+
+                else if(modein == LEDSTRIP_MIX_MODE) config= get_info_num(3, 
                                                                         ACCEPTS_ADVANCED_COLOR,
-                                                                        SITUATED_HIGH);
+                                                                        SITUATED_HIGH,
+                                                                        MODE_EXIST);
 
-                else if(modein == LEDSTRIP_PASSIVE_MODE) config= get_info_num(2, 
+                else if(modein == LEDSTRIP_PASSIVE_MODE) config= get_info_num(3, 
                                                                         HAS_PASSIVE,
-                                                                        SITUATED_HIGH);
+                                                                        SITUATED_HIGH,
+                                                                        MODE_EXIST);
 
-                else if(modein == LEDSTRIP_PATTERN_MODE) config= get_info_num(3, 
+                else if(modein == LEDSTRIP_PATTERN_MODE) config= get_info_num(4, 
                                                                         ACCEPTS_BASIC_COLOR,
                                                                         ACCEPTS_PATTERNS,
-                                                                        SITUATED_HIGH);
+                                                                        SITUATED_HIGH,
+                                                                        MODE_EXIST);
 
 
                                                         #ifdef DEBUG
@@ -696,8 +708,8 @@ uint16_t get_info_num(int count, ...) {
                         case SPANISH_LANG:
                                 if     (fieldin == ELEM_NAME)           info= "ILLOSTRIPS";
                                 else if(fieldin == ELEM_DESC)           info= "HOLA TESTING THE BEST OF THE BESTES SWITCHS";
-                                else if(fieldin == ELEM_MODE_0_NAME)    info= ""; // modo oculto
-                                else if(fieldin == ELEM_MODE_0_DESC)    info= ""; // 
+                                else if(fieldin == ELEM_MODE_0_NAME)    info= "S. PEPE"; // modo oculto
+                                else if(fieldin == ELEM_MODE_0_DESC)    info= "SOY DON CHIFLEIN...."; // 
                                 else if(fieldin == ELEM_MODE_1_NAME)    info= "MODO GIGACHAD";
                                 else if(fieldin == ELEM_MODE_1_DESC)    info= "ERAN TRES MOTORISTAS QUE ERAN MOTOS MIENTRAS QUE CHOCABAN CON UN BANCO.";
                                 else if(fieldin == ELEM_MODE_2_NAME)    info= "MODO GITANO";

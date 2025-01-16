@@ -38,6 +38,7 @@ void ELEMENT_::begin() {
 ELEMENT_::configurar_RF(RF_BAUD_RATE);
 delay(100);
 Serial1.onReceive(onUartInterrupt);
+element->agregar_evento(EV_START, 0);
 delay(100);
 if (!SPIFFS.begin(true)) {
                                             #ifdef DEBUG
@@ -367,6 +368,7 @@ byte ELEMENT_::get_flag(){
 void ELEMENT_::agregar_evento(byte eventType, int eventData) {
     unsigned long currentTime = millis();
     int duration = 0;
+    static byte lastEventType = 255; // Inicializado con un valor que no es un evento válido
 
     switch (eventType) {
         case EV_START:
@@ -387,6 +389,8 @@ void ELEMENT_::agregar_evento(byte eventType, int eventData) {
                 }
                 lastModeChangeTime = currentTime;
                 lastMode = eventData;
+            } else {
+                return; // No agregar si el modo no ha cambiado realmente
             }
             break;
 
@@ -397,19 +401,26 @@ void ELEMENT_::agregar_evento(byte eventType, int eventData) {
                 }
                 lastColorChangeTime = currentTime;
                 lastColor = eventData;
+            } else {
+                return; // No agregar si el color no ha cambiado realmente
             }
             break;
 
         case EV_SECTOR_REQ:
-            // No duration calculation for EV_SECTOR_REQ
+            if (lastEventType == EV_SECTOR_REQ) {
+                return; // No agregar si el último evento también fue EV_SECTOR_REQ
+            }
             break;
 
-        default: break;
+        default: 
+            return; // No agregar eventos desconocidos
     }
 
     EVENT_REGISTER_T newEvent = {static_cast<byte>(eventType), eventData, duration};
     eventVector.push_back(newEvent);
+    lastEventType = eventType;
 }
+
 
 void ELEMENT_::save_event_register() {
 

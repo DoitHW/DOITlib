@@ -44,7 +44,7 @@ enum MODE_CONFIGS{
     SIMON_GAME,
     ACCEPTS_DICE,
     NOP_2,
-    NOP_3
+    MODE_EXIST
 };
 
 

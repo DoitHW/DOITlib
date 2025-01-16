@@ -10,7 +10,7 @@
                                                 #define SERIAL_NUM      0xCACA   // -> 0xVV00= VERSION + 0x00MM= MES
                                                 #define NOSERIAL_BY_FILE         // -> NOSERIAL_BY_FILE / SERIAL_BY_FILE --> Activar Serial por FileSystem, si esta definido, ignora el SERIAL_NUM.
                                                 #define SHOW_MAC                 // -> Opcional disparar MAC al inicio  (No sirve pa ná...) 
-                                                #define FAST_RF                  // -> FAST_RF= 115200 / SLOW_RF= 9600 
+                                                #define SLOW_RF               // -> FAST_RF= 115200 / SLOW_RF= 9600 
 /*                                                                                                  
                                      .-+***+-:....                                                  
                                       .+@@@@@@@@@+:......:::.....                                   
@@ -60,7 +60,7 @@
 
 #define MAX_REG_EVENTS    1000
 #define LIFETIME_UPDATE_INTERVAL  60000
-#define MAX_EXPECTED_TIME    0xFFFFFFFF
+#define MAX_EXPECTED_TIME    0xF
 #define RF_TX_PIN         18 
 #define RF_RX_PIN         17  
 #define RF_CONFIG_PIN     46
@@ -169,11 +169,11 @@
 #define MAX_ALLOWED_TARGETS     0xFF
 #define MAX_VALID_DEVICE_ID     0xFF
 #define MAX_DATA_LENGTH         0xFF
-#define INACTIVITY_TIMEOUT      0xFF
+#define INACTIVITY_TIMEOUT      0x0F
 
-#define MAX_INTERRUPT_DURATION   0x20
-#define MAX_FRAME_RECEPTION_TIME 0x1F4
-#define FRAME_RECEPTION_TIMEOUT  0x64
+#define MAX_INTERRUPT_DURATION   0x10
+#define MAX_FRAME_RECEPTION_TIME 0x64
+#define FRAME_RECEPTION_TIMEOUT  0x0F
 
 // COLORES 
 
@@ -367,7 +367,7 @@ enum LIGHTSOURCE_MODE_LIST{
 };
 
 enum LEDSTRIP_MODE_LIST{
-    LEDSTRIP_CONTEST_MODE= 0,
+    LEDSTRIP_HIDDEN_MODE= 0,
     LEDSTRIP_BASIC_MODE,
     LEDSTRIP_SLOW_MODE,
     LEDSTRIP_MOTION_MODE,

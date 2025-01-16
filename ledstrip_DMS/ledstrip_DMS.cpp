@@ -55,6 +55,7 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             Serial.println("Sector data: " + String(sector_data[0], HEX));
             FRAME_T frame= frameMaker_RETURN_ELEM_SECTOR(globalID, LEF.origin, sector_data, sector);
             send_frame(frame);
+            agregar_evento(EV_SECTOR_REQ, sector);
                                                             #ifdef DEBUG
                                                              Serial.println("Info devuelta en un Return");
                                                              Serial.println("Recibido F_REQ_ELEM_INFO, lang= " +String(lang));
@@ -81,6 +82,7 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
                                                                         #ifdef DEBUG
                                                                         Serial.println("OJITO, que passem a modo: " +String(element->get_currentMode()));
                                                                         #endif
+            agregar_evento(EV_MODE_CHANGE, mode);
             break;
         }
         case F_SEND_TEST:{
@@ -89,8 +91,10 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             else if(testin == COLOR_TEST) delay(1);// fer algo}
             else if(testin == BLACKOUT){
                 element->work_time_handler(8);
-                //element->event_register_update(EV_END, 0x00);
-                delay(300);
+                delay(200);
+                element->agregar_evento(EV_END, 0);
+                // aqui es graba a spiffs tot el registre
+                delay(500);
                 ESP.restart();
             } // fer algo}
             break;
