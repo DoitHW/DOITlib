@@ -33,12 +33,16 @@ ELEMENT_::~ELEMENT_() {
 void ELEMENT_::begin() {
                                                     #ifdef DEBUG
                                                         Serial.begin(115200);
-                                                        Serial.println("ATENCION!!!!!!!!!!!!!!!!!!!");
+                                                        Serial.println("ATENCION!!!!!!!!!!!!!!");
                                                     #endif
 ELEMENT_::configurar_RF(RF_BAUD_RATE);
 delay(100);
+#ifdef PLAYER
+    Serial2.begin(9600, SERIAL_8N1, 8, 9);
+#endif
+delay(100);
 Serial1.onReceive(onUartInterrupt);
-element->agregar_evento(EV_START, 0);
+agregar_evento(EV_START, 0);
 delay(100);
 if (!SPIFFS.begin(true)) {
                                             #ifdef DEBUG

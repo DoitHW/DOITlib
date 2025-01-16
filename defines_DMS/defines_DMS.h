@@ -5,7 +5,7 @@
 //DELFINES GLOBALES
                                                 #define WALLWASHER
                                                 /*COLUMNA, FIBRAS, WALLWASHER, ETC*/
-
+                                                #define PLAYER                   // -> PLAYER / NOPLAYER
                                                 #define DEBUG                    // -> Desactivar en produccion 
                                                 #define SERIAL_NUM      0xCACA   // -> 0xVV00= VERSION + 0x00MM= MES
                                                 #define NOSERIAL_BY_FILE         // -> NOSERIAL_BY_FILE / SERIAL_BY_FILE --> Activar Serial por FileSystem, si esta definido, ignora el SERIAL_NUM.

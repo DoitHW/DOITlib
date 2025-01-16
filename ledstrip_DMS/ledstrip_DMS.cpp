@@ -6,7 +6,10 @@
 #include <vector>
 #include <EEPROM.h>
 
-
+#ifdef PLAYER
+  #include <play_DMS/play_DMS.h>
+  extern DOITSOUNDS_ doitPlayer;
+#endif
 extern float varaux;
 INFO_PACK_T info;
 
@@ -102,7 +105,10 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
         case F_SEND_COLOR: {
             byte color = LEF.data[0];
             element->work_time_handler(color);
-           // element->event_register_update(EV_COLOR_CHANGE, color);
+            #ifdef PLAYER
+                 doitPlayer.play_file(2,color);
+            #endif
+           
             CRGB colorin= colorHandler.get_CRGB_from_colorList(color);
                                                             #ifdef DEBUG
                                                                 Serial.println("Color recibido: " + String(color));
