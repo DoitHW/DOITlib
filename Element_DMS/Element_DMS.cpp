@@ -11,11 +11,23 @@
 
 
 
-ELEMENT_::ELEMENT_(){}
+ELEMENT_::ELEMENT_(){
+
+    lastEventTime = new unsigned long[MAX_EVENTS];
+    lastEventValue = new int[MAX_EVENTS];
+    
+    for(int i = 0; i < MAX_EVENTS; i++) {
+        lastEventTime[i] = 0;
+        lastEventValue[i] = -1;
+    }
+}
 
 
-
-
+ELEMENT_::~ELEMENT_() {
+    
+    delete[] lastEventTime;
+    delete[] lastEventValue;
+}
 
 
 void ELEMENT_::begin() {
@@ -23,7 +35,7 @@ void ELEMENT_::begin() {
                                                         Serial.begin(115200);
                                                         Serial.println("ATENCION!!!!!!!!!!!!!!!!!!!");
                                                     #endif
-ELEMENT_::configurar_RF(RF_FAST_BAUD_RATE);
+ELEMENT_::configurar_RF(RF_BAUD_RATE);
 delay(100);
 Serial1.onReceive(onUartInterrupt);
 delay(100);
@@ -267,9 +279,6 @@ byte ELEMENT_::get_ID(){
 }
 
 
-ELEMENT_::~ELEMENT_() {
-    
-}
 
 void ELEMENT_::start_working_time() {
     if (!workTimerRunning) {
@@ -355,37 +364,115 @@ byte ELEMENT_::get_flag(){
     return flag;
 }
 
+void ELEMENT_::agregar_evento(byte eventType, int eventData) {
+    unsigned long currentTime = millis();
+    int duration = 0;
+
+    switch (eventType) {
+        case EV_START:
+            lastStartTime = currentTime;
+            break;
+            
+        case EV_END:
+            if (lastStartTime > 0) {
+                duration = currentTime - lastStartTime;
+                lastStartTime = 0;
+            }
+            break;
+
+        case EV_MODE_CHANGE:
+            if (lastMode != eventData) {
+                if (lastModeChangeTime > 0) {
+                    duration = currentTime - lastModeChangeTime;
+                }
+                lastModeChangeTime = currentTime;
+                lastMode = eventData;
+            }
+            break;
+
+        case EV_COLOR_CHANGE:
+            if (lastColor != eventData) {
+                if (lastColorChangeTime > 0) {
+                    duration = currentTime - lastColorChangeTime;
+                }
+                lastColorChangeTime = currentTime;
+                lastColor = eventData;
+            }
+            break;
+
+        case EV_SECTOR_REQ:
+            // No duration calculation for EV_SECTOR_REQ
+            break;
+
+        default: break;
+    }
+
+    EVENT_REGISTER_T newEvent = {static_cast<byte>(eventType), eventData, duration};
+    eventVector.push_back(newEvent);
+}
+
+void ELEMENT_::save_event_register() {
+
+    File file = SPIFFS.open(ELEMENT_EVENT_REGISTER_FILE_PATH, FILE_APPEND);
+    if (!file) {
+        Serial.println("Failed to open file for appending");
+        return;
+    }
+    for (const auto& event : eventVector) {
+        String eventDescription = get_word_from_eventNum(event.type);
+        file.printf("%s  ->  %d -> %lu\n", eventDescription.c_str(), event.value, event.duration);
+    }
+    file.close();
+    eventVector.clear();
+}
+
 void ELEMENT_::configurar_RF(int baudRate) {
     pinMode(RF_CONFIG_PIN, OUTPUT);
     digitalWrite(RF_CONFIG_PIN, LOW);  // Entrar en modo configuración
     delay(500);
 
     // Intentar comunicarse con ambas velocidades por seguridad
-    Serial1.begin(RF_FAST_BAUD_RATE, SERIAL_8N1, RF_RX_PIN, RF_TX_PIN);
-    // Intentar enviar un comando de reset a valores de fábrica
-    byte comandoReset[] = {0xAA, 0xFA, 0xF0};  
+    Serial1.begin(115200, SERIAL_8N1, RF_RX_PIN, RF_TX_PIN);
+    byte comandoReset[] = {0xAA, 0xFA, 0xF0};  // Comando para resetear a valores de fábrica
     Serial1.write(comandoReset, sizeof(comandoReset));
     delay(1000); // Dar tiempo al módulo para reiniciarse
 
-    // Si no responde, intentar con 9600 bps
-    if (!Serial1.available()) {
+    // Verificar si responde a 115200
+    bool resetConfirmado = false;
+    if (Serial1.available()) {
+        Serial.println("Respuesta a 115200 detectada");
+        resetConfirmado = true;
+    } else {
+        // Si no responde, intentar con 9600
         Serial1.end();
-        Serial1.begin(RF_BAUD_RATE, SERIAL_8N1, RF_RX_PIN, RF_TX_PIN);
+        Serial1.begin(9600, SERIAL_8N1, RF_RX_PIN, RF_TX_PIN);
         Serial1.write(comandoReset, sizeof(comandoReset));
         delay(1000);
+        if (Serial1.available()) {
+            Serial.println("Respuesta a 9600 detectada");
+            resetConfirmado = true;
+        }
     }
 
-    // Configurar velocidad UART y velocidad inalámbrica
+    if (!resetConfirmado) {
+        Serial.println("Error: No se detectó respuesta del módulo RF");
+        digitalWrite(RF_CONFIG_PIN, HIGH);
+        return;
+    }
+
+    // Configurar comandos según la velocidad deseada
     byte comandoUART[7];
     byte comandoWirelessDataRate[7];
 
-    if (baudRate == RF_FAST_BAUD_RATE) {
+    if (baudRate == 115200) {
+        Serial.println("Config UART y Wireless a 115200");
         comandoUART[0] = 0xAA; comandoUART[1] = 0xFA; comandoUART[2] = 0x1E;
         comandoUART[3] = 0x00; comandoUART[4] = 0x01; comandoUART[5] = 0xC2; comandoUART[6] = 0x00;
-        
+
         comandoWirelessDataRate[0] = 0xAA; comandoWirelessDataRate[1] = 0xFA; comandoWirelessDataRate[2] = 0xC3;
         comandoWirelessDataRate[3] = 0x00; comandoWirelessDataRate[4] = 0x01; comandoWirelessDataRate[5] = 0xC2; comandoWirelessDataRate[6] = 0x00;
     } else {
+        Serial.println("Config UART y Wireless a 9600");
         comandoUART[0] = 0xAA; comandoUART[1] = 0xFA; comandoUART[2] = 0x1E;
         comandoUART[3] = 0x00; comandoUART[4] = 0x00; comandoUART[5] = 0x25; comandoUART[6] = 0x80;
 
@@ -404,16 +491,76 @@ void ELEMENT_::configurar_RF(int baudRate) {
     Serial1.write(comandoLeerConfiguracion, sizeof(comandoLeerConfiguracion));
     delay(500);
 
+    Serial.println(" =[Desglosando configuración recibida]=");
+
+    // Filtrar valores no relevantes
+    while (Serial1.available()) {
+        if (Serial1.peek() == 0x4F) {  // ASCII 'O'
+            Serial1.read(); // Ignorar 'O'
+            if (Serial1.peek() == 0x4B) {  // ASCII 'K'
+                Serial1.read(); // Ignorar 'K'
+                Serial1.read(); // Ignorar '\r'
+                Serial1.read(); // Ignorar '\n'
+            }
+        } else {
+            break;
+        }
+    }
+
+    if (Serial1.available() >= 13) {  // Verificar que haya suficientes datos para desglosar
+        byte frecuencia[4];
+        byte velocidad[4];
+        byte anchoBanda[2];
+        byte desviacionFrecuencia;
+        byte potencia;
+
+        for (int i = 0; i < 4; i++) frecuencia[i] = Serial1.read();
+        for (int i = 0; i < 4; i++) velocidad[i] = Serial1.read();
+        for (int i = 0; i < 2; i++) anchoBanda[i] = Serial1.read();
+        desviacionFrecuencia = Serial1.read();
+        potencia = Serial1.read();
+
+        uint32_t freq = (frecuencia[0] << 24) | (frecuencia[1] << 16) | (frecuencia[2] << 8) | frecuencia[3];
+        uint32_t baudrate = (velocidad[0] << 24) | (velocidad[1] << 16) | (velocidad[2] << 8) | velocidad[3];
+        uint16_t bw = (anchoBanda[0] << 8) | anchoBanda[1];
+
+        Serial.print("📡 Frecuencia: ");
+        Serial.print(freq);
+        Serial.println(" Hz");
+
+        Serial.print("⚡ Velocidad inalámbrica: ");
+        Serial.print(baudrate);
+        Serial.println(" bps");
+
+        Serial.print("📶 Ancho de banda: ");
+        Serial.print(bw);
+        Serial.println(" kHz");
+
+        Serial.print("🎛️ Desviación de frecuencia: ");
+        Serial.print(desviacionFrecuencia);
+        Serial.println(" kHz");
+
+        Serial.print("🔋 Potencia de transmisión: ");
+        Serial.print(potencia);
+        Serial.println(" dBm");
+        Serial.println();
+
+    } else {
+        Serial.println("Error: Datos insuficientes para interpretar la configuración.");
+    }
+
     // Salir del modo configuración
     digitalWrite(RF_CONFIG_PIN, HIGH);
     delay(500);
 
     // Reconfigurar la velocidad UART en el ESP32
     Serial1.end();
-    if (baudRate == RF_FAST_BAUD_RATE) {
-        Serial1.begin(RF_FAST_BAUD_RATE, SERIAL_8N1, RF_RX_PIN, RF_TX_PIN);
+    if (baudRate == 115200) {
+        Serial.println("Config velocidad UART en ESP32 a 115200");
+        Serial1.begin(115200, SERIAL_8N1, RF_RX_PIN, RF_TX_PIN);
     } else {
-        Serial1.begin(RF_BAUD_RATE, SERIAL_8N1, RF_RX_PIN, RF_TX_PIN);
+        Serial.println("Config velocidad UART en ESP32 a 9600");
+        Serial1.begin(9600, SERIAL_8N1, RF_RX_PIN, RF_TX_PIN);
     }
 
     Serial.println("Configuración completa y módulo reiniciado correctamente.");

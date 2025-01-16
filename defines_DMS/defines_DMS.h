@@ -3,13 +3,14 @@
 
 #include <Arduino.h>
 //DELFINES GLOBALES
-                                                #define NO_ELEM
+                                                #define WALLWASHER
                                                 /*COLUMNA, FIBRAS, WALLWASHER, ETC*/
 
                                                 #define DEBUG                    // -> Desactivar en produccion 
                                                 #define SERIAL_NUM      0xCACA   // -> 0xVV00= VERSION + 0x00MM= MES
                                                 #define NOSERIAL_BY_FILE         // -> NOSERIAL_BY_FILE / SERIAL_BY_FILE --> Activar Serial por FileSystem, si esta definido, ignora el SERIAL_NUM.
-                                                #define SHOW_MAC                 // -> Opcional disparar MAC al inicio  (No sirve pa ná...)                      
+                                                #define SHOW_MAC                 // -> Opcional disparar MAC al inicio  (No sirve pa ná...) 
+                                                #define FAST_RF                  // -> FAST_RF= 115200 / SLOW_RF= 9600 
 /*                                                                                                  
                                      .-+***+-:....                                                  
                                       .+@@@@@@@@@+:......:::.....                                   
@@ -63,8 +64,12 @@
 #define RF_TX_PIN         18 
 #define RF_RX_PIN         17  
 #define RF_CONFIG_PIN     46
-#define RF_BAUD_RATE      9600
-#define RF_FAST_BAUD_RATE 115200
+#if defined (FAST_RF)
+  #define RF_BAUD_RATE      115200
+#else
+  #define RF_BAUD_RATE      9600
+#endif
+
 #define UART_RX_BUFFER_SIZE 1024
 
 // DEFINES FRAME

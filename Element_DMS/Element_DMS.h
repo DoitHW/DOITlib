@@ -28,9 +28,13 @@ class ELEMENT_ {
         byte activePattern;
         static const int MAX_EVENTS = 1000;
         //static unsigned long lastEventTime;
-        static int currentEventIndex;
-        unsigned long lastEventTime[100] = {0};
-        int lastEventValue[100] = {-1};
+        unsigned long lastStartTime = 0;
+        unsigned long lastModeChangeTime = 0;
+        unsigned long lastColorChangeTime = 0;
+        int lastMode = -1;
+        int lastColor = -1;
+        unsigned long* lastEventTime;  // Array para almacenar los tiempos del último evento
+        int* lastEventValue;
 
         void          start_working_time(); 
         void          stopAndSave_working_time();  
@@ -69,10 +73,18 @@ class ELEMENT_ {
         uint8_t  ID;
 
         void            configurar_RF(int baudRate);
+        void            save_event_register();
+        void            agregar_evento(byte eventType, int eventData);
 
     protected:
         virtual void  RX_main_handler(LAST_ENTRY_FRAME_T LEF){}
     
+        struct EVENT_REGISTER_T {
+            byte type;
+            int value;
+            int duration;
+        };
+        std::vector<EVENT_REGISTER_T> eventVector;
         uint8_t  name[24];      
         uint8_t  serialNum[5];  
         byte     flag;
