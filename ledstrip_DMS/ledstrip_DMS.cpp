@@ -58,7 +58,7 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             Serial.println("Sector data: " + String(sector_data[0], HEX));
             FRAME_T frame= frameMaker_RETURN_ELEM_SECTOR(globalID, LEF.origin, sector_data, sector);
             send_frame(frame);
-            agregar_evento(EV_SECTOR_REQ, sector);
+            event_register(EV_SECTOR_REQ, sector);
                                                             #ifdef DEBUG
                                                              Serial.println("Info devuelta en un Return");
                                                              Serial.println("Recibido F_REQ_ELEM_INFO, lang= " +String(lang));
@@ -69,6 +69,7 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
         case F_SET_ELEM_ID:{
             element->set_ID(LEF.data[0]);
             globalID= LEF.data[0];
+            event_register(EV_ID_CHANGE, globalID);
             break;
         }
 
@@ -85,35 +86,38 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
                                                                         #ifdef DEBUG
                                                                         Serial.println("OJITO, que passem a modo: " +String(element->get_currentMode()));
                                                                         #endif
-            agregar_evento(EV_MODE_CHANGE, mode);
+            event_register(EV_MODE_CHANGE, mode);
             break;
         }
+
         case F_SEND_TEST:{
             byte testin= LEF.data[0];
-            if     (testin == HELLO_TEST) delay(1);// fer algo}
-            else if(testin == COLOR_TEST) delay(1);// fer algo}
+            if     (testin == HELLO_TEST) delay(1); 
+            else if(testin == START_TEST){
+                event_register(EV_START, 0);
+                // DIR HOLA AMB FAST.LED
+            }
             else if(testin == BLACKOUT){
-                element->work_time_handler(8);
+                // APAGAR FASTLED
+                event_register(EV_END, 0);
                 delay(200);
-                element->agregar_evento(EV_END, 0);
-                // aqui es graba a spiffs tot el registre
-                delay(500);
+                save_register();
+                delay(2000);
                 ESP.restart();
-            } // fer algo}
+            } 
             break;
         }
         case F_SEND_COLOR: {
             byte color = LEF.data[0];
-            element->work_time_handler(color);
             #ifdef PLAYER
                  doitPlayer.play_file(2,color);
             #endif
-           
+            event_register(EV_COLOR_CHANGE, color);
             CRGB colorin= colorHandler.get_CRGB_from_colorList(color);
                                                             #ifdef DEBUG
                                                                 Serial.println("Color recibido: " + String(color));
                                                             #endif
-            if (currentMode_ == LEDSTRIP_BASIC_MODE) {
+        if (currentMode_ == LEDSTRIP_BASIC_MODE) {
                                                             #ifdef DEBUG
                                                                 Serial.println("Manejando en modo BASIC_MODE.");
                                                             #endif
@@ -195,8 +199,7 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
 
         case F_SEND_PATTERN_NUM:{
                 byte numPattern= LEF.data[0];
-                if(numPattern != NO_PATTERN) element->work_time_handler(1);
-                else                         element->work_time_handler(8);
+
                 colorHandler.set_activePattern(numPattern);                                           
             break;
         }

@@ -1058,7 +1058,7 @@
 
 #ifdef BOTONERA
 	#ifdef NO_ELEM
-		const uint16_t elem_icon [ICON_LENGTH] PROGMEM [] PROGMEM = {};
+		const uint16_t elem_icon [ICON_LENGTH] PROGMEM = {};
 	#endif
 	const uint16_t doitPlaypad_64x64 [64*64] PROGMEM = {
 	// 'doitPlaypad_64x64, 64x64px

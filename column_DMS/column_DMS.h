@@ -17,8 +17,8 @@ class COLUMN_ : public ELEMENT_{
 
         void column_begin();
         void RX_main_handler(LAST_ENTRY_FRAME_T LEF)override;
-        void relay_handler(bool actionin);
-};
+        void relay_handler(bool actionin);      
+};                          
 
 
 extern COLUMN_ *element;

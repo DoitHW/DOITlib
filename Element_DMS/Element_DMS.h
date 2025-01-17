@@ -19,72 +19,71 @@ class ELEMENT_ {
     public: 
         ELEMENT_();
         virtual ~ELEMENT_();
-        void begin(); 
 
-        unsigned long lastLifeTimeUpdate = 0;
-        unsigned long workTimeStart = 0;
-        bool workTimerRunning = false;
-        bool stopwatchRunning = false;
+        uint8_t  ID;
         byte activePattern;
-        static const int MAX_EVENTS = 1000;
-        //static unsigned long lastEventTime;
+
+
+        void      begin();
+        void      configurar_RF(int baudRate);
+
+        void      event_register(int eventNum, int eventVal);
+        void      save_register();
+        void      print_event_register();
+        String    get_word_from_eventNum(int eventNumber);
+        String    get_serial_from_file();
+
+        byte      get_ID_from_file();
+        void      set_ID_to_file(byte ID);
+
+        void      set_ID(byte IDin);
+        byte      get_ID();
+  
+        void      set_type(byte typein);
+        byte      get_type();
+
+        void      set_manager(byte managerin);
+        byte      get_manager();
+
+        void      set_mode(uint8_t mode);
+        byte      get_currentMode();
+
+        void      set_flag(byte flagNum, bool state);
+        byte      get_flag();
+
+    protected:
+        virtual void  RX_main_handler(LAST_ENTRY_FRAME_T LEF){}
+    
+        enum EVENT_TYPE{
+            EV_START,
+            EV_END,
+            EV_SECTOR_REQ,
+            EV_MODE_CHANGE,
+            EV_COLOR_CHANGE,
+            EV_FLAG_CHANGE,
+            EV_ID_CHANGE
+        };
+
+        struct EVENT_T{
+            EVENT_TYPE eventNum;
+            int eventVal;
+            unsigned long timestamp;
+        };
+
+        std::vector<EVENT_T> events;
+        unsigned long totalColorTime = 0;
+        unsigned long totalWorkTime = 0;
         unsigned long lastStartTime = 0;
         unsigned long lastModeChangeTime = 0;
         unsigned long lastColorChangeTime = 0;
         int lastMode = -1;
         int lastColor = -1;
-        unsigned long* lastEventTime;  // Array para almacenar los tiempos del último evento
-        int* lastEventValue;
+        int sectorReqCount = 0;
+        int flagChangeCount = 0;
+        unsigned long totalColorTimeAllCycles = 0;
+        unsigned long totalWorkTimeAllCycles = 0;
+        int totalCycles = 0;
 
-        void          start_working_time(); 
-        void          stopAndSave_working_time();  
-        void          work_time_handler(byte colorin);
-        void          lifeTime_update();
-        unsigned long get_lifeTime();
-        void          set_lifeTime(unsigned long lifeTime);
-
-        int           get_workTime();
-        void          set_workTime(int workTime);
-
-        String        get_serial_from_file();
-
-        byte          get_ID_from_file();
-        void          set_ID_to_file(byte ID);
-
-        void          set_ID(byte IDin);
-        byte          get_ID();
-  
-        void          set_type(byte typein);
-        byte          get_type();
-
-        void          set_manager(byte managerin);
-        byte          get_manager();
-
-        void          set_mode(uint8_t mode);
-        byte          get_currentMode();
-
-        void          set_flag(byte flagNum, bool state);
-        byte          get_flag();
-
-        void            event_register_update(int eventNumber, int eventValue);
-        void            print_event_register();
-        String          get_word_from_eventNum(int eventNumber);
-
-        uint8_t  ID;
-
-        void            configurar_RF(int baudRate);
-        void            save_event_register();
-        void            agregar_evento(byte eventType, int eventData);
-
-    protected:
-        virtual void  RX_main_handler(LAST_ENTRY_FRAME_T LEF){}
-    
-        struct EVENT_REGISTER_T {
-            byte type;
-            int value;
-            int duration;
-        };
-        std::vector<EVENT_REGISTER_T> eventVector;
         uint8_t  name[24];      
         uint8_t  serialNum[5];  
         byte     flag;
@@ -104,3 +103,10 @@ class ELEMENT_ {
 
 
 #endif
+
+
+
+
+
+
+
