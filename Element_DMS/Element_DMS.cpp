@@ -31,7 +31,7 @@ delay(100);
 #endif
 delay(100);
 Serial1.onReceive(onUartInterrupt);
-
+//digitalWrite(RF_CONFIG_PIN, HIGH);
 delay(100);
 if (!SPIFFS.begin(true)) {
                                             #ifdef DEBUG

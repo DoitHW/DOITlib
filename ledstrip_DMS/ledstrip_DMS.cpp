@@ -22,9 +22,7 @@ LEDSTRIP_::LEDSTRIP_() {
 void LEDSTRIP_::ledstrip_begin(){
             colorHandler.begin(NUM_LEDS);
             delay(10);
-
             element->set_mode(DEFAULT_BASIC_MODE);
-         //   element->event_register_update(EV_START, 0x00);
 }
 
 

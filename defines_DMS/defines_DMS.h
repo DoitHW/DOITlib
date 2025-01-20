@@ -3,14 +3,14 @@
 
 #include <Arduino.h>
 //DELFINES GLOBALES
-                                                #define WALLWASHER
+                                                #define NO_ELEM
                                                 /*COLUMNA, FIBRAS, WALLWASHER, ETC*/
-                                                #define PLAYER                   // -> PLAYER / NOPLAYER
+                                                #define NOPLAYER                   // -> PLAYER / NOPLAYER
                                                 #define DEBUG                    // -> Desactivar en produccion 
                                                 #define SERIAL_NUM      0xCACA   // -> 0xVV00= VERSION + 0x00MM= MES
                                                 #define NOSERIAL_BY_FILE         // -> NOSERIAL_BY_FILE / SERIAL_BY_FILE --> Activar Serial por FileSystem, si esta definido, ignora el SERIAL_NUM.
                                                 #define SHOW_MAC                 // -> Opcional disparar MAC al inicio  (No sirve pa ná...) 
-                                                #define SLOW_RF               // -> FAST_RF= 115200 / SLOW_RF= 9600 
+                                                #define SLOW_RF                  // -> FAST_RF= 115200 / SLOW_RF= 9600 
 /*                                                                                                  
                                      .-+***+-:....                                                  
                                       .+@@@@@@@@@+:......:::.....                                   
@@ -330,7 +330,7 @@ enum TESTS_{
 #elif defined (FIBRAS)
   #define NUM_LEDS 1
 #elif defined (WALLWASHER)
-  #define NUM_LEDS 299
+  #define NUM_LEDS 36
 #elif defined (BOTONERA)
   #define NUM_LEDS 9
 #endif
