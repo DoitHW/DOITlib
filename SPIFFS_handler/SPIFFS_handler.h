@@ -33,4 +33,5 @@ void initializeDynamicOptions();
 void loadElementsFromSPIFFS();
 byte getCurrentElementID();
 bool isCurrentElementSelected();
+bool checkMostSignificantBit(byte modeConfig[2]);
 

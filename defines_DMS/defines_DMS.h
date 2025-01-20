@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 //DELFINES GLOBALES
-                                                #define WALLWASHER
+                                                #define NO_ELEM
                                                 /*COLUMNA, FIBRAS, WALLWASHER, ETC*/
                                                 #define PLAYER                   // -> PLAYER / NOPLAYER
                                                 #define DEBUG                    // -> Desactivar en produccion 

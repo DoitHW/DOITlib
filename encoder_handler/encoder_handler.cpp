@@ -5,6 +5,7 @@
 #include <Pulsadores_handler/Pulsadores_handler.h>
 #include <Colors_DMS/Color_DMS.h>
 #include <botonera_DMS/botonera_DMS.h>
+#include <DynamicLEDManager_DMS/DynamicLEDManager_DMS.h>
 
 
 // Variables globales para el manejo del encoder
@@ -14,13 +15,15 @@ int currentIndex = 0;
 unsigned long buttonPressStart = 0; // Marca el inicio de la pulsación larga
 bool isLongPress = false;          // Bandera para la pulsación larga
 bool inModesScreen = false;  
- int currentModeIndex = 0;  // Índice del modo actual dentro del menú MODOS
+int currentModeIndex = 0;  // Índice del modo actual dentro del menú MODOS
 int totalModes = 0;    
 unsigned long buttonReleaseTime = 0;  // Track when button is released
 bool modeScreenEnteredByLongPress = false;  // Flag to track how modes screen was entered
 bool longPressDetected = false;
 std::vector<String> elementFiles;
 std::vector<bool> selectedStates;
+int globalVisibleModesMap[16] = {0};  // Definición e inicialización
+
 
 void encoder_init_func() {
     //Serial.println("Inicializando encoder...");
@@ -32,7 +35,6 @@ void encoder_init_func() {
     encoder.setFilter(1023);
     //Serial.println("Encoder inicializado.");
 }
-
 
 void handleEncoder() {
     int32_t newEncoderValue = encoder.getCount();
@@ -47,9 +49,13 @@ void handleEncoder() {
             // Actualizar el elemento actual y el modo actual
             drawCurrentElement();  // Llama a `setPatternBotonera` con el modo actualizado
         } else if (inModesScreen && totalModes > 0) {
-            // Navegar entre modos en la pantalla de modos
             currentModeIndex = (currentModeIndex + direction + totalModes) % totalModes;
-            colorHandler.setPatternBotonera(currentModeIndex); // Actualizar patrones con el modo actual
+
+            // Traducir índice visible al índice real
+            int realModeIndex = globalVisibleModesMap[currentModeIndex];
+            if (realModeIndex >= 0) {
+                colorHandler.setPatternBotonera(realModeIndex, ledManager);  // Actualizar patrones con el modo real
+            }
             drawModesScreen();
         }
     }
@@ -72,12 +78,13 @@ void handleEncoder() {
                 std::vector<byte> elementID;
                 char elementName[25] = {0};
                 String modeName;
+                int realModeIndex = globalVisibleModesMap[currentModeIndex]; // Obtener el índice real
                 int modeNumber = currentModeIndex + 1; // Número del modo
 
                 if (currentFile == "Ambientes" || currentFile == "Fichas") {
                     INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
-                    option->currentMode = currentModeIndex;
-                    modeName = String((char*)option->mode[currentModeIndex].name);
+                    option->currentMode = realModeIndex; // Actualizar el índice real
+                    modeName = String((char*)option->mode[realModeIndex].name);
                     elementID.push_back(0); // ID predeterminada
                 } else {
                     // Leer y actualizar el archivo SPIFFS
@@ -85,7 +92,7 @@ void handleEncoder() {
                     if (f) {
                         // Guardar el nuevo modo seleccionado en el archivo
                         f.seek(OFFSET_CURRENTMODE, SeekSet);
-                        f.write((uint8_t*)&currentModeIndex, 1);
+                        f.write((uint8_t*)&realModeIndex, 1); // Escribir el índice real
 
                         // Leer el nombre del elemento
                         f.seek(OFFSET_NAME, SeekSet);
@@ -98,7 +105,7 @@ void handleEncoder() {
                         elementID.push_back(id);
 
                         // Leer el nombre del modo actual
-                        f.seek(OFFSET_MODES + (SIZE_MODE * currentModeIndex), SeekSet);
+                        f.seek(OFFSET_MODES + (SIZE_MODE * realModeIndex), SeekSet);
                         char modeNameBuf[25] = {0};
                         f.read((uint8_t*)modeNameBuf, 24);
                         modeName = String(modeNameBuf);
@@ -111,7 +118,7 @@ void handleEncoder() {
                 Serial.printf("Nombre del elemento: %s\n", elementName[0] ? elementName : currentFile.c_str());
                 Serial.printf("ID del elemento: %d\n", elementID[0]);
                 Serial.printf("Modo seleccionado: %s (Modo %d)\n", modeName.c_str(), modeNumber);
-                send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, elementID, currentModeIndex + 1));
+                send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, elementID, realModeIndex));
                 inModesScreen = false;
                 drawCurrentElement(); // Redibuja el elemento actual con el nuevo modo
             } else {

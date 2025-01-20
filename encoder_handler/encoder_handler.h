@@ -31,6 +31,8 @@ extern bool modeScreenEnteredByLongPress;
 extern bool isLongPress;
 extern bool hiddenMenuActive;
 extern unsigned long buttonPressStart;
+extern int globalVisibleModesMap[16];  // Declaración de la variable global
+
 
 
 

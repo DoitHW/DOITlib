@@ -5,6 +5,7 @@
 #include <map>
 #include <math.h>
 #include <FastLED.h>
+#include <DynamicLEDManager_DMS/DynamicLEDManager_DMS.h>
 //testing MARC 2
 //testing 2 3 4
 //testing 3
@@ -542,8 +543,9 @@ void COLORHANDLER_::set_botoneraPattern (byte patternin){
   }
 }
 
-void COLORHANDLER_::setPatternBotonera(byte mode) {
+void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager) {
   //Serial.println("setPatternBotonera: " + String(mode));
+  ledManager.clearEffects(); // Limpiar efectos dinámicos previos
     switch (mode) {
         case 0: {
          // Serial.println("Basico");
@@ -565,31 +567,41 @@ void COLORHANDLER_::setPatternBotonera(byte mode) {
             break;
         }
         case 1: {
-          //Serial.println("Calientes");
-          // leds[0] = CRGB(0xFF, 0x00, 0x00); // Rojo
-          // leds[1] = CRGB(0xFF, 0x1E, 0x14); 
-          // leds[2] = CRGB(0xFF, 0x3C, 0x28); 
-          // leds[3] = CRGB(0xFF, 0x5A, 0x1E); 
-          // leds[4] = CRGB(0xFF, 0x78, 0x14); 
-          // leds[5] = CRGB(0xFF, 0x96, 0x0A);
-          // leds[6] = CRGB(0xFF, 0xB4, 0x05); 
-          // leds[7] = CRGB(0xFF, 0xD2, 0x03);
-          // leds[8] = CRGB(0xFF, 0xF0, 0x00); 
+          Serial.println("Modo 1 dinamic effect");
+                   // Colores básicos para LEDs 1-8
+            for (int i = 1; i < NUM_LEDS; i++) {
+                switch (i) {
+                    case 1: leds[i] = CRGB::White; break;
+                    case 2: leds[i] = CRGB::Red; break;
+                    case 3: leds[i] = CRGB::Cyan; break;
+                    case 4: leds[i] = CRGB::Yellow; break;
+                    case 5: leds[i] = CRGB(0xFF, 0x59, 0x00); break;
+                    case 6: leds[i] = CRGB::Green; break;
+                    case 7: leds[i] = CRGB(0xFF, 0x00, 0xD2); break;
+                    case 8: leds[i] = CRGB::Blue; break;
+                    default: leds[i] = CRGB::Black; break;
+                }
+            }
 
-          leds[0] = CRGB::Black;               // Negro (equivalente al "rojo" inicial apagado)
-leds[1] = CRGB(0x80, 0x00, 0x00);   // Rojo oscuro (borgoña)
-leds[2] = CRGB(0xFF, 0x00, 0x00);   // Rojo puro
-leds[3] = CRGB(0xFF, 0x66, 0x00);   // Naranja brillante
-leds[4] = CRGB(0xFF, 0xA5, 0x00);   // Naranja cálido (ámbar)
-leds[5] = CRGB(0xFF, 0xFF, 0x00);   // Amarillo puro
-leds[6] = CRGB(0xFF, 0xE6, 0x33);   // Amarillo dorado (mostaza)
-leds[7] = CRGB(0xFF, 0xF2, 0xCC);   // Blanco cálido con tinte crema
-leds[8] = CRGB(0xFF, 0xFA, 0xE6);   // Blanco marfil (ligeramente más claro)
-
-
+            // Registrar el efecto dinámico para el LED 0 (fade entre celeste y azul)
+            ledManager.addEffect(new FadeEffect(*this, 0, CRGB::Blue, CRGB::Cyan, 50));
         break;
         }
         case 2: {
+          //Serial.println("Frios");
+            // Patrón gradiente de colores fríos
+          leds[0] = CRGB::Black;              // Negro (equivalente al "rojo" inicial apagado)
+          leds[1] = CRGB(0x80, 0x00, 0x00);   // Rojo oscuro (borgoña)
+          leds[2] = CRGB(0xFF, 0x00, 0x00);   // Rojo puro
+          leds[3] = CRGB(0xFF, 0x66, 0x00);   // Naranja brillante
+          leds[4] = CRGB(0xFF, 0xA5, 0x00);   // Naranja cálido (ámbar)
+          leds[5] = CRGB(0xFF, 0xFF, 0x00);   // Amarillo puro
+          leds[6] = CRGB(0xFF, 0xE6, 0x33);   // Amarillo dorado (mostaza)
+          leds[7] = CRGB(0xFF, 0xF2, 0xCC);   // Blanco cálido con tinte crema
+          leds[8] = CRGB(0xFF, 0xFA, 0xE6);   // Blanco marfil (ligeramente más claro)
+        break;
+        }
+        case 3: {
           //Serial.println("Frios");
             // Patrón gradiente de colores fríos
           leds[0] = CRGB::Black; // Rojo  
@@ -610,5 +622,5 @@ leds[8] = CRGB(0xFF, 0xFA, 0xE6);   // Blanco marfil (ligeramente más claro)
         }
     }
     // Actualizar la visualización de los LEDs
-    FastLED.show();
+    //FastLED.show();
 }

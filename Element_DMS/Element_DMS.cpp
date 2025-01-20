@@ -39,6 +39,9 @@ ELEMENT_::configurar_RF(RF_BAUD_RATE);
 delay(100);
 #ifdef PLAYER
     Serial2.begin(9600, SERIAL_8N1, 8, 9);
+if (!Serial2) {
+    Serial.println("ERROR INIT SERIAL 2");
+}
 #endif
 delay(100);
 Serial1.onReceive(onUartInterrupt);
@@ -551,7 +554,7 @@ void ELEMENT_::configurar_RF(int baudRate) {
         Serial.print(bw);
         Serial.println(" kHz");
 
-        Serial.print("🎛️ Desviación de frecuencia: ");
+        Serial.print("🎛️  Desviación de frecuencia: ");
         Serial.print(desviacionFrecuencia);
         Serial.println(" kHz");
 

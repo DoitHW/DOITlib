@@ -4,6 +4,7 @@
 #define COLOR_DMS_H
 #include <defines_DMS/defines_DMS.h>
 #include <Element_DMS/Element_DMS.h>
+#include <DynamicLEDManager_DMS/DynamicLEDManager_DMS.h>
 #include <FastLED.h>
 
 /*
@@ -129,7 +130,7 @@ class COLORHANDLER_ {
         void set_currentBrightness(byte brigthin);
         byte get_currentBrightness();
 
-        void setPatternBotonera(byte mode);
+        void setPatternBotonera(byte mode, DynamicLEDManager& ledManager);
         void set_botoneraPattern(byte patternin);
 
         void action_frank();
@@ -160,13 +161,15 @@ class COLORHANDLER_ {
         void rainbowCycle(int SpeedDelay);
 
         void FillLEDsFromPaletteColors( uint8_t colorIndex);
+
+        int numLeds;
        
     private:
 
     unsigned long lastUpdate = 0;
     int position = 0;
     bool isAnimating = false;
-    int numLeds;
+    
 
     bool paused;
     bool passive;

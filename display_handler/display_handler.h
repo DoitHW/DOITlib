@@ -6,6 +6,8 @@
 #include <vector>
 #include <string>
 
+// Declaración adelantada (forward) para no generar bucle de includes.
+class DynamicLEDManager;
 void display_init();
 void drawNoElementsMessage();
 void drawErrorMessage(const char* message);

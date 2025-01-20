@@ -175,37 +175,42 @@ bool saveElementFieldByField(const char* baseName, const uint16_t* iconData) {
     }
 
 void printElementInfo(const String &fileName) {
+    
+    Serial.println("Se va a abrir el archivo: " + fileName);
     fs::File f = SPIFFS.open(fileName, "r");
     if (!f) {
         Serial.println("Error al abrir el archivo del elemento para imprimir su info.");
         return;
     }
 
+    Serial.println("#### Mostrando elemento en SPIFFFS ####");
+    Serial.println();
+
     // Leer campos
     char name[25] = {0};
     f.seek(OFFSET_NAME, SeekSet);
     f.read((uint8_t*)name, 24);
-    Serial.printf("Nombre: %s\n", name);
+    Serial.printf("✍️ Nombre: %s\n", name);
 
     char desc[193] = {0};
     f.seek(OFFSET_DESC, SeekSet);
     f.read((uint8_t*)desc, 192);
-    Serial.printf("Descripción: %s\n", desc);
+    Serial.printf("📋 Descripción: %s\n", desc);
 
-    byte serialNum[2] = {0};
+    byte serialNum[4] = {0}; // Cambiado a tamaño 4 para coincidir con la lectura
     f.seek(OFFSET_SERIAL, SeekSet);
-    f.read(serialNum, 2);
-    Serial.printf("Número de serie: 0x%02X%02X\n", serialNum[0], serialNum[1]);
+    f.read(serialNum, 4);
+    Serial.printf("📋 Número de serie: 0x%02X%02X%02X%02X\n", serialNum[0], serialNum[1], serialNum[2], serialNum[3]);
 
     byte id;
     f.seek(OFFSET_ID, SeekSet);
-    f.read(&id,1);
-    Serial.printf("ID: %d\n", id);
+    f.read(&id, 1);
+    Serial.printf("📋 ID: 0x%02X\n", id); // Corregido el formato de impresión
 
     byte currentMode;
     f.seek(OFFSET_CURRENTMODE, SeekSet);
-    f.read(&currentMode,1);
-    Serial.printf("Modo actual: %d\n", currentMode);
+    f.read(&currentMode, 1);
+    Serial.printf("📋 Modo actual: %d\n", currentMode);
 
     // Leer modos
     f.seek(OFFSET_MODES, SeekSet);
@@ -214,15 +219,22 @@ void printElementInfo(const String &fileName) {
         char modeDesc[193] = {0};
         byte modeConfig[2] = {0};
 
-        f.read((uint8_t*)modeName,24);
-        f.read((uint8_t*)modeDesc,192);
-        f.read(modeConfig,2);
+        f.read((uint8_t*)modeName, 24);
+        f.read((uint8_t*)modeDesc, 192);
+        f.read(modeConfig, 2);
 
-        if (strlen(modeName)>0) {
+        
+
+        if (strlen(modeName) > 0) {
             Serial.printf("Modo %d:\n", i);
             Serial.printf("  Nombre: %s\n", modeName);
             Serial.printf("  Descripción: %s\n", modeDesc);
             Serial.printf("  Configuración: 0x%02X%02X\n", modeConfig[0], modeConfig[1]);
+            if (checkMostSignificantBit(modeConfig)) {
+            Serial.println("El bit más significativo del modo " + String(i) + " es 1");
+        } else {
+            Serial.println("El bit más significativo del modo " + String(i) + " es 0");
+        }
         }
     }
 
@@ -340,6 +352,12 @@ byte getCurrentElementID() {
 
 bool isCurrentElementSelected() {
     return selectedStates[currentIndex];  // Devuelve true si está seleccionado
+}
+
+bool checkMostSignificantBit(byte modeConfig[2]) {
+    // Devuelve true si el bit más significativo del primer byte es 1, de lo contrario false
+    Serial.println("Devolviendo el bit más significativo del modo. ");
+    return (modeConfig[0] & 0x80) != 0;
 }
 
 
