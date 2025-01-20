@@ -5,12 +5,12 @@
 //DELFINES GLOBALES
                                                 #define NO_ELEM
                                                 /*COLUMNA, FIBRAS, WALLWASHER, ETC*/
-                                                #define PLAYER                   // -> PLAYER / NOPLAYER
+                                                #define NOPLAYER                   // -> PLAYER / NOPLAYER
                                                 #define DEBUG                    // -> Desactivar en produccion 
                                                 #define SERIAL_NUM      0xCACA   // -> 0xVV00= VERSION + 0x00MM= MES
                                                 #define NOSERIAL_BY_FILE         // -> NOSERIAL_BY_FILE / SERIAL_BY_FILE --> Activar Serial por FileSystem, si esta definido, ignora el SERIAL_NUM.
                                                 #define SHOW_MAC                 // -> Opcional disparar MAC al inicio  (No sirve pa ná...) 
-                                                #define SLOW_RF               // -> FAST_RF= 115200 / SLOW_RF= 9600 
+                                                #define SLOW_RF                  // -> FAST_RF= 115200 / SLOW_RF= 9600 
 /*                                                                                                  
                                      .-+***+-:....                                                  
                                       .+@@@@@@@@@+:......:::.....                                   
@@ -51,12 +51,12 @@
 
 #define BOTONERA
     // OJO CHEINCH 
-#define ELEMENT_WORKTIME_FILE_PATH       "/WORKINGTIME_FILE.txt"
-#define ELEMENT_LIFETIME_FILE_PATH       "/LIFETIME_FILE.txt"
+
 #define ELEMENT_ID_FILE_PATH             "/ID_FILE.txt"
 #define ELEMENT_SERIALNUM_FILE_PATH      "/SERIALNUM_FILE.txt"
 #define ELEMENT_EVENT_REGISTER_FILE_PATH "/EVENT_REG_FILE.txt"
 
+#define MAX_EVENTS     1000 
 
 #define MAX_REG_EVENTS    1000
 #define LIFETIME_UPDATE_INTERVAL  60000
@@ -296,8 +296,8 @@
 
 enum TESTS_{
   BLACKOUT= 0,
-  HELLO_TEST,
-  COLOR_TEST
+  START_TEST,
+  HELLO_TEST
   // añadir mas tiestos
 };
 
@@ -330,18 +330,12 @@ enum TESTS_{
 #elif defined (FIBRAS)
   #define NUM_LEDS 1
 #elif defined (WALLWASHER)
-  #define NUM_LEDS 299
+  #define NUM_LEDS 36
 #elif defined (BOTONERA)
   #define NUM_LEDS 9
 #endif
 
-enum EVENTS_{
-  EV_START,
-  EV_END,
-  EV_SECTOR_REQ,
-  EV_MODE_CHANGE,
-  EV_COLOR_CHANGE
-};
+
 
 
 enum COLUMN_MODE_LIST{
@@ -525,3 +519,173 @@ enum SECTOR_LIST{
 
 
 #endif
+
+
+
+
+
+/*
+
+{EV_START, 0, 0}
+{EV_MODE_CHANGE, 1, 0} 
+{EV_COLOR_CHANGE, 2, 12000} aqui se guarda un valor de 12000 por que el siguiente  EV_COLOR_CHANGE con eventVal distinto ha ocurrido 12000 ms despues de el de esta linea
+{EV_FLAG_CHANGE, 1, 40000}  aqui se guarda un valor de 40000 por que el siguiente  EV_FLAG_CHANGE con eventVal distinto ha ocurrido 40000 ms despues de el de esta linea
+{EV_COLOR_CHANGE, 6, 0} aqui se guarda 0 por que el siguiente valor de EV_COLOR_CHANGE es el mismo que el de esta linea. por lo tanto al no haber habido un cambio de color, el cronometro para este color sigue contando.
+{EV_COLOR_CHANGE, 6, 50000}  aqui se guarda un valor de 50000 por que el siguiente  EV_COLOR_CHANGE con eventVal distinto ha ocurrido 50000 ms despues de el de esta linea
+{EV_SECTOR_REQ, 9, 0} aqui se guarda simplemente el evento con su eventVal y su timeStamp igual a 0.
+{EV_MODE_CHANGE, 3, 25000} igual que  todo lo anterior, 25000 son los ms que han pasado hasta el siguiente EV_CHANGE_MODE con eventVal distinto
+{EV_MODE_CHANGE, 4, 0} etc 
+{EV_SECTOR_REQ, 9, 0} etc 
+{EV_FLAG_CHANGE, 0, 0} etc 
+{EV_COLOR_CHANGE, 7, 0} etc 
+{EV_COLOR_CHANGE, 1, 0} etc
+{EV_END, 0, 67000} // 67000 son los ms transcurridos desde el EV_START, ademas aqui termina el contador de tiempo de todos los eventos que no han recibido un evento equivalente que detenga y registre el cronometro. es decir que en el ultimo EV_COLOR_CHANGE se registrara el tiempo transcurrido hasta este EV_END
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Nombre: Columna
+Numero de serie: 67A5D48283F1
+Tiempo de trabajo: 9833 minutos
+Tiempo de vida: 6532 horas.
+numero de ciclos: 69
+
+
+--NUEVO CICLO 24-- 
+
+evento: DISPOSITIVO INICIADO EN MODO BASICO
+valor: 0
+duracion: 0
+
+evento: CAMBIO DE MODO
+valor: 1
+duracion: 2 minutos
+
+evento: CAMBIO DE COLOR
+valor: 2
+duracion: 4 minutos
+
+evento: CAMBIO DE COLOR
+valor: 6
+duracion: 16 minutos
+
+evento: CAMBIO DE MODO
+valor: 3
+duracion: 31 minutos
+
+evento: APAGANDO DISPOSITIVO
+valor: 0
+duracion: 39 minutos
+
+-- FIN DE CICLO -- 
+
+
+--NUEVO CICLO 25-- 
+
+evento: DISPOSITIVO INICIADO EN MODO BASICO
+valor: 0
+duracion: 0
+
+evento: CAMBIO DE MODO
+valor: 1
+duracion: 4 minutos
+
+evento: CAMBIO DE COLOR
+valor: 2
+duracion: 5 minutos
+
+evento: CAMBIO DE COLOR
+valor: 6
+duracion: 15 minutos
+
+evento: CAMBIO DE MODO
+valor: 3
+duracion: 32 minutos
+
+evento: APAGANDO DISPOSITIVO
+valor: 0
+duracion: 34 minutos
+
+-- FIN DE CICLO -- 
+
+--NUEVO CICLO 26-- 
+
+evento: DISPOSITIVO INICIADO EN MODO BASICO
+valor: 0
+duracion: 0
+
+evento: CAMBIO DE MODO
+valor: 1
+duracion: 9 minutos
+
+evento: CAMBIO DE COLOR
+valor: 2
+duracion: 14 minutos
+
+evento: CAMBIO DE COLOR
+valor: 6
+duracion: 18 minutos
+
+evento: CAMBIO DE MODO
+valor: 3
+duracion: 39 minutos
+
+evento: APAGANDO DISPOSITIVO
+valor: 0
+duracion: 42 minutos
+
+-- FIN DE CICLO -- 
+
+*/

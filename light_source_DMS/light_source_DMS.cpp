@@ -84,9 +84,9 @@ void LIGHTSOURCE_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
         case F_SEND_TEST:{
             byte testin= LEF.data[0];
             if     (testin == HELLO_TEST) delay(1);// fer algo}
-            else if(testin == COLOR_TEST) delay(1);// fer algo}
+            else if(testin == START_TEST) delay(1);// fer algo}
             else if(testin == BLACKOUT){
-                element->work_time_handler(8);
+
                 delay(300);
                 ESP.restart();
             } // fer algo}
@@ -94,7 +94,7 @@ void LIGHTSOURCE_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
         }
         case F_SEND_COLOR:{
             byte color = LEF.data[0];
-            element->work_time_handler(color);
+
             fan_relay_handler(color);
             CRGB colorin= colorHandler.get_CRGB_from_colorList(color);
                                                             #ifdef DEBUG
@@ -183,11 +183,11 @@ void LIGHTSOURCE_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
         case F_SEND_PATTERN_NUM:{
                 byte numPattern= LEF.data[0];
                 if(numPattern != NO_PATTERN){ 
-                    element->work_time_handler(1);
+
                     fan_relay_handler(1);
                 }
                 else{                        
-                element->work_time_handler(8);
+
                 fan_relay_handler(8);
                 }
                 colorHandler.set_activePattern(numPattern);                                           

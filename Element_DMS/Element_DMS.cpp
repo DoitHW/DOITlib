@@ -12,21 +12,10 @@
 
 
 ELEMENT_::ELEMENT_(){
-
-    lastEventTime = new unsigned long[MAX_EVENTS];
-    lastEventValue = new int[MAX_EVENTS];
-    
-    for(int i = 0; i < MAX_EVENTS; i++) {
-        lastEventTime[i] = 0;
-        lastEventValue[i] = -1;
-    }
 }
 
 
-ELEMENT_::~ELEMENT_() {
-    
-    delete[] lastEventTime;
-    delete[] lastEventValue;
+ELEMENT_::~ELEMENT_() { 
 }
 
 
@@ -45,7 +34,7 @@ if (!Serial2) {
 #endif
 delay(100);
 Serial1.onReceive(onUartInterrupt);
-agregar_evento(EV_START, 0);
+//digitalWrite(RF_CONFIG_PIN, HIGH);
 delay(100);
 if (!SPIFFS.begin(true)) {
                                             #ifdef DEBUG
@@ -62,15 +51,210 @@ delay(100);
 
 }
 
+void ELEMENT_::event_register(int eventNum, int eventVal) {
+    unsigned long currentTime = millis();
+    EVENT_TYPE eventType = static_cast<EVENT_TYPE>(eventNum);
+
+    // Resetear el vector events cuando se recibe EV_START
+    if (eventType == EV_START) {
+        events.clear();
+        lastStartTime = currentTime;
+        lastModeChangeTime = 0;
+        lastColorChangeTime = 0;
+        lastMode = -1;
+        lastColor = -1;
+    }
+
+    switch (eventType) {
+        case EV_START:
+            events.push_back(EVENT_T{eventType, 0, 0});
+            break;
+
+        case EV_END:
+            if (lastStartTime > 0) {
+                events.push_back(EVENT_T{eventType, 0, currentTime - lastStartTime});
+                
+                // Actualizar tiempos para eventos sin cierre
+                for (auto it = events.rbegin(); it != events.rend(); ++it) {
+                    if (it->eventNum == EV_COLOR_CHANGE && it->timestamp == 0) {
+                        it->timestamp = currentTime - lastColorChangeTime;
+                        break;
+                    }
+                    // Hacer lo mismo para MODE_CHANGE, FLAG_CHANGE, ID_CHANGE si es necesario
+                }
+            }
+            break;
+
+        case EV_MODE_CHANGE:
+            if (lastMode != eventVal) {
+                if (lastModeChangeTime > 0) {
+                    for (auto it = events.rbegin(); it != events.rend(); ++it) {
+                        if (it->eventNum == EV_MODE_CHANGE && it->timestamp == 0) {
+                            it->timestamp = currentTime - lastModeChangeTime;
+                            break;
+                        }
+                    }
+                }
+                events.push_back(EVENT_T{eventType, eventVal, 0});
+                lastMode = eventVal;
+                lastModeChangeTime = currentTime;
+            }
+            break;
+
+        case EV_COLOR_CHANGE:
+            // Solo contar el tiempo si el color no es negro (8)
+            if (lastColor != eventVal) {
+                if (lastColorChangeTime > 0 && lastColor != 8) { // Solo actualizar si el último color no es negro
+                    for (auto it = events.rbegin(); it != events.rend(); ++it) {
+                        if (it->eventNum == EV_COLOR_CHANGE && it->timestamp == 0) {
+                            it->timestamp = currentTime - lastColorChangeTime;
+                            break;
+                        }
+                    }
+                }
+                
+                // Solo registrar el evento si no es negro
+                if (eventVal != 8) { 
+                    events.push_back(EVENT_T{eventType, eventVal, 0});
+                }
+
+                lastColor = eventVal;
+                lastColorChangeTime = currentTime;
+            }
+            break;
+
+        case EV_FLAG_CHANGE:
+            events.push_back(EVENT_T{eventType, eventVal, 0});
+            break;
+
+        case EV_ID_CHANGE:
+            events.push_back(EVENT_T{eventType, eventVal, 0});
+            break;
+
+        case EV_SECTOR_REQ:
+            if (events.empty() || events.back().eventNum != EV_SECTOR_REQ) {
+                events.push_back(EVENT_T{eventType, eventVal, 0});
+            }
+            break;
+    }
+}
+
+
+void ELEMENT_::save_register() {
+    const char* tempFileName = "/temp.txt";
+    File oldFile = SPIFFS.open(ELEMENT_EVENT_REGISTER_FILE_PATH, FILE_READ);
+    File newFile = SPIFFS.open(tempFileName, FILE_WRITE);
+
+    if (!oldFile || !newFile) {
+        Serial.println("Error al abrir archivos para escritura/reescritura");
+        return;
+    }
+
+    // Variables para estadísticas globales
+    unsigned long totalWorkTime = 0; // En segundos
+    unsigned long totalLifeTime = 0;  // En minutos
+    int totalCycles = 0;
+    std::vector<String> cycles;
+
+    // Leer estadísticas existentes
+    if (oldFile.available()) {
+        String line;
+        while (oldFile.available()) {
+            line = oldFile.readStringUntil('\n');
+            if (line.startsWith("Tiempo de trabajo:")) {
+                totalWorkTime = line.substring(line.indexOf(":") + 1).toInt();
+            } else if (line.startsWith("Tiempo de vida:")) {
+                totalLifeTime = line.substring(line.indexOf(":") + 1).toInt() * 60; // Convertir a segundos
+            } else if (line.startsWith("Numero de ciclos:")) {
+                totalCycles = line.substring(line.indexOf(":") + 1).toInt();
+            }
+        }
+        oldFile.seek(0); // Volver al inicio del archivo
+    }
+
+    // Calcular el tiempo de trabajo del ciclo actual en segundos
+    unsigned long currentCycleWorkTime = 0;
+    for (const auto& event : events) {
+        if (event.eventNum == EV_COLOR_CHANGE) {
+            currentCycleWorkTime += event.timestamp; // Ya está en milisegundos, no se multiplica por 60
+        }
+    }
+
+    // Actualizar estadísticas globales
+    totalWorkTime += currentCycleWorkTime / 1000; // Convertir milisegundos a segundos
+    totalLifeTime += totalWorkTime / 60;           // Convertir segundos a minutos
+    totalCycles++;
+
+    // Escribir la cabecera actualizada
+    String name = get_string_from_info_DB(ELEM_NAME, 1);
+    String serial = get_serial_from_file();
+    newFile.println("Nombre: " + name);
+    newFile.println("Numero de serie: " + serial);
+    newFile.printf("Tiempo de trabajo: %lu segundos\n", totalWorkTime);
+    newFile.printf("Tiempo de vida: %lu minutos\n", totalLifeTime);
+    newFile.printf("Numero de ciclos: %d\n\n", totalCycles);
+
+    // Leer ciclos existentes
+    while (oldFile.available()) {
+        String cycle = "";
+        String line = oldFile.readStringUntil('\n');
+        if (line.startsWith("--NUEVO CICLO")) {
+            cycle += line + "\n";
+            do {
+                line = oldFile.readStringUntil('\n');
+                cycle += line + "\n";
+            } while (oldFile.available() && !line.startsWith("-- FIN DE CICLO --"));
+            cycles.push_back(cycle);
+        }
+    }
+
+    // Añadir el nuevo ciclo
+    String newCycle = "--NUEVO CICLO " + String(totalCycles) + "--\n";
+    for (const auto& event : events) {
+        newCycle += "evento: " + get_word_from_eventNum(event.eventNum) + "\n";
+        newCycle += "valor: " + String(event.eventVal) + "\n";
+        newCycle += "duracion: " + String(event.timestamp / 1000) + " segundos\n\n"; // Convertir a segundos
+    }
+    newCycle += "-- FIN DE CICLO --\n\n";
+    cycles.push_back(newCycle);
+
+    // Eliminar ciclos antiguos si se excede el máximo
+    while (cycles.size() > MAX_EVENTS) {
+        cycles.erase(cycles.begin());
+    }
+
+    // Escribir los ciclos en el nuevo archivo
+    for (const auto& cycle : cycles) {
+        newFile.print(cycle);
+    }
+
+    oldFile.close();
+    newFile.close();
+
+    // Reemplazar el archivo antiguo con el nuevo
+    SPIFFS.remove(ELEMENT_EVENT_REGISTER_FILE_PATH);
+    SPIFFS.rename(tempFileName, ELEMENT_EVENT_REGISTER_FILE_PATH);
+
+    Serial.println("Registro de eventos guardado y actualizado en SPIFFS");
+
+    // Limpiar el vector de eventos para el próximo ciclo
+    events.clear();
+}
+
+
+
 String ELEMENT_::get_word_from_eventNum(int eventNumber){
 
     String frase;
     switch(eventNumber){
-        case 0: frase=   "DISPOSITIVO INICIADO EN MODO BASICO"; break;
-        case 1: frase=   "APAGANDO DISPOSITIVO"; break;
-        case 2: frase=   "PETICION DE SECTOR";   break;
-        case 3: frase=   "CAMBIO DE MODO";       break;
-        case 4: frase=   "CAMBIO DE COLOR";      break;
+        case EV_START:        frase=   "DISPOSITIVO INICIADO EN MODO BASICO"; break;
+        case EV_END:          frase=   "APAGANDO DISPOSITIVO"; break;
+        case EV_SECTOR_REQ:   frase=   "PETICION DE SECTOR";   break;
+        case EV_MODE_CHANGE:  frase=   "CAMBIO DE MODO";       break;
+        case EV_COLOR_CHANGE: frase=   "CAMBIO DE COLOR";      break;
+        case EV_FLAG_CHANGE:  frase=   "CAMBIO DE FLAG";       break;
+        case EV_ID_CHANGE:    frase=   "CAMBIO DE ID";       break;
+
         default: frase=   "ERROR"; break;
     }
     return frase;
@@ -91,92 +275,6 @@ void   ELEMENT_::print_event_register(){
 
 
 
-
-void ELEMENT_::event_register_update(int eventNumber, int eventValue) {
-    static int currentLine = 0;  // Mantener el índice global de línea
-    static bool isFileInitialized = false;
-    // Inicializar SPIFFS si no está iniciado
-
-    unsigned long currentTime = millis() / 1000;
-    unsigned long elapsedTime = currentTime - lastEventTime[eventNumber];
-
-    // Abrir el archivo en modo lectura y escritura
-    File file = SPIFFS.open(ELEMENT_EVENT_REGISTER_FILE_PATH, FILE_APPEND);
-    if (!file) {
-        Serial.println("Error al abrir el archivo para escritura");
-        return;
-    }
-
-    // Si es la primera vez, contar las líneas para saber dónde empezar
-    if (!isFileInitialized) {
-        File tempFile = SPIFFS.open(ELEMENT_EVENT_REGISTER_FILE_PATH, FILE_READ);
-        if (tempFile) {
-            int lineCount = 0;
-            while (tempFile.available()) {
-                tempFile.readStringUntil('\n');
-                lineCount++;
-            }
-            currentLine = lineCount % MAX_REG_EVENTS;
-            tempFile.close();
-        }
-        isFileInitialized = true;
-    }
-
-    // Crear un archivo temporal para sobrescribir la línea deseada
-    File tempFile = SPIFFS.open("/temp_log.txt", FILE_WRITE);
-    File readFile = SPIFFS.open(ELEMENT_EVENT_REGISTER_FILE_PATH, FILE_READ);
-
-    int lineCounter = 0;
-    while (readFile.available()) {
-        String line = readFile.readStringUntil('\n');
-        tempFile.println(line);
-        lineCounter++;
-    }
-
-    // Si el evento es el mismo pero con valor diferente, actualizar la línea anterior
-    if (lastEventValue[eventNumber] != -1 && lastEventValue[eventNumber] != eventValue) {
-        tempFile.printf("%s -> %d   durante %lu segundos\n", get_word_from_eventNum(eventNumber).c_str(), lastEventValue[eventNumber], elapsedTime);
-    }
-
-    // Registrar el nuevo evento
-    tempFile.printf("%s -> %d comenzando ahora\n", get_word_from_eventNum(eventNumber).c_str(), eventValue);
-
-    lastEventTime[eventNumber] = currentTime;
-    lastEventValue[eventNumber] = eventValue;
-
-    readFile.close();
-    tempFile.close();
-
-    // Reemplazar el archivo original
-    SPIFFS.remove(ELEMENT_EVENT_REGISTER_FILE_PATH);
-    SPIFFS.rename("/temp_log.txt", ELEMENT_EVENT_REGISTER_FILE_PATH);
-
-    Serial.println("Evento registrado correctamente");
-}
-
-
-
-
-void ELEMENT_::work_time_handler(byte colorin) {
-    if (colorin != 8) {
-        if (!workTimerRunning) {  // Usar workTimerRunning en lugar de stopwatchRunning
-            start_working_time();
-        } else {
-            #ifdef DEBUG
-                Serial.println("El cronómetro ya está activo.");
-            #endif
-        }
-    } else {
-        if (workTimerRunning) {  // Usar workTimerRunning en lugar de stopwatchRunning
-            stopAndSave_working_time();
-        } else {
-            #ifdef DEBUG
-                Serial.println("El cronómetro ya está detenido.");
-            #endif
-        }
-    }
-}
-
 String ELEMENT_::get_serial_from_file(){
     String serial= "";
     File file = SPIFFS.open(ELEMENT_SERIALNUM_FILE_PATH, "r");
@@ -193,58 +291,6 @@ String ELEMENT_::get_serial_from_file(){
     return serial;
 }
 
-
-void ELEMENT_::set_lifeTime(unsigned long lifeTime){
-    File file = SPIFFS.open(ELEMENT_LIFETIME_FILE_PATH, "w");
-    if (!file) {
-                                                                                        #ifdef DEBUG
-                                                                                            Serial.println("Error al abrir el archivo lifetime");
-                                                                                        #endif
-        return;
-    }
-    file.print(lifeTime);
-    file.close();
-}
-
-unsigned long ELEMENT_::get_lifeTime(){
-
-    File file = SPIFFS.open(ELEMENT_LIFETIME_FILE_PATH, "r");
-    if (!file) {
-                                                                                        #ifdef DEBUG
-                                                                                            Serial.println("Error al abrir el archivo lifetime");
-                                                                                        #endif
-        return -1;
-    }
-    int value = file.parseInt();
-    file.close();
-    return value;
-}
-
-void ELEMENT_::set_workTime(int workTime){
-    File file = SPIFFS.open(ELEMENT_WORKTIME_FILE_PATH, "w");
-    if (!file) {
-                                                                                            #ifdef DEBUG
-                                                                                                Serial.println("Error al abrir el archivo worktime");
-                                                                                            #endif
-        return;
-    }
-    file.print(workTime);
-    file.close();
-}
-
-int ELEMENT_::get_workTime(){
-    
-    File file = SPIFFS.open(ELEMENT_WORKTIME_FILE_PATH, "r");
-    if (!file) {
-                                                                            #ifdef DEBUG
-                                                                                Serial.println("Error al abrir el archivo worktime");
-                                                                            #endif
-        return -1;
-    }
-    int value = file.parseInt();
-    file.close();
-    return value;
-}
 
 byte ELEMENT_::get_ID_from_file(){
     File file = SPIFFS.open(ELEMENT_ID_FILE_PATH, "r");
@@ -286,44 +332,6 @@ byte ELEMENT_::get_ID(){
     return ID;
 }
 
-
-
-void ELEMENT_::start_working_time() {
-    if (!workTimerRunning) {
-        workTimeStart = millis();
-        workTimerRunning = true;
-    }
-}
-
-
-void ELEMENT_::stopAndSave_working_time() {
-     if (workTimerRunning) {
-        unsigned long elapsedTime = (millis() - workTimeStart) / 1000; // convertir a segundos
-        int currentWorkTime = ELEMENT_::get_workTime();
-        ELEMENT_::set_workTime(currentWorkTime + elapsedTime);
-        workTimerRunning = false;
-                                                                                            #ifdef DEBUG
-                                                                                            Serial.print("⏳ WorkTime actualizado: ");
-                                                                                            Serial.print(ELEMENT_::get_workTime());
-                                                                                            Serial.println(" segundos.");
-                                                                                            #endif
-    }
-
-}
-
-void ELEMENT_::lifeTime_update() {
-        if (millis() - lastLifeTimeUpdate >= LIFETIME_UPDATE_INTERVAL) {   
-            //ELEMENT_::print_event_register(); 
-        lastLifeTimeUpdate = millis();
-        unsigned long currentLifeTime = ELEMENT_::get_lifeTime();
-        ELEMENT_::set_lifeTime(currentLifeTime + 1);
-                                                                                            #ifdef DEBUG
-                                                                                            Serial.print("⏳ LifeTime incrementado: ");
-                                                                                            Serial.print(ELEMENT_::get_lifeTime());
-                                                                                            Serial.println(" minutos.");
-                                                                                            #endif  
-    }
-}
 
 
 
@@ -370,78 +378,6 @@ void ELEMENT_::set_flag(byte flagNum, bool state) {
 
 byte ELEMENT_::get_flag(){
     return flag;
-}
-
-void ELEMENT_::agregar_evento(byte eventType, int eventData) {
-    unsigned long currentTime = millis();
-    int duration = 0;
-    static byte lastEventType = 255; // Inicializado con un valor que no es un evento válido
-
-    switch (eventType) {
-        case EV_START:
-            lastStartTime = currentTime;
-            break;
-            
-        case EV_END:
-            if (lastStartTime > 0) {
-                duration = currentTime - lastStartTime;
-                lastStartTime = 0;
-            }
-            break;
-
-        case EV_MODE_CHANGE:
-            if (lastMode != eventData) {
-                if (lastModeChangeTime > 0) {
-                    duration = currentTime - lastModeChangeTime;
-                }
-                lastModeChangeTime = currentTime;
-                lastMode = eventData;
-            } else {
-                return; // No agregar si el modo no ha cambiado realmente
-            }
-            break;
-
-        case EV_COLOR_CHANGE:
-            if (lastColor != eventData) {
-                if (lastColorChangeTime > 0) {
-                    duration = currentTime - lastColorChangeTime;
-                }
-                lastColorChangeTime = currentTime;
-                lastColor = eventData;
-            } else {
-                return; // No agregar si el color no ha cambiado realmente
-            }
-            break;
-
-        case EV_SECTOR_REQ:
-            if (lastEventType == EV_SECTOR_REQ) {
-                return; // No agregar si el último evento también fue EV_SECTOR_REQ
-            }
-            break;
-
-        default: 
-            return; // No agregar eventos desconocidos
-    }
-
-    EVENT_REGISTER_T newEvent = {static_cast<byte>(eventType), eventData, duration};
-    eventVector.push_back(newEvent);
-    lastEventType = eventType;
-}
-
-
-void ELEMENT_::save_event_register() {
-
-    File file = SPIFFS.open(ELEMENT_EVENT_REGISTER_FILE_PATH, FILE_APPEND);
-    if (!file) {
-        Serial.println("Failed to open file for appending");
-        return;
-    }
-    for (const auto& event : eventVector) {
-        String eventDescription = get_word_from_eventNum(event.type);
-        file.printf("%s  ->  %d -> %lu\n", eventDescription.c_str(), event.value, event.duration);
-    }
-    file.close();
-    eventVector.clear();
 }
 
 void ELEMENT_::configurar_RF(int baudRate) {
@@ -584,100 +520,3 @@ void ELEMENT_::configurar_RF(int baudRate) {
     Serial.println("Configuración completa y módulo reiniciado correctamente.");
     delay(200);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// bool firstBoot = preferences.getBool("firstBoot", true); // Leer la bandera, por defecto 'true'
-    // if (firstBoot) {
-    //     ELEMENT_::set_ID_to_file(DEFAULT_DEVICE); // Solo se ejecutará en la primera carga del firmware
-    //     preferences.putBool("firstBoot", false);  // Marcar como ya inicializado
-    //     Serial.println("Archivo creado por primera vez.");
-    // } else {
-    //     Serial.println("El archivo ya fue creado anteriormente.");
-    // }
-
-    // preferences.end();
-
-    //if (esp_reset_reason() == ESP_RST_POWERON) ELEMENT_::set_ID_to_file(DEFAULT_DEVICE);
-
-
-    // RTC_DATA_ATTR static uint32_t bootCount = 0;
-    // if(bootCount == 0) ELEMENT_::set_ID_to_file(DEFAULT_DEVICE);
-    // bootCount++;
-    // Serial.println("#########################    Boot number: " + String(bootCount));
-
-
-    // byte IDtocheck= ELEMENT_::get_ID_from_file();
-    // if(IDtocheck != DEFAULT_DEVICE) ELEMENT_::set_ID_protected(false);                                  
-    // bool prot=   ELEMENT_::get_ID_protected();
-    // if(prot == false) ELEMENT_::set_ID_to_file(DEFAULT_DEVICE);

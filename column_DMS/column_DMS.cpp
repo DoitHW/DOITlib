@@ -19,6 +19,8 @@ void COLUMN_::column_begin(){
             colorHandler.begin(NUM_LEDS);
             delay(10);
             pinMode(COLUMN_RELAY_PIN, OUTPUT);
+            digitalWrite(COLUMN_RELAY_PIN, LOW);
+            element->set_mode(DEFAULT_BASIC_MODE);
 }
 
 
@@ -54,6 +56,7 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             Serial.println("Sector data: " + String(sector_data[0], HEX));
             FRAME_T frame= frameMaker_RETURN_ELEM_SECTOR(globalID, LEF.origin, sector_data, sector);
             send_frame(frame);
+            event_register(EV_SECTOR_REQ, sector);
                                                             #ifdef DEBUG
                                                              Serial.println("Info devuelta en un Return");
                                                              Serial.println("Recibido F_REQ_ELEM_INFO, lang= " +String(lang));
@@ -64,6 +67,7 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
         case F_SET_ELEM_ID:{
             element->set_ID(LEF.data[0]);
             globalID= LEF.data[0];
+            event_register(EV_ID_CHANGE, globalID);
             break;
         }
         case F_SET_ELEM_MODE:{
@@ -76,6 +80,7 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             element->set_mode(mode);
             if(element->get_currentMode() == COLUMN_PASSIVE_MODE) colorHandler.set_passive(true);
             else                                                  colorHandler.set_passive(false);
+            event_register(EV_MODE_CHANGE, mode);
                                                                         #ifdef DEBUG
                                                                         Serial.println("OJITO, que passem a modo: " +String(element->get_currentMode()));
                                                                         #endif
@@ -83,18 +88,27 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
         }
         case F_SEND_TEST:{
             byte testin= LEF.data[0];
-            if     (testin == HELLO_TEST) delay(1);// fer algo}
-            else if(testin == COLOR_TEST) delay(1);// fer algo}
+            if     (testin == HELLO_TEST) delay(1); 
+            else if(testin == START_TEST){
+                event_register(EV_START, 0);
+                // DIR HOLA AMB FAST.LED
+            }
             else if(testin == BLACKOUT){
-                element->work_time_handler(8);
-                delay(300);
+                // APAGAR FASTLED
+                event_register(EV_END, 0);
+                delay(200);
+                save_register();
+                delay(2000);
                 ESP.restart();
-            } // fer algo}
+            } 
             break;
         }
         case F_SEND_COLOR:{
             byte color = LEF.data[0];
-            element->work_time_handler(color);
+            #ifdef PLAYER
+                 doitPlayer.play_file(2,color);
+            #endif
+            event_register(EV_COLOR_CHANGE, color);
             CRGB colorin= colorHandler.get_CRGB_from_colorList(color);
                                                             #ifdef DEBUG
                                                                 Serial.println("Color recibido: " + String(color));
@@ -181,8 +195,7 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
         }
         case F_SEND_PATTERN_NUM:{
                 byte numPattern= LEF.data[0];
-                if(numPattern != NO_PATTERN) element->work_time_handler(1);
-                else                         element->work_time_handler(8);
+ // event
                 colorHandler.set_activePattern(numPattern);                                           
             break;
         }
