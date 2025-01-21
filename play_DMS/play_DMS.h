@@ -18,7 +18,7 @@ class DOITSOUNDS_ : public ELEMENT_{
         DFRobotDFPlayerMini player;
         
         void begin();
-
+        bool readCard();
         void play_file(byte bankin, byte filein);
 
 };
