@@ -3,9 +3,10 @@
 
 #include <Arduino.h>
 //DELFINES GLOBALES
-                                                #define NO_ELEM
+                                                #define WALLWASHER
                                                 /*COLUMNA, FIBRAS, WALLWASHER, ETC*/
-                                                #define NOPLAYER                   // -> PLAYER / NOPLAYER
+                                                #define NOPLAYER                 // -> PLAYER / NOPLAYER
+                                                #define NFC                      // -> NFC / NONFC
                                                 #define DEBUG                    // -> Desactivar en produccion 
                                                 #define SERIAL_NUM      0xCACA   // -> 0xVV00= VERSION + 0x00MM= MES
                                                 #define NOSERIAL_BY_FILE         // -> NOSERIAL_BY_FILE / SERIAL_BY_FILE --> Activar Serial por FileSystem, si esta definido, ignora el SERIAL_NUM.
@@ -44,13 +45,16 @@
 
 
 
-
-
-
 //
 
 #define BOTONERA
     // OJO CHEINCH 
+
+#define MAX_TEXT_LENGTH 50
+#define I2C2_SDA 40
+#define I2C2_SCL 41
+
+
 
 #define ELEMENT_ID_FILE_PATH             "/ID_FILE.txt"
 #define ELEMENT_SERIALNUM_FILE_PATH      "/SERIALNUM_FILE.txt"
@@ -330,7 +334,7 @@ enum TESTS_{
 #elif defined (FIBRAS)
   #define NUM_LEDS 1
 #elif defined (WALLWASHER)
-  #define NUM_LEDS 36
+  #define NUM_LEDS 299
 #elif defined (BOTONERA)
   #define NUM_LEDS 9
 #endif
