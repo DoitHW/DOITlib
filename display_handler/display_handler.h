@@ -13,6 +13,8 @@ void drawNoElementsMessage();
 void drawErrorMessage(const char* message);
 void drawElementIcon(fs::File& f, int startX, int startY);
 void drawHiddenMenu(int selection);
+void scrollTextTickerBounce(int selection);
+
 
 extern TFT_eSPI tft;
 extern TFT_eSprite uiSprite;

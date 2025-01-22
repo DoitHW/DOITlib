@@ -180,7 +180,7 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
     // Navegación por el menú con el encoder
     if (newEncoderValue != lastEncoderValue) {
         hiddenMenuSelection += (newEncoderValue > lastEncoderValue) ? 1 : -1;
-        hiddenMenuSelection = constrain(hiddenMenuSelection, 0, 1);
+        hiddenMenuSelection = constrain(hiddenMenuSelection, 0, 5); // Ahora hay 6 opciones (índices 0-5)
         lastEncoderValue = newEncoderValue;
         drawHiddenMenu(hiddenMenuSelection);
     }
@@ -192,22 +192,42 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
     }
 
     if (digitalRead(ENC_BUTTON) == LOW && !encoderButtonPressed && !menuJustOpened) {
-        encoderButtonPressed = true;  
-
-        if (hiddenMenuSelection == 0) {
-            Serial.println("Opción: Cambiar idioma (sin implementar aún)");
-            byte respuesta = element->buscar_elemento_nuevo();
+    encoderButtonPressed = true;
+    byte respuesta = 0;
+    switch (hiddenMenuSelection) {
+        case 0: // Escanear sala
+            Serial.println("Buscar elemento nuevo...");
+            respuesta = element->buscar_elemento_nuevo();
             element->mostrarMensajeTemporal(respuesta, 3000);
-        } 
-        else if (hiddenMenuSelection == 1) {
+            break;
+        case 1: // Cambiar idioma
+            Serial.println("Cambiando idioma...");
+            // Lógica para cambiar idioma
+            break;
+        case 2: // Sonido
+            Serial.println("Ajustando sonido...");
+            // Lógica para ajustar sonido
+            break;
+        case 3: // Brillo
+            Serial.println("Ajustando brillo...");
+            // Lógica para ajustar brillo
+            break;
+        case 4: // Respuestas
+            Serial.println("Configurando respuestas...");
+            // Lógica para configurar respuestas
+            break;
+        case 5: // Volver
             Serial.println("Volviendo al menú principal");
             hiddenMenuActive = false;
-            initialEntry = true;  // Restablecer para la próxima vez
+            initialEntry = true;
             PulsadoresHandler::limpiarEstados();
             drawCurrentElement();
-        }
+            break;
+        default:
+            break;
     }
 }
 
+}
 
 

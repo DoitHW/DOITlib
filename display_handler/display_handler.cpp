@@ -3,7 +3,7 @@
 #include <encoder_handler/encoder_handler.h>
 #include <Colors_DMS/Color_DMS.h>
 #include <DynamicLEDManager_DMS/DynamicLEDManager_DMS.h>
-
+#include "rom/rtc.h"    // Opcional, si quieres info de reset
 
 // Definir dimensiones
 #define CARD_WIDTH 110
@@ -179,7 +179,6 @@ void drawCurrentElement() {
     uiSprite.pushSprite(0, 0);
 }
 
-
 void animateTransition(int direction) {
     if (elementFiles.size() <= 1) return;
     int nextIndex = currentIndex + direction;
@@ -190,7 +189,6 @@ void animateTransition(int direction) {
     currentIndex = nextIndex;
     drawCurrentElement();
 }
-
 
 // Función para mostrar la pantalla MODOS
 void drawModesScreen() {
@@ -320,26 +318,425 @@ void drawModesScreen() {
     memcpy(globalVisibleModesMap, visibleModesMap, sizeof(visibleModesMap));
 }
 
-void drawHiddenMenu(int selection) {
+
+// void drawHiddenMenu(int selection) {
+//     // Opciones del menú oculto
+//     const char* menuOptions[] = {
+//         "Buscar elemento",
+//         "Idioma",
+//         "Sonido",
+//         "Brillo",
+//         "Respuestas muy muy largas",
+//         "Volver al menú principal"
+//     };
+//     const int numOptions = sizeof(menuOptions) / sizeof(menuOptions[0]);
+
+//     // Número de opciones visibles a la vez (simulamos scroll vertical con startIndex)
+//     const int visibleOptions = 4;
+
+//     // Medidas de la “tarjeta” y la barra de scroll vertical
+//     const int cardWidth       = 110; 
+//     const int cardHeight      = CARD_HEIGHT;     // Asegúrate de tenerlo definido
+//     const int cardMargin      = CARD_MARGIN;     // Asegúrate de tenerlo definido
+//     const int scrollBarWidth  = 5;
+//     const int scrollBarMargin = 3;
+
+//     // Parámetros del scroll horizontal (vaivén)
+//     const int scrollSpeed    = 1;      // Velocidad de desplazamiento (px por “tick”)
+//     const int scrollUpdateMs = 40;     // Intervalo de refresco (ms) para la animación
+//     static unsigned long lastScrollTime = 0;
+
+//     // Variables estáticas para conservar estado entre llamadas
+//     // - scrollOffsets[]: posición actual (en píxeles) del desplazamiento
+//     // - scrollDirections[]: dirección de desplazamiento (+1 o -1)
+//     static int scrollOffsets[6]    = {0};
+//     static int scrollDirections[6] = {1,1,1,1,1,1};
+
+//     // Cálculo del índice inicial (startIndex) para “scroll” vertical
+//     int startIndex = max(0, min(selection - visibleOptions / 2, numOptions - visibleOptions));
+
+//     // Limpiar sprite principal con color de fondo
+//     uiSprite.fillSprite(BACKGROUND_COLOR);
+
+//     // Dibujar título (centrado arriba)
+//     uiSprite.setTextColor(TEXT_COLOR);
+//     uiSprite.setTextDatum(TC_DATUM);
+//     uiSprite.setTextSize(2);
+//     uiSprite.drawString("MENU OCULTO", 64, 5);
+
+//     // === DIBUJAR LAS OPCIONES VISIBLES ===
+//     for (int i = 0; i < visibleOptions && (startIndex + i) < numOptions; i++) {
+//         int currentIndex = startIndex + i;
+//         int y = 30 + i * (cardHeight + cardMargin);
+
+//         // Dibuja el fondo de la tarjeta
+//         uiSprite.fillRoundRect(9, y, cardWidth, cardHeight, 5, CARD_COLOR);
+
+//         // Borde resaltado si es la opción seleccionada
+//         bool isSelected = (currentIndex == selection);
+//         uint32_t borderColor = isSelected ? HIGHLIGHT_COLOR : TEXT_COLOR;
+//         uiSprite.drawRoundRect(9, y, cardWidth, cardHeight, 5, borderColor);
+
+//         // Zona disponible para el texto dentro de la tarjeta
+//         int textAreaX = 9 + 2;                // margen izquierdo dentro de la tarjeta
+//         int textAreaY = y + 2;                // margen superior
+//         int textAreaW = cardWidth - 4;        // ancho interno para el texto
+//         int textAreaH = cardHeight - 4;       // alto interno
+
+//         // Cambiar ajuste del texto para medir correctamente
+//         uiSprite.setTextColor(borderColor);
+//         uiSprite.setTextSize(1);
+//         uiSprite.setTextDatum(TL_DATUM);  // top-left para medir el ancho en pixeles
+
+//         // Medimos el ancho del texto completo con la misma fuente, tamaño, etc.
+//         int fullTextWidth = uiSprite.textWidth(menuOptions[currentIndex]);
+
+//         // Si NO está seleccionada o el texto cabe en el ancho => dibujar estático
+//         if (!isSelected || fullTextWidth <= textAreaW) {
+//             // Para evitar que se desborde, si es más largo y no está seleccionado:
+//             // recortamos con "..."
+//             String tempStr = menuOptions[currentIndex];
+//             if (!isSelected && fullTextWidth > textAreaW) {
+//                 // Reemplazar el final con "..." hasta que quepa
+//                 while (uiSprite.textWidth(tempStr + "...") > textAreaW && tempStr.length() > 0) {
+//                     tempStr.remove(tempStr.length() - 1);
+//                 }
+//                 tempStr += "...";
+//             }
+
+//             // Centrado vertical y algo aproximado horizontal (o simplemente left-justified)
+//             int yCenter = textAreaY + (textAreaH - 8) / 2;  
+//             // 8 px es aprox la altura de la fuente a textSize=1 (Fuente 1)
+
+//             uiSprite.drawString(tempStr.c_str(), textAreaX, yCenter);
+
+//             // Reset scroll si NO está seleccionada
+//             if (!isSelected) {
+//                 scrollOffsets[currentIndex]    = 0;
+//                 scrollDirections[currentIndex] = 1;
+//             }
+//         }
+//         else {
+//             // === Está seleccionada Y el texto excede el ancho => SCROLL HORIZONTAL (vaivén) ===
+
+//             // Calculamos el máximo desplazamiento
+//             // Si el texto mide 150 px y el área es 100 px => maxScroll = 50
+//             int maxScroll = fullTextWidth - textAreaW;
+
+//             // Actualizamos desplazamiento cada X ms
+//             unsigned long now = millis();
+//             if (now - lastScrollTime >= scrollUpdateMs) {
+//                 scrollOffsets[currentIndex] += scrollDirections[currentIndex] * scrollSpeed;
+//                 // Rebotar a izquierda
+//                 if (scrollOffsets[currentIndex] < 0) {
+//                     scrollOffsets[currentIndex] = 0;
+//                     scrollDirections[currentIndex] = 1;
+//                 }
+//                 // Rebotar a derecha
+//                 else if (scrollOffsets[currentIndex] > maxScroll) {
+//                     scrollOffsets[currentIndex] = maxScroll;
+//                     scrollDirections[currentIndex] = -1;
+//                 }
+//                 lastScrollTime = now;
+//             }
+
+//             // Creamos un sprite auxiliar del tamaño de textAreaW x textAreaH
+//             TFT_eSprite textSprite(&tft);
+//             if (textSprite.createSprite(textAreaW, textAreaH) == nullptr) {
+//                 // Si no hay memoria, dibuja estático para evitar reset
+//                 uiSprite.drawString(menuOptions[currentIndex], textAreaX, textAreaY);
+//                 continue; 
+//             }
+
+//             // Fondo igual al color de la tarjeta
+//             textSprite.fillSprite(CARD_COLOR);
+
+//             // Ajustamos el sprite para dibujar el texto
+//             textSprite.setTextColor(borderColor);
+//             textSprite.setTextSize(1);
+//             textSprite.setTextDatum(TL_DATUM);  // Arriba-izq
+
+//             // Calcular posición X dentro del sprite para “mover” el texto
+//             int xPos = -scrollOffsets[currentIndex];
+//             // Centrado vertical aproximado
+//             int yPos = (textAreaH - 8) / 2;  // 8 px = altura aproximada de la fuente
+
+//             // Dibujamos la cadena en el sprite
+//             textSprite.drawString(menuOptions[currentIndex], xPos, yPos);
+
+//             // Copiamos el sprite al uiSprite en la posición textAreaX, textAreaY
+//             textSprite.pushSprite(textAreaX, textAreaY);
+
+//             // Liberamos memoria
+//             textSprite.deleteSprite();
+//         }
+//     }
+
+//     // === BARRA DE DESPLAZAMIENTO VERTICAL ===
+//     const int scrollBarHeight = visibleOptions * (cardHeight + cardMargin) - cardMargin;
+//     const int scrollBarY = 30;
+//     const int scrollBarX = 128 - scrollBarWidth - scrollBarMargin;
+
+//     // Fondo de la barra
+//     uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_DARKGREY);
+
+//     // “Pulgar” de la barra
+//     if (numOptions > visibleOptions) {
+//         float thumbRatio = (float)visibleOptions / numOptions;
+//         int thumbHeight = max(20, (int)(scrollBarHeight * thumbRatio));
+//         int thumbY = scrollBarY + (scrollBarHeight - thumbHeight)
+//                      * ((float)startIndex / (numOptions - visibleOptions));
+//         uiSprite.fillRect(scrollBarX, thumbY, scrollBarWidth, thumbHeight, TFT_LIGHTGREY);
+//     }
+//     else {
+//         // Si hay menos o igual opciones que el área visible, no hace falta “pulgar”
+//         uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_LIGHTGREY);
+//     }
+
+//     // Empujar todo a pantalla
+//     uiSprite.pushSprite(0, 0);
+// }
+
+    // Opciones del menú oculto
+    const char* menuOptions[] = {
+        " Buscar elemento",
+        " Idioma",
+        " Sonido",
+        " Brillo",
+        " Respuestas muy muy largas",
+        " Volver al menu principal"
+    };
+    const int numOptions = sizeof(menuOptions) / sizeof(menuOptions[0]);
+
+    // Número máximo de opciones visibles
+    const int visibleOptions = 4;
+
+void drawHiddenMenu(int selection)
+{
+    // Dimensiones de las tarjetas
+    const int cardWidth  = 110;
+    const int cardHeight = CARD_HEIGHT;  // ajusta con tu valor
+    const int cardMargin = CARD_MARGIN;  // ajusta con tu valor
+
+    // Limpiar sprite principal con color de fondo
     uiSprite.fillSprite(BACKGROUND_COLOR);
-    uiSprite.setTextColor(selection == 0 ? HIGHLIGHT_COLOR : TEXT_COLOR, BACKGROUND_COLOR);
-    uiSprite.drawString("1. Idioma", tft.width() / 2, 40);
-    uiSprite.setTextColor(selection == 1 ? HIGHLIGHT_COLOR : TEXT_COLOR, BACKGROUND_COLOR);
-    uiSprite.drawString("2. Volver", tft.width() / 2, 70);
+
+    // Dibujar título
+    uiSprite.setTextColor(TEXT_COLOR);
+    uiSprite.setTextDatum(TC_DATUM);
+    uiSprite.setTextSize(2);
+    uiSprite.drawString("AJUSTES", 64, 5);
+
+    // Cálculo de startIndex para scroll vertical
+    int startIndex = max(0, min(selection - visibleOptions / 2, numOptions - visibleOptions));
+
+    // Dibujar las opciones visibles
+    for (int i = 0; i < visibleOptions && (startIndex + i) < numOptions; i++)
+    {
+        int currentIndex = startIndex + i;
+        int y = 30 + i * (cardHeight + cardMargin);
+
+        // Fondo de la tarjeta
+        uiSprite.fillRoundRect(9, y, cardWidth, cardHeight, 5, CARD_COLOR);
+
+        // Color del borde (resaltar si es la seleccionada)
+        bool isSelected = (currentIndex == selection);
+        uint32_t borderColor = isSelected ? HIGHLIGHT_COLOR : TEXT_COLOR;
+        uiSprite.drawRoundRect(9, y, cardWidth, cardHeight, 5, borderColor);
+
+        // Área interna de texto
+        int textAreaX = 9 + 2;
+        int textAreaY = y + 2;
+        int textAreaW = cardWidth  - 4;
+        int textAreaH = cardHeight - 4;
+
+        // Ajustes de texto
+        uiSprite.setTextColor(borderColor);
+        uiSprite.setTextSize(1);
+        uiSprite.setTextDatum(TL_DATUM);
+
+        // Medir el ancho total
+        int fullTextWidth = uiSprite.textWidth(menuOptions[currentIndex]);
+        // Copiamos el texto a un String para recortarlo si excede
+        String tempStr = menuOptions[currentIndex];
+
+        // Si sobrepasa el ancho, lo truncamos sin añadir "..."
+        if (fullTextWidth > textAreaW) {
+            while (uiSprite.textWidth(tempStr) > textAreaW && tempStr.length() > 0) {
+                tempStr.remove(tempStr.length() - 1);
+            }
+        }
+
+        // Centrado vertical aproximado
+        int yCenter = textAreaY + (textAreaH - 8) / 2;
+        uiSprite.drawString(tempStr, textAreaX, yCenter);
+    }
+
+    // Barra de scroll vertical
+    const int scrollBarWidth  = 5;
+    const int scrollBarMargin = 3;
+    const int scrollBarHeight = visibleOptions * (cardHeight + cardMargin) - cardMargin;
+    const int scrollBarY      = 30;
+    const int scrollBarX      = 128 - scrollBarWidth - scrollBarMargin;
+
+    uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_DARKGREY);
+
+    // “Pulgar” en caso de haber más opciones que las visibles
+    if (numOptions > visibleOptions) {
+        float thumbRatio = (float)visibleOptions / (float)numOptions;
+        int thumbHeight  = max(20, (int)(scrollBarHeight * thumbRatio));
+        int thumbY       = scrollBarY + (scrollBarHeight - thumbHeight)
+                           * (float)(selection - startIndex) / (float)(numOptions - visibleOptions);
+        uiSprite.fillRect(scrollBarX, thumbY, scrollBarWidth, thumbHeight, TFT_LIGHTGREY);
+    }
+    else {
+        // Si no hay scroll vertical
+        uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_LIGHTGREY);
+    }
+
+    // Enviar todo a la pantalla
     uiSprite.pushSprite(0, 0);
 }
 
+void scrollTextTickerBounce(int selection)
+{
+    // ==========================
+    // 1. CONFIGURACIÓN
+    // ==========================
+    const int cardWidth   = 110;
+    const int cardHeight  = CARD_HEIGHT;
+    const int cardMargin  = CARD_MARGIN;
+    const int visibleOptions = 4;
 
+    // Intervalo de “salto” (ms) para moverse 1 carácter
+    const unsigned long frameInterval = 400;
 
+    // Tamaño máximo del substring (nº de caracteres visibles a la vez)
+    const int chunkSize = 17;
 
+    // Offsets y dirección de scroll (+1 o -1)
+    static int charOffsets[6]         = {0,0,0,0,0,0}; 
+    static int scrollDirections[6]    = {1,1,1,1,1,1};
 
+    // Control de tiempo de la última actualización
+    static unsigned long lastFrameTime = 0;
 
+    // ==========================
+    // 2. FUENTE MONO Y WRAP OFF
+    // ==========================
+    tft.setFreeFont(nullptr);
+    tft.setTextFont(1);
+    tft.setTextWrap(false);
+    tft.setTextSize(1);
 
+    // ==========================
+    // 3. CADENA Y MEDIR LONGITUD
+    // ==========================
+    if (selection < 0 || selection >= numOptions) return;
+    String text = menuOptions[selection];
 
+    int fullTextWidth = tft.textWidth(text.c_str());
+    int textVisibleW  = cardWidth - 4; 
+    if (fullTextWidth <= textVisibleW) {
+        // Cabe sin scroll => no hacemos nada
+        return;
+    }
 
+    // ==========================
+    // 4. CÁLCULO DE POSICIÓN
+    // ==========================
+    int startIndex = max(0, min(selection - visibleOptions / 2, numOptions - visibleOptions));
+    int cardIndex  = selection - startIndex;
+    if (cardIndex < 0 || cardIndex >= visibleOptions) return;
 
+    int cardY      = 30 + cardIndex * (cardHeight + cardMargin);
+    int textAreaX  = 9 + 2;  // = 11
+    int textAreaY  = cardY + 2;
+    int textAreaW  = textVisibleW;      // cardWidth - 4
+    int textAreaH  = cardHeight - 4;
 
+    // ==========================
+    // 5. CONTROL DE TIEMPO Y “VAIVÉN”
+    // ==========================
+    unsigned long now = millis();
+    if (now - lastFrameTime >= frameInterval) {
+        // Avanzamos / retrocedemos 1 carácter
+        charOffsets[selection] += scrollDirections[selection];
 
+        // Límite izquierdo (0)
+        if (charOffsets[selection] < 0) {
+            charOffsets[selection] = 0;
+            scrollDirections[selection] = +1; // rebote
+        }
 
+        // Límite derecho (text.length() - chunkSize)
+        int maxOffset = text.length() - chunkSize;
+        if (maxOffset < 0) maxOffset = 0; // chunkSize mayor o igual a la longitud
 
+        if (charOffsets[selection] > maxOffset) {
+            charOffsets[selection] = maxOffset;
+            scrollDirections[selection] = -1; // rebote
+        }
 
+        lastFrameTime = now;
+    }
+
+    // ==========================
+    // 6. CREAR SPRITE PEQUEÑO
+    // ==========================
+    TFT_eSprite tickerSprite(&tft);
+    if (tickerSprite.createSprite(textAreaW, textAreaH) == nullptr) {
+        // Sin memoria => no scroll
+        return;
+    }
+
+    // ==========================
+    // 7. AJUSTES EN SPRITE
+    // ==========================
+    tickerSprite.setFreeFont(nullptr);
+    tickerSprite.setTextFont(1);
+    tickerSprite.setTextWrap(false);
+    tickerSprite.setTextSize(1);
+    tickerSprite.setTextColor(HIGHLIGHT_COLOR);
+    tickerSprite.setTextDatum(TL_DATUM);
+
+    // Fondo con tu color de tarjeta
+    tickerSprite.fillSprite(CARD_COLOR);
+
+    // ==========================
+    // 8. POSICIÓN VERTICAL (centrado)
+    // ==========================
+    int yCenter = (textAreaH - 8) / 2;
+    if (yCenter < 0) yCenter = 0;
+    if (yCenter >= textAreaH) yCenter = textAreaH - 1;
+
+    // ==========================
+    // 9. SUBSTRING SIN “...”
+    // ==========================
+    int offset = charOffsets[selection];
+    if (offset < 0) offset = 0;
+    if (offset >= (int)text.length()) offset = text.length() - 1;
+
+    int endIndex = offset + chunkSize;
+    if (endIndex > (int)text.length()) {
+        endIndex = text.length();
+    }
+
+    String sliceStr = text.substring(offset, endIndex);
+
+    // Si está vacío, mejor un string vacío que “...”
+    if (sliceStr.isEmpty()) {
+        sliceStr = "";
+    }
+
+    // ==========================
+    // 10. DIBUJAR SUBSTRING
+    // ==========================
+    tickerSprite.drawString(sliceStr, 0, yCenter);
+
+    // ==========================
+    // 11. Mostrar en pantalla
+    // ==========================
+    tickerSprite.pushSprite(textAreaX, textAreaY);
+    tickerSprite.deleteSprite();
+}
