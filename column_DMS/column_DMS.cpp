@@ -106,7 +106,7 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
         case F_SEND_COLOR:{
             byte color = LEF.data[0];
             #ifdef PLAYER
-                 doitPlayer.play_file(2,color);
+                 //doitPlayer.play_file(2,color);
             #endif
             event_register(EV_COLOR_CHANGE, color);
             CRGB colorin= colorHandler.get_CRGB_from_colorList(color);

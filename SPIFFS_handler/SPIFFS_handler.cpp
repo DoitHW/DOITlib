@@ -4,8 +4,6 @@
 #include "icons_64x64_DMS/icons_64x64_DMS.h"
 
 
- INFO_PACK_T ambientesOption;
- INFO_PACK_T fichasOption;
 
 bool writeBytesChecked(fs::File &f, const uint8_t* data, size_t length) {
     size_t written = f.write(data, length);
@@ -18,7 +16,7 @@ bool writeBytesChecked(fs::File &f, const uint8_t* data, size_t length) {
 
 
 void formatSPIFFS() {
-    //Serial.print("Formateando SPIFFS...");
+    Serial.print("Formateando SPIFFS...");
     SPIFFS.end();
     if (!SPIFFS.format()) {
         Serial.println("Error al formatear SPIFFS.");

@@ -195,26 +195,31 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
     encoderButtonPressed = true;
     byte respuesta = 0;
     switch (hiddenMenuSelection) {
-        case 0: // Escanear sala
+        case 0: {// Escanear sala
             Serial.println("Buscar elemento nuevo...");
-            respuesta = element->buscar_elemento_nuevo();
-            element->mostrarMensajeTemporal(respuesta, 3000);
+            element->validar_elemento();
+            hiddenMenuActive = false;
             break;
+        }
         case 1: // Cambiar idioma
             Serial.println("Cambiando idioma...");
             // Lógica para cambiar idioma
+            hiddenMenuActive = false;
             break;
         case 2: // Sonido
             Serial.println("Ajustando sonido...");
             // Lógica para ajustar sonido
+            hiddenMenuActive = false;
             break;
         case 3: // Brillo
             Serial.println("Ajustando brillo...");
             // Lógica para ajustar brillo
+            hiddenMenuActive = false;
             break;
         case 4: // Respuestas
             Serial.println("Configurando respuestas...");
             // Lógica para configurar respuestas
+            hiddenMenuActive = false;
             break;
         case 5: // Volver
             Serial.println("Volviendo al menú principal");

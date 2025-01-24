@@ -3,10 +3,10 @@
 
 #include <Arduino.h>
 //DELFINES GLOBALES
-                                                #define WALLWASHER
+                                                #define NO_ELEM                 //NO_ELEM
                                                 /*COLUMNA, FIBRAS, WALLWASHER, ETC*/
-                                                #define NOPLAYER                 // -> PLAYER / NOPLAYER
-                                                #define NFC                      // -> NFC / NONFC
+                                                #define PLAYER                 // -> PLAYER / NOPLAYER
+                                                #define NONFC                      // -> NFC / NONFC
                                                 #define DEBUG                    // -> Desactivar en produccion 
                                                 #define SERIAL_NUM      0xCACA   // -> 0xVV00= VERSION + 0x00MM= MES
                                                 #define NOSERIAL_BY_FILE         // -> NOSERIAL_BY_FILE / SERIAL_BY_FILE --> Activar Serial por FileSystem, si esta definido, ignora el SERIAL_NUM.
@@ -321,7 +321,7 @@ enum TESTS_{
 #define LIGHTSOURCE_FAN_RELAY_PIN   42
 
 // DEFINES LEDSTRIPS
-#define LEDSTRIP_LED_DATA_PIN 45 // 21= oficial
+#define LEDSTRIP_LED_DATA_PIN 45 // 21= oficial //franc: led pin 45
 
 // DEFINES BOTONERA
 #define BOTONERA_DATA_PIN     21

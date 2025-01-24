@@ -101,222 +101,440 @@ void BOTONERA_::sectorIn_handler(std::vector<byte> data, byte targetin) {
     }
 }
 
-byte BOTONERA_::buscar_elemento_nuevo() {
-    const int max_reintentos = 5;  
-    bool error_detectado = false;
-
-    // Crear la estructura en el heap de forma segura
-    INFO_PACK_T *aux = new INFO_PACK_T;
-    if (!aux) {
-        Serial.println("❌ Error: Memoria insuficiente.");
-        return 0;
-    }
-    memset(aux, 0, sizeof(INFO_PACK_T));  // ✅ Memoria completamente inicializada
-
-    iniciarEscaneoElemento("Escaneando ...");
-    byte tempID = DEFAULT_DEVICE;
-    // ✅ Petición inicial del serial antes del bucle principal
-    send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA, tempID, SPANISH_LANG, ELEM_SERIAL_SECTOR));
+byte tempID;
+byte BOTONERA_::validar_serial() {
+    const int max_reintentos = 5;
     frameReceived = false;
-    unsigned long startTime = millis();
 
-    while (!frameReceived && millis() - startTime < 2500) {
-        // Esperar hasta recibir una trama válida
-    }
+    for (int intento = 0; intento < max_reintentos; intento++) {
+        // Mostrar algo en la interfaz de usuario, p.ej. "Escaneando..."
+        iniciarEscaneoElemento("Escaneando...");
 
-    if (frameReceived) {
+        // Petición de ELEM_SERIAL_SECTOR al DEFAULT_DEVICE
+        send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA,
+                                              DEFAULT_DEVICE,
+                                              SPANISH_LANG,
+                                              ELEM_SERIAL_SECTOR));
+
         frameReceived = false;
-        LAST_ENTRY_FRAME_T LEF = extract_info_from_frameIn(uartBuffer);
-        
-        if (LEF.data.size() >= 3 && LEF.data[0] == ELEM_SERIAL_SECTOR) {
-            memcpy(aux->serialNum, &LEF.data[1], 5);
-            
-            // ✅ Comprobación en SPIFFS
-            if (serialExistsInSPIFFS(aux->serialNum)) {
-                Serial.println("✅ Elemento ya existente. Abortando.");
-                delete aux;
-                return 2;
-            }
-            Serial.println("🔍  Número de serie nuevo. Continuando búsqueda. 🔍 ");
-        } else {
-            Serial.println("❌ Error: Trama del serial recibida inválida.");
-            delete aux;
-            return 0;
+        unsigned long startTime = millis();
+
+        // Espera hasta 2.5s a que frameReceived se ponga en true
+        while (!frameReceived && (millis() - startTime < 2500)) {
+            delay(10);
         }
-    } else {
-        Serial.println("❌ ERROR: No se recibió respuesta al pedir serial.");
-        delete aux;
-        return 0;
-    }
 
-    // ✅ Continuar con la búsqueda de sectores
-    for (int sector = ELEM_NAME_SECTOR; sector <= ELEM_ICON_ROW_63_SECTOR; ++sector) {
-        int intentos = 0;
-        bool sector_completado = false;
+        // Si hubo respuesta (frameReceived = true), procesamos
+        if (frameReceived) {
+            frameReceived = false; // Reiniciamos el flag
+            LAST_ENTRY_FRAME_T LEF = extract_info_from_frameIn(uartBuffer);
 
-        while (intentos < max_reintentos && !sector_completado) {
-            send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA, tempID, SPANISH_LANG, sector));
-            frameReceived = false;
-            startTime = millis();
+            // Verificamos que la trama sea del sector correcto y tenga tamaño
+            if (LEF.data.size() >= 3 && LEF.data[0] == ELEM_SERIAL_SECTOR) {
+                // Guardamos el serial recibido
+                memcpy(lastSerial, &LEF.data[1], 5);
 
-            // ✅ Modificado: Esperar solo hasta recibir la trama
-            while (!frameReceived && millis() - startTime < 2500) {
-                // Esperando recepción sin bloquear
-            }
-
-            if (frameReceived) {
-                frameReceived = false;
-                LAST_ENTRY_FRAME_T LEF = extract_info_from_frameIn(uartBuffer);
-
-                // ✅ Validación del sector recibido
-                if (LEF.data.size() > 1 && LEF.data[0] == sector) {
-                    switch (sector) {
-                        case ELEM_NAME_SECTOR:
-                            memcpy(aux->name, &LEF.data[1], min(sizeof(aux->name), LEF.data.size() - 1));
-                            break;
-                        case ELEM_DESC_SECTOR:
-                            memcpy(aux->desc, &LEF.data[1], min(sizeof(aux->desc), LEF.data.size() - 1));
-                            break;
-                        case ELEM_SERIAL_SECTOR:
-                            memcpy(aux->serialNum, &LEF.data[1], min(sizeof(aux->serialNum), LEF.data.size() - 1));
-                            break;
-                        case ELEM_ID_SECTOR:
-                            aux->ID = LEF.data[1];
-                            break;
-                        case ELEM_CMODE_SECTOR:
-                            aux->currentMode = LEF.data[1];
-                            break;
-                        default:
-                            if (sector >= ELEM_MODE_0_NAME_SECTOR && sector <= ELEM_MODE_15_FLAG_SECTOR) {
-                                int modeIndex = (sector - ELEM_MODE_0_NAME_SECTOR) / 3;
-                                int fieldIndex = (sector - ELEM_MODE_0_NAME_SECTOR) % 3;
-                                if (fieldIndex == 0)
-                                    memcpy(aux->mode[modeIndex].name, &LEF.data[1], min(sizeof(aux->mode[modeIndex].name), LEF.data.size() - 1));
-                                else if (fieldIndex == 1)
-                                    memcpy(aux->mode[modeIndex].desc, &LEF.data[1], min(sizeof(aux->mode[modeIndex].desc), LEF.data.size() - 1));
-                                else if (fieldIndex == 2)
-                                    memcpy(aux->mode[modeIndex].config, &LEF.data[1], min(sizeof(aux->mode[modeIndex].config), LEF.data.size() - 1));
-                            }
-                            // ✅ Almacenamiento seguro del icono
-                            else if (sector >= ELEM_ICON_ROW_0_SECTOR && sector <= ELEM_ICON_ROW_63_SECTOR) {
-                                int rowIndex = sector - ELEM_ICON_ROW_0_SECTOR;
-                                if (LEF.data.size() == 129) {
-                                    for (int col = 0; col < ICON_COLUMNS; ++col) {
-                                        uint8_t msb = LEF.data[2 * col + 1];
-                                        uint8_t lsb = LEF.data[2 * col + 2];
-                                        aux->icono[rowIndex][col] = (uint16_t(msb) << 8) | lsb;
-                                    }
-                                } else {
-                                    Serial.printf("❌ Error: Trama incompleta en fila %d.\n", rowIndex);
-                                }
-                            }
-                            break;
-                    }
-                    float progreso = (sector * 100.0) / ELEM_ICON_ROW_63_SECTOR;
-                    actualizarBarraProgreso(progreso);
-                    Serial.printf("✅ Datos correctamente recibidos y guardados para sector: %d\n", sector);
-                    sector_completado = true;  // ✅ Salir sin esperar más
+                // Decidimos si es un elemento existente o nuevo
+                if (serialExistsInSPIFFS(lastSerial)) {
+                    // Elemento existente
+                    return 1;
+                } else {
+                    // Elemento nuevo
+                    return 2;
                 }
             }
-            intentos++;
         }
 
-        if (!sector_completado) {
-            Serial.printf("❌ Error: Sector %d no respondió tras %d intentos.\n", sector, max_reintentos);
-            error_detectado = true;
+        // Si llegamos aquí, este intento falló
+        Serial.printf("⚠️ Intento %d/%d fallido\n", intento+1, max_reintentos);
+        delay(500);
+    }
+
+    // Si terminamos el bucle, no hubo respuesta válida
+    return 0;
+}
+
+void BOTONERA_::procesar_datos_sector(LAST_ENTRY_FRAME_T &LEF, int sector, INFO_PACK_T* infoPack) {
+    switch (sector) {
+        case ELEM_NAME_SECTOR:
+            memcpy(infoPack->name, &LEF.data[1], 
+                   min(sizeof(infoPack->name), LEF.data.size() - 1));
+            break;
+
+        case ELEM_DESC_SECTOR:
+            memcpy(infoPack->desc, &LEF.data[1], 
+                   min(sizeof(infoPack->desc), LEF.data.size() - 1));
+            break;
+
+        case ELEM_SERIAL_SECTOR:
+            memcpy(infoPack->serialNum, &LEF.data[1], 
+                   min(sizeof(infoPack->serialNum), LEF.data.size() - 1));
+            break;
+
+        case ELEM_ID_SECTOR:
+            infoPack->ID = LEF.data[1];
+            break;
+
+        case ELEM_CMODE_SECTOR:
+            infoPack->currentMode = LEF.data[1];
+            break;
+
+        default:
+            // Procesar modos
+            if (sector >= ELEM_MODE_0_NAME_SECTOR && sector <= ELEM_MODE_15_FLAG_SECTOR) {
+                int modeIndex  = (sector - ELEM_MODE_0_NAME_SECTOR) / 3;
+                int fieldIndex = (sector - ELEM_MODE_0_NAME_SECTOR) % 3;
+
+                if (fieldIndex == 0) {
+                    memcpy(infoPack->mode[modeIndex].name, &LEF.data[1],
+                           min(sizeof(infoPack->mode[modeIndex].name), LEF.data.size()-1));
+                }
+                else if (fieldIndex == 1) {
+                    memcpy(infoPack->mode[modeIndex].desc, &LEF.data[1],
+                           min(sizeof(infoPack->mode[modeIndex].desc), LEF.data.size()-1));
+                }
+                else {
+                    memcpy(infoPack->mode[modeIndex].config, &LEF.data[1],
+                           min(sizeof(infoPack->mode[modeIndex].config), LEF.data.size()-1));
+                }
+            }
+            // Procesar iconos
+            else if (sector >= ELEM_ICON_ROW_0_SECTOR && sector <= ELEM_ICON_ROW_63_SECTOR) {
+                int rowIndex = sector - ELEM_ICON_ROW_0_SECTOR;
+                if (LEF.data.size() == 129) {
+                    for (int col = 0; col < ICON_COLUMNS; ++col) {
+                        uint8_t msb = LEF.data[2 * col + 1];
+                        uint8_t lsb = LEF.data[2 * col + 2];
+                        infoPack->icono[rowIndex][col] = (uint16_t(msb) << 8) | lsb;
+                    }
+                } else {
+                    Serial.printf("❌ Fila de icono incompleta: Sector %d\n", sector);
+                }
+            }
+            break;
+    }
+}
+
+void BOTONERA_::actualizar_elemento_existente() {
+    fs::File root = SPIFFS.open("/");
+    fs::File file = root.openNextFile();
+
+    while(file) {
+        byte existingSerial[5];
+        file.seek(OFFSET_SERIAL);
+        file.read(existingSerial, 5);
+
+        // Si coincide con el "último serial" leído
+        if(memcmp(existingSerial, lastSerial, 5) == 0) {
+            // Actualizamos la ID en el archivo
+            file.seek(OFFSET_ID);
+            file.write(&lastAssignedID, 1);
+            file.close();
+            break;
+        }
+        file = root.openNextFile();
+    }
+    root.close();
+
+    // Recargamos la lista en RAM
+    loadElementsFromSPIFFS();
+}
+
+bool BOTONERA_::guardar_elemento(INFO_PACK_T* infoPack) {
+    // Generamos un nombre de archivo único
+    String uniqueFileName = generateUniqueFileName((char*)infoPack->name);
+    fs::File file = SPIFFS.open(uniqueFileName, "w");
+    if (!file) return false;
+
+    bool success = true;
+    success &= writeBytesChecked(file, infoPack->name,      sizeof(infoPack->name));
+    success &= writeBytesChecked(file, infoPack->desc,      sizeof(infoPack->desc));
+    success &= writeBytesChecked(file, infoPack->serialNum, sizeof(infoPack->serialNum));
+    success &= writeBytesChecked(file, &infoPack->ID,       1);
+    success &= writeBytesChecked(file, &infoPack->currentMode, 1);
+
+    // Guardamos los 16 modos
+    for (int i = 0; i < 16 && success; ++i) {
+        success &= writeBytesChecked(file, infoPack->mode[i].name,   sizeof(infoPack->mode[i].name));
+        success &= writeBytesChecked(file, infoPack->mode[i].desc,   sizeof(infoPack->mode[i].desc));
+        success &= writeBytesChecked(file, infoPack->mode[i].config, sizeof(infoPack->mode[i].config));
+    }
+
+    // Guardamos icono (64 filas, N columnas * 2 bytes)
+    for (int y = 0; y < ICON_ROWS && success; ++y) {
+        success &= writeBytesChecked(file, (uint8_t*)infoPack->icono[y], ICON_COLUMNS * 2);
+    }
+
+    file.close();
+
+    if (success) {
+        // Recargamos la lista en memoria
+        loadElementsFromSPIFFS();
+        return true;
+    }
+
+    // Si falló algo, borramos el archivo incompleto
+    SPIFFS.remove(uniqueFileName);
+    return false;
+}
+
+void BOTONERA_::reasignar_id_elemento(INFO_PACK_T* infoPack) {
+    byte newID = getNextAvailableID();
+    byte currentID = 0;
+
+    if(infoPack) {
+        // Caso 2: se nos ha pasado la info de un elemento nuevo
+        if(infoPack->ID == 0xDD) {
+            infoPack->ID = newID;
+            Serial.printf("🆔 Nueva ID asignada: %02X\n", newID);
+        }
+    } else {
+        // Caso 1: reasignación en un elemento ya existente, sin un infoPack
+        fs::File root = SPIFFS.open("/");
+        fs::File file = root.openNextFile();
+
+        while(file) {
+            byte existingSerial[5];
+            file.seek(OFFSET_SERIAL);
+            file.read(existingSerial, 5);
+
+            if(memcmp(existingSerial, element->lastSerial, 5) == 0) {
+                file.seek(OFFSET_ID);
+                file.read(&currentID, 1);
+
+                if(currentID == 0xDD) {
+                    file.seek(OFFSET_ID);
+                    file.write(&newID, 1);
+                    Serial.printf("🆔 ID actualizada: %02X\n", newID);
+                }
+                file.close();
+                break;
+            }
+            file = root.openNextFile();
+        }
+        root.close();
+    }
+
+    Serial.println("currentID: " + String(currentID));
+    Serial.println("newID: "     + String(newID));
+
+    // Se envía el frame para fijar la nueva ID
+    send_frame(frameMaker_SET_ELEM_ID(DEFAULT_BOTONERA, DEFAULT_DEVICE, newID));
+    delay(10);
+
+    // Ejemplo: envío de test
+    std::vector<byte> target;
+    target.push_back(currentID);
+    send_frame(frameMaker_SEND_TEST(DEFAULT_BOTONERA, target, newID));
+
+    Serial.println("🆙🆙🆙🆙 ID reasignada");
+}
+
+void BOTONERA_::validar_elemento() {
+    // Llama a validar_serial(), que retorna:
+    //   0 -> No se recibió respuesta (error)
+    //   1 -> Elemento existente en SPIFFS
+    //   2 -> Elemento no existente (nuevo)
+    byte resultado = validar_serial();
+    switch (resultado) {
+        case 0: {
+            // Error al leer el serial
+            Serial.println("❌ No se pudo validar el serial");
+            mostrarMensajeTemporal(0, 3000);
+            return;
+        }
+
+        case 1: {
+            // El elemento ya existe. 
+            // 1) Recuperar ID desde SPIFFS
+            byte existingID = getIdFromSPIFFS(lastSerial);
+            if (existingID == 0xFF) {
+                // Algo falló al buscar la ID
+                Serial.println("❌ No se encontró la ID en SPIFFS, aunque el serial existe.");
+                mostrarMensajeTemporal(0, 3000);
+                return;
+            }
+
+            // 2) Reasignar la ID al elemento que responde en la ID por defecto
+            lastAssignedID = existingID; 
+            send_frame(frameMaker_SET_ELEM_ID(DEFAULT_BOTONERA,
+                                              DEFAULT_DEVICE,
+                                              lastAssignedID));
+            delay(20);
+            // 3) Verificar confirmación de ID (petición de ELEM_ID_SECTOR a la new ID)
+            if (confirmarCambioID(lastAssignedID)) {
+                // Éxito: ID confirmada
+                Serial.printf("✅ ID reasignada y confirmada: 0x%02X\n", lastAssignedID);
+                // Mostramos mensaje "elemento existente" => 1
+                mostrarMensajeTemporal(1, 3000);
+            } else {
+                // Falló la confirmación 
+                Serial.println("❌ Falló la confirmación de la ID reasignada.");
+                mostrarMensajeTemporal(0, 3000);
+            }
+
+            return;
+        }
+
+        case 2: {
+            // Elemento nuevo. 
+            // 1) Obtenemos la próxima ID disponible
+            lastAssignedID = getNextAvailableID();
+
+            // 2) Asignamos esa ID al elemento que responde actualmente en DEFAULT_DEVICE
+            Serial.println("Cambiando de ID en caso 2");
+            send_frame(frameMaker_SET_ELEM_ID(DEFAULT_BOTONERA,
+                                              DEFAULT_DEVICE,
+                                              lastAssignedID));
+            delay(20);
+            // 3) Podemos verificar si deseamos confirmarlo también:
+            if (!confirmarCambioID(lastAssignedID)) {
+                Serial.println("❌ Falló la confirmación de la nueva ID en elemento nuevo.");
+                mostrarMensajeTemporal(0, 3000);
+                finalizarEscaneoElemento();
+                return;
+            }
+            Serial.printf("✅ Nueva ID asignada y confirmada: 0x%02X\n", lastAssignedID);
+
+            // 4) Descargamos la información completa del elemento (nombre, desc, modos...)
+            bool exito = procesar_y_guardar_elemento_nuevo(lastAssignedID);
+
+            // 5) Resultado final: si todo fue bien => mostrarMensajeTemporal(2, 3000) 
+            //                      si no => mensaje de error
+            if (exito) {
+                mostrarMensajeTemporal(2, 3000);
+            } else {
+                mostrarMensajeTemporal(0, 3000);
+            }
+            finalizarEscaneoElemento();
+            return;
+        }
+    }
+}
+
+byte BOTONERA_::getIdFromSPIFFS(byte *serial) {
+    fs::File root = SPIFFS.open("/");
+    fs::File file = root.openNextFile();
+
+    while (file) {
+        // Leemos el serial en la posición OFFSET_SERIAL
+        file.seek(OFFSET_SERIAL);
+        byte existingSerial[5];
+        file.read(existingSerial, 5);
+
+        // Comparamos con el serial pasado como parámetro
+        if (memcmp(existingSerial, serial, 5) == 0) {
+            // Leemos la ID
+            file.seek(OFFSET_ID);
+            byte existingID;
+            file.read(&existingID, 1);
+
+            file.close();
+            root.close();
+            return existingID; // Devuelve la ID encontrada
+        }
+
+        file = root.openNextFile();
+    }
+
+    root.close();
+    return 0xFF; // Indica que no se encontró
+}
+
+bool BOTONERA_::confirmarCambioID(byte nuevaID) {
+    // Petición de ELEM_ID_SECTOR al "nuevaID"
+    send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA,
+                                          nuevaID,
+                                          SPANISH_LANG,
+                                          ELEM_ID_SECTOR));
+
+    if (!esperar_respuesta(2000)) {
+        Serial.println("No llegó respuesta");
+        return false;
+    }
+
+    // Procesamos la trama recibida
+    LAST_ENTRY_FRAME_T LEF = extract_info_from_frameIn(uartBuffer);
+
+    // Verificamos que data[0] sea ELEM_ID_SECTOR y data[1] sea la nuevaID
+    if (LEF.data.size() >= 2 &&
+        LEF.data[0] == ELEM_ID_SECTOR &&
+        LEF.data[1] == nuevaID) {
+        return true; // Confirmación OK
+    }
+
+    return false; // Sector incorrecto o ID incorrecta
+}
+
+bool BOTONERA_::esperar_respuesta(unsigned long timeout) {
+    unsigned long startTime = millis();
+    frameReceived = false;
+
+    while (millis() - startTime < timeout) {
+        if (frameReceived) {
+            return true; // Respuesta recibida
+        }
+        delay(10);
+        // Aquí podrías hacer yield() en ESP8266/ESP32
+    }
+    return false; // Timeout
+}
+
+bool BOTONERA_::procesar_y_guardar_elemento_nuevo(byte targetID) {
+    INFO_PACK_T* infoPack = new INFO_PACK_T;
+    memset(infoPack, 0, sizeof(INFO_PACK_T));
+    
+    // Rellenamos la info base
+    infoPack->ID = targetID;
+    memcpy(infoPack->serialNum, lastSerial, 5);
+
+    // Pedimos todos los sectores
+    bool error = false;
+    for (int sector = ELEM_NAME_SECTOR; sector <= ELEM_ICON_ROW_63_SECTOR; sector++) {
+        if (!procesar_sector(sector, infoPack, targetID)) {
+            error = true;
             break;
         }
     }
 
-    // ✅ Finalización y limpieza de memoria
-    if (error_detectado) {
-        Serial.println("❌ ERROR: Fallo de comunicación. Liberando memoria.");
-        delete aux;
-        return 0;
-    } else {
-        finalizarEscaneoElemento();
-        print_info_pack(aux);
-        anadir_elemento_nuevo(aux);
-        delete aux;
-        return 1;
+    // Si falló alguno de los sectores, limpiamos y salimos
+    if (error) {
+        delete infoPack;
+        return false;
     }
+
+    // Si llegamos aquí, descargamos todo OK => lo guardamos en SPIFFS
+    bool guardado = guardar_elemento(infoPack);
+    delete infoPack;
+
+    // guardado => true/false
+    return guardado;
 }
 
+bool BOTONERA_::procesar_sector(int sector, INFO_PACK_T* infoPack, uint8_t targetID) {
+    const int max_reintentos = 3;
 
-byte BOTONERA_::anadir_elemento_nuevo(const INFO_PACK_T *infoPack) {
-    if (!infoPack) {
-        Serial.println("❌ Error: El paquete de información es nulo.");
-        return 0;
-    }
+    for (int intento = 0; intento < max_reintentos; intento++) {
+        // Petición del sector al "targetID"
+        send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA,
+                                              targetID,
+                                              SPANISH_LANG,
+                                              sector));
 
-    // Crear una copia temporal del número de serie para pasarla como byte*
-    byte serialNumCopy[5];
-    memcpy(serialNumCopy, infoPack->serialNum, sizeof(serialNumCopy));
+        if (esperar_respuesta(2000)) {
+            LAST_ENTRY_FRAME_T LEF = extract_info_from_frameIn(uartBuffer);
 
-    // Verificar si ya existe un elemento con el mismo número de serie usando la función existente
-    if (serialExistsInSPIFFS(serialNumCopy)) {
-        Serial.println("⚠️ Número de serie ya existente.");
-        // Abrir el archivo correspondiente para comprobar la ID
-        fs::File root = SPIFFS.open("/");
-        fs::File file = root.openNextFile();
-        while (file) {
-            byte existingSerialNum[5];
-            file.seek(OFFSET_SERIAL);
-            file.read(existingSerialNum, 5);
-            if (memcmp(existingSerialNum, serialNumCopy, 5) == 0) {
-                file.seek(OFFSET_ID);
-                byte existingID;
-                file.read(&existingID, 1);
-                if (existingID == 0xDD) {
-                    byte newID = getNextAvailableID();
-                    file.seek(OFFSET_ID);
-                    file.write(&newID, 1);
-                    Serial.printf("✅ ID reasignada a: %d\n", newID);
-                }
-                file.close();
-                return 2;
+            if (LEF.data.size() > 1 && LEF.data[0] == sector) {
+                // Procesar y copiar datos
+                procesar_datos_sector(LEF, sector, infoPack);
+
+                // Actualizar alguna barra de progreso, si la tienes implementada
+                actualizarBarraProgreso((sector * 100.0) / ELEM_ICON_ROW_63_SECTOR);
+                return true;
             }
-            file = root.openNextFile();
         }
     }
-
-    // Generar un nombre de archivo único si el nombre ya existe
-    String uniqueFileName = generateUniqueFileName((char*)infoPack->name);
-
-    // Abrir archivo para escritura
-    fs::File file = SPIFFS.open(uniqueFileName, "w");
-    if (!file) {
-        Serial.println("❌ Error al abrir archivo en SPIFFS.");
-        return 0;
-    }
-
-    // Guardar información del elemento directamente
-    file.write((const uint8_t*)infoPack->name, 24);
-    file.write((const uint8_t*)infoPack->desc, 192);
-    file.write((const uint8_t*)infoPack->serialNum, 5);
-    file.write(&infoPack->ID, 1);
-    file.write(&infoPack->currentMode, 1);
-
-    // Guardar modos
-    for (int i = 0; i < 16; ++i) {
-        file.write((const uint8_t*)infoPack->mode[i].name, 24);
-        file.write((const uint8_t*)infoPack->mode[i].desc, 192);
-        file.write((const uint8_t*)infoPack->mode[i].config, 2);
-    }
-
-    // Guardar icono
-    for (int y = 0; y < 64; ++y) {
-        file.write((const uint8_t*)infoPack->icono[y], 64 * 2);
-    }
-
-    file.close();
-    Serial.println("✅ Elemento añadido correctamente.");
-
-    // Actualizar la lista de elementos y dibujar el elemento añadido
-    loadElementsFromSPIFFS();
-    drawCurrentElement();
-
-    return 1;
+    return false;
 }
 
 void BOTONERA_::print_info_pack(const INFO_PACK_T *infoPack) {
@@ -404,9 +622,9 @@ bool BOTONERA_::serialExistsInSPIFFS(byte serialNum[5]) {
 
     while (file) {
         // Validar que el archivo tenga suficiente tamaño antes de leer
-        if (file.size() >= OFFSET_SERIAL + 2) {
+        if (file.size() >= OFFSET_SERIAL + 5) {
             file.seek(OFFSET_SERIAL);
-            file.read(tempPack->serialNum, 2);
+            file.read(tempPack->serialNum, 5);
             Serial.printf("Serial leído: %02X%02X%02X%02X%02X\n", tempPack->serialNum[0], tempPack->serialNum[1], tempPack->serialNum[2], tempPack->serialNum[3], tempPack->serialNum[4]);
 
             if (tempPack->serialNum[0] == serialNum[0] && tempPack->serialNum[1] == serialNum[1] && tempPack->serialNum[2] == serialNum[2] && tempPack->serialNum[3] == serialNum[3] && tempPack->serialNum[4] == serialNum[4]) {
@@ -436,7 +654,7 @@ void BOTONERA_::iniciarEscaneoElemento(const char* mensajeInicial) {
     tft.setTextDatum(MC_DATUM);
     tft.setTextFont(2); // Usa Font 2
     tft.drawString(mensajeInicial, 64, 30);
-    
+    delay(100);
     actualizarBarraProgreso(0);
 }
 
@@ -478,7 +696,7 @@ void BOTONERA_::finalizarEscaneoElemento() {
     tft.drawLine(62, 94, 70, 86, TFT_WHITE);
     
     delay(3000);
-    //drawCurrentElement();  // Volver a la pantalla principal
+    drawCurrentElement();  // Volver a la pantalla principal
 }
 
 void BOTONERA_::dibujarMarco(uint16_t color) {
@@ -500,14 +718,14 @@ void BOTONERA_::mostrarMensajeTemporal(int respuesta, int dTime) {
         colorTexto = TFT_RED;
         mensajePrincipal = "ERROR";
         mensajeSecundario = "Sin respuesta";
-    } else if (respuesta == 1) {
+    } else if (respuesta == 2) {
         colorTexto = TFT_GREEN;
         mensajePrincipal = "NUEVO";
-        mensajeSecundario = "Elemento nuevo    Agregando...";
-    } else if (respuesta == 2) {
+        mensajeSecundario = "Elemento nuevo    Agregado";
+    } else if (respuesta == 1) {
         colorTexto = TFT_YELLOW;
         mensajePrincipal = "ADVERTENCIA";
-        mensajeSecundario = "Elemento ya existe Reasignando ID";
+        mensajeSecundario = "Elemento existente Reasignando ID";
     } else {
         colorTexto = TFT_RED;
         mensajePrincipal = "ERROR";
@@ -516,7 +734,7 @@ void BOTONERA_::mostrarMensajeTemporal(int respuesta, int dTime) {
 
     // Mostrar mensaje principal centrado
     tft.setTextFont(4);
-    if (respuesta == 2) tft.setTextFont(2);  // Fuente aún más pequeña
+    if (respuesta == 1) tft.setTextFont(2);  // Fuente aún más pequeña
     tft.setTextDatum(MC_DATUM);
     tft.setTextColor(colorTexto);
     tft.drawString(mensajePrincipal, 64, 30);
@@ -614,20 +832,21 @@ byte BOTONERA_::getNextAvailableID() {
     fs::File root = SPIFFS.open("/");
     fs::File file = root.openNextFile();
 
+    // Escanea todos los archivos y busca la ID más alta para incrementarla
     while (file) {
         byte existingID;
         file.seek(OFFSET_ID);
         file.read(&existingID, 1);
+
         if (existingID >= nextID) {
-            nextID = existingID + 1;
+            nextID = existingID + 1; 
         }
         file = root.openNextFile();
     }
+    root.close();
 
     Serial.printf("✅ Nueva ID disponible: %d\n", nextID);
     return nextID;
 }
-
-
 
 

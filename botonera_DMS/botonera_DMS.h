@@ -20,8 +20,6 @@ class BOTONERA_ : public ELEMENT_{
         void botonera_begin();
         void RX_main_handler(LAST_ENTRY_FRAME_T LEF)override;
         void sectorIn_handler(std::vector<byte> data, byte tragetin);
-        byte buscar_elemento_nuevo();
-        byte anadir_elemento_nuevo(const INFO_PACK_T *infoPack);
         void print_info_pack(const INFO_PACK_T *infoPack);
         bool serialExistsInSPIFFS(byte serialNum[5]);
         void iniciarEscaneoElemento(const char* mensajeInicial);
@@ -31,8 +29,21 @@ class BOTONERA_ : public ELEMENT_{
         void mostrarMensajeTemporal(int respuesta, int dTime);
         byte getNextAvailableID();
 
+        byte validar_serial();
+        void procesar_datos_sector(LAST_ENTRY_FRAME_T &LEF, int sector, INFO_PACK_T* infoPack);
+        bool guardar_elemento(INFO_PACK_T* infoPack);
+        void reasignar_id_elemento(INFO_PACK_T* infoPack = nullptr);
+        void validar_elemento();
+        bool esperar_respuesta(unsigned long timeout);
+        void actualizar_elemento_existente() ;
+        bool procesar_y_guardar_elemento_nuevo(byte targetID);
+        bool procesar_sector(int sector, INFO_PACK_T* infoPack, uint8_t targetID);
+        bool confirmarCambioID(byte nuevaID);
+        byte getIdFromSPIFFS(byte *serial) ;
 
-        
+    private:   
+        byte lastAssignedID = DEFAULT_DEVICE;
+        byte lastSerial[5] = {0};
 
 };
 

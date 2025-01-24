@@ -3,33 +3,31 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-#include <Adafruit_PN532.h>
+#include <PN532_I2C.h>
+#include <PN532.h>
 
+// Si no vas a incluir PN532 en el .h (sólo en .cpp), no lo pongas aquí.
+// Pero si necesitas usar tipos de PN532 en la declaración de la clase, sí debes incluirlo.
+// #include <PN532.h>
 
+// ----------------------------------------------------------------------------
+// Clase TOKEN_
+// ----------------------------------------------------------------------------
 class TOKEN_ {
-private:
-    struct TOKEN_FILE_ADDR {
-        byte file;
-        byte bank;
-    };
-    struct TOKEN_INFO {
-        TOKEN_FILE_ADDR fileAddr;
-        byte color;
-        uint16_t timeColor;
-        byte command;
-        TOKEN_FILE_ADDR partner[8];
-    };
-    TwoWire I2C2;                      // Instancia de I2C personalizada
-    Adafruit_PN532 nfc;
-    unsigned long lastReadAttempt;     // Último intento de lectura
-    unsigned long readInterval;
-
 public:
-    TOKEN_() : I2C2(1), nfc(-1, -1, &I2C2) {}
+    // Constructor (opcional si no necesitas lógica especial)
+    TOKEN_() : lastReadAttempt(0), readInterval(200) {}
 
-    ~TOKEN_() {}
+    // Inicializa el bus I2C y el PN532
     void begin();
+
+    // Lee una tarjeta y devuelve true si se detectó, false si no
     bool readCard(uint8_t *uid, uint8_t &uidLength);
 
+private:
+    // Variables internas para controlar el intervalo entre lecturas
+    unsigned long lastReadAttempt;
+    unsigned long readInterval;
 };
-#endif
+
+#endif // TOKEN_DMS_H

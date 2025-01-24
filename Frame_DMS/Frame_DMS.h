@@ -117,7 +117,7 @@ FRAME_T frameMaker_REQ_ELEM_INFO       (byte originin, byte targetin, byte idiom
 FRAME_T frameMaker_REQ_ELEM_STATE      (byte originin, byte targetin);
 
 FRAME_T frameMaker_SET_ELEM_MODE       (byte originin, std::vector<byte>targetin, byte modein);
-FRAME_T frameMaker_SET_ELEM_ID         (byte originin, std::vector<byte>targetin, byte IDin);  
+FRAME_T frameMaker_SET_ELEM_ID         (byte originin, byte targetin, byte IDin);  
 
 FRAME_T frameMaker_SEND_COLOR          (byte originin, std::vector<byte>targetin, byte colorin);
 FRAME_T frameMaker_SEND_TEST           (byte originin, std::vector<byte>targetin, byte testin);
