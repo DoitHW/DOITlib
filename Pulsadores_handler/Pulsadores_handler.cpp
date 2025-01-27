@@ -8,6 +8,7 @@
 int filas[FILAS] = {4, 5, 6, 7};
 int columnas[COLUMNAS] = {1, 2, 3};
 static bool lastState[FILAS][COLUMNAS];
+bool relay_state = false;
 
 byte pulsadorColor[FILAS][COLUMNAS] = {
     {ORANGE, GREEN, WHITE},
@@ -73,7 +74,7 @@ void PulsadoresHandler::mostrarColor(byte color) {
     byte elementID = getCurrentElementID();  // Obtener la ID solo si está seleccionado
     target.push_back(elementID);  
 
-    static bool relay_state = false;
+    
     const char* colorNombre = "";
 
     switch (color) {
@@ -89,7 +90,6 @@ void PulsadoresHandler::mostrarColor(byte color) {
         case RELAY:
             colorNombre = "Relay";
             relay_state = !relay_state;
-            target.push_back(0xFF); //Comentar o eliminar esta línea
             send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, target, relay_state));
             delay(5);
             break;

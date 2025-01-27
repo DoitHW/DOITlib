@@ -89,7 +89,6 @@ void drawNavigationArrows() {
 }
 
 void drawCurrentElement() {
-
     uiSprite.fillSprite(BACKGROUND_COLOR);
 
     // Mostrar mensaje si no hay elementos
@@ -105,17 +104,10 @@ void drawCurrentElement() {
     // Variable para almacenar el modo actual
     byte currentMode = 0;
 
-     if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Apagar") {
-        INFO_PACK_T* option = nullptr;
-
-        if (currentFile == "Ambientes") {
-            option = &ambientesOption;
-        } else if (currentFile == "Fichas") {
-            option = &fichasOption;
-        } else if (currentFile == "Apagar") {
-            option = &apagarSala;
-        }
-        // Leer y usar el modo actual desde la opción dinámica
+    // --- Distinción entre elementos fijos y elementos de SPIFFS ---
+    if (currentFile == "Ambientes" || currentFile == "Fichas") {
+        // ---------- 1) CASO: AMBIENTES / FICHAS ----------
+        INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
         currentMode = option->currentMode;
 
         int startX = (tft.width() - 64) / 2;
@@ -134,8 +126,30 @@ void drawCurrentElement() {
 
         // Dibujar círculo de selección si está seleccionado
         drawSelectionCircle(selectedStates[currentIndex], startX, startY);
-    } else {
-        // Elementos cargados desde SPIFFS
+    }
+    else if (currentFile == "Apagar") {
+        // ---------- 2) CASO: APAGAR ----------
+        INFO_PACK_T* option = &apagarSala;  
+        // En teoría no tendrá modos, pero currentMode = option->currentMode;
+        // no lo usamos para dibujar nada.
+
+        int startX = (tft.width() - 64) / 2;
+        int startY = (tft.height() - 64) / 2 - 20;
+
+        // Dibujar ícono
+        for (int y = 0; y < 64; y++) {
+            memcpy(lineBuffer, option->icono[y], 64 * 2);
+            uiSprite.pushImage(startX, startY + y, 64, 1, lineBuffer);
+        }
+
+        // Dibujar sólo el nombre, SIN círculo de selección ni modos
+        Serial.println("Nombre elemento: " + String((char*)option->name));
+        drawElementName((char*)option->name, /* isSelected = */ false);
+
+        // Nota: No se dibuja drawModeName() ni drawSelectionCircle()
+    }
+    else {
+        // ---------- 3) CASO: ELEMENTO SPIFFS ----------
         fs::File f = SPIFFS.open(currentFile, "r");
         if (!f) {
             drawErrorMessage("Error leyendo elemento");
@@ -171,14 +185,15 @@ void drawCurrentElement() {
         drawSelectionCircle(selectedStates[currentIndex], startX, startY);
     }
 
-    // Actualizar `currentModeIndex` y reflejar el patrón en los LEDs
+    // Actualizar currentModeIndex y reflejar el patrón en los LEDs
     currentModeIndex = currentMode;
     // Llamar a setPatternBotonera con el gestor de efectos
     colorHandler.setPatternBotonera(currentModeIndex, ledManager);
 
-
-    // Mostrar el modo actual en el monitor serial
+    // Mostrar el modo actual en Serial
     Serial.println("Modo actual!: " + String(currentModeIndex));
+
+    // Flechas de navegación
     drawNavigationArrows();
     uiSprite.pushSprite(0, 0);
 }
@@ -343,22 +358,15 @@ void drawModesScreen() {
 
     int visibleCurrentModeIndex = -1; // Índice visible que se resaltará
 
-    if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Apagar") {
-    INFO_PACK_T* option = nullptr;
-    if (currentFile == "Ambientes") {
-        option = &ambientesOption;
-    } else if (currentFile == "Fichas") {
-        option = &fichasOption;
-    } else if (currentFile == "Apagar") {
-        option = &apagarSala;
-    }
+    // --- 1) Si es Ambientes o Fichas, mostramos sus modos ---
+    if (currentFile == "Ambientes" || currentFile == "Fichas") {
+        INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+
         // Cargar modos de las opciones dinámicas
         for (int i = 0; i < 16; i++) {
             if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
                 visibleModesMap[totalModes] = i; // Mapear índice visible al índice real
 
-                // CORRECCIÓN: en lugar de (i == currentModeIndex), comparamos el índice visible (totalModes)
-                // con currentModeIndex, porque currentModeIndex se usa como índice de la lista visible.
                 if (totalModes == currentModeIndex) {
                     visibleCurrentModeIndex = totalModes;
                 }
@@ -379,7 +387,21 @@ void drawModesScreen() {
                 totalModes++;
             }
         }
-    } else {
+    }
+    // --- 2) Si es Apagar, no mostramos modos ---
+    else if (currentFile == "Apagar") {
+        uiSprite.setTextDatum(TC_DATUM);
+        uiSprite.setTextSize(1);
+        uiSprite.setTextColor(TEXT_COLOR);
+        uiSprite.drawString("Sin modos disponibles", 64, 40);
+        uiSprite.pushSprite(0, 0);
+
+        // No hay modos, así que totalModes = 0.
+        totalModes = 0;
+        return; 
+    }
+    // --- 3) Elemento de SPIFFS ---
+    else {
         fs::File f = SPIFFS.open(currentFile, "r");
         if (!f) {
             Serial.println("Error al abrir archivo para leer modos.");
@@ -393,7 +415,6 @@ void drawModesScreen() {
             char modeDesc[193] = {0};
             byte modeConfig[2] = {0};
 
-            // Leer datos exactamente como `printElementInfo`
             if (f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet)) {
                 f.read((uint8_t*)modeName, 24);
                 f.read((uint8_t*)modeDesc, 192);
@@ -403,7 +424,6 @@ void drawModesScreen() {
                     if (checkMostSignificantBit(modeConfig)) {
                         visibleModesMap[totalModes] = i; // Mapear índice visible al índice real
 
-                        // CORRECCIÓN: mismo cambio que en la parte de dinámicos
                         if (totalModes == currentModeIndex) {
                             visibleCurrentModeIndex = totalModes;
                         }
@@ -426,10 +446,10 @@ void drawModesScreen() {
                 }
             }
         }
-
         f.close();
     }
 
+    // Si totalModes == 0, mostramos aviso
     if (totalModes == 0) {
         uiSprite.drawString("No hay modos disponibles", 10, 25);
         Serial.println("⚡ Advertencia: No hay modos disponibles para mostrar.");
@@ -447,9 +467,7 @@ void drawModesScreen() {
 
     uiSprite.pushSprite(0, 0);
 
-    // Actualizar desplazamiento objetivo
-    // Usamos visibleCurrentModeIndex para centrar la vista en el modo "resaltado"
-    // aunque, si ninguno coincidió, quedará en -1 y no forzará el scroll.
+    // Actualizar desplazamiento objetivo para centrar el modo resaltado
     if (visibleCurrentModeIndex >= 0) {
         targetScrollOffset = visibleCurrentModeIndex * cardHeightWithMargin;
         if (targetScrollOffset > totalModes * cardHeightWithMargin - 100) {
@@ -458,7 +476,7 @@ void drawModesScreen() {
         if (targetScrollOffset < 0) targetScrollOffset = 0;
     }
 
-    // Aplicar desplazamiento suave
+    // Desplazamiento suave
     scrollOffset += (targetScrollOffset - scrollOffset) / 4;
 
     // Actualizar el mapa global

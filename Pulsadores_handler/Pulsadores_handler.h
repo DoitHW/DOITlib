@@ -10,6 +10,7 @@ extern int filas[FILAS];
 extern int columnas[COLUMNAS];
 
 extern byte pulsadorColor[FILAS][COLUMNAS];
+extern bool relay_state;
 
 class PulsadoresHandler {
 public:

@@ -80,17 +80,16 @@ void handleEncoder() {
             // --- SINCRONIZACIÓN ANTES DE ENTRAR EN LA PANTALLA DE MODOS ---
             String currentFile = elementFiles[currentIndex];
 
+            // Si es "Apagar", no queremos abrir la pantalla de modos
+            if (currentFile == "Apagar") {
+                // Ignorar pulsación larga en Apagar
+                return;
+            }
+
             // 1) Obtener el modo real actualmente almacenado
             int realModeIndex = 0; // Por defecto
-            if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Apagar") {
-                INFO_PACK_T* option = nullptr;
-                if (currentFile == "Ambientes") {
-                    option = &ambientesOption;
-                } else if (currentFile == "Fichas") {
-                    option = &fichasOption;
-                } else { // "Apagar"
-                    option = &apagarSala;
-                }
+            if (currentFile == "Ambientes" || currentFile == "Fichas") {
+                INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
                 realModeIndex = option->currentMode; 
             } else {
                 fs::File f = SPIFFS.open(currentFile, "r");
@@ -105,16 +104,8 @@ void handleEncoder() {
             int tempCurrentModeIndex = 0;
             int foundVisibleIndex = -1;
             
-            if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Apagar") {
-                INFO_PACK_T* option = nullptr;
-                if (currentFile == "Ambientes") {
-                    option = &ambientesOption;
-                } else if (currentFile == "Fichas") {
-                    option = &fichasOption;
-                } else { // "Apagar"
-                    option = &apagarSala;
-                }
-
+            if (currentFile == "Ambientes" || currentFile == "Fichas") {
+                INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
                 for (int i = 0; i < 16; i++) {
                     if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
                         if (i == realModeIndex) {
@@ -166,9 +157,43 @@ void handleEncoder() {
     // Cuando se suelta el botón
     else {
         if (!hiddenMenuActive && buttonPressStart > 0 && millis() - buttonPressStart < 2000) {
+            String currentFile = elementFiles[currentIndex];
+
+            // --- CASO ESPECIAL: Apagar como "botón" que hace broadcast BLACKOUT ---
+            if (currentFile == "Apagar") {
+                // Envía trama de apagado (broadcast)
+                std::vector<byte> elementID;
+                elementID.clear();
+                elementID.push_back(0xFF); // Broadcast
+
+                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, BLACKOUT));
+
+                // Mostrar mensaje 5s
+                uiSprite.fillSprite(TFT_BLACK);
+                uiSprite.setTextDatum(MC_DATUM);
+                uiSprite.setTextSize(2);
+                uiSprite.setTextColor(TFT_WHITE);
+                uiSprite.drawString("APAGANDO", tft.width() / 2, tft.height() / 2 - 10);
+                uiSprite.drawString("Sala...", tft.width() / 2, tft.height() / 2 + 10);
+                uiSprite.pushSprite(0, 0);
+                relay_state = false;
+                
+                delay(5000);
+
+                // Regresar al "menú principal" (por ejemplo al índice 0)
+                currentIndex = 0;
+                inModesScreen = false;
+                drawCurrentElement();
+
+                // Reset pulsación
+                buttonPressStart = 0;
+                isLongPress = false;
+                return; 
+            }
+
+            // --- 1) Si estamos en la pantalla de modos (inModesScreen = true) ---
             if (inModesScreen) {
                 // Seleccionar modo actual
-                String currentFile = elementFiles[currentIndex];
                 std::vector<byte> elementID;
                 char elementName[25] = {0};
                 String modeName;
@@ -177,15 +202,8 @@ void handleEncoder() {
                 int realModeIndex = globalVisibleModesMap[currentModeIndex];
                 int modeNumber = currentModeIndex + 1; // Número del modo en la lista visible
 
-                if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Apagar") {
-                    INFO_PACK_T* option = nullptr;
-                    if (currentFile == "Ambientes") {
-                        option = &ambientesOption;
-                    } else if (currentFile == "Fichas") {
-                        option = &fichasOption;
-                    } else { // "Apagar"
-                        option = &apagarSala;
-                    }
+                if (currentFile == "Ambientes" || currentFile == "Fichas") {
+                    INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
                     option->currentMode = realModeIndex; 
                     modeName = String((char*)option->mode[realModeIndex].name);
                     elementID.push_back(0); // ID predeterminada
@@ -225,15 +243,15 @@ void handleEncoder() {
                 send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, elementID, realModeIndex));
                 inModesScreen = false;
                 drawCurrentElement(); // Redibuja el elemento actual con el nuevo modo
-            } else {
-                // Cambiar selección del elemento actual
+            }
+            // --- 2) Si NO estamos en la pantalla de modos (seleccionar/deseleccionar) ---
+            else {
                 selectedStates[currentIndex] = !selectedStates[currentIndex];
 
                 // Obtener la ID del elemento como std::vector<byte>
                 std::vector<byte> elementID;
-                String currentFile = elementFiles[currentIndex];
 
-                // Si NO es Ambientes, Fichas ni Apagar, se asume que es un elemento de SPIFFS
+                // Si NO es Ambientes, Fichas ni Apagar => es de SPIFFS
                 if (!currentFile.startsWith("Ambientes")
                     && !currentFile.startsWith("Fichas")
                     && !currentFile.startsWith("Apagar"))
@@ -250,8 +268,8 @@ void handleEncoder() {
                         elementID.push_back(0); // Valor por defecto en caso de error
                     }
                 } else {
-                    // Para los elementos fijos (Ambientes, Fichas, Apagar) usamos ID=0
-                    elementID.push_back(0);
+                    elementID.push_back(0); // Valor por defecto para Ambientes/Fichas
+                    // (Apagar ya está interceptado antes)
                 }
 
                 // Enviar el estado del color basado en la selección
@@ -269,7 +287,7 @@ void handleEncoder() {
             }
         }
 
-        // Resetear variables de pulsaciones
+        // Resetear pulsaciones
         buttonPressStart = 0;
         isLongPress = false;
     }
@@ -316,6 +334,7 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
             Serial.println("Cambiando idioma...");
             // Lógica para cambiar idioma
             formatSPIFFS();
+            loadElementsFromSPIFFS();
             hiddenMenuActive = false;
             break;
         case 2: // Sonido
