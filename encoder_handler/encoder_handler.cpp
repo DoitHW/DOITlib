@@ -82,8 +82,15 @@ void handleEncoder() {
 
             // 1) Obtener el modo real actualmente almacenado
             int realModeIndex = 0; // Por defecto
-            if (currentFile == "Ambientes" || currentFile == "Fichas") {
-                INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+            if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Apagar") {
+                INFO_PACK_T* option = nullptr;
+                if (currentFile == "Ambientes") {
+                    option = &ambientesOption;
+                } else if (currentFile == "Fichas") {
+                    option = &fichasOption;
+                } else { // "Apagar"
+                    option = &apagarSala;
+                }
                 realModeIndex = option->currentMode; 
             } else {
                 fs::File f = SPIFFS.open(currentFile, "r");
@@ -98,8 +105,16 @@ void handleEncoder() {
             int tempCurrentModeIndex = 0;
             int foundVisibleIndex = -1;
             
-            if (currentFile == "Ambientes" || currentFile == "Fichas") {
-                INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+            if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Apagar") {
+                INFO_PACK_T* option = nullptr;
+                if (currentFile == "Ambientes") {
+                    option = &ambientesOption;
+                } else if (currentFile == "Fichas") {
+                    option = &fichasOption;
+                } else { // "Apagar"
+                    option = &apagarSala;
+                }
+
                 for (int i = 0; i < 16; i++) {
                     if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
                         if (i == realModeIndex) {
@@ -162,8 +177,15 @@ void handleEncoder() {
                 int realModeIndex = globalVisibleModesMap[currentModeIndex];
                 int modeNumber = currentModeIndex + 1; // Número del modo en la lista visible
 
-                if (currentFile == "Ambientes" || currentFile == "Fichas") {
-                    INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+                if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Apagar") {
+                    INFO_PACK_T* option = nullptr;
+                    if (currentFile == "Ambientes") {
+                        option = &ambientesOption;
+                    } else if (currentFile == "Fichas") {
+                        option = &fichasOption;
+                    } else { // "Apagar"
+                        option = &apagarSala;
+                    }
                     option->currentMode = realModeIndex; 
                     modeName = String((char*)option->mode[realModeIndex].name);
                     elementID.push_back(0); // ID predeterminada
@@ -211,7 +233,11 @@ void handleEncoder() {
                 std::vector<byte> elementID;
                 String currentFile = elementFiles[currentIndex];
 
-                if (!currentFile.startsWith("Ambientes") && !currentFile.startsWith("Fichas")) {
+                // Si NO es Ambientes, Fichas ni Apagar, se asume que es un elemento de SPIFFS
+                if (!currentFile.startsWith("Ambientes")
+                    && !currentFile.startsWith("Fichas")
+                    && !currentFile.startsWith("Apagar"))
+                {
                     fs::File f = SPIFFS.open(currentFile, "r");
                     if (f) {
                         byte id = 0;
@@ -224,17 +250,18 @@ void handleEncoder() {
                         elementID.push_back(0); // Valor por defecto en caso de error
                     }
                 } else {
-                    elementID.push_back(0); // Valor por defecto para opciones dinámicas
+                    // Para los elementos fijos (Ambientes, Fichas, Apagar) usamos ID=0
+                    elementID.push_back(0);
                 }
 
                 // Enviar el estado del color basado en la selección
                 if (selectedStates[currentIndex]) {
                     Serial.printf("Enviando color blanco a la ID %d\n", elementID[0]);
-                    //send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, elementID, 0x00)); 
+                    //send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, elementID, 0x00));
                     send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, START_TEST));
                 } else {
                     Serial.printf("Enviando color negro a la ID %d\n", elementID[0]);
-                    //send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, elementID, 0x08)); 
+                    //send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, elementID, 0x08));
                     send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, BLACKOUT));
                 }
 
@@ -242,7 +269,7 @@ void handleEncoder() {
             }
         }
 
-        // Resetear pulsaciones
+        // Resetear variables de pulsaciones
         buttonPressStart = 0;
         isLongPress = false;
     }
@@ -288,6 +315,7 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
         case 1: // Cambiar idioma
             Serial.println("Cambiando idioma...");
             // Lógica para cambiar idioma
+            formatSPIFFS();
             hiddenMenuActive = false;
             break;
         case 2: // Sonido

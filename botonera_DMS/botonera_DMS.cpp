@@ -501,6 +501,7 @@ bool BOTONERA_::procesar_y_guardar_elemento_nuevo(byte targetID) {
 
     // Si llegamos aquí, descargamos todo OK => lo guardamos en SPIFFS
     bool guardado = guardar_elemento(infoPack);
+    print_info_pack(infoPack);
     delete infoPack;
 
     // guardado => true/false

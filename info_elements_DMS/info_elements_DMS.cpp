@@ -34,8 +34,7 @@ uint16_t get_info_num(int count, ...) {
                                                                         HAS_RELAY_1,
                                                                         ACCEPTS_SENS_VAL_1);
 
-                else if(modein == COLUMN_RB_MOTION_MODE) config= get_info_num(3, 
-                                                                        ACCEPTS_BASIC_COLOR,
+                else if(modein == COLUMN_RB_MOTION_MODE) config= get_info_num(2, 
                                                                         HAS_RELAY_1,
                                                                         ACCEPTS_SENS_VAL_1);
 

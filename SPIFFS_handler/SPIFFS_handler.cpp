@@ -264,30 +264,44 @@ bool readElementData(fs::File& f, char* elementName, char* modeName, int& startX
 
 
 void initializeDynamicOptions() {
-    // Configuración de la opción "Ambientes"
+    // ----- Ambientes -----
     memset(&ambientesOption, 0, sizeof(INFO_PACK_T));
     strncpy((char*)ambientesOption.name, "Ambientes", 24);
     strncpy((char*)ambientesOption.desc, "Configura los ambientes de la sala.", 192);
     ambientesOption.currentMode = 0;
     strncpy((char*)ambientesOption.mode[0].name, "Basico", 24);
     strncpy((char*)ambientesOption.mode[0].desc, "Modo basico para ambientes.", 192);
-    ambientesOption.mode[0].config[0] = 0x01;
-    ambientesOption.mode[0].config[1] = 0x00;
+    ambientesOption.mode[0].config[0] = 0x80;
+    ambientesOption.mode[0].config[1] = 0x01;
     memcpy(ambientesOption.icono, ambientes_64x64, sizeof(ambientesOption.icono));
 
-    // Configuración de la opción "Fichas"
+    // ----- Fichas -----
     memset(&fichasOption, 0, sizeof(INFO_PACK_T));
     strncpy((char*)fichasOption.name, "Fichas", 24);
     strncpy((char*)fichasOption.desc, "Interacción con fichas NFC.", 192);
     fichasOption.currentMode = 0;
     strncpy((char*)fichasOption.mode[0].name, "Basico", 24);
     strncpy((char*)fichasOption.mode[0].desc, "Modo basico para fichas NFC.", 192);
-    fichasOption.mode[0].config[0] = 0x02;
+    fichasOption.mode[0].config[0] = 0x82;
     fichasOption.mode[0].config[1] = 0x00;
     memcpy(fichasOption.icono, fichas_64x64, sizeof(fichasOption.icono));
     Serial.println("Nombre de fichasOption.name después de crear el icono: " + String((char*)fichasOption.name));
 
+    // ----- ApagarSala -----
+    memset(&apagarSala, 0, sizeof(INFO_PACK_T));
+    strncpy((char*)apagarSala.name, "Apagar", 24);
+    strncpy((char*)apagarSala.desc, "Apaga la sala por completo.", 192);
+    apagarSala.currentMode = 0;
+    // Puedes añadir uno o varios modos, aquí un ejemplo con un solo modo "OFF".
+    strncpy((char*)apagarSala.mode[0].name, "OFF", 24);
+    strncpy((char*)apagarSala.mode[0].desc, "Modo para apagar la sala.", 192);
+    apagarSala.mode[0].config[0] = 0x83; // El valor que tú desees para este modo
+    apagarSala.mode[0].config[1] = 0x00;
+
+    // Asumiendo que tienes un icono llamado apagar_64x64:
+    memcpy(apagarSala.icono, apagar_sala_64x64, sizeof(apagarSala.icono));
 }
+
 
 void loadElementsFromSPIFFS() {
     elementFiles.clear();
@@ -295,9 +309,14 @@ void loadElementsFromSPIFFS() {
 
     // Agregar las opciones dinámicas
     elementFiles.push_back("Ambientes");
-    selectedStates.push_back(false); // No seleccionada inicialmente
+    selectedStates.push_back(false);
+
     elementFiles.push_back("Fichas");
-    selectedStates.push_back(false); // No seleccionada inicialmente
+    selectedStates.push_back(false);
+
+    elementFiles.push_back("Apagar");
+    selectedStates.push_back(false);
+
 
     // Cargar elementos desde SPIFFS
     fs::File root = SPIFFS.open("/");
@@ -331,7 +350,7 @@ byte getCurrentElementID() {
     byte elementID = BROADCAST;  
     String currentFile = elementFiles[currentIndex];
 
-    if (currentFile == "Ambientes" || currentFile == "Fichas") {
+    if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Apagar") {
         INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
         return option->ID;
     }

@@ -39,7 +39,6 @@ void drawNoElementsMessage() {
     uiSprite.pushSprite(0, 0);
 }
 
-
 void drawErrorMessage(const char* message) {
     Serial.println(message);
     uiSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
@@ -106,10 +105,16 @@ void drawCurrentElement() {
     // Variable para almacenar el modo actual
     byte currentMode = 0;
 
-    if (currentFile == "Ambientes" || currentFile == "Fichas") {
-        // Opciones dinámicas
-        INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+     if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Apagar") {
+        INFO_PACK_T* option = nullptr;
 
+        if (currentFile == "Ambientes") {
+            option = &ambientesOption;
+        } else if (currentFile == "Fichas") {
+            option = &fichasOption;
+        } else if (currentFile == "Apagar") {
+            option = &apagarSala;
+        }
         // Leer y usar el modo actual desde la opción dinámica
         currentMode = option->currentMode;
 
@@ -338,9 +343,15 @@ void drawModesScreen() {
 
     int visibleCurrentModeIndex = -1; // Índice visible que se resaltará
 
-    if (currentFile == "Ambientes" || currentFile == "Fichas") {
-        INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
-
+    if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Apagar") {
+    INFO_PACK_T* option = nullptr;
+    if (currentFile == "Ambientes") {
+        option = &ambientesOption;
+    } else if (currentFile == "Fichas") {
+        option = &fichasOption;
+    } else if (currentFile == "Apagar") {
+        option = &apagarSala;
+    }
         // Cargar modos de las opciones dinámicas
         for (int i = 0; i < 16; i++) {
             if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {

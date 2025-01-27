@@ -603,7 +603,7 @@ void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager)
         }
         case 3: {
           //Serial.println("Frios");
-            // Patrón gradiente de colores fríos
+          // Patrón gradiente de colores fríos
           leds[0] = CRGB::Black; // Rojo  
           leds[1] = CRGB(0x33, 0x00, 0x66); // Morado oscuro
           leds[2] = CRGB(0x66, 0x00, 0xCC); // Morado brillante

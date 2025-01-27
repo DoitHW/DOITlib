@@ -89,6 +89,7 @@ void PulsadoresHandler::mostrarColor(byte color) {
         case RELAY:
             colorNombre = "Relay";
             relay_state = !relay_state;
+            target.push_back(0xFF); //Comentar o eliminar esta línea
             send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, target, relay_state));
             delay(5);
             break;

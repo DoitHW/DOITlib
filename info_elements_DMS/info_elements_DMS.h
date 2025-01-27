@@ -29,11 +29,11 @@ FLAGS de modo:
 */
 
 enum MODE_CONFIGS{
-    ACCEPTS_BASIC_COLOR= 0,
-    ACCEPTS_ADVANCED_COLOR,
-    HAS_RELAY_1,
-    HAS_RELAY_2,
-    ACCEPTS_SENS_VAL_1,
+    ACCEPTS_BASIC_COLOR= 0,  //Mapeja els 8 colors bàsics i cada pulsació envia color bàsic
+    ACCEPTS_ADVANCED_COLOR,  //Mapeja els 8 colors bàsics i permet mescla colors
+    HAS_RELAY_1,             //Mapeja només el botó relé (fade entre 2 colors)
+    HAS_RELAY_2,             //Unexpected 
+    ACCEPTS_SENS_VAL_1,      //Llegir i enviar valor sensor accelerometre
     ACCEPTS_SENS_VAL_2,
     SITUATED_HIGH,
     HAS_PASSIVE,
