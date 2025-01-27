@@ -88,7 +88,7 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             break;
         }
 
-        case F_SEND_TEST:{
+        case F_SEND_COMMAND:{
             byte testin= LEF.data[0];
             if     (testin == HELLO_TEST) delay(1); 
             else if(testin == START_TEST){

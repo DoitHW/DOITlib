@@ -168,7 +168,6 @@ void drawCurrentElement() {
 
     // Actualizar `currentModeIndex` y reflejar el patrón en los LEDs
     currentModeIndex = currentMode;
-    //colorHandler.setPatternBotonera(currentModeIndex);
     // Llamar a setPatternBotonera con el gestor de efectos
     colorHandler.setPatternBotonera(currentModeIndex, ledManager);
 
@@ -191,6 +190,132 @@ void animateTransition(int direction) {
 }
 
 // Función para mostrar la pantalla MODOS
+// void drawModesScreen() {
+//     static int scrollOffset = 0;
+//     static int targetScrollOffset = 0;
+
+//     uiSprite.fillSprite(BACKGROUND_COLOR);
+
+//     // Título
+//     uiSprite.setTextColor(TEXT_COLOR);
+//     uiSprite.setTextDatum(TC_DATUM);
+//     uiSprite.setTextSize(2);
+//     uiSprite.drawString("MODOS", 64, 5);
+
+//     // Obtener modos del elemento actual
+//     String currentFile = elementFiles[currentIndex];
+//     totalModes = 0;
+
+//     // Arreglo auxiliar para mapear índices visibles a índices reales
+//     int visibleModesMap[16] = {0};
+//     memset(visibleModesMap, -1, sizeof(visibleModesMap));  // Inicializar con -1
+
+//     if (currentFile == "Ambientes" || currentFile == "Fichas") {
+//         INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+
+//         // Cargar modos de las opciones dinámicas
+//         for (int i = 0; i < 16; i++) {
+//             if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
+//                 visibleModesMap[totalModes] = i;  // Mapear índice visible al índice real
+//                 int y = 30 + totalModes * (CARD_HEIGHT + CARD_MARGIN) - scrollOffset;
+//                 if (y > 20 && y < 110) {
+//                     uiSprite.fillRoundRect(9, y, CARD_WIDTH, CARD_HEIGHT, 5, CARD_COLOR);
+//                     uiSprite.drawRoundRect(9, y, CARD_WIDTH, CARD_HEIGHT, 5, (totalModes == currentModeIndex) ? HIGHLIGHT_COLOR : TEXT_COLOR);
+
+//                     uiSprite.setTextColor((totalModes == currentModeIndex) ? HIGHLIGHT_COLOR : TEXT_COLOR);
+//                     uiSprite.setTextDatum(CL_DATUM);
+//                     uiSprite.setTextSize(1);
+//                     uiSprite.drawString((char*)option->mode[i].name, 15, y + CARD_HEIGHT / 2);
+//                 }
+//                 totalModes++;
+//             }
+//         }
+//     } else {
+//         fs::File f = SPIFFS.open(currentFile, "r");
+//         if (!f) {
+//             Serial.println("Error al abrir archivo para leer modos.");
+//             uiSprite.drawString("Error leyendo modos", 10, 25);
+//             uiSprite.pushSprite(0, 0);
+//             return;
+//         }
+
+//         //Serial.println("⚡⚡⚡⚡ currentFile - drawModesScreen: " + String(currentFile));
+
+//         for (int i = 0; i < 16; i++) {
+//             char modeName[25] = {0};
+//             char modeDesc[193] = {0};
+//             byte modeConfig[2] = {0};
+
+//             // Leer datos exactamente como `printElementInfo`
+//             if (f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet)) {
+//                 f.read((uint8_t*)modeName, 24);
+//                 f.read((uint8_t*)modeDesc, 192);
+//                 f.read(modeConfig, 2);
+
+//                 if (strlen(modeName) > 0) {
+//                     //Serial.printf("Modo %d:\n", i);
+//                     //Serial.printf("  Nombre: %s\n", modeName);
+//                    // Serial.printf("  Descripción: %s\n", modeDesc);
+//                     //Serial.printf("  Configuración: 0x%02X%02X\n", modeConfig[0], modeConfig[1]);
+
+//                     // Verificar el bit más significativo
+//                     if (checkMostSignificantBit(modeConfig)) {
+//                         visibleModesMap[totalModes] = i;  // Mapear índice visible al índice real
+//                         Serial.printf("El bit más significativo del modo %d es 1\n", i);
+//                         int y = 30 + totalModes * (CARD_HEIGHT + CARD_MARGIN) - scrollOffset;
+//                         if (y > 20 && y < 110) {
+//                             uiSprite.fillRoundRect(9, y, CARD_WIDTH, CARD_HEIGHT, 5, CARD_COLOR);
+//                             uiSprite.drawRoundRect(9, y, CARD_WIDTH, CARD_HEIGHT, 5, (totalModes == currentModeIndex) ? HIGHLIGHT_COLOR : TEXT_COLOR);
+
+//                             uiSprite.setTextColor((totalModes == currentModeIndex) ? HIGHLIGHT_COLOR : TEXT_COLOR);
+//                             uiSprite.setTextDatum(CL_DATUM);
+//                             uiSprite.setTextSize(1);
+//                             uiSprite.drawString(modeName, 15, y + CARD_HEIGHT / 2);
+//                         }
+//                         totalModes++;
+//                     } else {
+//                         //Serial.printf("El bit más significativo del modo %d es 0\n", i);
+//                     }
+//                 } else {
+//                     //Serial.printf("Modo %d tiene nombre vacío o inválido.\n", i);
+//                 }
+//             } else {
+//                 Serial.printf("Error: No se pudo buscar el offset del modo %d\n", i);
+//             }
+//         }
+
+//         f.close();
+//     }
+
+//     if (totalModes == 0) {
+//         uiSprite.drawString("No hay modos disponibles", 10, 25);
+//         Serial.println("⚡ Advertencia: No hay modos disponibles para mostrar.");
+//         return;
+//     }
+
+//     // Dibujar barra de desplazamiento
+//     int cardHeightWithMargin = CARD_HEIGHT + CARD_MARGIN;
+//     int scrollBarHeight = 100 * (100.0 / (totalModes * cardHeightWithMargin));
+//     int scrollBarY = 25 + (100 - scrollBarHeight) * (scrollOffset / (float)(totalModes * cardHeightWithMargin - 100));
+
+//     uiSprite.fillRoundRect(122, 25, SCROLL_BAR_WIDTH, 100, 2, TFT_DARKGREY);
+//     uiSprite.fillRoundRect(122, scrollBarY, SCROLL_BAR_WIDTH, scrollBarHeight, 2, TEXT_COLOR);
+
+//     uiSprite.pushSprite(0, 0);
+
+//     // Actualizar desplazamiento objetivo
+//     targetScrollOffset = currentModeIndex * (CARD_HEIGHT + CARD_MARGIN);
+//     if (targetScrollOffset > totalModes * (CARD_HEIGHT + CARD_MARGIN) - 100) {
+//         targetScrollOffset = totalModes * (CARD_HEIGHT + CARD_MARGIN) - 100;
+//     }
+//     if (targetScrollOffset < 0) targetScrollOffset = 0;
+
+//     // Aplicar desplazamiento suave
+//     scrollOffset += (targetScrollOffset - scrollOffset) / 4;
+
+//     // Actualizar el mapa global
+//     memcpy(globalVisibleModesMap, visibleModesMap, sizeof(visibleModesMap));
+// }
 void drawModesScreen() {
     static int scrollOffset = 0;
     static int targetScrollOffset = 0;
@@ -211,17 +336,29 @@ void drawModesScreen() {
     int visibleModesMap[16] = {0};
     memset(visibleModesMap, -1, sizeof(visibleModesMap));  // Inicializar con -1
 
+    int visibleCurrentModeIndex = -1; // Índice visible que se resaltará
+
     if (currentFile == "Ambientes" || currentFile == "Fichas") {
         INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
 
         // Cargar modos de las opciones dinámicas
         for (int i = 0; i < 16; i++) {
             if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
-                visibleModesMap[totalModes] = i;  // Mapear índice visible al índice real
+                visibleModesMap[totalModes] = i; // Mapear índice visible al índice real
+
+                // CORRECCIÓN: en lugar de (i == currentModeIndex), comparamos el índice visible (totalModes)
+                // con currentModeIndex, porque currentModeIndex se usa como índice de la lista visible.
+                if (totalModes == currentModeIndex) {
+                    visibleCurrentModeIndex = totalModes;
+                }
+
                 int y = 30 + totalModes * (CARD_HEIGHT + CARD_MARGIN) - scrollOffset;
                 if (y > 20 && y < 110) {
                     uiSprite.fillRoundRect(9, y, CARD_WIDTH, CARD_HEIGHT, 5, CARD_COLOR);
-                    uiSprite.drawRoundRect(9, y, CARD_WIDTH, CARD_HEIGHT, 5, (totalModes == currentModeIndex) ? HIGHLIGHT_COLOR : TEXT_COLOR);
+                    uiSprite.drawRoundRect(
+                        9, y, CARD_WIDTH, CARD_HEIGHT, 5,
+                        (totalModes == currentModeIndex) ? HIGHLIGHT_COLOR : TEXT_COLOR
+                    );
 
                     uiSprite.setTextColor((totalModes == currentModeIndex) ? HIGHLIGHT_COLOR : TEXT_COLOR);
                     uiSprite.setTextDatum(CL_DATUM);
@@ -240,8 +377,6 @@ void drawModesScreen() {
             return;
         }
 
-        //Serial.println("⚡⚡⚡⚡ currentFile - drawModesScreen: " + String(currentFile));
-
         for (int i = 0; i < 16; i++) {
             char modeName[25] = {0};
             char modeDesc[193] = {0};
@@ -254,19 +389,21 @@ void drawModesScreen() {
                 f.read(modeConfig, 2);
 
                 if (strlen(modeName) > 0) {
-                    //Serial.printf("Modo %d:\n", i);
-                    //Serial.printf("  Nombre: %s\n", modeName);
-                   // Serial.printf("  Descripción: %s\n", modeDesc);
-                    //Serial.printf("  Configuración: 0x%02X%02X\n", modeConfig[0], modeConfig[1]);
-
-                    // Verificar el bit más significativo
                     if (checkMostSignificantBit(modeConfig)) {
-                        visibleModesMap[totalModes] = i;  // Mapear índice visible al índice real
-                        Serial.printf("El bit más significativo del modo %d es 1\n", i);
+                        visibleModesMap[totalModes] = i; // Mapear índice visible al índice real
+
+                        // CORRECCIÓN: mismo cambio que en la parte de dinámicos
+                        if (totalModes == currentModeIndex) {
+                            visibleCurrentModeIndex = totalModes;
+                        }
+
                         int y = 30 + totalModes * (CARD_HEIGHT + CARD_MARGIN) - scrollOffset;
                         if (y > 20 && y < 110) {
                             uiSprite.fillRoundRect(9, y, CARD_WIDTH, CARD_HEIGHT, 5, CARD_COLOR);
-                            uiSprite.drawRoundRect(9, y, CARD_WIDTH, CARD_HEIGHT, 5, (totalModes == currentModeIndex) ? HIGHLIGHT_COLOR : TEXT_COLOR);
+                            uiSprite.drawRoundRect(
+                                9, y, CARD_WIDTH, CARD_HEIGHT, 5,
+                                (totalModes == currentModeIndex) ? HIGHLIGHT_COLOR : TEXT_COLOR
+                            );
 
                             uiSprite.setTextColor((totalModes == currentModeIndex) ? HIGHLIGHT_COLOR : TEXT_COLOR);
                             uiSprite.setTextDatum(CL_DATUM);
@@ -274,14 +411,8 @@ void drawModesScreen() {
                             uiSprite.drawString(modeName, 15, y + CARD_HEIGHT / 2);
                         }
                         totalModes++;
-                    } else {
-                        //Serial.printf("El bit más significativo del modo %d es 0\n", i);
                     }
-                } else {
-                    //Serial.printf("Modo %d tiene nombre vacío o inválido.\n", i);
                 }
-            } else {
-                Serial.printf("Error: No se pudo buscar el offset del modo %d\n", i);
             }
         }
 
@@ -291,6 +422,7 @@ void drawModesScreen() {
     if (totalModes == 0) {
         uiSprite.drawString("No hay modos disponibles", 10, 25);
         Serial.println("⚡ Advertencia: No hay modos disponibles para mostrar.");
+        uiSprite.pushSprite(0, 0);
         return;
     }
 
@@ -305,11 +437,15 @@ void drawModesScreen() {
     uiSprite.pushSprite(0, 0);
 
     // Actualizar desplazamiento objetivo
-    targetScrollOffset = currentModeIndex * (CARD_HEIGHT + CARD_MARGIN);
-    if (targetScrollOffset > totalModes * (CARD_HEIGHT + CARD_MARGIN) - 100) {
-        targetScrollOffset = totalModes * (CARD_HEIGHT + CARD_MARGIN) - 100;
+    // Usamos visibleCurrentModeIndex para centrar la vista en el modo "resaltado"
+    // aunque, si ninguno coincidió, quedará en -1 y no forzará el scroll.
+    if (visibleCurrentModeIndex >= 0) {
+        targetScrollOffset = visibleCurrentModeIndex * cardHeightWithMargin;
+        if (targetScrollOffset > totalModes * cardHeightWithMargin - 100) {
+            targetScrollOffset = totalModes * cardHeightWithMargin - 100;
+        }
+        if (targetScrollOffset < 0) targetScrollOffset = 0;
     }
-    if (targetScrollOffset < 0) targetScrollOffset = 0;
 
     // Aplicar desplazamiento suave
     scrollOffset += (targetScrollOffset - scrollOffset) / 4;

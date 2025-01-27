@@ -991,12 +991,12 @@ FRAME_T frameMaker_SEND_FILE_NUM(byte originin, std::vector<byte>targetin, byte 
 }
 
 
-FRAME_T frameMaker_SEND_TEST(byte originin, std::vector<byte>targetin, byte testin){
+FRAME_T frameMaker_SEND_COMMAND (byte originin, std::vector<byte>targetin, byte commandin){
 
     FRAME_T frame;
     memset(&frame, 0, sizeof(FRAME_T));
-    frame.data.resize(L_SEND_TEST);
-    uint16_t  frameLength = 0x07 + targetin.size() + L_SEND_TEST;
+    frame.data.resize(L_SEND_COMMAND);
+    uint16_t  frameLength = 0x07 + targetin.size() + L_SEND_COMMAND;
 
     frame.start= NEW_START;
     frame.frameLengthLsb = frameLength & 0xFF;     
@@ -1004,10 +1004,10 @@ FRAME_T frameMaker_SEND_TEST(byte originin, std::vector<byte>targetin, byte test
     frame.origin= originin;
     frame.numTargets = targetin.size();
     frame.target= targetin;
-    frame.function= F_SEND_TEST;
-    frame.dataLengthMsb = (L_SEND_TEST >> 8) & 0xFF; 
-    frame.dataLengthLsb = L_SEND_TEST & 0xFF;   
-    frame.data[0]= testin;
+    frame.function= F_SEND_COMMAND;
+    frame.dataLengthMsb = (L_SEND_COMMAND >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_SEND_COMMAND & 0xFF;   
+    frame.data[0]= commandin;
     frame.checksum= checksum_calc(frame);
     frame.end= NEW_END;
 

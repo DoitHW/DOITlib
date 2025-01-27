@@ -42,35 +42,114 @@ void handleEncoder() {
         int32_t direction = (newEncoderValue > lastEncoderValue) ? 1 : -1;
         lastEncoderValue = newEncoderValue;
 
+        // Navegar por elementos
         if (!inModesScreen && elementFiles.size() > 1) {
             Serial.println("Encoder girado, cambiando de elemento...");
             currentIndex = (currentIndex + direction + elementFiles.size()) % elementFiles.size();
 
-            // Actualizar el elemento actual y el modo actual
-            drawCurrentElement();  // Llama a `setPatternBotonera` con el modo actualizado
-        } else if (inModesScreen && totalModes > 0) {
+            // Redibujar el elemento actual y actualizar patrón
+            drawCurrentElement();  // Llama a setPatternBotonera() con el modo actualizado
+        }
+        // Navegar por modos visibles
+        else if (inModesScreen && totalModes > 0) {
+            // currentModeIndex se maneja como índice 'visible'
             currentModeIndex = (currentModeIndex + direction + totalModes) % totalModes;
 
-            // Traducir índice visible al índice real
+            // Obtener el índice real a partir del índice visible
             int realModeIndex = globalVisibleModesMap[currentModeIndex];
             if (realModeIndex >= 0) {
-                colorHandler.setPatternBotonera(realModeIndex, ledManager);  // Actualizar patrones con el modo real
+                // Actualizar patrón en la botonera
+                colorHandler.setPatternBotonera(realModeIndex, ledManager);
             }
+            // Redibujar la pantalla de modos
             drawModesScreen();
         }
     }
 
+    // Lectura del botón del encoder
     if (digitalRead(ENC_BUTTON) == LOW) {
         if (buttonPressStart == 0) {
-            buttonPressStart = millis(); // Registrar inicio
-        } else if (!hiddenMenuActive && millis() - buttonPressStart > 2000 && !isLongPress) {
+            // Registrar inicio de la pulsación
+            buttonPressStart = millis();
+        }
+        // Pulsación larga para mostrar menú de modos
+        else if (!hiddenMenuActive && millis() - buttonPressStart > 2000 && !isLongPress) {
             isLongPress = true;
-            inModesScreen = true;
             modeScreenEnteredByLongPress = true;
 
-            drawModesScreen(); // Muestra la pantalla de modos
+            // --- SINCRONIZACIÓN ANTES DE ENTRAR EN LA PANTALLA DE MODOS ---
+            String currentFile = elementFiles[currentIndex];
+
+            // 1) Obtener el modo real actualmente almacenado
+            int realModeIndex = 0; // Por defecto
+            if (currentFile == "Ambientes" || currentFile == "Fichas") {
+                INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+                realModeIndex = option->currentMode; 
+            } else {
+                fs::File f = SPIFFS.open(currentFile, "r");
+                if (f) {
+                    f.seek(OFFSET_CURRENTMODE, SeekSet);
+                    realModeIndex = f.read(); // Lee un byte (modo real)
+                    f.close();
+                }
+            }
+
+            // 2) Encontrar cuál es su índice visible (currentModeIndex) en la lista filtrada
+            int tempCurrentModeIndex = 0;
+            int foundVisibleIndex = -1;
+            
+            if (currentFile == "Ambientes" || currentFile == "Fichas") {
+                INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+                for (int i = 0; i < 16; i++) {
+                    if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
+                        if (i == realModeIndex) {
+                            foundVisibleIndex = tempCurrentModeIndex;
+                            break;
+                        }
+                        tempCurrentModeIndex++;
+                    }
+                }
+            } else {
+                fs::File f = SPIFFS.open(currentFile, "r");
+                if (f) {
+                    for (int i = 0; i < 16; i++) {
+                        char modeName[25] = {0};
+                        char modeDesc[193] = {0};
+                        byte modeConfig[2] = {0};
+
+                        if (f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet)) {
+                            f.read((uint8_t*)modeName, 24);
+                            f.read((uint8_t*)modeDesc, 192);
+                            f.read(modeConfig, 2);
+
+                            if (strlen(modeName) > 0 && checkMostSignificantBit(modeConfig)) {
+                                if (i == realModeIndex) {
+                                    foundVisibleIndex = tempCurrentModeIndex;
+                                    break;
+                                }
+                                tempCurrentModeIndex++;
+                            }
+                        }
+                    }
+                    f.close();
+                }
+            }
+
+            // 3) Ajustar currentModeIndex para que la pantalla de modos lo muestre en verde
+            if (foundVisibleIndex >= 0) {
+                currentModeIndex = foundVisibleIndex;
+            } else {
+                // Si no se encontró, arrancamos la lista en 0
+                currentModeIndex = 0;
+            }
+            // --- FIN DE LA SINCRONIZACIÓN ---
+
+            inModesScreen = true;
+            drawModesScreen(); // Muestra la pantalla de modos con el modo sincronizado
         }
-    } else {
+    } 
+    // Cuando se suelta el botón
+    else {
         if (!hiddenMenuActive && buttonPressStart > 0 && millis() - buttonPressStart < 2000) {
             if (inModesScreen) {
                 // Seleccionar modo actual
@@ -78,23 +157,25 @@ void handleEncoder() {
                 std::vector<byte> elementID;
                 char elementName[25] = {0};
                 String modeName;
-                int realModeIndex = globalVisibleModesMap[currentModeIndex]; // Obtener el índice real
-                int modeNumber = currentModeIndex + 1; // Número del modo
+
+                // Obtener el índice real a partir del índice visible (currentModeIndex)
+                int realModeIndex = globalVisibleModesMap[currentModeIndex];
+                int modeNumber = currentModeIndex + 1; // Número del modo en la lista visible
 
                 if (currentFile == "Ambientes" || currentFile == "Fichas") {
                     INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
-                    option->currentMode = realModeIndex; // Actualizar el índice real
+                    option->currentMode = realModeIndex; 
                     modeName = String((char*)option->mode[realModeIndex].name);
                     elementID.push_back(0); // ID predeterminada
                 } else {
                     // Leer y actualizar el archivo SPIFFS
                     fs::File f = SPIFFS.open(currentFile, "r+");
                     if (f) {
-                        // Guardar el nuevo modo seleccionado en el archivo
+                        // Guardar el nuevo modo seleccionado
                         f.seek(OFFSET_CURRENTMODE, SeekSet);
-                        f.write((uint8_t*)&realModeIndex, 1); // Escribir el índice real
+                        f.write((uint8_t*)&realModeIndex, 1);
 
-                        // Leer el nombre del elemento
+                        // Leer nombre del elemento
                         f.seek(OFFSET_NAME, SeekSet);
                         f.read((uint8_t*)elementName, 24);
 
@@ -104,7 +185,7 @@ void handleEncoder() {
                         f.read(&id, 1);
                         elementID.push_back(id);
 
-                        // Leer el nombre del modo actual
+                        // Leer el nombre del modo
                         f.seek(OFFSET_MODES + (SIZE_MODE * realModeIndex), SeekSet);
                         char modeNameBuf[25] = {0};
                         f.read((uint8_t*)modeNameBuf, 24);
@@ -114,10 +195,11 @@ void handleEncoder() {
                     }
                 }
 
-                // Mostrar información por Serial
+                // Mostrar en Serial
                 Serial.printf("Nombre del elemento: %s\n", elementName[0] ? elementName : currentFile.c_str());
                 Serial.printf("ID del elemento: %d\n", elementID[0]);
                 Serial.printf("Modo seleccionado: %s (Modo %d)\n", modeName.c_str(), modeNumber);
+
                 send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, elementID, realModeIndex));
                 inModesScreen = false;
                 drawCurrentElement(); // Redibuja el elemento actual con el nuevo modo
@@ -148,16 +230,19 @@ void handleEncoder() {
                 // Enviar el estado del color basado en la selección
                 if (selectedStates[currentIndex]) {
                     Serial.printf("Enviando color blanco a la ID %d\n", elementID[0]);
-                    send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, elementID, 0x00)); // Enviar color blanco
+                    //send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, elementID, 0x00)); 
+                    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, START_TEST));
                 } else {
                     Serial.printf("Enviando color negro a la ID %d\n", elementID[0]);
-                    send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, elementID, 0x08)); // Enviar color negro
+                    //send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, elementID, 0x08)); 
+                    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, BLACKOUT));
                 }
 
                 drawCurrentElement(); // Redibuja el elemento actual
             }
         }
 
+        // Resetear pulsaciones
         buttonPressStart = 0;
         isLongPress = false;
     }
@@ -195,8 +280,7 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
     encoderButtonPressed = true;
     byte respuesta = 0;
     switch (hiddenMenuSelection) {
-        case 0: {// Escanear sala
-            Serial.println("Buscar elemento nuevo...");
+        case 0: {// Añadir elemento
             element->validar_elemento();
             hiddenMenuActive = false;
             break;

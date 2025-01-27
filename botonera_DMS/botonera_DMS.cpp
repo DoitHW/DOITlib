@@ -108,7 +108,7 @@ byte BOTONERA_::validar_serial() {
 
     for (int intento = 0; intento < max_reintentos; intento++) {
         // Mostrar algo en la interfaz de usuario, p.ej. "Escaneando..."
-        iniciarEscaneoElemento("Escaneando...");
+        iniciarEscaneoElemento("Buscando elementos...");
 
         // Petición de ELEM_SERIAL_SECTOR al DEFAULT_DEVICE
         send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA,
@@ -322,11 +322,6 @@ void BOTONERA_::reasignar_id_elemento(INFO_PACK_T* infoPack) {
     send_frame(frameMaker_SET_ELEM_ID(DEFAULT_BOTONERA, DEFAULT_DEVICE, newID));
     delay(10);
 
-    // Ejemplo: envío de test
-    std::vector<byte> target;
-    target.push_back(currentID);
-    send_frame(frameMaker_SEND_TEST(DEFAULT_BOTONERA, target, newID));
-
     Serial.println("🆙🆙🆙🆙 ID reasignada");
 }
 
@@ -339,7 +334,7 @@ void BOTONERA_::validar_elemento() {
     switch (resultado) {
         case 0: {
             // Error al leer el serial
-            Serial.println("❌ No se pudo validar el serial");
+            Serial.println("❌ No se obtuvo respuesta");
             mostrarMensajeTemporal(0, 3000);
             return;
         }
@@ -395,7 +390,8 @@ void BOTONERA_::validar_elemento() {
                 return;
             }
             Serial.printf("✅ Nueva ID asignada y confirmada: 0x%02X\n", lastAssignedID);
-
+            iniciarEscaneoElemento("Escaneando...");
+            actualizarBarraProgreso(0);
             // 4) Descargamos la información completa del elemento (nombre, desc, modos...)
             bool exito = procesar_y_guardar_elemento_nuevo(lastAssignedID);
 
@@ -646,17 +642,76 @@ bool BOTONERA_::serialExistsInSPIFFS(byte serialNum[5]) {
     return false;
 }
 
+// void BOTONERA_::iniciarEscaneoElemento(const char* mensajeInicial) {
+//     tft.fillScreen(TFT_BLACK);
+//     dibujarMarco(TFT_WHITE);
+    
+//     tft.setTextColor(TFT_WHITE);
+//     tft.setTextDatum(MC_DATUM);
+//     tft.setTextFont(2); // Usa Font 2
+//     tft.drawString(mensajeInicial, 64, 30);
+//     delay(100);
+    
+// }
+
 void BOTONERA_::iniciarEscaneoElemento(const char* mensajeInicial) {
     tft.fillScreen(TFT_BLACK);
     dibujarMarco(TFT_WHITE);
     
     tft.setTextColor(TFT_WHITE);
-    tft.setTextDatum(MC_DATUM);
-    tft.setTextFont(2); // Usa Font 2
-    tft.drawString(mensajeInicial, 64, 30);
+    tft.setTextDatum(MC_DATUM); // Cada línea centrada
+    tft.setTextFont(2);
+    
+    const uint16_t maxWidth = 120; // Ancho máximo por línea con margen
+    const uint8_t lineHeight = tft.fontHeight(); // Altura de la fuente
+    uint16_t yPos = 30; // Posición vertical inicial
+    const uint16_t screenHeight = 128;
+
+    const char* start = mensajeInicial;
+    const char* end = start;
+    const char* lastSpace = nullptr;
+
+    while (*start) {
+        end = start;
+        lastSpace = nullptr;
+        uint16_t currentWidth = 0;
+
+        // Encontrar el punto de corte para la línea actual
+        while (*end) {
+            if (*end == ' ') lastSpace = end;
+
+            // Calcular ancho hasta el carácter actual
+            char temp[21] = {0};
+            strncpy(temp, start, end - start + 1);
+            currentWidth = tft.textWidth(temp);
+
+            if (currentWidth > maxWidth) break;
+            end++;
+        }
+
+        // Ajustar el corte al último espacio si es posible
+        if (lastSpace && lastSpace > start && lastSpace < end) {
+            end = lastSpace;
+        } else if (end == start) {
+            end++; // Caso extremo: un carácter muy ancho
+        } else if (*end) {
+            end--; // Retroceder si se superó el ancho
+        }
+
+        // Extraer y dibujar la línea
+        char line[128] = {0};
+        strncpy(line, start, end - start);
+        tft.drawString(line, 64, yPos);
+
+        yPos += lineHeight;
+        if (yPos + lineHeight > screenHeight) break; // Verificar espacio vertical
+
+        start = (*end == ' ') ? end + 1 : end; // Saltar espacios si los hay
+    }
+    
     delay(100);
-    actualizarBarraProgreso(0);
 }
+
 
 void BOTONERA_::actualizarBarraProgreso(float progreso) {
     int barraAnchoMax = 100;
@@ -721,7 +776,7 @@ void BOTONERA_::mostrarMensajeTemporal(int respuesta, int dTime) {
     } else if (respuesta == 2) {
         colorTexto = TFT_GREEN;
         mensajePrincipal = "NUEVO";
-        mensajeSecundario = "Elemento nuevo    Agregado";
+        mensajeSecundario = "  Elemento nuevo  Agregado";
     } else if (respuesta == 1) {
         colorTexto = TFT_YELLOW;
         mensajePrincipal = "ADVERTENCIA";

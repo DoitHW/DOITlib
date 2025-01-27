@@ -126,8 +126,8 @@
 #define L_SEND_PATTERN_NUM    0x01  
 #define F_SEND_FLAG_BYTE      0xCE
 #define L_SEND_FLAG_BYTE      0x01
-#define F_SEND_TEST           0xCF
-#define L_SEND_TEST           0x01
+#define F_SEND_COMMAND        0xCF
+#define L_SEND_COMMAND        0x01
 
 #define F_RETURN_ELEM_SECTOR     0xD0
 #define L_RETURN_ELEM_SECTOR_01  0x01

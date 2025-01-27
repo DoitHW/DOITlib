@@ -71,7 +71,6 @@ void PulsadoresHandler::mostrarColor(byte color) {
     }
 
     byte elementID = getCurrentElementID();  // Obtener la ID solo si está seleccionado
-    elementID = 0xFF;
     target.push_back(elementID);  
 
     static bool relay_state = false;
@@ -90,10 +89,8 @@ void PulsadoresHandler::mostrarColor(byte color) {
         case RELAY:
             colorNombre = "Relay";
             relay_state = !relay_state;
-            target.push_back(0xFF);
             send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, target, relay_state));
             delay(5);
-            send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA, 0x01, SPANISH_LANG, ELEM_LIFE_TIME_SECTOR));
             break;
         default:
             Serial.println("Ningún botón presionado.");
@@ -104,8 +101,7 @@ void PulsadoresHandler::mostrarColor(byte color) {
         send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, color));
     }
 
-    Serial.print("Botón presionado y seleccionado: ");
-    Serial.println(colorNombre);
+    Serial.print("Botón presionado y seleccionado: " + String(colorNombre));
 }
 
 void PulsadoresHandler::limpiarEstados() {
