@@ -20,6 +20,10 @@ void animateTransition(int direction);
 void drawModesScreen();
 void drawCurrentElement();
 
+void handleModeSelection(const String& currentFile);
+void toggleElementSelection(const String& currentFile);
+void requestAndSyncElementMode();
+
 // Variables externas requeridas
 extern std::vector<String> elementFiles;
 extern std::vector<bool> selectedStates;

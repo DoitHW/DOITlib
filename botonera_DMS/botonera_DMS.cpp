@@ -91,6 +91,41 @@ void BOTONERA_::sectorIn_handler(std::vector<byte> data, byte targetin) {
         //Aquí copiar data a partir de data[1] a INFO_PACK_T
         break;
     }
+     case ELEM_CMODE_SECTOR:{
+        
+        
+                    // Procesar modo actual recibido
+            byte receivedMode = data[1];
+            Serial.println("📢 ID: "+String(targetin) + " con MODO " +String(receivedMode));
+
+            // Leer el modo almacenado en SPIFFS
+            fs::File file = SPIFFS.open(getCurrentFilePath(targetin), "r+");
+            if (!file) {
+                Serial.println("Error: No se pudo abrir el archivo en SPIFFS.");
+                break;
+            }
+
+            // Obtener el modo actual almacenado
+            file.seek(OFFSET_CURRENTMODE, SeekSet);
+            byte storedMode;
+            file.read(&storedMode, 1);
+
+            // Comparar y actualizar si es necesario
+            if (storedMode != receivedMode) {
+                Serial.printf("Actualizando el modo en SPIFFS: %d -> %d\n", storedMode, receivedMode);
+                file.seek(OFFSET_CURRENTMODE, SeekSet);
+                file.write(&receivedMode, 1);
+            } else {
+                Serial.println("El modo recibido coincide con el almacenado en SPIFFS.");
+            }
+
+            file.close();
+
+            // Redibujar la pantalla para reflejar los cambios
+            drawCurrentElement();
+        
+        break;
+    }
     case ELEM_ICON_ROW_63_SECTOR:{
 
     break;
@@ -100,6 +135,26 @@ void BOTONERA_::sectorIn_handler(std::vector<byte> data, byte targetin) {
         break;
     }
 }
+
+String BOTONERA_::getCurrentFilePath(byte elementID) {
+    for (const String& fileName : elementFiles) {
+        fs::File file = SPIFFS.open(fileName, "r");
+        if (!file) continue;
+
+        file.seek(OFFSET_ID, SeekSet);
+        byte id;
+        file.read(&id, 1);
+        file.close();
+
+        if (id == elementID) {
+            return fileName;  // Devolver el archivo que coincide con la ID
+        }
+    }
+
+    Serial.printf("Error: No se encontró un archivo para el elemento ID %d.\n", elementID);
+    return String();  // Retornar cadena vacía si no se encuentra
+}
+
 
 byte tempID;
 byte BOTONERA_::validar_serial() {
@@ -445,7 +500,7 @@ bool BOTONERA_::confirmarCambioID(byte nuevaID) {
                                           ELEM_ID_SECTOR));
 
     if (!esperar_respuesta(2000)) {
-        Serial.println("No llegó respuesta");
+        Serial.println("No llegó respuesta de ELEM_ID_SECTOR");
         return false;
     }
 
