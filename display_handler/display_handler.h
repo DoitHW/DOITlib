@@ -15,6 +15,6 @@ void drawElementIcon(fs::File& f, int startX, int startY);
 void drawHiddenMenu(int selection);
 void scrollTextTickerBounce(int selection);
 
-
+extern bool isScrollingText;
 extern TFT_eSPI tft;
 extern TFT_eSprite uiSprite;

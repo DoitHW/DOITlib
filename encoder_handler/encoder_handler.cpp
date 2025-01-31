@@ -319,6 +319,8 @@ void handleEncoder() {
             int realModeIndex = globalVisibleModesMap[currentModeIndex];
             if (realModeIndex >= 0) {
                 // Actualizar patrón en la botonera
+                String currentFile = elementFiles[currentIndex];
+                colorHandler.setCurrentFile(currentFile);
                 colorHandler.setPatternBotonera(realModeIndex, ledManager);
             }
             // Redibujar la pantalla de modos

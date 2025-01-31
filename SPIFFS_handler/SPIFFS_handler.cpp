@@ -373,8 +373,34 @@ bool isCurrentElementSelected() {
 
 bool checkMostSignificantBit(byte modeConfig[2]) {
     // Devuelve true si el bit más significativo del primer byte es 1, de lo contrario false
-    Serial.println("Devolviendo el bit más significativo del modo. ");
+    //Serial.println("Devolviendo el bit más significativo del modo. ");
     return (modeConfig[0] & 0x80) != 0;
+}
+
+bool getModeConfig(const String& fileName, byte mode, byte modeConfig[2]) {
+    memset(modeConfig, 0, 2); // Inicializar en 0
+
+    if (fileName == "Ambientes" || fileName == "Fichas") {
+        INFO_PACK_T* option = (fileName == "Ambientes") ? &ambientesOption : &fichasOption;
+        memcpy(modeConfig, option->mode[mode].config, 2);
+        return true;
+    } else {
+        fs::File f = SPIFFS.open(fileName, "r");
+        if (!f) {
+            Serial.println("❌ Error abriendo el archivo: " + fileName);
+            return false;
+        }
+
+        f.seek(OFFSET_MODES + (SIZE_MODE * mode) + 24 + 192, SeekSet);
+        if (f.read(modeConfig, 2) != 2) {
+            Serial.println("❌ Error leyendo configuración del modo");
+            f.close();
+            return false;
+        }
+
+        f.close();
+        return true;
+    }
 }
 
 

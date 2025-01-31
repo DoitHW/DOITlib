@@ -6,6 +6,8 @@
 #include <math.h>
 #include <FastLED.h>
 #include <DynamicLEDManager_DMS/DynamicLEDManager_DMS.h>
+#include <SPIFFS_handler/SPIFFS_handler.h>
+#include <info_elements_DMS/info_elements_DMS.h>
 //testing MARC 2
 //testing 2 3 4
 //testing 3
@@ -544,83 +546,71 @@ void COLORHANDLER_::set_botoneraPattern (byte patternin){
 }
 
 void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager) {
-  //Serial.println("setPatternBotonera: " + String(mode));
-  ledManager.clearEffects(); // Limpiar efectos dinámicos previos
-    switch (mode) {
-        case 0: {
-         // Serial.println("Basico");
-            // Patrón básico: Colores específicos para cada LED
-            for (int i = 0; i < numLeds; i++) {
-                switch (i) {
-                    case 0: leds[i] = CRGB::Brown; break;
-                    case 1: leds[i] = CRGB::White; break;
-                    case 2: leds[i] = CRGB::Red; break;
-                    case 3: leds[i] = CRGB::Cyan; break;
-                    case 4: leds[i] = CRGB::Yellow; break;
-                    case 5: leds[i] = CRGB(0xFF, 0x59, 0x00); break;
-                    case 6: leds[i] = CRGB::Green; break;
-                    case 7: leds[i] = CRGB(0xFF, 0x00, 0xD2); break;
-                    case 8: leds[i] = CRGB::Blue; break;
-                    default: leds[i] = CRGB::Black; break;
-                }
-            }
-            break;
-        }
-        case 1: {
-          Serial.println("Modo 1 dinamic effect");
-                   // Colores básicos para LEDs 1-8
-            for (int i = 1; i < NUM_LEDS; i++) {
-                switch (i) {
-                    case 1: leds[i] = CRGB::White; break;
-                    case 2: leds[i] = CRGB::Red; break;
-                    case 3: leds[i] = CRGB::Cyan; break;
-                    case 4: leds[i] = CRGB::Yellow; break;
-                    case 5: leds[i] = CRGB(0xFF, 0x59, 0x00); break;
-                    case 6: leds[i] = CRGB::Green; break;
-                    case 7: leds[i] = CRGB(0xFF, 0x00, 0xD2); break;
-                    case 8: leds[i] = CRGB::Blue; break;
-                    default: leds[i] = CRGB::Black; break;
-                }
-            }
+    Serial.printf("setPatternBotonera: %d\n", mode);
+    ledManager.clearEffects(); // Limpiar efectos dinámicos previos
 
-            // Registrar el efecto dinámico para el LED 0 (fade entre celeste y azul)
-            ledManager.addEffect(new FadeEffect(*this, 0, CRGB::Blue, CRGB::Cyan, 50));
-        break;
-        }
-        case 2: {
-          //Serial.println("Frios");
-            // Patrón gradiente de colores fríos
-          leds[0] = CRGB::Black;              // Negro (equivalente al "rojo" inicial apagado)
-          leds[1] = CRGB(0x80, 0x00, 0x00);   // Rojo oscuro (borgoña)
-          leds[2] = CRGB(0xFF, 0x00, 0x00);   // Rojo puro
-          leds[3] = CRGB(0xFF, 0x66, 0x00);   // Naranja brillante
-          leds[4] = CRGB(0xFF, 0xA5, 0x00);   // Naranja cálido (ámbar)
-          leds[5] = CRGB(0xFF, 0xFF, 0x00);   // Amarillo puro
-          leds[6] = CRGB(0xFF, 0xE6, 0x33);   // Amarillo dorado (mostaza)
-          leds[7] = CRGB(0xFF, 0xF2, 0xCC);   // Blanco cálido con tinte crema
-          leds[8] = CRGB(0xFF, 0xFA, 0xE6);   // Blanco marfil (ligeramente más claro)
-        break;
-        }
-        case 3: {
-          //Serial.println("Frios");
-          // Patrón gradiente de colores fríos
-          leds[0] = CRGB::Black; // Rojo  
-          leds[1] = CRGB(0x33, 0x00, 0x66); // Morado oscuro
-          leds[2] = CRGB(0x66, 0x00, 0xCC); // Morado brillante
-          leds[3] = CRGB(0x00, 0x00, 0xFF); // Azul puro
-          leds[4] = CRGB(0x33, 0x66, 0xFF); // Azul cielo
-          leds[5] = CRGB(0x00, 0xCC, 0xFF); // Turquesa intenso
-          leds[6] = CRGB(0x33, 0xFF, 0xFF); // Turquesa brillante
-          leds[7] = CRGB(0x99, 0xCC, 0xFF); // Azul claro con blanco
-          leds[8] = CRGB(0xFF, 0xFF, 0xFF); // Blanco puro
-        break;
-        }
-        default: {
-            // Sin patrón: Apagar todos los LEDs
-            fill_solid(leds, numLeds, CRGB::Black);
-            break;
-        }
+    // Verificar que el modo está dentro del rango válido (0-15)
+    if (mode >= 16) {
+        Serial.printf("⚠️ Modo inválido: %d\n", mode);
+        return;
     }
-    // Actualizar la visualización de los LEDs
-    //FastLED.show();
+
+    // Obtener la configuración de flags del modo actual usando SPIFFS_handler::getModeConfig
+    byte modeConfig[2] = {0};
+    if (!getModeConfig(currentFile, mode, modeConfig)) {
+        Serial.println("⚠️ No se pudo obtener la configuración del modo.");
+        return;
+    }
+
+    // **Imprimir configuración en HEX y BINARIO**
+    Serial.printf("Modo %d - Configuración HEX: 0x%02X%02X\n", mode, modeConfig[0], modeConfig[1]);
+    Serial.print("Modo " + String(mode) + " - Configuración BIN: ");
+    for (int i = 7; i >= 0; i--) Serial.print((modeConfig[1] >> i) & 1);
+    Serial.print(" ");
+    for (int i = 7; i >= 0; i--) Serial.print((modeConfig[0] >> i) & 1);
+    Serial.println("\n");
+
+    // **Mapeo de los bits según la estructura MODE_CONFIGS**
+    struct ModeFlags {
+        bool modeExist, nop3, acceptsDice, nop2, nop1, acceptsPatterns, acceptsBankFile, canAnswer;
+        bool hasPassive, situatedHigh, acceptsSensVal2, acceptsSensVal1, hasRelay2, hasRelay1, acceptsAdvancedColor, acceptsBasicColor;
+    } flags = {
+        (modeConfig[0] >> 7) & 1, (modeConfig[0] >> 6) & 1, (modeConfig[0] >> 5) & 1, (modeConfig[0] >> 4) & 1,
+        (modeConfig[0] >> 3) & 1, (modeConfig[0] >> 2) & 1, (modeConfig[0] >> 1) & 1, (modeConfig[0] >> 0) & 1,
+        (modeConfig[1] >> 7) & 1, (modeConfig[1] >> 6) & 1, (modeConfig[1] >> 5) & 1, (modeConfig[1] >> 4) & 1,
+        (modeConfig[1] >> 3) & 1, (modeConfig[1] >> 2) & 1, (modeConfig[1] >> 1) & 1, (modeConfig[1] >> 0) & 1
+    };
+
+    // **Impresión detallada del estado de los bits**
+    Serial.printf(
+        "ACCEPTS_BASIC_COLOR = %d\nACCEPTS_ADVANCED_COLOR = %d\nHAS_RELAY_1 = %d\nHAS_RELAY_2 = %d\n"
+        "ACCEPTS_SENS_VAL_1 = %d\nACCEPTS_SENS_VAL_2 = %d\nSITUATED_HIGH = %d\nHAS_PASSIVE = %d\n"
+        "CAN_ANSWER = %d\nACCEPTS_BANK_FILE = %d\nACCEPTS_PATTERNS = %d\nNOP_1 = %d\nNOP_2 = %d\n"
+        "ACCEPTS_DICE = %d\nNOP_3 = %d\nMODE_EXIST = %d\n--------------------------------------------------\n",
+        flags.acceptsBasicColor, flags.acceptsAdvancedColor, flags.hasRelay1, flags.hasRelay2,
+        flags.acceptsSensVal1, flags.acceptsSensVal2, flags.situatedHigh, flags.hasPassive,
+        flags.canAnswer, flags.acceptsBankFile, flags.acceptsPatterns, flags.nop1, flags.nop2,
+        flags.acceptsDice, flags.nop3, flags.modeExist
+    );
+
+    // **Aplicar mapeo de colores básicos si corresponde**
+    if (flags.acceptsBasicColor || flags.acceptsAdvancedColor) {
+        Serial.println("🎨 Aplicando mapeo de colores básicos/avanzados.");
+        CRGB colorMap[] = { CRGB::Black, CRGB::White, CRGB::Red, CRGB::Cyan, CRGB::Yellow, CRGB(0xFF, 0x59, 0x00), CRGB::Green, CRGB(0xFF, 0x00, 0xD2), CRGB::Blue };
+        for (int i = 1; i < NUM_LEDS; i++) leds[i] = colorMap[i];
+    } else {
+        Serial.println("🕶 Apagando todos los LEDs.");
+        fill_solid(leds, numLeds, CRGB::Black);
+    }
+
+    // **Aplicar efecto dinámico en LED 0 si el modo tiene relay activo**
+    if (flags.hasRelay1 || flags.hasRelay2) {
+        Serial.println("⚡ Aplicando efecto dinámico en LED 0 (Relay 1 o Relay 2 activo).");
+        ledManager.addEffect(new FadeEffect(*this, 0, CRGB::Blue, CRGB::Cyan, 50));
+    } else {
+        Serial.println("❌ No hay relé activo, apagando LED 0.");
+        leds[0] = CRGB::Black;
+    }
+
+    FastLED.show();
 }

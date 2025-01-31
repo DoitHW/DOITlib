@@ -9,7 +9,7 @@ void DOITSOUNDS_::begin(){
     
 
   if (player.begin(Serial2)) {
-    player.volume(20);
+    player.volume(30);
     player.playFolder(01, 001);
     Serial.println("DFPlayer Mini inicializado");
   } else {

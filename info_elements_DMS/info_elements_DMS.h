@@ -29,22 +29,22 @@ FLAGS de modo:
 */
 
 enum MODE_CONFIGS{
-    ACCEPTS_BASIC_COLOR= 0,  //Mapeja els 8 colors bàsics i cada pulsació envia color bàsic
+    ACCEPTS_BASIC_COLOR= 0,  //Mapeja els 8 colors bàsics i cada pulsació envia color bàsic                 //LSB
     ACCEPTS_ADVANCED_COLOR,  //Mapeja els 8 colors bàsics i permet mescla colors
     HAS_RELAY_1,             //Mapeja només el botó relé (fade entre 2 colors)
     HAS_RELAY_2,             //Unexpected 
     ACCEPTS_SENS_VAL_1,      //Llegir i enviar valor sensor accelerometre
     ACCEPTS_SENS_VAL_2,
     SITUATED_HIGH,
-    HAS_PASSIVE,
-    CAN_ANSWER,
+    HAS_PASSIVE,                                                                                            //MSB
+    CAN_ANSWER,                                                                                             //LSB
     ACCEPTS_BANK_FILE,
     ACCEPTS_PATTERNS,
-    GUESS_COLOR,
-    SIMON_GAME,
-    ACCEPTS_DICE,
+    NOP_1,
     NOP_2,
-    MODE_EXIST
+    ACCEPTS_DICE,
+    NOP_3,
+    MODE_EXIST                                                                                              //MSB
 };
 
 

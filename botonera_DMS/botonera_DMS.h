@@ -10,6 +10,7 @@
 #include <Arduino.h>
 #include <Frame_DMS/Frame_DMS.h>
 #include <vector>
+#include <play_DMS/play_DMS.h>
 
 
 class BOTONERA_ : public ELEMENT_{
@@ -50,6 +51,7 @@ class BOTONERA_ : public ELEMENT_{
 
 
 extern BOTONERA_ *element;
+extern DOITSOUNDS_ doitPlayer;
 
 
 

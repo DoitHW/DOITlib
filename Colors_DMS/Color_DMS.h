@@ -163,7 +163,7 @@ class COLORHANDLER_ {
         void FillLEDsFromPaletteColors( uint8_t colorIndex);
 
         int numLeds;
-       
+        void setCurrentFile(const String& file) { currentFile = file; } 
     private:
 
     unsigned long lastUpdate = 0;
@@ -184,6 +184,7 @@ class COLORHANDLER_ {
     uint16_t fadeTime;
 
     unsigned long lastUpdateTime;
+    String currentFile;
 
 };
 

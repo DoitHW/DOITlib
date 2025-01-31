@@ -60,6 +60,13 @@ void BOTONERA_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             
             break;
         }
+        case F_SEND_FILE_NUM: {
+            Serial.println("Recibido un play sound");
+
+            doitPlayer.play_file(LEF.data[0],LEF.data[1]);
+            
+            break;
+        }
 
         default: {
                                                                 #ifdef DEBUG
