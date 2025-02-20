@@ -142,6 +142,7 @@ void ELEMENT_::event_register(int eventNum, int eventVal) {
 
 void ELEMENT_::save_register() {
     const char* tempFileName = "/temp.txt";
+    
     File oldFile = SPIFFS.open(ELEMENT_EVENT_REGISTER_FILE_PATH, FILE_READ);
     File newFile = SPIFFS.open(tempFileName, FILE_WRITE);
 
@@ -260,7 +261,7 @@ String ELEMENT_::get_word_from_eventNum(int eventNumber){
     return frase;
 }
 void   ELEMENT_::print_event_register(){
-
+    
     File file = SPIFFS.open(ELEMENT_EVENT_REGISTER_FILE_PATH, FILE_READ);
     if (!file) {
         Serial.println("Error al abrir el archivo para lectura");
@@ -277,6 +278,7 @@ void   ELEMENT_::print_event_register(){
 
 String ELEMENT_::get_serial_from_file(){
     String serial= "";
+    
     File file = SPIFFS.open(ELEMENT_SERIALNUM_FILE_PATH, "r");
     if (!file) {
                                                                                         #ifdef DEBUG
@@ -293,6 +295,7 @@ String ELEMENT_::get_serial_from_file(){
 
 
 byte ELEMENT_::get_ID_from_file(){
+   
     File file = SPIFFS.open(ELEMENT_ID_FILE_PATH, "r");
     if (!file) {
                                                                                     #ifdef DEBUG
@@ -306,6 +309,7 @@ byte ELEMENT_::get_ID_from_file(){
 }
 
 void ELEMENT_::set_ID_to_file(byte IDin){
+    
     File file = SPIFFS.open(ELEMENT_ID_FILE_PATH, "w");
     if (!file) {
                                                                                 #ifdef DEBUG
@@ -394,7 +398,10 @@ void ELEMENT_::configurar_RF(int baudRate) {
     // Verificar si responde a 115200
     bool resetConfirmado = false;
     if (Serial1.available()) {
-        Serial.println("Respuesta a 115200 detectada");
+                                                                                #ifdef DEBUG
+                                                                                    Serial.println("Respuesta a 115200 detectada");                                                      
+                                                                                #endif
+        
         resetConfirmado = true;
     } else {
         // Si no responde, intentar con 9600
@@ -403,13 +410,18 @@ void ELEMENT_::configurar_RF(int baudRate) {
         Serial1.write(comandoReset, sizeof(comandoReset));
         delay(1000);
         if (Serial1.available()) {
-            Serial.println("Respuesta a 9600 detectada");
+                                                                                #ifdef DEBUG
+                                                                                    Serial.println("Respuesta a 9600 detectada");                                                  
+                                                                                #endif
+                                                                                
             resetConfirmado = true;
         }
     }
 
     if (!resetConfirmado) {
-        Serial.println("Error: No se detectó respuesta del módulo RF");
+                                                                                #ifdef DEBUG
+                                                                                    Serial.println("Error: No se detectó respuesta del módulo RF");                                                    
+                                                                                #endif                                                                   
         digitalWrite(RF_CONFIG_PIN, HIGH);
         return;
     }
@@ -419,14 +431,18 @@ void ELEMENT_::configurar_RF(int baudRate) {
     byte comandoWirelessDataRate[7];
 
     if (baudRate == 115200) {
-        Serial.println("Config UART y Wireless a 115200");
+                                                                                #ifdef DEBUG
+                                                                                Serial.println("Config UART y Wireless a 115200");                                                        
+                                                                                #endif
         comandoUART[0] = 0xAA; comandoUART[1] = 0xFA; comandoUART[2] = 0x1E;
         comandoUART[3] = 0x00; comandoUART[4] = 0x01; comandoUART[5] = 0xC2; comandoUART[6] = 0x00;
 
         comandoWirelessDataRate[0] = 0xAA; comandoWirelessDataRate[1] = 0xFA; comandoWirelessDataRate[2] = 0xC3;
         comandoWirelessDataRate[3] = 0x00; comandoWirelessDataRate[4] = 0x01; comandoWirelessDataRate[5] = 0xC2; comandoWirelessDataRate[6] = 0x00;
     } else {
-        Serial.println("Config UART y Wireless a 9600");
+                                                                                #ifdef DEBUG
+                                                                                Serial.println("Config UART y Wireless a 9600");                                                       
+                                                                                #endif
         comandoUART[0] = 0xAA; comandoUART[1] = 0xFA; comandoUART[2] = 0x1E;
         comandoUART[3] = 0x00; comandoUART[4] = 0x00; comandoUART[5] = 0x25; comandoUART[6] = 0x80;
 
@@ -445,7 +461,10 @@ void ELEMENT_::configurar_RF(int baudRate) {
     Serial1.write(comandoLeerConfiguracion, sizeof(comandoLeerConfiguracion));
     delay(500);
 
-    Serial.println(" =[Desglosando configuración recibida]=");
+                                                                                #ifdef DEBUG
+                                                                                    Serial.println(" =[Desglosando configuración recibida]=");                                                          
+                                                                                #endif
+    
 
     // Filtrar valores no relevantes
     while (Serial1.available()) {
@@ -477,46 +496,52 @@ void ELEMENT_::configurar_RF(int baudRate) {
         uint32_t freq = (frecuencia[0] << 24) | (frecuencia[1] << 16) | (frecuencia[2] << 8) | frecuencia[3];
         uint32_t baudrate = (velocidad[0] << 24) | (velocidad[1] << 16) | (velocidad[2] << 8) | velocidad[3];
         uint16_t bw = (anchoBanda[0] << 8) | anchoBanda[1];
+                                                                                #ifdef DEBUG
+                                                                                    Serial.print("📡 Frecuencia: ");
+                                                                                    Serial.print(freq);
+                                                                                    Serial.println(" Hz");
 
-        Serial.print("📡 Frecuencia: ");
-        Serial.print(freq);
-        Serial.println(" Hz");
+                                                                                    Serial.print("⚡ Velocidad inalámbrica: ");
+                                                                                    Serial.print(baudrate);
+                                                                                    Serial.println(" bps");
 
-        Serial.print("⚡ Velocidad inalámbrica: ");
-        Serial.print(baudrate);
-        Serial.println(" bps");
+                                                                                    Serial.print("📶 Ancho de banda: ");
+                                                                                    Serial.print(bw);
+                                                                                    Serial.println(" kHz");
 
-        Serial.print("📶 Ancho de banda: ");
-        Serial.print(bw);
-        Serial.println(" kHz");
+                                                                                    Serial.print("🎛️  Desviación de frecuencia: ");
+                                                                                    Serial.print(desviacionFrecuencia);
+                                                                                    Serial.println(" kHz");
 
-        Serial.print("🎛️  Desviación de frecuencia: ");
-        Serial.print(desviacionFrecuencia);
-        Serial.println(" kHz");
-
-        Serial.print("🔋 Potencia de transmisión: ");
-        Serial.print(potencia);
-        Serial.println(" dBm");
-        Serial.println();
+                                                                                    Serial.print("🔋 Potencia de transmisión: ");
+                                                                                    Serial.print(potencia);
+                                                                                    Serial.println(" dBm");
+                                                                                    Serial.println();                                                        
+                                                                                #endif
+        
 
     } else {
-        Serial.println("Error: Datos insuficientes para interpretar la configuración.");
+                                                                                #ifdef DEBUG
+                                                                                    Serial.println("Error: Datos insuficientes para interpretar la configuración.");                                                      
+                                                                                #endif
     }
 
     // Salir del modo configuración
     digitalWrite(RF_CONFIG_PIN, HIGH);
-    delay(500);
+    delay(10);
 
     // Reconfigurar la velocidad UART en el ESP32
     Serial1.end();
     if (baudRate == 115200) {
-        Serial.println("Config velocidad UART en ESP32 a 115200");
+                                                                                #ifdef DEBUG
+                                                                                    Serial.println("Config velocidad UART en ESP32 a 115200");                                                      
+                                                                                #endif
+        
         Serial1.begin(115200, SERIAL_8N1, RF_RX_PIN, RF_TX_PIN);
     } else {
-        Serial.println("Config velocidad UART en ESP32 a 9600");
+                                                                                #ifdef DEBUG
+                                                                                Serial.println("Config velocidad UART en ESP32 a 9600");                                                                           
+                                                                                #endif
         Serial1.begin(9600, SERIAL_8N1, RF_RX_PIN, RF_TX_PIN);
     }
-
-    Serial.println("Configuración completa y módulo reiniciado correctamente.");
-    delay(200);
 }

@@ -49,11 +49,17 @@ void LEDSTRIP_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             byte lang= LEF.data[0];
             byte sector= LEF.data[1];
             //element->event_register_update(EV_SECTOR_REQ, sector);
-            Serial.println("lenguaje pedido: " + String(lang));   
-            Serial.println("sector pedido: " + String(sector));   
+                                                            #ifdef DEBUG
+                                                            Serial.println("lenguaje pedido: " + String(lang));   
+                                                            Serial.println("sector pedido: " + String(sector));   
+                                                            #endif
+
             byte sector_data[192];
             get_sector_data(sector_data, lang, sector);
-            Serial.println("Sector data: " + String(sector_data[0], HEX));
+                                                            #ifdef DEBUG
+                                                            Serial.println("Sector data: " + String(sector_data[0], HEX));
+                                                            #endif
+
             FRAME_T frame= frameMaker_RETURN_ELEM_SECTOR(globalID, LEF.origin, sector_data, sector);
             send_frame(frame);
             event_register(EV_SECTOR_REQ, sector);

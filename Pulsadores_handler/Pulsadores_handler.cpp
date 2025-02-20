@@ -9,7 +9,7 @@
 int filas[FILAS] = {4, 5, 6, 7};
 int columnas[COLUMNAS] = {1, 2, 3};
 static bool lastState[FILAS][COLUMNAS];
-bool relay_state = false;
+bool relay_state = true;
 
 byte pulsadorColor[FILAS][COLUMNAS] = {
     {ORANGE, GREEN, WHITE},
@@ -69,8 +69,6 @@ void PulsadoresHandler::mostrarColor(byte color) {
 
     // Verificar si el elemento actual es "Ambientes"
     if (currentFile == "Ambientes") {
-        Serial.println("Modo Ambientes detectado. Verificando si está seleccionado...");
-
         // Si "Ambientes" no está seleccionado, no se envía ninguna trama
         bool ambientesSeleccionado = false;
         for (size_t i = 0; i < elementFiles.size(); i++) {
@@ -79,17 +77,15 @@ void PulsadoresHandler::mostrarColor(byte color) {
                 break;
             }
         }
-        if (!ambientesSeleccionado) {
-            Serial.println("⚠️ El elemento 'Ambientes' no está seleccionado. No se enviará ninguna trama.");
-            return;
-        }
-
+        if (!ambientesSeleccionado) return;
+        
         // Recorrer la lista de elementos en SPIFFS y agregar sus IDs si están seleccionados
         for (size_t i = 0; i < elementFiles.size(); i++) {
             if (selectedStates[i] && elementFiles[i] != "Apagar" && elementFiles[i] != "Fichas") {
                 byte elementID = 0;
 
                 // Leer la ID desde SPIFFS
+            
                 fs::File f = SPIFFS.open(elementFiles[i], "r");
                 if (f) {
                     f.seek(OFFSET_ID, SeekSet);
@@ -100,14 +96,19 @@ void PulsadoresHandler::mostrarColor(byte color) {
                 // Agregar al target si la ID es válida
                 if (elementID != 0) {
                     target.push_back(elementID);
-                    Serial.printf("Elemento seleccionado agregado a la trama: ID %d\n", elementID);
+                                                                                #ifdef DEBUG
+                                                                                Serial.printf("Elemento seleccionado agregado a la trama: ID %d\n", elementID);                                              
+                                                                                #endif
+                    
                 }
             }
         }
     } else {
         // Si no es "Ambientes", se comporta de manera normal (envío a un solo elemento seleccionado)
         if (!isCurrentElementSelected()) {
-            Serial.println("El elemento actual no está seleccionado. No se enviará la trama.");
+                                                                                            #ifdef DEBUG
+                                                                                                Serial.println("El elemento actual no está seleccionado. No se enviará la trama.");                                                                    
+                                                                                            #endif
             return;
         }
         byte elementID = getCurrentElementID();
@@ -115,7 +116,9 @@ void PulsadoresHandler::mostrarColor(byte color) {
     }
 
     if (target.empty()) {
-        Serial.println("⚠️ No hay elementos seleccionados para recibir la trama.");
+                                                                                            #ifdef DEBUG
+                                                                                            Serial.println("⚠️ No hay elementos seleccionados para recibir la trama.");                                                                          
+                                                                                            #endif
         return;
     }
 
@@ -138,15 +141,15 @@ void PulsadoresHandler::mostrarColor(byte color) {
             delay(5);
             break;
         default:
-            Serial.println("Ningún botón presionado.");
             return;
     }
 
     if (color != RELAY) {
         send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, color));
     }
-
-    Serial.printf("🎨 Botón presionado y seleccionado: %s\n", colorNombre);
+                                                                                                #ifdef DEBUG
+                                                                                                Serial.printf("🎨 Botón presionado y seleccionado: %s\n", colorNombre);                                                                              
+                                                                                                #endif
 }
 
 

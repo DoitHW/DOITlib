@@ -25,51 +25,53 @@ void TOKEN_::begin() {
     // 1) Inicializa I2C en pines 40 (SDA) y 41 (SCL)
     I2C2.begin(40, 41);
 
-    Serial.println("Escaneando dispositivos I2C...");
     bool dispositivoEncontrado = false;
     for (uint8_t address = 1; address < 127; address++) {
         I2C2.beginTransmission(address);
         if (I2C2.endTransmission() == 0) {
-            Serial.print("Dispositivo I2C encontrado en dirección: 0x");
-            Serial.println(address, HEX);
             dispositivoEncontrado = true;
+                                                                                                        #ifdef DEBUG
+                                                                                                        Serial.print("Dispositivo I2C encontrado en dirección: 0x");
+                                                                                                        Serial.println(address, HEX);                                                                          
+                                                                                                        #endif
         }
     }
     
     if (!dispositivoEncontrado) {
-        Serial.println("Error: No se encontraron dispositivos en el bus I2C. Verifica las conexiones y el cableado.");
+                                                                                                        #ifdef DEBUG
+                                                                                                        Serial.println("Error: No se encontraron dispositivos en el bus I2C. Verifica las conexiones y el cableado.");                                                               
+                                                                                                        #endif
         // Aquí podrías hacer un return o continuar igualmente;
         // depende de la lógica que quieras manejar si no encuentra nada
     }
 
     // 2) Inicializa el lector NFC
-    Serial.println("Inicializando PN532...");
     nfc.begin();
     delay(100); // Pequeña pausa para la configuración interna
 
     // 3) Verifica el firmware del PN532
-    Serial.println("Obteniendo versión del firmware del PN532...");
     uint32_t versiondata = nfc.getFirmwareVersion();
     if (!versiondata) {
-        Serial.println("Error: No se detectó el PN532. Verifica conexiones o módulo.");
+                                                                                                            #ifdef DEBUG
+                                                                                                                    Serial.println("Error: No se detectó el PN532. Verifica conexiones o módulo.");                                                              
+                                                                                                            #endif
         while (1) {
             // Bucle infinito para detener el programa; o bien usa return
         }
     }
 
+                                                                                                            #ifdef DEBUG
+                                                                                                            Serial.print("Encontrado chip PN5 ");
+                                                                                                            Serial.println((versiondata >> 24) & 0xFF, HEX);
+                                                                                                            Serial.print("Firmware: v");
+                                                                                                            Serial.print((versiondata >> 16) & 0xFF, DEC);
+                                                                                                            Serial.print(".");
+                                                                                                            Serial.println((versiondata >> 8) & 0xFF, DEC);                                                                  
+                                                                                                            Serial.println("El lector NFC está listo. Esperando un tag NFC...");
+                                                                                                            #endif
     // 4) Imprime la versión
-    Serial.print("Encontrado chip PN5");
-    Serial.println((versiondata >> 24) & 0xFF, HEX);
-    Serial.print("Firmware: v");
-    Serial.print((versiondata >> 16) & 0xFF, DEC);
-    Serial.print(".");
-    Serial.println((versiondata >> 8) & 0xFF, DEC);
-
     // 5) Configura el PN532 (SAMConfig)
-    Serial.println("Configurando SAM...");
     nfc.SAMConfig();
-    Serial.println("Configuración SAM completada.");
-    Serial.println("El lector NFC está listo. Esperando un tag NFC...");
 }
 
 bool TOKEN_::readCard(uint8_t *uid, uint8_t &uidLength) {
@@ -85,16 +87,17 @@ bool TOKEN_::readCard(uint8_t *uid, uint8_t &uidLength) {
     //    Si tu librería no lo admite, la llamada puede ser bloqueante.
     //    Usamos la forma básica:
     if (nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, 1)) {
-        Serial.println("¡Tarjeta detectada!");
-        Serial.print("UID Length: ");
-        Serial.print(uidLength, DEC);
-        Serial.println(" bytes");
-        Serial.print("UID Value: ");
-        for (uint8_t i = 0; i < uidLength; i++) {
-            Serial.print(" 0x");
-            Serial.print(uid[i], HEX);
-        }
-        Serial.println("");
+                                                                                                            #ifdef DEBUG
+                                                                                                            Serial.print("UID Length: ");
+                                                                                                            Serial.print(uidLength, DEC);
+                                                                                                            Serial.println(" bytes");
+                                                                                                            Serial.print("UID Value: ");
+                                                                                                            for (uint8_t i = 0; i < uidLength; i++) {
+                                                                                                                Serial.print(" 0x");
+                                                                                                                Serial.print(uid[i], HEX);
+                                                                                                            }
+                                                                                                            Serial.println("");                                                              
+                                                                                                            #endif
         return true; // Se detectó una tarjeta
     }
 

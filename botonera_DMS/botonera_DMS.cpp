@@ -22,6 +22,96 @@ void BOTONERA_::botonera_begin(){
             
 }
 
+void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
+    Serial.println("\n==== 📨 Trama Recibida 📨 ====");
+
+    // Determinar origen
+    String origenStr;
+    if (LEF.origin == 0xDB) origenStr = "BOTONERA";
+    else if (LEF.origin == 0xDC) origenStr = "CONSOLA";
+    else if (LEF.origin == 0xFF) origenStr = "BROADCAST";
+    else origenStr = "DESCONOCIDO";
+
+    Serial.printf("📌 Origen: %s (0x%02X)\n", origenStr.c_str(), LEF.origin);
+
+    // Determinar función
+    String functionStr;
+    switch (LEF.function) {
+        case 0xA0: functionStr = "F_REQ_ELEM_SECTOR"; break;
+        case 0xA1: functionStr = "F_REQ_ELEM_INFO"; break;
+        case 0xA2: functionStr = "F_REQ_ELEM_STATE"; break;
+        case 0xA3: functionStr = "F_REQ_ELEM_ICON"; break;
+        case 0xB1: functionStr = "F_SET_ELEM_ID"; break;
+        case 0xB2: functionStr = "F_SET_ELEM_MODE"; break;
+        case 0xB3: functionStr = "F_SET_ELEM_DEAF"; break;
+        case 0xC1: functionStr = "F_SEND_COLOR"; break;
+        case 0xC2: functionStr = "F_SEND_RGB"; break;
+        case 0xC3: functionStr = "F_SEND_BRIGHTNESS"; break;
+        case 0xCA: functionStr = "F_SEND_SENSOR_VALUE"; break;
+        case 0xCB: functionStr = "F_SEND_SENSOR_VALUE_2"; break;
+        case 0xCC: functionStr = "F_SEND_FILE_NUM"; break;
+        case 0xCD: functionStr = "F_SEND_PATTERN_NUM"; break;
+        case 0xCE: functionStr = "F_SEND_FLAG_BYTE"; break;
+        case 0xCF: functionStr = "F_SEND_COMMAND"; break;
+        case 0xD0: functionStr = "F_RETURN_ELEM_SECTOR"; break;
+        case 0xD1: functionStr = "F_RETURN_ELEM_INFO"; break;
+        case 0xD2: functionStr = "F_RETURN_ELEM_STATE"; break;
+        case 0xD3: functionStr = "F_RETURN_ELEM_ICON"; break;
+        case 0xDE: functionStr = "F_RETURN_ELEM_ERROR"; break;
+        default: functionStr = "FUNCIÓN DESCONOCIDA";
+    }
+
+    Serial.printf("🛠️  Función: %s (0x%02X)\n", functionStr.c_str(), LEF.function);
+
+    // Interpretación de datos
+    Serial.print("📦 Data: ");
+    if (LEF.data.empty()) {
+        Serial.println("No hay datos para esta función.");
+    } else {
+        if (LEF.function == 0xCA || LEF.function == 0xCB) { // Sensores
+            int minVal = (LEF.data[0] << 8) | LEF.data[1];
+            int maxVal = (LEF.data[2] << 8) | LEF.data[3];
+            int sensedVal = (LEF.data[4] << 8) | LEF.data[5];
+
+            Serial.printf("MIN = %d, MAX= %d, VAL= %d\n", minVal, maxVal, sensedVal);
+        } 
+        else if (LEF.function == 0xC1) { // Color recibido
+            String colorName;
+            switch (LEF.data[0]) {
+                case 0: colorName = "BLANCO"; break;
+                case 1: colorName = "AMARILLO"; break;
+                case 2: colorName = "NARANJA"; break;
+                case 3: colorName = "ROJO"; break;
+                case 4: colorName = "VIOLETA"; break;
+                case 5: colorName = "AZUL"; break;
+                case 6: colorName = "CELESTE"; break;
+                case 7: colorName = "VERDE"; break;
+                case 8: colorName = "NEGRO"; break;
+                default: colorName = "COLOR DESCONOCIDO";
+            }
+            Serial.printf("%s (0x%02X)\n", colorName.c_str(), LEF.data[0]);
+        } 
+        else if (LEF.function == 0xCE) { // Cambio en el relé
+            Serial.println("Cambio de estado en el relé.");
+        } 
+        else if (LEF.function == 0xA0) { // Petición de sector
+            String idioma = (LEF.data[0] == 1) ? "ES" : "OTRO";
+            Serial.printf("Idioma: %s, Sector: %d\n", idioma.c_str(), LEF.data[1]);
+        } 
+        else if (LEF.function == 0xCC) { // Petición de archivo
+            Serial.printf("Carpeta (Bank): %d, Archivo (File): %d\n", LEF.data[0], LEF.data[1]);
+        } 
+        else {
+            // Imprimir todos los datos si no hay interpretación específica
+            for (size_t i = 0; i < LEF.data.size(); i++) {
+                Serial.printf("0x%02X ", LEF.data[i]);
+            }
+            Serial.println();
+        }
+    }
+
+    Serial.println("=============================");
+}
 
 void BOTONERA_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
     if (!element) {
@@ -30,7 +120,7 @@ void BOTONERA_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
                                                             #endif
         return;
     }
-
+    printFrameInfo(LEF);
     // Depuración del estado de la pila
     Serial.println("Inicio de RX_main_handler");
     UBaseType_t stackSize = uxTaskGetStackHighWaterMark(NULL);
@@ -106,6 +196,7 @@ void BOTONERA_::sectorIn_handler(std::vector<byte> data, byte targetin) {
             Serial.println("📢 ID: "+String(targetin) + " con MODO " +String(receivedMode));
 
             // Leer el modo almacenado en SPIFFS
+     
             fs::File file = SPIFFS.open(getCurrentFilePath(targetin), "r+");
             if (!file) {
                 Serial.println("Error: No se pudo abrir el archivo en SPIFFS.");
@@ -145,6 +236,7 @@ void BOTONERA_::sectorIn_handler(std::vector<byte> data, byte targetin) {
 
 String BOTONERA_::getCurrentFilePath(byte elementID) {
     for (const String& fileName : elementFiles) {
+
         fs::File file = SPIFFS.open(fileName, "r");
         if (!file) continue;
 
@@ -278,6 +370,7 @@ void BOTONERA_::procesar_datos_sector(LAST_ENTRY_FRAME_T &LEF, int sector, INFO_
 }
 
 void BOTONERA_::actualizar_elemento_existente() {
+
     fs::File root = SPIFFS.open("/");
     fs::File file = root.openNextFile();
 
@@ -305,6 +398,7 @@ void BOTONERA_::actualizar_elemento_existente() {
 bool BOTONERA_::guardar_elemento(INFO_PACK_T* infoPack) {
     // Generamos un nombre de archivo único
     String uniqueFileName = generateUniqueFileName((char*)infoPack->name);
+ 
     fs::File file = SPIFFS.open(uniqueFileName, "w");
     if (!file) return false;
 
@@ -352,6 +446,7 @@ void BOTONERA_::reasignar_id_elemento(INFO_PACK_T* infoPack) {
         }
     } else {
         // Caso 1: reasignación en un elemento ya existente, sin un infoPack
+    
         fs::File root = SPIFFS.open("/");
         fs::File file = root.openNextFile();
 
@@ -417,7 +512,7 @@ void BOTONERA_::validar_elemento() {
             send_frame(frameMaker_SET_ELEM_ID(DEFAULT_BOTONERA,
                                               DEFAULT_DEVICE,
                                               lastAssignedID));
-            delay(20);
+            delay(500);
             // 3) Verificar confirmación de ID (petición de ELEM_ID_SECTOR a la new ID)
             if (confirmarCambioID(lastAssignedID)) {
                 // Éxito: ID confirmada
@@ -443,7 +538,7 @@ void BOTONERA_::validar_elemento() {
             send_frame(frameMaker_SET_ELEM_ID(DEFAULT_BOTONERA,
                                               DEFAULT_DEVICE,
                                               lastAssignedID));
-            delay(20);
+            delay(500);
             // 3) Podemos verificar si deseamos confirmarlo también:
             if (!confirmarCambioID(lastAssignedID)) {
                 Serial.println("❌ Falló la confirmación de la nueva ID en elemento nuevo.");
@@ -452,9 +547,10 @@ void BOTONERA_::validar_elemento() {
                 return;
             }
             Serial.printf("✅ Nueva ID asignada y confirmada: 0x%02X\n", lastAssignedID);
-            iniciarEscaneoElemento("Escaneando...");
+            iniciarEscaneoElemento("Agregando ...");
             actualizarBarraProgreso(0);
             // 4) Descargamos la información completa del elemento (nombre, desc, modos...)
+            delay(500);
             bool exito = procesar_y_guardar_elemento_nuevo(lastAssignedID);
 
             // 5) Resultado final: si todo fue bien => mostrarMensajeTemporal(2, 3000) 
@@ -471,6 +567,7 @@ void BOTONERA_::validar_elemento() {
 }
 
 byte BOTONERA_::getIdFromSPIFFS(byte *serial) {
+  
     fs::File root = SPIFFS.open("/");
     fs::File file = root.openNextFile();
 
@@ -662,7 +759,7 @@ bool BOTONERA_::serialExistsInSPIFFS(byte serialNum[5]) {
         Serial.println("Error: SPIFFS no pudo montarse correctamente.");
         return false;
     }
-
+  
     fs::File root = SPIFFS.open("/");
     
     if (!root || !root.isDirectory()) {
@@ -947,6 +1044,7 @@ void BOTONERA_::mostrarMensajeTemporal(int respuesta, int dTime) {
 
 byte BOTONERA_::getNextAvailableID() {
     byte nextID = 0x01;
+
     fs::File root = SPIFFS.open("/");
     fs::File file = root.openNextFile();
 

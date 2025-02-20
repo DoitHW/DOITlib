@@ -162,6 +162,8 @@ class COLORHANDLER_ {
 
         void FillLEDsFromPaletteColors( uint8_t colorIndex);
 
+        void welcomeEffect();
+
         int numLeds;
         void setCurrentFile(const String& file) { currentFile = file; } 
     private:

@@ -688,6 +688,8 @@ uint16_t get_info_num(int count, ...) {
                                                                         SITUATED_HIGH,
                                                                         MODE_EXIST);
 
+                                                                        
+
 
                                                         #ifdef DEBUG
                                                                 Serial.print("Se devuelve un 16bit config -> " );

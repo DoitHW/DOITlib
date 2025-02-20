@@ -6,8 +6,10 @@
 #include <Colors_DMS/Color_DMS.h>
 #include <botonera_DMS/botonera_DMS.h>
 #include <DynamicLEDManager_DMS/DynamicLEDManager_DMS.h>
+#include <ADXL345_handler/ADXL345_handler.h>
+#include <microphone_DMS/microphone_DMS.h>
 
-
+#define MODE_BACK -2
 // Variables globales para el manejo del encoder
 ESP32Encoder encoder;
 int32_t lastEncoderValue = 0;
@@ -22,14 +24,16 @@ bool modeScreenEnteredByLongPress = false;  // Flag to track how modes screen wa
 bool longPressDetected = false;
 std::vector<String> elementFiles;
 std::vector<bool> selectedStates;
-int globalVisibleModesMap[16] = {0};  // Definición e inicialización
+int globalVisibleModesMap[17] = {0};  // Definición e inicialización
+
+
 
 
 void encoder_init_func() {
     //Serial.println("Inicializando encoder...");
     pinMode(ENC_BUTTON, INPUT_PULLUP);
     ESP32Encoder::useInternalWeakPullResistors = UP;
-    encoder.attachSingleEdge(ENC_A, ENC_B);
+    encoder.attachSingleEdge(ENC_B, ENC_A); //original encoder.attachSingleEdge(ENC_A, ENC_B);
     encoder.clearCount();
     encoder.setCount(0);
     encoder.setFilter(1023);
@@ -47,8 +51,11 @@ void encoder_init_func() {
 //             Serial.println("Encoder girado, cambiando de elemento...");
 //             currentIndex = (currentIndex + direction + elementFiles.size()) % elementFiles.size();
 
-//             // Redibujar el elemento actual y actualizar patrón
-//             drawCurrentElement();  // Llama a setPatternBotonera() con el modo actualizado
+//             // Sincronizar el modo del elemento actual
+//             //requestAndSyncElementMode();
+
+//             // Redibujar el elemento actual
+//             drawCurrentElement();  
 //         }
 //         // Navegar por modos visibles
 //         else if (inModesScreen && totalModes > 0) {
@@ -59,6 +66,8 @@ void encoder_init_func() {
 //             int realModeIndex = globalVisibleModesMap[currentModeIndex];
 //             if (realModeIndex >= 0) {
 //                 // Actualizar patrón en la botonera
+//                 String currentFile = elementFiles[currentIndex];
+//                 colorHandler.setCurrentFile(currentFile);
 //                 colorHandler.setPatternBotonera(realModeIndex, ledManager);
 //             }
 //             // Redibujar la pantalla de modos
@@ -82,20 +91,19 @@ void encoder_init_func() {
 
 //             // Si es "Apagar", no queremos abrir la pantalla de modos
 //             if (currentFile == "Apagar") {
-//                 // Ignorar pulsación larga en Apagar
 //                 return;
 //             }
 
 //             // 1) Obtener el modo real actualmente almacenado
-//             int realModeIndex = 0; // Por defecto
+//             int realModeIndex = 0;
 //             if (currentFile == "Ambientes" || currentFile == "Fichas") {
 //                 INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
-//                 realModeIndex = option->currentMode; 
+//                 realModeIndex = option->currentMode;
 //             } else {
 //                 fs::File f = SPIFFS.open(currentFile, "r");
 //                 if (f) {
 //                     f.seek(OFFSET_CURRENTMODE, SeekSet);
-//                     realModeIndex = f.read(); // Lee un byte (modo real)
+//                     realModeIndex = f.read();
 //                     f.close();
 //                 }
 //             }
@@ -103,7 +111,7 @@ void encoder_init_func() {
 //             // 2) Encontrar cuál es su índice visible (currentModeIndex) en la lista filtrada
 //             int tempCurrentModeIndex = 0;
 //             int foundVisibleIndex = -1;
-            
+
 //             if (currentFile == "Ambientes" || currentFile == "Fichas") {
 //                 INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
 //                 for (int i = 0; i < 16; i++) {
@@ -145,15 +153,14 @@ void encoder_init_func() {
 //             if (foundVisibleIndex >= 0) {
 //                 currentModeIndex = foundVisibleIndex;
 //             } else {
-//                 // Si no se encontró, arrancamos la lista en 0
 //                 currentModeIndex = 0;
 //             }
 //             // --- FIN DE LA SINCRONIZACIÓN ---
 
 //             inModesScreen = true;
-//             drawModesScreen(); // Muestra la pantalla de modos con el modo sincronizado
+//             drawModesScreen();
 //         }
-//     } 
+//     }
 //     // Cuando se suelta el botón
 //     else {
 //         if (!hiddenMenuActive && buttonPressStart > 0 && millis() - buttonPressStart < 2000) {
@@ -161,14 +168,17 @@ void encoder_init_func() {
 
 //             // --- CASO ESPECIAL: Apagar como "botón" que hace broadcast BLACKOUT ---
 //             if (currentFile == "Apagar") {
-//                 // Envía trama de apagado (broadcast)
-//                 std::vector<byte> elementID;
-//                 elementID.clear();
-//                 elementID.push_back(0xFF); // Broadcast
+//                 // Deseleccionar todos los elementos
+//                 for (size_t i = 0; i < selectedStates.size(); i++) {
+//                     selectedStates[i] = false;
+//                 }
 
+//                 // Enviar broadcast BLACKOUT
+//                 std::vector<byte> elementID;
+//                 elementID.push_back(0xFF);
 //                 send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, BLACKOUT));
 
-//                 // Mostrar mensaje 5s
+//                 // Mostrar mensaje de apagado durante 5 segundos
 //                 uiSprite.fillSprite(TFT_BLACK);
 //                 uiSprite.setTextDatum(MC_DATUM);
 //                 uiSprite.setTextSize(2);
@@ -176,11 +186,10 @@ void encoder_init_func() {
 //                 uiSprite.drawString("APAGANDO", tft.width() / 2, tft.height() / 2 - 10);
 //                 uiSprite.drawString("Sala...", tft.width() / 2, tft.height() / 2 + 10);
 //                 uiSprite.pushSprite(0, 0);
-//                 relay_state = false;
-                
+
 //                 delay(5000);
 
-//                 // Regresar al "menú principal" (por ejemplo al índice 0)
+//                 // Volver al menú principal
 //                 currentIndex = 0;
 //                 inModesScreen = false;
 //                 drawCurrentElement();
@@ -188,112 +197,41 @@ void encoder_init_func() {
 //                 // Reset pulsación
 //                 buttonPressStart = 0;
 //                 isLongPress = false;
-//                 return; 
+//                 return;
 //             }
 
 //             // --- 1) Si estamos en la pantalla de modos (inModesScreen = true) ---
 //             if (inModesScreen) {
-//                 // Seleccionar modo actual
-//                 std::vector<byte> elementID;
-//                 char elementName[25] = {0};
-//                 String modeName;
-
-//                 // Obtener el índice real a partir del índice visible (currentModeIndex)
-//                 int realModeIndex = globalVisibleModesMap[currentModeIndex];
-//                 int modeNumber = currentModeIndex + 1; // Número del modo en la lista visible
-
-//                 if (currentFile == "Ambientes" || currentFile == "Fichas") {
-//                     INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
-//                     option->currentMode = realModeIndex; 
-//                     modeName = String((char*)option->mode[realModeIndex].name);
-//                     elementID.push_back(0); // ID predeterminada
-//                 } else {
-//                     // Leer y actualizar el archivo SPIFFS
-//                     fs::File f = SPIFFS.open(currentFile, "r+");
-//                     if (f) {
-//                         // Guardar el nuevo modo seleccionado
-//                         f.seek(OFFSET_CURRENTMODE, SeekSet);
-//                         f.write((uint8_t*)&realModeIndex, 1);
-
-//                         // Leer nombre del elemento
-//                         f.seek(OFFSET_NAME, SeekSet);
-//                         f.read((uint8_t*)elementName, 24);
-
-//                         // Leer la ID del elemento
-//                         byte id = 0;
-//                         f.seek(OFFSET_ID, SeekSet);
-//                         f.read(&id, 1);
-//                         elementID.push_back(id);
-
-//                         // Leer el nombre del modo
-//                         f.seek(OFFSET_MODES + (SIZE_MODE * realModeIndex), SeekSet);
-//                         char modeNameBuf[25] = {0};
-//                         f.read((uint8_t*)modeNameBuf, 24);
-//                         modeName = String(modeNameBuf);
-
-//                         f.close();
-//                     }
-//                 }
-
-//                 // Mostrar en Serial
-//                 Serial.printf("Nombre del elemento: %s\n", elementName[0] ? elementName : currentFile.c_str());
-//                 Serial.printf("ID del elemento: %d\n", elementID[0]);
-//                 Serial.printf("Modo seleccionado: %s (Modo %d)\n", modeName.c_str(), modeNumber);
-
-//                 send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, elementID, realModeIndex));
-//                 inModesScreen = false;
-//                 drawCurrentElement(); // Redibuja el elemento actual con el nuevo modo
+//                 handleModeSelection(currentFile);
 //             }
-//             // --- 2) Si NO estamos en la pantalla de modos (seleccionar/deseleccionar) ---
+//             // --- 2) Si NO estamos en la pantalla de modos ---
 //             else {
-//                 selectedStates[currentIndex] = !selectedStates[currentIndex];
-
-//                 // Obtener la ID del elemento como std::vector<byte>
-//                 std::vector<byte> elementID;
-
-//                 // Si NO es Ambientes, Fichas ni Apagar => es de SPIFFS
-//                 if (!currentFile.startsWith("Ambientes")
-//                     && !currentFile.startsWith("Fichas")
-//                     && !currentFile.startsWith("Apagar"))
-//                 {
-//                     fs::File f = SPIFFS.open(currentFile, "r");
-//                     if (f) {
-//                         byte id = 0;
-//                         f.seek(OFFSET_ID, SeekSet);
-//                         f.read(&id, 1);
-//                         elementID.push_back(id);
-//                         f.close();
-//                     } else {
-//                         Serial.println("Error al leer la ID del archivo.");
-//                         elementID.push_back(0); // Valor por defecto en caso de error
-//                     }
-//                 } else {
-//                     elementID.push_back(0); // Valor por defecto para Ambientes/Fichas
-//                     // (Apagar ya está interceptado antes)
-//                 }
-
-//                 // Enviar el estado del color basado en la selección
-//                 if (selectedStates[currentIndex]) {
-//                     Serial.printf("Enviando color blanco a la ID %d\n", elementID[0]);
-//                     //send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, elementID, 0x00));
-//                     send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, START_TEST));
-//                 } else {
-//                     Serial.printf("Enviando color negro a la ID %d\n", elementID[0]);
-//                     //send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, elementID, 0x08));
-//                     send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, BLACKOUT));
-//                 }
-
-//                 drawCurrentElement(); // Redibuja el elemento actual
+//                 toggleElementSelection(currentFile);
 //             }
 //         }
 
-//         // Resetear pulsaciones
+//         // Resetear variables de pulsación
 //         buttonPressStart = 0;
 //         isLongPress = false;
 //     }
 // }
+bool ignoreInputs = false;
+bool ignoreEncoderClick = false;
+
 
 void handleEncoder() {
+        // Si se debe ignorar el click residual, chequea si ya se soltó el botón.
+        if (ignoreEncoderClick) {
+            if (digitalRead(ENC_BUTTON) == HIGH) {
+                // El botón ya se soltó: se restablece la bandera.
+                ignoreEncoderClick = false;
+            } else {
+                // Mientras el botón esté presionado, no se procesan entradas.
+                return;
+            }
+        }
+        
+    if (ignoreInputs) return;
     int32_t newEncoderValue = encoder.getCount();
     if (newEncoderValue != lastEncoderValue) {
         int32_t direction = (newEncoderValue > lastEncoderValue) ? 1 : -1;
@@ -301,11 +239,43 @@ void handleEncoder() {
 
         // Navegar por elementos
         if (!inModesScreen && elementFiles.size() > 1) {
-            Serial.println("Encoder girado, cambiando de elemento...");
             currentIndex = (currentIndex + direction + elementFiles.size()) % elementFiles.size();
 
-            // Sincronizar el modo del elemento actual
-            requestAndSyncElementMode();
+            // Obtener el archivo actual
+            String currentFile = elementFiles[currentIndex];
+
+            // Obtener el modo actual almacenado
+            int realModeIndex = 0;
+            byte modeConfig[2] = {0};
+
+            if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Apagar") {
+                INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+                realModeIndex = option->currentMode;
+                memcpy(modeConfig, option->mode[realModeIndex].config, 2);
+            } else {
+               
+                fs::File f = SPIFFS.open(currentFile, "r");
+                if (f) {
+                    f.seek(OFFSET_CURRENTMODE, SeekSet);
+                    realModeIndex = f.read();
+                    f.seek(OFFSET_MODES + realModeIndex * SIZE_MODE + 216, SeekSet);
+                    f.read(modeConfig, 2);
+                    f.close();
+                }
+            }
+
+            // Extraer los flags del modo actual del nuevo elemento
+            ModeFlags flags = extractModeFlags(modeConfig);
+
+            // Actualizar adxl y useMic
+            adxl = flags.acceptsSensVal1;
+            useMic = flags.acceptsSensVal2;
+                                                                    #ifdef DEBUG
+                                                                    Serial.println("🚀 Cambió de elemento, actualizando flags:");
+                                                                    Serial.println("adxl status: " + String(adxl ? "true" : "false"));
+                                                                    Serial.println("useMic status: " + String(useMic ? "true" : "false"));                                                                        
+                                                                    #endif
+
 
             // Redibujar el elemento actual
             drawCurrentElement();  
@@ -353,6 +323,7 @@ void handleEncoder() {
                 INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
                 realModeIndex = option->currentMode;
             } else {
+             
                 fs::File f = SPIFFS.open(currentFile, "r");
                 if (f) {
                     f.seek(OFFSET_CURRENTMODE, SeekSet);
@@ -377,6 +348,7 @@ void handleEncoder() {
                     }
                 }
             } else {
+              
                 fs::File f = SPIFFS.open(currentFile, "r");
                 if (f) {
                     for (int i = 0; i < 16; i++) {
@@ -421,53 +393,37 @@ void handleEncoder() {
 
             // --- CASO ESPECIAL: Apagar como "botón" que hace broadcast BLACKOUT ---
             if (currentFile == "Apagar") {
-                // Deseleccionar todos los elementos
                 for (size_t i = 0; i < selectedStates.size(); i++) {
                     selectedStates[i] = false;
                 }
-
-                // Enviar broadcast BLACKOUT
                 std::vector<byte> elementID;
                 elementID.push_back(0xFF);
                 send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, BLACKOUT));
+                setAllElementsToBasicMode();
 
-                // Mostrar mensaje de apagado durante 5 segundos
-                uiSprite.fillSprite(TFT_BLACK);
-                uiSprite.setTextDatum(MC_DATUM);
-                uiSprite.setTextSize(2);
-                uiSprite.setTextColor(TFT_WHITE);
-                uiSprite.drawString("APAGANDO", tft.width() / 2, tft.height() / 2 - 10);
-                uiSprite.drawString("Sala...", tft.width() / 2, tft.height() / 2 + 10);
-                uiSprite.pushSprite(0, 0);
+                showMessageWithLoading("Apagando Sala...", 5000);
 
-                delay(5000);
-
-                // Volver al menú principal
                 currentIndex = 0;
                 inModesScreen = false;
                 drawCurrentElement();
-
-                // Reset pulsación
                 buttonPressStart = 0;
                 isLongPress = false;
                 return;
             }
 
-            // --- 1) Si estamos en la pantalla de modos (inModesScreen = true) ---
             if (inModesScreen) {
                 handleModeSelection(currentFile);
-            }
-            // --- 2) Si NO estamos en la pantalla de modos ---
-            else {
+            } else {
                 toggleElementSelection(currentFile);
             }
         }
 
-        // Resetear variables de pulsación
         buttonPressStart = 0;
         isLongPress = false;
     }
 }
+
+
 
 void requestAndSyncElementMode() {
     String currentFile = elementFiles[currentIndex];
@@ -479,6 +435,7 @@ void requestAndSyncElementMode() {
         elementID = option->ID;  // ID para elementos fijos
     } else {
         // Leer la ID desde SPIFFS
+       
         fs::File f = SPIFFS.open(currentFile, "r");
         if (f) {
             f.seek(OFFSET_ID, SeekSet);
@@ -486,27 +443,37 @@ void requestAndSyncElementMode() {
             f.close();
         }
             // Enviar trama de petición de modo
-    send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA, elementID, SPANISH_LANG, ELEM_CMODE_SECTOR));
+    //send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA, elementID, SPANISH_LANG, ELEM_CMODE_SECTOR));
 
     // Esperar respuesta del sector ELEM_CMODE_SECTOR
-    if (!element->esperar_respuesta(2000)) {
-        Serial.printf("No llegó respuesta del sector ELEM_CMODE_SECTOR para el elemento con ID %d\n", elementID);
-        return;
-    }
+    // if (!element->esperar_respuesta(100)) {
+    //     Serial.printf("No llegó respuesta del sector ELEM_CMODE_SECTOR para el elemento con ID %d\n", elementID);
+    //     return;
+    // }
     }
 
 
 
     // Si llega la respuesta, el modo será procesado en RX_main_handler
-    Serial.printf("Respuesta del sector ELEM_CMODE_SECTOR recibida para el elemento con ID %d\n", elementID);
+                                                                                                    #ifdef DEBUG
+                                                                                                    Serial.printf("Respuesta del sector ELEM_CMODE_SECTOR recibida para el elemento con ID %d\n", elementID);    
+                                                                                                    #endif
+    
 }
 
-
 void handleModeSelection(const String& currentFile) {
+    // Si se selecciona la opción de regresar (icono de flecha), salimos inmediatamente
+    if (globalVisibleModesMap[currentModeIndex] == -2) {
+        inModesScreen = false;
+        drawCurrentElement();
+        return;
+    }
+  
     // Variables necesarias para procesar el modo seleccionado
     std::vector<byte> elementID;
     char elementName[25] = {0};
     String modeName;
+    uint8_t modeConfig[2] = {0};
 
     // Obtener el índice real del modo a partir del índice visible
     int realModeIndex = globalVisibleModesMap[currentModeIndex];
@@ -516,8 +483,11 @@ void handleModeSelection(const String& currentFile) {
         // Procesar elementos dinámicos
         INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
         option->currentMode = realModeIndex;
+        // Se asume que en la estructura ya está el nombre completo del modo
         modeName = String((char*)option->mode[realModeIndex].name);
         elementID.push_back(0); // ID predeterminada para dinámicos
+        // Si en elementos dinámicos también se requiere la configuración,
+        // se debe asignar modeConfig con los datos correspondientes.
     } else {
         // Procesar elementos cargados desde SPIFFS
         fs::File f = SPIFFS.open(currentFile, "r+");
@@ -536,22 +506,60 @@ void handleModeSelection(const String& currentFile) {
             f.read(&id, 1);
             elementID.push_back(id);
 
-            // Leer el nombre del modo
-            f.seek(OFFSET_MODES + (SIZE_MODE * realModeIndex), SeekSet);
+            // Leer el registro del modo desde SPIFFS
+            // Cada registro de modo ocupa SIZE_MODE bytes (218 bytes en este caso)
+            // y comienza en OFFSET_MODES + (SIZE_MODE * realModeIndex)
+            int modoOffset = OFFSET_MODES + (SIZE_MODE * realModeIndex);
+
+            // Primero, leer el nombre del modo (los primeros 24 bytes)
+            f.seek(modoOffset, SeekSet);
             char modeNameBuf[25] = {0};
             f.read((uint8_t*)modeNameBuf, 24);
             modeName = String(modeNameBuf);
+
+            // Saltar la descripción (192 bytes) y posicionarse al comienzo de la configuración
+            f.seek(modoOffset + 24 + 192, SeekSet);
+
+            // Leer los 2 bytes de configuración
+            f.read(modeConfig, 2);
 
             f.close();
         }
     }
 
-    // Mostrar en Serial
+    // Extraer los flags usando la función previamente adaptada
+    ModeFlags flags = extractModeFlags(modeConfig);
+#ifdef DEBUG
+    Serial.println("📋 Mode Name: " + String(modeName));  
+#endif
+
+    // Ajustar las variables globales según los flags
+    adxl = flags.acceptsSensVal1;
+    useMic = flags.acceptsSensVal2;
+    
+#ifdef DEBUG
+    Serial.println("adxl status " + String(adxl ? "true" : "false"));
+    Serial.println("useMic status " + String(useMic ? "true" : "false"));    
+#endif
+
+    // **Nueva lógica**: Si el elemento no está seleccionado, seleccionarlo automáticamente
+    if (!selectedStates[currentIndex]) {
+        selectedStates[currentIndex] = true;
+#ifdef DEBUG
+        Serial.println("✅ Elemento seleccionado automáticamente.");
+#endif
+    }
+
+    // Mostrar en Serial otros datos
+#ifdef DEBUG
     Serial.printf("Nombre del elemento: %s\n", elementName[0] ? elementName : currentFile.c_str());
     Serial.printf("ID del elemento: %d\n", elementID[0]);
-    Serial.printf("Modo seleccionado: %s (Modo %d)\n", modeName.c_str(), modeNumber);
+    Serial.printf("Modo seleccionado: %s (Modo %d)\n", modeName.c_str(), modeNumber);    
+#endif
 
     // Enviar la trama con el modo seleccionado
+    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, START_TEST));
+    delay(300);
     send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, elementID, realModeIndex));
 
     // Salir de la pantalla de modos y redibujar el elemento actual
@@ -565,10 +573,13 @@ void toggleElementSelection(const String& currentFile) {
 
     // Crear el vector para almacenar la ID del elemento
     std::vector<byte> elementID;
+    // Determinar si el elemento proviene de SPIFFS
+    bool isElementFromSPIFFS = !currentFile.startsWith("Ambientes") &&
+                               !currentFile.startsWith("Fichas") &&
+                               !currentFile.startsWith("Apagar");
 
-    // Si NO es Ambientes, Fichas ni Apagar => es un elemento cargado desde SPIFFS
-    if (!currentFile.startsWith("Ambientes") && !currentFile.startsWith("Fichas") && !currentFile.startsWith("Apagar")) {
-        fs::File f = SPIFFS.open(currentFile, "r");
+    if (isElementFromSPIFFS) {
+        fs::File f = SPIFFS.open(currentFile, "r+");
         if (f) {
             byte id = 0;
             f.seek(OFFSET_ID, SeekSet);
@@ -580,25 +591,41 @@ void toggleElementSelection(const String& currentFile) {
             elementID.push_back(0); // Valor por defecto en caso de error
         }
     } else {
-        // Valor por defecto para Ambientes/Fichas
+        // Si es "Ambientes", "Fichas" o "Apagar", no hacemos nada con SPIFFS
         elementID.push_back(0);
     }
 
-    // Enviar la trama con el estado actualizado
-    if (selectedStates[currentIndex]) {
-        // Elemento seleccionado: enviar comando de inicio
-        Serial.printf("Enviando comando de inicio a la ID %d\n", elementID[0]);
-        send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, START_TEST));
-    } else {
-        // Elemento deseleccionado: enviar comando de apagado
-        Serial.printf("Enviando comando de apagado a la ID %d\n", elementID[0]);
-        send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, BLACKOUT));
+    // Solo si es un elemento de SPIFFS se envía el comando y se actualiza el modo
+    if (isElementFromSPIFFS) {
+        // Determinar el comando a enviar
+        byte command = selectedStates[currentIndex] ? START_TEST : BLACKOUT;
+        Serial.printf("Enviando comando %s a la ID %d\n",
+                      command == START_TEST ? "START_TEST" : "BLACKOUT",
+                      elementID[0]);
+        send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, command));
+
+        if (command == BLACKOUT) {
+            showMessageWithLoading("Apagando Elemento", 3000);
+        }
+
+        // Actualizar el modo del elemento a "básico"
+        fs::File f = SPIFFS.open(currentFile, "r+");
+        if (f) {
+            byte basicMode = DEFAULT_BASIC_MODE;  // modo 1
+            f.seek(OFFSET_CURRENTMODE, SeekSet);
+            f.write(&basicMode, 1);
+            f.close();
+            Serial.printf("Modo actualizado a básico (1) en SPIFFS para el elemento %s\n", currentFile.c_str());
+        } else {
+            Serial.println("Error al abrir el archivo para actualizar el modo.");
+        }
     }
+    
+    // En el caso de "Ambientes", "Fichas" o "Apagar", únicamente se alterna el estado de selección
 
     // Redibujar el elemento actual para reflejar la selección/deselección
     drawCurrentElement();
 }
-
 
 void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
     int32_t newEncoderValue = encoder.getCount();
@@ -630,6 +657,7 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
 
     if (digitalRead(ENC_BUTTON) == LOW && !encoderButtonPressed && !menuJustOpened) {
     encoderButtonPressed = true;
+    ignoreEncoderClick = true;
     byte respuesta = 0;
     switch (hiddenMenuSelection) {
         case 0: {// Añadir elemento
@@ -638,33 +666,48 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
             break;
         }
         case 1: // Cambiar idioma
-            Serial.println("Cambiando idioma...");
+                                                                                            #ifdef DEBUG
+                                                                                            Serial.println("Cambiando idioma...");
+                                                                                            #endif
             // Lógica para cambiar idioma
             formatSPIFFS();
             loadElementsFromSPIFFS();
+            drawCurrentElement();
             hiddenMenuActive = false;
             break;
         case 2: // Sonido
-            Serial.println("Ajustando sonido...");
+                                                                                            #ifdef DEBUG
+                                                                                            Serial.println("Ajustando sonido...");
+                                                                                            #endif
             // Lógica para ajustar sonido
+            drawCurrentElement();
             hiddenMenuActive = false;
             break;
         case 3: // Brillo
-            Serial.println("Ajustando brillo...");
+                                                                                            #ifdef DEBUG
+                                                                                            Serial.println("Ajustando brillo...");
+                                                                                            #endif
             // Lógica para ajustar brillo
+            drawCurrentElement();
             hiddenMenuActive = false;
             break;
         case 4: // Respuestas
-            Serial.println("Configurando respuestas...");
+                                                                                            #ifdef DEBUG
+                                                                                            Serial.println("Configurando respuestas...");
+                                                                                            #endif
             // Lógica para configurar respuestas
+            drawCurrentElement();
             hiddenMenuActive = false;
             break;
         case 5: // Volver
-            Serial.println("Volviendo al menú principal");
-            hiddenMenuActive = false;
-            initialEntry = true;
+                                                                                            #ifdef DEBUG
+                                                                                            Serial.println("Volviendo al menú principal");
+                                                                                            #endif
+            
             PulsadoresHandler::limpiarEstados();
             drawCurrentElement();
+            initialEntry = false;
+            hiddenMenuActive = false;
             break;
         default:
             break;
@@ -672,5 +715,31 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
 }
 
 }
+
+ModeFlags extractModeFlags(const uint8_t modeConfig[2]) {
+    ModeFlags flags = {
+        // Ahora se asume que modeConfig[0] es el byte alto (bits 15 a 8)
+        .modeExist             = (modeConfig[0] >> 7) & 1,  // Bit 15
+        .nop2                  = (modeConfig[0] >> 6) & 1,  // Bit 14
+        .nop1                  = (modeConfig[0] >> 5) & 1,  // Bit 13
+        .acceptsPatterns       = (modeConfig[0] >> 4) & 1,  // Bit 12
+        .acceptsBankFile       = (modeConfig[0] >> 3) & 1,  // Bit 11
+        .canAnswer             = (modeConfig[0] >> 2) & 1,  // Bit 10
+        .hasPassive            = (modeConfig[0] >> 1) & 1,  // Bit 9
+        .situatedHigh          = (modeConfig[0] >> 0) & 1,  // Bit 8
+
+        // modeConfig[1] es el byte bajo (bits 7 a 0)
+        .acceptsSensVal2       = (modeConfig[1] >> 7) & 1,  // Bit 7
+        .acceptsSensVal1       = (modeConfig[1] >> 6) & 1,  // Bit 6
+        .hasRelay4             = (modeConfig[1] >> 5) & 1,  // Bit 5
+        .hasRelay3             = (modeConfig[1] >> 4) & 1,  // Bit 4
+        .hasRelay2             = (modeConfig[1] >> 3) & 1,  // Bit 3
+        .hasRelay1             = (modeConfig[1] >> 2) & 1,  // Bit 2
+        .acceptsAdvancedColor  = (modeConfig[1] >> 1) & 1,  // Bit 1
+        .acceptsBasicColor     = (modeConfig[1] >> 0) & 1   // Bit 0
+    };
+    return flags;
+}
+
 
 

@@ -3,16 +3,18 @@
 
 #include <Arduino.h>
 //DELFINES GLOBALES
-                                                #define NO_ELEM                 //NO_ELEM
-                                                /*COLUMNA, FIBRAS, WALLWASHER, ETC*/
+                                                #define NO_ELEM
+                                                /*COLUMNA, FIBRAS, WALLWASHER, VUMETER, ETC*/
                                                 #define PLAYER                 // -> PLAYER / NOPLAYER
-                                                #define NONFC                      // -> NFC / NONFC
+                                                #define NONFC                    // -> NFC / NONFC
+                                                #define MIC                      // -> MIC / NOMIC
                                                 #define DEBUG                    // -> Desactivar en produccion 
-                                                #define SERIAL_NUM      0xCACA   // -> 0xVV00= VERSION + 0x00MM= MES
+                                                #define SERIAL_NUM        0xC0CA // -> 0xVV00= VERSION + 0x00MM= MES
                                                 #define NOSERIAL_BY_FILE         // -> NOSERIAL_BY_FILE / SERIAL_BY_FILE --> Activar Serial por FileSystem, si esta definido, ignora el SERIAL_NUM.
                                                 #define SHOW_MAC                 // -> Opcional disparar MAC al inicio  (No sirve pa ná...) 
                                                 #define SLOW_RF                  // -> FAST_RF= 115200 / SLOW_RF= 9600 
-/*                                                                                                  
+                                                #define ADXL 
+/*                                                                                                 
                                      .-+***+-:....                                                  
                                       .+@@@@@@@@@+:......:::.....                                   
                                         .=@@@@@@@@@@@@@@@@@@@@@@@@@@+:.                             
@@ -21,7 +23,7 @@
                                     ..#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@+..                  
                                   ..#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@+.                 
                                  .*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@#.                
-                              ..-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@+...             
+                              ..-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ .@@@@@@@@@+...             
                               .+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@+..           
                              .#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@*.           
                            ..#@@@@@@@@@@@@@@@@@@@%#+:......+@@@@@@@-.....................           
@@ -54,20 +56,22 @@
 #define I2C2_SDA 40
 #define I2C2_SCL 41
 
+#define I2S_WS   16
+#define I2S_SD   47
+#define I2S_SCK  48
 
 
 #define ELEMENT_ID_FILE_PATH             "/ID_FILE.txt"
 #define ELEMENT_SERIALNUM_FILE_PATH      "/SERIALNUM_FILE.txt"
 #define ELEMENT_EVENT_REGISTER_FILE_PATH "/EVENT_REG_FILE.txt"
 
-#define MAX_EVENTS     1000 
+#define MAX_EVENTS     2000 
 
-#define MAX_REG_EVENTS    1000
 #define LIFETIME_UPDATE_INTERVAL  60000
-#define MAX_EXPECTED_TIME    0xF
+#define MAX_EXPECTED_TIME    0x1F
 #define RF_TX_PIN         18 
 #define RF_RX_PIN         17  
-#define RF_CONFIG_PIN     46
+#define RF_CONFIG_PIN     46 //original pin 46
 #if defined (FAST_RF)
   #define RF_BAUD_RATE      115200
 #else
@@ -75,6 +79,14 @@
 #endif
 
 #define UART_RX_BUFFER_SIZE 1024
+
+#define RESPONSE_TIME       0xFF
+
+#define SAMPLES             1024
+#define SAMPLING_FREQUENCY  44100
+
+#define MAX_BALLS 5  // Máximo de bolas simultáneas
+#define COLOR_VARIATION 30  // Variación máxima de color
 
 // DEFINES FRAME
 #define NEW_START             0xE1
@@ -126,8 +138,8 @@
 #define L_SEND_PATTERN_NUM    0x01  
 #define F_SEND_FLAG_BYTE      0xCE
 #define L_SEND_FLAG_BYTE      0x01
-#define F_SEND_COMMAND        0xCF
-#define L_SEND_COMMAND        0x01
+#define F_SEND_COMMAND          0xCF
+#define L_SEND_COMMAND           0x01
 
 #define F_RETURN_ELEM_SECTOR     0xD0
 #define L_RETURN_ELEM_SECTOR_01  0x01
@@ -151,7 +163,7 @@
 #define MIN_DEAF_TIME         0x01  
 #define MAX_DEAF_TIME         0x05 
 
-#define NORMAL_FADE           0x4FF  // original
+#define NORMAL_FADE           0x4BB  // 4ff original
 #define SLOWEST_FADE          0x13FF
 #define FASTEST_FADE          0x0A
 #define SLOW_FADE             0x32
@@ -226,6 +238,17 @@
 #define ICON_ROWS         64
 #define ICON_LENGTH      ICON_COLUMNS*ICON_ROWS
 
+// BANKS & FILES
+#define RESERVED_BANK      1      
+
+#define WIN_RESP_M_BANK   23
+#define WIN_RESP_H_BANK   24
+#define FAIL_RESP_M_BANK  25
+#define FAIL_RESP_H_BANK  26
+
+#define WOMAN_VOICE 0x00
+#define MAN_VOICE   0x01
+
 // DEFINES INFO_ELEMENTS
 #define SPANISH_LANG        0x01
 #define ENGLISH_LANG        0x02
@@ -234,6 +257,17 @@
 #define CATALAN_LANG        0x05
 #define MEXICAN_LANG        0x06
 #define EUSKERA_LANG        0x07
+
+#define SPANISH_FILE_OFFSET   10
+#define ENGLISH_FILE_OFFSET   20
+#define GERMAN_FILE_OFFSET    30
+#define FRENCH_FILE_OFFSET    40
+#define MEXICAN_FILE_OFFSET   50
+#define CATALAN_FILE_OFFSET   60
+#define EUSKERA_FILE_OFFSET   70
+
+#define MAN_VOICE_BANK_OFFSET  1
+
 
 #define MSB 0x00
 #define LSB 0x01
@@ -321,20 +355,42 @@ enum TESTS_{
 #define LIGHTSOURCE_FAN_RELAY_PIN   42
 
 // DEFINES LEDSTRIPS
-#define LEDSTRIP_LED_DATA_PIN 45 // 21= oficial //franc: led pin 45
+#define LEDSTRIP_LED_DATA_PIN       45 // 21= oficial 0 45 per tires super long
 
 // DEFINES BOTONERA
-#define BOTONERA_DATA_PIN     21
+#define BOTONERA_DATA_PIN           21
+
+//DEFINES ESCALERA
+#define VUMETER_SEL_MODE_PIN_01   1
+#define VUMETER_SEL_MODE_PIN_02   2
+#define VUMETER_SEL_MODE_PIN_03   3
+#define VUMETER_SEL_MODE_PIN_04   4
+#define VUMETER_SEL_MODE_PIN_05   5
+#define VUMETER_SEL_MODE_PIN_06   6
+
+
+#define VUMETER_LED_DATA_PIN        21
 
 
 
 
 #if   defined (COLUMNA)
-  #define NUM_LEDS 1
+  #define NUM_STEPS  1 
+  #define LEDS_STEP  1
+  #define NUM_LEDS   NUM_STEPS*LEDS_STEP 
 #elif defined (FIBRAS)
-  #define NUM_LEDS 1
+  #define NUM_STEPS  1 
+  #define LEDS_STEP  1
+  #define NUM_LEDS   NUM_STEPS*LEDS_STEP 
 #elif defined (WALLWASHER)
-  #define NUM_LEDS 299
+  #define NUM_STEPS  1 
+  #define LEDS_STEP  576
+  #define NUM_LEDS   NUM_STEPS*LEDS_STEP 
+#elif defined (ESCALERA)
+  #define NUM_STEPS  10 // 11
+  #define LEDS_STEP  27
+  #define NUM_LEDS   NUM_STEPS*LEDS_STEP 
+// botonera sempre al final dels elifs
 #elif defined (BOTONERA)
   #define NUM_LEDS 9
 #endif
@@ -350,7 +406,8 @@ enum COLUMN_MODE_LIST{
     COLUMN_RB_MOTION_MODE,
     COLUMN_MIX_MODE,
     COLUMN_PASSIVE_MODE,
-    COLUMN_PATTERN_MODE
+    COLUMN_PATTERN_MODE, 
+    COLUMN_BUBBLE_MODE
 };
 
 enum LIGHTSOURCE_MODE_LIST{
@@ -372,7 +429,26 @@ enum LEDSTRIP_MODE_LIST{
     LEDSTRIP_RB_MOTION_MODE,
     LEDSTRIP_MIX_MODE,
     LEDSTRIP_PASSIVE_MODE,
-    LEDSTRIP_PATTERN_MODE,
+    LEDSTRIP_PATTERN_MODE
+};
+
+enum VUMETER_MODE_LIST{
+    VUMETER_HIDDEN_MODE= 0,
+    VUMETER_BASIC_MODE,
+    VUMETER_SLOW_MODE,
+    VUMETER_MOTION_MODE,
+    VUMETER_RB_MOTION_MODE,
+    VUMETER_MIX_MODE,
+    VUMETER_PASSIVE_MODE,
+    VUMETER_PATTERN_MODE,
+    VUMETER_MODE_8,
+    VUMETER_MODE_9,
+    VUMETER_SIMON_GAME_MODE,
+    VUMETER_SECUENCER_GAME_MODE,
+    VUMETER_SPEAK_GAME_MODE,
+    VUMETER_BLOCK_SPEAK_MODE,
+    VUMETER_TONE_DETECT_MODE,
+    VUMETER_METEOR_VOICE_MODE
 };
 
 enum PATTERN_LIST{
@@ -693,3 +769,127 @@ duracion: 42 minutos
 -- FIN DE CICLO -- 
 
 */
+
+
+#define TT1 &TomThumb
+
+#define FM9 &FreeMono9pt7b
+#define FM12 &FreeMono12pt7b
+#define FM18 &FreeMono18pt7b
+#define FM24 &FreeMono24pt7b
+
+#define FMB9 &FreeMonoBold9pt7b
+#define FMB12 &FreeMonoBold12pt7b
+#define FMB18 &FreeMonoBold18pt7b
+#define FMB24 &FreeMonoBold24pt7b
+
+#define FMO9 &FreeMonoOblique9pt7b
+#define FMO12 &FreeMonoOblique12pt7b
+#define FMO18 &FreeMonoOblique18pt7b
+#define FMO24 &FreeMonoOblique24pt7b
+
+#define FMBO9 &FreeMonoBoldOblique9pt7b
+#define FMBO12 &FreeMonoBoldOblique12pt7b
+#define FMBO18 &FreeMonoBoldOblique18pt7b
+#define FMBO24 &FreeMonoBoldOblique24pt7b
+
+#define FSS9 &FreeSans9pt7b
+#define FSS12 &FreeSans12pt7b
+#define FSS18 &FreeSans18pt7b
+#define FSS24 &FreeSans24pt7b
+
+#define FSSB9 &FreeSansBold9pt7b
+#define FSSB12 &FreeSansBold12pt7b
+#define FSSB18 &FreeSansBold18pt7b
+#define FSSB24 &FreeSansBold24pt7b
+
+#define FSSO9 &FreeSansOblique9pt7b
+#define FSSO12 &FreeSansOblique12pt7b
+#define FSSO18 &FreeSansOblique18pt7b
+#define FSSO24 &FreeSansOblique24pt7b
+
+#define FSSBO9 &FreeSansBoldOblique9pt7b
+#define FSSBO12 &FreeSansBoldOblique12pt7b
+#define FSSBO18 &FreeSansBoldOblique18pt7b
+#define FSSBO24 &FreeSansBoldOblique24pt7b
+
+#define FS9 &FreeSerif9pt7b
+#define FS12 &FreeSerif12pt7b
+#define FS18 &FreeSerif18pt7b
+#define FS24 &FreeSerif24pt7b
+
+#define FSI9 &FreeSerifItalic9pt7b
+#define FSI12 &FreeSerifItalic12pt7b
+#define FSI19 &FreeSerifItalic18pt7b
+#define FSI24 &FreeSerifItalic24pt7b
+
+#define FSB9 &FreeSerifBold9pt7b
+#define FSB12 &FreeSerifBold12pt7b
+#define FSB18 &FreeSerifBold18pt7b
+#define FSB24 &FreeSerifBold24pt7b
+
+#define FSBI9 &FreeSerifBoldItalic9pt7b
+#define FSBI12 &FreeSerifBoldItalic12pt7b
+#define FSBI18 &FreeSerifBoldItalic18pt7b
+#define FSBI24 &FreeSerifBoldItalic24pt7b
+
+#define FF0 NULL //ff0 reserved for GLCD
+#define FF1 &FreeMono9pt7b
+#define FF2 &FreeMono12pt7b
+#define FF3 &FreeMono18pt7b
+#define FF4 &FreeMono24pt7b
+
+#define FF5 &FreeMonoBold9pt7b
+#define FF6 &FreeMonoBold12pt7b
+#define FF7 &FreeMonoBold18pt7b
+#define FF8 &FreeMonoBold24pt7b
+
+#define FF9 &FreeMonoOblique9pt7b
+#define FF10 &FreeMonoOblique12pt7b
+#define FF11 &FreeMonoOblique18pt7b
+#define FF12 &FreeMonoOblique24pt7b
+
+#define FF13 &FreeMonoBoldOblique9pt7b
+#define FF14 &FreeMonoBoldOblique12pt7b
+#define FF15 &FreeMonoBoldOblique18pt7b
+#define FF16 &FreeMonoBoldOblique24pt7b
+
+#define FF17 &FreeSans9pt7b
+#define FF18 &FreeSans12pt7b
+#define FF19 &FreeSans18pt7b
+#define FF20 &FreeSans24pt7b
+
+#define FF21 &FreeSansBold9pt7b
+#define FF22 &FreeSansBold12pt7b
+#define FF23 &FreeSansBold18pt7b
+#define FF24 &FreeSansBold24pt7b
+
+#define FF25 &FreeSansOblique9pt7b
+#define FF26 &FreeSansOblique12pt7b
+#define FF27 &FreeSansOblique18pt7b
+#define FF28 &FreeSansOblique24pt7b
+
+#define FF29 &FreeSansBoldOblique9pt7b
+#define FF30 &FreeSansBoldOblique12pt7b
+#define FF31 &FreeSansBoldOblique18pt7b
+#define FF32 &FreeSansBoldOblique24pt7b
+
+#define FF33 &FreeSerif9pt7b
+#define FF34 &FreeSerif12pt7b
+#define FF35 &FreeSerif18pt7b
+#define FF36 &FreeSerif24pt7b
+
+#define FF37 &FreeSerifItalic9pt7b
+#define FF38 &FreeSerifItalic12pt7b
+#define FF39 &FreeSerifItalic18pt7b
+#define FF40 &FreeSerifItalic24pt7b
+
+#define FF41 &FreeSerifBold9pt7b
+#define FF42 &FreeSerifBold12pt7b
+#define FF43 &FreeSerifBold18pt7b
+#define FF44 &FreeSerifBold24pt7b
+
+#define FF45 &FreeSerifBoldItalic9pt7b
+#define FF46 &FreeSerifBoldItalic12pt7b
+#define FF47 &FreeSerifBoldItalic18pt7b
+#define FF48 &FreeSerifBoldItalic24pt7b

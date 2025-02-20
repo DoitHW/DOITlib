@@ -19,6 +19,7 @@ public:
     SENSOR_VALUE_T createSensorValue(long finalValue);
     bool isInitialized() const;       // Verificar si está inicializado
     void setThreshold(float newThreshold);  // Configurar un nuevo umbral
+    void end();
 
 private:
     Adafruit_ADXL345_Unified accel;

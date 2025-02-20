@@ -42,6 +42,7 @@ class BOTONERA_ : public ELEMENT_{
         bool confirmarCambioID(byte nuevaID);
         byte getIdFromSPIFFS(byte *serial);
         String getCurrentFilePath(byte elementID);
+        void printFrameInfo(LAST_ENTRY_FRAME_T LEF);
 
     private:   
         byte lastAssignedID = DEFAULT_DEVICE;
