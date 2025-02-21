@@ -170,7 +170,9 @@ void updateNameDisplay() {
     uiSprite.setTextSize(1);
     int textWidth = uiSprite.textWidth(currentDisplayName);
     // Usamos alineación izquierda: cuando nameScrollOffset es 0, el extremo izquierdo se dibuja en x=0.
-    int drawX = 0 - nameScrollOffset;
+    //int drawX = 0 - nameScrollOffset;
+    int drawX = (DISPLAY_WIDTH - textWidth) / 2 - nameScrollOffset;
+
     int drawY = NAME_Y;
     
     // Limpiar toda la línea horizontal donde se muestra el nombre (de x = 0 a DISPLAY_WIDTH)
@@ -201,16 +203,20 @@ void updateNameScroll() {
          return;
     }
     
-    int maxScroll = textWidth - (DISPLAY_WIDTH - 10);  // Ajustamos el rango con el margen
+    //int maxScroll = textWidth - (DISPLAY_WIDTH - 10);  // Ajustamos el rango con el margen
+    int centerOffset = (DISPLAY_WIDTH - textWidth) / 2;
+    int maxScroll = abs(centerOffset) + textWidth - DISPLAY_WIDTH;
+    int minScroll = -maxScroll;
+
     if (millis() - lastNameScrollUpdate >= NAME_SCROLL_INTERVAL) {
          nameScrollOffset += nameScrollDirection;
-         if (nameScrollOffset < 0) {
-              nameScrollOffset = 0;
-              nameScrollDirection = 1;
-         } else if (nameScrollOffset > maxScroll) {
-              nameScrollOffset = maxScroll;
-              nameScrollDirection = -1;
-         }
+         if (nameScrollOffset <= minScroll) {
+            nameScrollOffset = minScroll;
+            nameScrollDirection = 1;
+        } else if (nameScrollOffset >= maxScroll) {
+            nameScrollOffset = maxScroll;
+            nameScrollDirection = -1;
+        }
          lastNameScrollUpdate = millis();
          updateNameDisplay();
     }
@@ -220,7 +226,7 @@ void updateNameScroll() {
 const int MODE_DISPLAY_WIDTH = 128;        // Ancho total del display (o zona asignada)
 const int MODE_Y = tft.height() - 15;        // Posición vertical donde se dibuja el nombre del modo (igual que drawModeName)
 const int MODE_AREA_HEIGHT = 20;             // Altura de la zona a actualizar (ajusta para que no se solape)
-const int MODE_SCROLL_INTERVAL = 30;         // Intervalo de actualización (ms)
+const int MODE_SCROLL_INTERVAL = 60;         // Intervalo de actualización (ms)
 
 // Variables globales para el scroll del nombre del modo
 bool modeScrollActive = false;             // Se activa si el texto del modo es demasiado largo
@@ -231,24 +237,27 @@ unsigned long lastModeScrollUpdate = 0;    // Última actualización en ms
 
 // Actualiza la zona del nombre del modo usando el desplazamiento actual
 void updateModeDisplay() {
-    // Establecer la fuente y tamaño para obtener el ancho correcto
+    // Establecer fuente y tamaño antes de calcular el ancho
     uiSprite.setFreeFont(&FreeSans9pt7b);
     uiSprite.setTextSize(1);
+
     int textWidth = uiSprite.textWidth(currentModeDisplayName);
-    // Usamos alineación izquierda para que cuando el desplazamiento sea 0, se vea el principio (la "T" o lo que corresponda)
-    int drawX = 0 - modeScrollOffset;
+    int centerX = (MODE_DISPLAY_WIDTH - textWidth) / 2;
+
+    // Ajustar desplazamiento desde el centro
+    int drawX = centerX - modeScrollOffset;
     int drawY = MODE_Y;
-    
-    // Borrar la zona completa donde se dibuja el nombre del modo (de 0 a MODE_DISPLAY_WIDTH)
+
+    // Borrar el área donde se dibuja el nombre del modo
     uiSprite.fillRect(0, drawY, MODE_DISPLAY_WIDTH, MODE_AREA_HEIGHT, BACKGROUND_COLOR);
-    
+
     uiSprite.setFreeFont(&FreeSans9pt7b);
     uiSprite.setTextSize(1);
-    uiSprite.setTextDatum(TL_DATUM); // Alineación izquierda
+    uiSprite.setTextDatum(TL_DATUM); // Mantener alineación izquierda para el scroll
     uiSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
     uiSprite.drawString(currentModeDisplayName, drawX, drawY);
-    
-    // Actualizar la región completa en la TFT
+
+    // Refrescar solo la parte afectada en la pantalla
     uiSprite.pushSprite(0, drawY, 0, drawY, MODE_DISPLAY_WIDTH, MODE_AREA_HEIGHT);
 }
 
@@ -257,7 +266,7 @@ void updateModeScroll() {
     uiSprite.setFreeFont(&FreeSans9pt7b);
     uiSprite.setTextSize(1);
     int textWidth = uiSprite.textWidth(currentModeDisplayName);
-    
+
     // Si el texto cabe en el área, desactivar scroll
     if (textWidth <= MODE_DISPLAY_WIDTH) {
          modeScrollActive = false;
@@ -265,18 +274,24 @@ void updateModeScroll() {
          return;
     }
 
-    int extraMargin = 5;
+    int extraMargin = 10;
     
-    int maxScroll = textWidth - (MODE_DISPLAY_WIDTH - extraMargin);  // Rango máximo de desplazamiento
+    // Ajuste del desplazamiento máximo para centrar correctamente
+    int maxScroll = (textWidth - MODE_DISPLAY_WIDTH) / 2 + extraMargin;
+    int minScroll = -maxScroll; // Permitir que el texto se desplace en ambas direcciones
+
     if (millis() - lastModeScrollUpdate >= MODE_SCROLL_INTERVAL) {
          modeScrollOffset += modeScrollDirection;
-         if (modeScrollOffset < 0) {
-              modeScrollOffset = 0;
+
+         // Invertir dirección del scroll al alcanzar los límites
+         if (modeScrollOffset <= minScroll) {
+              modeScrollOffset = minScroll;
               modeScrollDirection = 1;
-         } else if (modeScrollOffset > maxScroll) {
+         } else if (modeScrollOffset >= maxScroll) {
               modeScrollOffset = maxScroll;
               modeScrollDirection = -1;
          }
+
          lastModeScrollUpdate = millis();
          updateModeDisplay();
     }
@@ -338,6 +353,7 @@ void drawCurrentElement() {
          uiSprite.setTextSize(1);
          String displayName = String((char*)option->name);
          int elementTextWidth = uiSprite.textWidth(displayName);
+         Serial.println("2 Tamaño de "+String(displayName)+ " es " + String(elementTextWidth));
          if (elementTextWidth > DISPLAY_WIDTH) {
               nameScrollActive = true;
               currentDisplayName = displayName;
@@ -400,6 +416,7 @@ void drawCurrentElement() {
          uiSprite.setTextSize(1);
          String displayName = getDisplayName(currentFile);
          int elementTextWidth = uiSprite.textWidth(displayName);
+         Serial.println("1 Tamaño de "+String(displayName)+ " es " + String(elementTextWidth));
          if (elementTextWidth > DISPLAY_WIDTH) {
               nameScrollActive = true;
               currentDisplayName = displayName;

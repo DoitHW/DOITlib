@@ -216,10 +216,10 @@ bool readElementData(fs::File& f, char* elementName, char* modeName, int& startX
 void initializeDynamicOptions() {
     // ----- Ambientes -----
     memset(&ambientesOption, 0, sizeof(INFO_PACK_T));
-    strncpy((char*)ambientesOption.name, "Ambientes", 24);
+    strncpy((char*)ambientesOption.name, "AMBIENTES", 24);
     strncpy((char*)ambientesOption.desc, "Configura los ambientes de la sala.", 192);
     ambientesOption.currentMode = 0;
-    strncpy((char*)ambientesOption.mode[0].name, "Basico", 24);
+    strncpy((char*)ambientesOption.mode[0].name, "BASICO", 24);
     strncpy((char*)ambientesOption.mode[0].desc, "Modo basico para ambientes.", 192);
     ambientesOption.mode[0].config[0] = 0x80;
     ambientesOption.mode[0].config[1] = 0x01;
@@ -227,88 +227,26 @@ void initializeDynamicOptions() {
 
     // ----- Fichas -----
     memset(&fichasOption, 0, sizeof(INFO_PACK_T));
-    strncpy((char*)fichasOption.name, "Fichas", 24);
+    strncpy((char*)fichasOption.name, "FICHAS", 24);
     strncpy((char*)fichasOption.desc, "Interacción con fichas NFC.", 192);
     fichasOption.currentMode = 0;
-    strncpy((char*)fichasOption.mode[0].name, "1", 24);
+    strncpy((char*)fichasOption.mode[0].name, "BASICO", 24);
     strncpy((char*)fichasOption.mode[0].desc, "Modo basico para fichas NFC.", 192);
     fichasOption.mode[0].config[0] = 0x80;
     fichasOption.mode[0].config[1] = 0x01;
-    strncpy((char*)fichasOption.mode[1].name, "2", 24);
-    strncpy((char*)fichasOption.mode[1].desc, "Modo basico para fichas NFC.", 192);
-    fichasOption.mode[1].config[0] = 0x80;
-    fichasOption.mode[1].config[1] = 0x02;
-    strncpy((char*)fichasOption.mode[2].name, "3", 24);
-    strncpy((char*)fichasOption.mode[2].desc, "Modo basico para fichas NFC.", 192);
-    fichasOption.mode[2].config[0] = 0x80;
-    fichasOption.mode[2].config[1] = 0x04;
-    strncpy((char*)fichasOption.mode[3].name, "4", 24);
-    strncpy((char*)fichasOption.mode[3].desc, "Modo basico para fichas NFC.", 192);
-    fichasOption.mode[3].config[0] = 0x80;
-    fichasOption.mode[3].config[1] = 0x08;
-
-
-    strncpy((char*)fichasOption.mode[4].name, "5", 24);
-    strncpy((char*)fichasOption.mode[4].desc, "Modo basico para fichas NFC.", 192);
-    fichasOption.mode[4].config[0] = 0x80;
-    fichasOption.mode[4].config[1] = 0x10;
-    strncpy((char*)fichasOption.mode[5].name, "6", 24);
-    strncpy((char*)fichasOption.mode[5].desc, "Modo basico para fichas NFC.", 192);
-    fichasOption.mode[5].config[0] = 0x80;
-    fichasOption.mode[5].config[1] = 0x20;
-    strncpy((char*)fichasOption.mode[6].name, "7", 24);
-    strncpy((char*)fichasOption.mode[6].desc, "Modo basico para fichas NFC.", 192);
-    fichasOption.mode[6].config[0] = 0x80;
-    fichasOption.mode[6].config[1] = 0x40;
-    strncpy((char*)fichasOption.mode[7].name, "8", 24);
-    strncpy((char*)fichasOption.mode[7].desc, "Modo basico para fichas NFC.", 192);
-    fichasOption.mode[7].config[0] = 0x80;
-    fichasOption.mode[7].config[1] = 0x80;
-
-
-    strncpy((char*)fichasOption.mode[8].name, "9", 24);
-    strncpy((char*)fichasOption.mode[8].desc, "Modo basico para fichas NFC.", 192);
-    fichasOption.mode[8].config[0] = 0x81;
-    fichasOption.mode[8].config[1] = 0x00;
-    strncpy((char*)fichasOption.mode[9].name, "10", 24);
-    strncpy((char*)fichasOption.mode[9].desc, "Modo basico para fichas NFC.", 192);
-    fichasOption.mode[9].config[0] = 0x82;
-    fichasOption.mode[9].config[1] = 0x00;
-    strncpy((char*)fichasOption.mode[10].name, "11", 24);
-    strncpy((char*)fichasOption.mode[10].desc, "Modo basico para fichas NFC.", 192);
-    fichasOption.mode[10].config[0] = 0x84;
-    fichasOption.mode[10].config[1] = 0x00;
-    strncpy((char*)fichasOption.mode[11].name, "12", 24);
-    strncpy((char*)fichasOption.mode[11].desc, "Modo basico para fichas NFC.", 192);
-    fichasOption.mode[11].config[0] = 0x88;
-    fichasOption.mode[11].config[1] = 0x00;
-
-
-    strncpy((char*)fichasOption.mode[12].name, "13", 24);
-    strncpy((char*)fichasOption.mode[12].desc, "Modo basico para fichas NFC.", 192);
-    fichasOption.mode[12].config[0] = 0x90;
-    fichasOption.mode[12].config[1] = 0x00;
-    strncpy((char*)fichasOption.mode[13].name, "14", 24);
-    strncpy((char*)fichasOption.mode[13].desc, "Modo basico para fichas NFC.", 192);
-    fichasOption.mode[13].config[0] = 0xA0;
-    fichasOption.mode[13].config[1] = 0x00;
-    strncpy((char*)fichasOption.mode[14].name, "15", 24);
-    strncpy((char*)fichasOption.mode[14].desc, "Modo basico para fichas NFC.", 192);
-    fichasOption.mode[14].config[0] = 0xC0;
-    fichasOption.mode[14].config[1] = 0x00;
     memcpy(fichasOption.icono, fichas_64x64, sizeof(fichasOption.icono));
     //Serial.println("Nombre de fichasOption.name después de crear el icono: " + String((char*)fichasOption.name));
 
     // ----- ApagarSala -----
     memset(&apagarSala, 0, sizeof(INFO_PACK_T));
-    strncpy((char*)apagarSala.name, "Apagar", 24);
+    strncpy((char*)apagarSala.name, "APAGAR", 24);
     strncpy((char*)apagarSala.desc, "Apaga la sala por completo.", 192);
     apagarSala.currentMode = 0;
     // Puedes añadir uno o varios modos, aquí un ejemplo con un solo modo "OFF".
-    strncpy((char*)apagarSala.mode[0].name, "OFF", 24);
-    strncpy((char*)apagarSala.mode[0].desc, "Modo para apagar la sala.", 192);
-    apagarSala.mode[0].config[0] = 0x7F; // El valor que tú desees para este modo
-    apagarSala.mode[0].config[1] = 0xFF;
+    // strncpy((char*)apagarSala.mode[0].name, "OFF", 24);
+    // strncpy((char*)apagarSala.mode[0].desc, "Modo para apagar la sala.", 192);
+    // apagarSala.mode[0].config[0] = 0x7F; // El valor que tú desees para este modo
+    // apagarSala.mode[0].config[1] = 0xFF;
 
     // Asumiendo que tienes un icono llamado apagar_64x64:
     memcpy(apagarSala.icono, apagar_sala_64x64, sizeof(apagarSala.icono));
