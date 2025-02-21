@@ -29,22 +29,23 @@ FLAGS de modo:
 */
 
 enum MODE_CONFIGS{
-    HAS_BASIC_COLOR= 0,
-    HAS_PULSE,
-    HAS_ADVANCED_COLOR,
-    HAS_RELAY_1,
-    HAS_RELAY_2,
-    HAS_RELAY_3,
-    HAS_RELAY_4,
-    HAS_SENS_VAL_1,
-    HAS_SENS_VAL_2,
-    SITUATED_HIGH,
-    HAS_PASSIVE,
-    CAN_ANSWER,
-    HAS_BANK_FILE,
-    HAS_PATTERNS,
-    NOP_1,
-    MODE_EXIST
+    HAS_BASIC_COLOR= 0, //b0
+    HAS_PULSE,          //b1
+    HAS_ADVANCED_COLOR, //b2
+    HAS_RELAY_1,        //b3
+    HAS_RELAY_2,        //b4
+    HAS_RELAY_3,        //b5
+    HAS_RELAY_4,        //b6
+    HAS_SENS_VAL_1,     //b7
+    
+    HAS_SENS_VAL_2,     //b8
+    SITUATED_HIGH,      //b9
+    HAS_PASSIVE,        //b10
+    CAN_ANSWER,         //b11
+    HAS_BANK_FILE,      //b12
+    HAS_PATTERNS,       //b13
+    NOP_1,              //b14
+    MODE_EXIST          //b15
 };
 
 

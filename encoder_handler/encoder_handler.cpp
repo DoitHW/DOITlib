@@ -8,6 +8,7 @@
 #include <DynamicLEDManager_DMS/DynamicLEDManager_DMS.h>
 #include <ADXL345_handler/ADXL345_handler.h>
 #include <microphone_DMS/microphone_DMS.h>
+#include <info_elements_DMS/info_elements_DMS.h>
 
 #define MODE_BACK -2
 // Variables globales para el manejo del encoder
@@ -26,211 +27,30 @@ std::vector<String> elementFiles;
 std::vector<bool> selectedStates;
 int globalVisibleModesMap[17] = {0};  // Definición e inicialización
 
-
-
-
 void encoder_init_func() {
-    //Serial.println("Inicializando encoder...");
     pinMode(ENC_BUTTON, INPUT_PULLUP);
     ESP32Encoder::useInternalWeakPullResistors = UP;
     encoder.attachSingleEdge(ENC_B, ENC_A); //original encoder.attachSingleEdge(ENC_A, ENC_B);
     encoder.clearCount();
     encoder.setCount(0);
     encoder.setFilter(1023);
-    //Serial.println("Encoder inicializado.");
 }
 
-// void handleEncoder() {
-//     int32_t newEncoderValue = encoder.getCount();
-//     if (newEncoderValue != lastEncoderValue) {
-//         int32_t direction = (newEncoderValue > lastEncoderValue) ? 1 : -1;
-//         lastEncoderValue = newEncoderValue;
-
-//         // Navegar por elementos
-//         if (!inModesScreen && elementFiles.size() > 1) {
-//             Serial.println("Encoder girado, cambiando de elemento...");
-//             currentIndex = (currentIndex + direction + elementFiles.size()) % elementFiles.size();
-
-//             // Sincronizar el modo del elemento actual
-//             //requestAndSyncElementMode();
-
-//             // Redibujar el elemento actual
-//             drawCurrentElement();  
-//         }
-//         // Navegar por modos visibles
-//         else if (inModesScreen && totalModes > 0) {
-//             // currentModeIndex se maneja como índice 'visible'
-//             currentModeIndex = (currentModeIndex + direction + totalModes) % totalModes;
-
-//             // Obtener el índice real a partir del índice visible
-//             int realModeIndex = globalVisibleModesMap[currentModeIndex];
-//             if (realModeIndex >= 0) {
-//                 // Actualizar patrón en la botonera
-//                 String currentFile = elementFiles[currentIndex];
-//                 colorHandler.setCurrentFile(currentFile);
-//                 colorHandler.setPatternBotonera(realModeIndex, ledManager);
-//             }
-//             // Redibujar la pantalla de modos
-//             drawModesScreen();
-//         }
-//     }
-
-//     // Lectura del botón del encoder
-//     if (digitalRead(ENC_BUTTON) == LOW) {
-//         if (buttonPressStart == 0) {
-//             // Registrar inicio de la pulsación
-//             buttonPressStart = millis();
-//         }
-//         // Pulsación larga para mostrar menú de modos
-//         else if (!hiddenMenuActive && millis() - buttonPressStart > 2000 && !isLongPress) {
-//             isLongPress = true;
-//             modeScreenEnteredByLongPress = true;
-
-//             // --- SINCRONIZACIÓN ANTES DE ENTRAR EN LA PANTALLA DE MODOS ---
-//             String currentFile = elementFiles[currentIndex];
-
-//             // Si es "Apagar", no queremos abrir la pantalla de modos
-//             if (currentFile == "Apagar") {
-//                 return;
-//             }
-
-//             // 1) Obtener el modo real actualmente almacenado
-//             int realModeIndex = 0;
-//             if (currentFile == "Ambientes" || currentFile == "Fichas") {
-//                 INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
-//                 realModeIndex = option->currentMode;
-//             } else {
-//                 fs::File f = SPIFFS.open(currentFile, "r");
-//                 if (f) {
-//                     f.seek(OFFSET_CURRENTMODE, SeekSet);
-//                     realModeIndex = f.read();
-//                     f.close();
-//                 }
-//             }
-
-//             // 2) Encontrar cuál es su índice visible (currentModeIndex) en la lista filtrada
-//             int tempCurrentModeIndex = 0;
-//             int foundVisibleIndex = -1;
-
-//             if (currentFile == "Ambientes" || currentFile == "Fichas") {
-//                 INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
-//                 for (int i = 0; i < 16; i++) {
-//                     if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
-//                         if (i == realModeIndex) {
-//                             foundVisibleIndex = tempCurrentModeIndex;
-//                             break;
-//                         }
-//                         tempCurrentModeIndex++;
-//                     }
-//                 }
-//             } else {
-//                 fs::File f = SPIFFS.open(currentFile, "r");
-//                 if (f) {
-//                     for (int i = 0; i < 16; i++) {
-//                         char modeName[25] = {0};
-//                         char modeDesc[193] = {0};
-//                         byte modeConfig[2] = {0};
-
-//                         if (f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet)) {
-//                             f.read((uint8_t*)modeName, 24);
-//                             f.read((uint8_t*)modeDesc, 192);
-//                             f.read(modeConfig, 2);
-
-//                             if (strlen(modeName) > 0 && checkMostSignificantBit(modeConfig)) {
-//                                 if (i == realModeIndex) {
-//                                     foundVisibleIndex = tempCurrentModeIndex;
-//                                     break;
-//                                 }
-//                                 tempCurrentModeIndex++;
-//                             }
-//                         }
-//                     }
-//                     f.close();
-//                 }
-//             }
-
-//             // 3) Ajustar currentModeIndex para que la pantalla de modos lo muestre en verde
-//             if (foundVisibleIndex >= 0) {
-//                 currentModeIndex = foundVisibleIndex;
-//             } else {
-//                 currentModeIndex = 0;
-//             }
-//             // --- FIN DE LA SINCRONIZACIÓN ---
-
-//             inModesScreen = true;
-//             drawModesScreen();
-//         }
-//     }
-//     // Cuando se suelta el botón
-//     else {
-//         if (!hiddenMenuActive && buttonPressStart > 0 && millis() - buttonPressStart < 2000) {
-//             String currentFile = elementFiles[currentIndex];
-
-//             // --- CASO ESPECIAL: Apagar como "botón" que hace broadcast BLACKOUT ---
-//             if (currentFile == "Apagar") {
-//                 // Deseleccionar todos los elementos
-//                 for (size_t i = 0; i < selectedStates.size(); i++) {
-//                     selectedStates[i] = false;
-//                 }
-
-//                 // Enviar broadcast BLACKOUT
-//                 std::vector<byte> elementID;
-//                 elementID.push_back(0xFF);
-//                 send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, BLACKOUT));
-
-//                 // Mostrar mensaje de apagado durante 5 segundos
-//                 uiSprite.fillSprite(TFT_BLACK);
-//                 uiSprite.setTextDatum(MC_DATUM);
-//                 uiSprite.setTextSize(2);
-//                 uiSprite.setTextColor(TFT_WHITE);
-//                 uiSprite.drawString("APAGANDO", tft.width() / 2, tft.height() / 2 - 10);
-//                 uiSprite.drawString("Sala...", tft.width() / 2, tft.height() / 2 + 10);
-//                 uiSprite.pushSprite(0, 0);
-
-//                 delay(5000);
-
-//                 // Volver al menú principal
-//                 currentIndex = 0;
-//                 inModesScreen = false;
-//                 drawCurrentElement();
-
-//                 // Reset pulsación
-//                 buttonPressStart = 0;
-//                 isLongPress = false;
-//                 return;
-//             }
-
-//             // --- 1) Si estamos en la pantalla de modos (inModesScreen = true) ---
-//             if (inModesScreen) {
-//                 handleModeSelection(currentFile);
-//             }
-//             // --- 2) Si NO estamos en la pantalla de modos ---
-//             else {
-//                 toggleElementSelection(currentFile);
-//             }
-//         }
-
-//         // Resetear variables de pulsación
-//         buttonPressStart = 0;
-//         isLongPress = false;
-//     }
-// }
 bool ignoreInputs = false;
 bool ignoreEncoderClick = false;
 
-
 void handleEncoder() {
-        // Si se debe ignorar el click residual, chequea si ya se soltó el botón.
-        if (ignoreEncoderClick) {
-            if (digitalRead(ENC_BUTTON) == HIGH) {
-                // El botón ya se soltó: se restablece la bandera.
-                ignoreEncoderClick = false;
-            } else {
-                // Mientras el botón esté presionado, no se procesan entradas.
-                return;
-            }
+    // Si se debe ignorar el click residual, chequea si ya se soltó el botón.
+    if (ignoreEncoderClick) {
+        if (digitalRead(ENC_BUTTON) == HIGH) {
+            // El botón ya se soltó: se restablece la bandera.
+            ignoreEncoderClick = false;
+        } else {
+            // Mientras el botón esté presionado, no se procesan entradas.
+            return;
         }
-        
+    }
+    
     if (ignoreInputs) return;
     int32_t newEncoderValue = encoder.getCount();
     if (newEncoderValue != lastEncoderValue) {
@@ -253,7 +73,6 @@ void handleEncoder() {
                 realModeIndex = option->currentMode;
                 memcpy(modeConfig, option->mode[realModeIndex].config, 2);
             } else {
-               
                 fs::File f = SPIFFS.open(currentFile, "r");
                 if (f) {
                     f.seek(OFFSET_CURRENTMODE, SeekSet);
@@ -264,18 +83,15 @@ void handleEncoder() {
                 }
             }
 
-            // Extraer los flags del modo actual del nuevo elemento
-            ModeFlags flags = extractModeFlags(modeConfig);
+            // Extraer los flags del modo actual usando getModeFlag()
+            adxl = getModeFlag(modeConfig, HAS_SENS_VAL_1);
+            useMic = getModeFlag(modeConfig, HAS_SENS_VAL_2);
 
-            // Actualizar adxl y useMic
-            adxl = flags.acceptsSensVal1;
-            useMic = flags.acceptsSensVal2;
-                                                                    #ifdef DEBUG
-                                                                    Serial.println("🚀 Cambió de elemento, actualizando flags:");
-                                                                    Serial.println("adxl status: " + String(adxl ? "true" : "false"));
-                                                                    Serial.println("useMic status: " + String(useMic ? "true" : "false"));                                                                        
-                                                                    #endif
-
+            #ifdef DEBUG
+            Serial.println("🚀 Cambió de elemento, actualizando flags:");
+            Serial.println("adxl status: " + String(adxl ? "true" : "false"));
+            Serial.println("useMic status: " + String(useMic ? "true" : "false"));                                                                        
+            #endif
 
             // Redibujar el elemento actual
             drawCurrentElement();  
@@ -323,7 +139,6 @@ void handleEncoder() {
                 INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
                 realModeIndex = option->currentMode;
             } else {
-             
                 fs::File f = SPIFFS.open(currentFile, "r");
                 if (f) {
                     f.seek(OFFSET_CURRENTMODE, SeekSet);
@@ -348,7 +163,6 @@ void handleEncoder() {
                     }
                 }
             } else {
-              
                 fs::File f = SPIFFS.open(currentFile, "r");
                 if (f) {
                     for (int i = 0; i < 16; i++) {
@@ -422,7 +236,6 @@ void handleEncoder() {
         isLongPress = false;
     }
 }
-
 
 
 void requestAndSyncElementMode() {
@@ -527,17 +340,12 @@ void handleModeSelection(const String& currentFile) {
         }
     }
 
-    // Extraer los flags usando la función previamente adaptada
-    ModeFlags flags = extractModeFlags(modeConfig);
+    // Extraer los flags usando la nueva función getModeFlag()
+    adxl = getModeFlag(modeConfig, HAS_SENS_VAL_1);
+    useMic = getModeFlag(modeConfig, HAS_SENS_VAL_2);
+
 #ifdef DEBUG
     Serial.println("📋 Mode Name: " + String(modeName));  
-#endif
-
-    // Ajustar las variables globales según los flags
-    adxl = flags.acceptsSensVal1;
-    useMic = flags.acceptsSensVal2;
-    
-#ifdef DEBUG
     Serial.println("adxl status " + String(adxl ? "true" : "false"));
     Serial.println("useMic status " + String(useMic ? "true" : "false"));    
 #endif
@@ -716,29 +524,42 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
 
 }
 
-ModeFlags extractModeFlags(const uint8_t modeConfig[2]) {
-    ModeFlags flags = {
-        // Ahora se asume que modeConfig[0] es el byte alto (bits 15 a 8)
-        .modeExist             = (modeConfig[0] >> 7) & 1,  // Bit 15
-        .nop2                  = (modeConfig[0] >> 6) & 1,  // Bit 14
-        .nop1                  = (modeConfig[0] >> 5) & 1,  // Bit 13
-        .acceptsPatterns       = (modeConfig[0] >> 4) & 1,  // Bit 12
-        .acceptsBankFile       = (modeConfig[0] >> 3) & 1,  // Bit 11
-        .canAnswer             = (modeConfig[0] >> 2) & 1,  // Bit 10
-        .hasPassive            = (modeConfig[0] >> 1) & 1,  // Bit 9
-        .situatedHigh          = (modeConfig[0] >> 0) & 1,  // Bit 8
 
-        // modeConfig[1] es el byte bajo (bits 7 a 0)
-        .acceptsSensVal2       = (modeConfig[1] >> 7) & 1,  // Bit 7
-        .acceptsSensVal1       = (modeConfig[1] >> 6) & 1,  // Bit 6
-        .hasRelay4             = (modeConfig[1] >> 5) & 1,  // Bit 5
-        .hasRelay3             = (modeConfig[1] >> 4) & 1,  // Bit 4
-        .hasRelay2             = (modeConfig[1] >> 3) & 1,  // Bit 3
-        .hasRelay1             = (modeConfig[1] >> 2) & 1,  // Bit 2
-        .acceptsAdvancedColor  = (modeConfig[1] >> 1) & 1,  // Bit 1
-        .acceptsBasicColor     = (modeConfig[1] >> 0) & 1   // Bit 0
-    };
-    return flags;
+bool getModeFlag(const uint8_t modeConfig[2], MODE_CONFIGS flag) {
+    // Construir el uint16_t interpretando data[0] como el MSByte y data[1] como el LSByte (big-endian)
+    uint16_t config = (uint16_t(modeConfig[0]) << 8) | uint16_t(modeConfig[1]);
+    // Extraer el bit (el enum indica el offset desde el bit 0, LSB)
+    return (config >> flag) & 1;
+}
+
+
+
+void debugModeConfig(const uint8_t modeConfig[2]) {
+    Serial.println("===== Estado de modeConfig =====");
+    for (int i = HAS_BASIC_COLOR; i <= MODE_EXIST; i++) {
+        MODE_CONFIGS flag = static_cast<MODE_CONFIGS>(i);
+        bool isActive = getModeFlag(modeConfig, flag);
+        switch (flag) {
+            case HAS_BASIC_COLOR:   Serial.print("HAS_BASIC_COLOR"); break;
+            case HAS_PULSE:         Serial.print("HAS_PULSE"); break;
+            case HAS_ADVANCED_COLOR:Serial.print("HAS_ADVANCED_COLOR"); break;
+            case HAS_RELAY_1:       Serial.print("HAS_RELAY_1"); break;
+            case HAS_RELAY_2:       Serial.print("HAS_RELAY_2"); break;
+            case HAS_RELAY_3:       Serial.print("HAS_RELAY_3"); break;
+            case HAS_RELAY_4:       Serial.print("HAS_RELAY_4"); break;
+            case HAS_SENS_VAL_1:    Serial.print("HAS_SENS_VAL_1"); break;
+            case HAS_SENS_VAL_2:    Serial.print("HAS_SENS_VAL_2"); break;
+            case SITUATED_HIGH:     Serial.print("SITUATED_HIGH"); break;
+            case HAS_PASSIVE:       Serial.print("HAS_PASSIVE"); break;
+            case CAN_ANSWER:        Serial.print("CAN_ANSWER"); break;
+            case HAS_BANK_FILE:     Serial.print("HAS_BANK_FILE"); break;
+            case HAS_PATTERNS:      Serial.print("HAS_PATTERNS"); break;
+            case NOP_1:             Serial.print("NOP_1"); break;
+            case MODE_EXIST:        Serial.print("MODE_EXIST"); break;
+        }
+        Serial.print(" = ");
+        Serial.println(isActive ? "1" : "0");
+    }
 }
 
 

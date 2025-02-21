@@ -1,6 +1,7 @@
 #pragma once
 
 #include <SPIFFS_handler/SPIFFS_handler.h>
+#include <info_elements_DMS/info_elements_DMS.h>
 #include <Arduino.h>
 #include <ESP32Encoder.h>
 #include <vector>
@@ -9,26 +10,6 @@
 #define ENC_A 26
 #define ENC_B 34
 #define ENC_BUTTON 33
-
-struct ModeFlags {
-    bool modeExist;
-    bool nop2;
-    bool nop1;
-    bool acceptsPatterns;
-    bool acceptsBankFile;
-    bool canAnswer;
-    bool hasPassive;
-    bool situatedHigh;
-
-    bool acceptsSensVal2;
-    bool acceptsSensVal1;
-    bool hasRelay4;
-    bool hasRelay3;
-    bool hasRelay2;
-    bool hasRelay1;
-    bool acceptsAdvancedColor;
-    bool acceptsBasicColor;
-};
 
 
 // Declaración de funciones relacionadas con el encoder
@@ -45,8 +26,8 @@ void handleModeSelection(const String& currentFile);
 void toggleElementSelection(const String& currentFile);
 void requestAndSyncElementMode();
 
-
-ModeFlags extractModeFlags(const uint8_t modeConfig[2]);
+bool getModeFlag(const uint8_t modeConfig[2], MODE_CONFIGS flag);
+void debugModeConfig(const uint8_t modeConfig[2]);
 
 // Variables externas requeridas
 extern std::vector<String> elementFiles;

@@ -8,6 +8,7 @@
 #include <DynamicLEDManager_DMS/DynamicLEDManager_DMS.h>
 #include <SPIFFS_handler/SPIFFS_handler.h>
 #include <info_elements_DMS/info_elements_DMS.h>
+#include <encoder_handler/encoder_handler.h>
 //testing MARC 2
 //testing 2 3 4
 //testing 3
@@ -600,112 +601,73 @@ void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager)
   ledManager.clearEffects(); // Limpiar efectos dinámicos previos
 
   if (mode >= 16) {
-                                                                                          #ifdef DEBUG
-                                                                                              Serial.printf("⚠️ Modo inválido: %d\n", mode);                                                                            
-                                                                                          #endif
+      #ifdef DEBUG
+          Serial.printf("⚠️ Modo inválido: %d\n", mode);
+      #endif
       return;
   }
 
   byte modeConfig[2] = {0};
   if (!getModeConfig(currentFile, mode, modeConfig)) {
-                                                                                          #ifdef DEBUG
-                                                                                          Serial.println("⚠️ No se pudo obtener la configuración del modo.");                                                                               
-                                                                                          #endif
+      #ifdef DEBUG
+          Serial.println("⚠️ No se pudo obtener la configuración del modo.");
+      #endif
       return;
   }
 
-                                                                                          #ifdef DEBUG
-                                                                                            // Imprimir configuración en binario para depuración
-                                                                                          Serial.print("Modo " + String(mode) + " - Configuración BIN: ");
-                                                                                          for (int i = 7; i >= 0; i--) Serial.print((modeConfig[0] >> i) & 1);
-                                                                                          Serial.print(" ");
-                                                                                          for (int i = 7; i >= 0; i--) Serial.print((modeConfig[1] >> i) & 1);
-                                                                                          Serial.println("\n");                                                                                
-                                                                                          #endif
- 
-
-  // Mapeo de los bits según la estructura MODE_CONFIGS (big-endian)
-  struct ModeFlags {
-      bool modeExist, nop2, nop1, acceptsPatterns, acceptsBankFile, canAnswer, hasPassive, situatedHigh;
-      bool acceptsSensVal2, acceptsSensVal1, hasRelay4, hasRelay3, hasRelay2, hasRelay1, acceptsAdvancedColor, acceptsBasicColor;
-  } flags = {
-      (modeConfig[0] >> 7) & 1,  // bit15: modeExist
-      (modeConfig[0] >> 6) & 1,  // bit14: nop2
-      (modeConfig[0] >> 5) & 1,  // bit13: nop1
-      (modeConfig[0] >> 4) & 1,  // bit12: acceptsPatterns
-      (modeConfig[0] >> 3) & 1,  // bit11: acceptsBankFile
-      (modeConfig[0] >> 2) & 1,  // bit10: canAnswer
-      (modeConfig[0] >> 1) & 1,  // bit9:  hasPassive
-      (modeConfig[0] >> 0) & 1,  // bit8:  situatedHigh
-      (modeConfig[1] >> 7) & 1,  // bit7:  acceptsSensVal2
-      (modeConfig[1] >> 6) & 1,  // bit6:  acceptsSensVal1
-      (modeConfig[1] >> 5) & 1,  // bit5:  hasRelay4
-      (modeConfig[1] >> 4) & 1,  // bit4:  hasRelay3
-      (modeConfig[1] >> 3) & 1,  // bit3:  hasRelay2
-      (modeConfig[1] >> 2) & 1,  // bit2:  hasRelay1
-      (modeConfig[1] >> 1) & 1,  // bit1:  acceptsAdvancedColor
-      (modeConfig[1] >> 0) & 1   // bit0:  acceptsBasicColor
-  };
-
-                                                                                          #ifdef DEBUG
-                                                                                            // Impresión detallada de los flags
-                                                                                          Serial.printf(
-                                                                                            "ACCEPTS_BASIC_COLOR = %d\nACCEPTS_ADVANCED_COLOR = %d\nHAS_RELAY_1 = %d\nHAS_RELAY_2 = %d\n"
-                                                                                            "HAS_RELAY_3 = %d\nHAS_RELAY_4 = %d\nACCEPTS_SENS_VAL_1 = %d\nACCEPTS_SENS_VAL_2 = %d\n"
-                                                                                            "SITUATED_HIGH = %d\nHAS_PASSIVE = %d\nCAN_ANSWER = %d\nACCEPTS_BANK_FILE = %d\n"
-                                                                                            "ACCEPTS_PATTERNS = %d\nNOP_1 = %d\nNOP_2 = %d\nMODE_EXIST = %d\n--------------------------------------------------\n",
-                                                                                            flags.acceptsBasicColor, flags.acceptsAdvancedColor, flags.hasRelay1, flags.hasRelay2,
-                                                                                            flags.hasRelay3, flags.hasRelay4, flags.acceptsSensVal1, flags.acceptsSensVal2,
-                                                                                            flags.situatedHigh, flags.hasPassive, flags.canAnswer, flags.acceptsBankFile,
-                                                                                            flags.acceptsPatterns, flags.nop1, flags.nop2, flags.modeExist
-                                                                                          );                                                                                 
-                                                                                          #endif
- 
+  #ifdef DEBUG
+      // Llamar a la función de depuración para imprimir todos los flags
+      Serial.println("Mode "+String(mode) + " - Byte Config: 0x"+ String(modeConfig[0],HEX)+String(modeConfig[1],HEX));
+      debugModeConfig(modeConfig);
+  #endif
 
   // --- Bloque modular para asignar colores a la botonera (LEDs 1 a NUM_LEDS-1) ---
-  // Si en el futuro se desea otro mapeo según nuevos flags, se añade aquí la condición correspondiente.
-  if (flags.hasPassive) {
+  if (getModeFlag(modeConfig, HAS_PASSIVE)) {
       // Mapeo PASIVO: todos los LEDs a color blanco (incluyendo el LED 0)
-                                                                                          #ifdef DEBUG
-                                                                                            Serial.println("🌟 Mapeo PASIVO: Todos los LEDs en blanco.");                                                                            
-                                                                                          #endif
-      
+      #ifdef DEBUG
+          Serial.println("🌟 Mapeo PASIVO: Todos los LEDs en blanco.");
+      #endif
       fill_solid(leds + 1, numLeds - 1, CRGB::White);
-  } else if (flags.acceptsBasicColor || flags.acceptsAdvancedColor) {
+      if (getModeFlag(modeConfig, HAS_RELAY_1) || getModeFlag(modeConfig, HAS_RELAY_2)) {
+        #ifdef DEBUG
+            Serial.println("⚡ Aplicando efecto dinámico en LED 0 (Relay activo).");
+        #endif
+        ledManager.addEffect(new FadeEffect(*this, 0, CRGB::Blue, CRGB::Cyan, 50));
+    }
+  } else if (getModeFlag(modeConfig, HAS_BASIC_COLOR) || getModeFlag(modeConfig, HAS_ADVANCED_COLOR)) {
       // Mapeo de colores básicos/avanzados
-                                                                                          #ifdef DEBUG
-                                                                                            Serial.println("🎨 Mapeo de colores básicos/avanzados.");                                                                            
-                                                                                          #endif
-      
-      CRGB colorMap[] = { CRGB::Black, CRGB::White, CRGB::Red, CRGB::Cyan,
-                          CRGB::Yellow, CRGB(0xFF, 0x59, 0x00), CRGB::Green,
-                          CRGB(0xFF, 0x00, 0xD2), CRGB::Blue };
+      #ifdef DEBUG
+          Serial.println("🎨 Mapeo de colores básicos/avanzados.");
+      #endif
+      CRGB colorMap[] = {
+          CRGB::Black, CRGB::White, CRGB::Red, CRGB::Cyan,
+          CRGB::Yellow, CRGB(0xFF, 0x59, 0x00), CRGB::Green,
+          CRGB(0xFF, 0x00, 0xD2), CRGB::Blue
+      };
+
       // Se mapean los LEDs del 1 al NUM_LEDS-1 (el LED 0 se tratará luego)
       for (int i = 1; i < NUM_LEDS; i++) {
           leds[i] = colorMap[i];
       }
   } else {
       // Si no se acepta color, se apagan los LEDs de la botonera (excluyendo el LED 0)
-                                                                                          #ifdef DEBUG
-                                                                                          Serial.println("🕶 Apagando todos los LEDs de la botonera.");                                                                             
-                                                                                          #endif
-      
+      #ifdef DEBUG
+          Serial.println("🕶 Apagando todos los LEDs de la botonera.");
+      #endif
       fill_solid(leds + 1, numLeds - 1, CRGB::Black);
   }
 
   // --- Bloque modular para el LED 0 (efecto de relé) ---
-  // Si se está en modo pasivo, ya se asignó el blanco, por lo que se deja intacto.
-  if (!flags.hasPassive) {
-      if (flags.hasRelay1 || flags.hasRelay2) {
-                                                                                          #ifdef DEBUG
-                                                                                          Serial.println("⚡ Aplicando efecto dinámico en LED 0 (Relay activo).");                                                                           
-                                                                                          #endif
-          
+  if (!getModeFlag(modeConfig, HAS_PASSIVE)) {
+      if (getModeFlag(modeConfig, HAS_RELAY_1) || getModeFlag(modeConfig, HAS_RELAY_2)) {
+          #ifdef DEBUG
+              Serial.println("⚡ Aplicando efecto dinámico en LED 0 (Relay activo).");
+          #endif
           ledManager.addEffect(new FadeEffect(*this, 0, CRGB::Blue, CRGB::Cyan, 50));
       } else {
-                                                                                          #ifdef DEBUG
-                                                                                            Serial.println("❌ No hay relé activo, apagando LED 0.");                                                                          
-                                                                                          #endif
+          #ifdef DEBUG
+              Serial.println("❌ No hay relé activo, apagando LED 0.");
+          #endif
           leds[0] = CRGB::Black;
       }
   }
