@@ -1,5 +1,6 @@
 #pragma once
 #include <Arduino.h>
+#include <vector>
 
 // Definiciones de filas y columnas
 #define FILAS 4
@@ -11,13 +12,23 @@ extern int columnas[COLUMNAS];
 
 extern byte pulsadorColor[FILAS][COLUMNAS];
 extern bool relay_state;
+enum ButtonEventType { BUTTON_PRESSED, BUTTON_RELEASED };
 
 class PulsadoresHandler {
 public:
     PulsadoresHandler();
     void begin();                      // Inicializa los pines
-    byte leerPulsador();               // Lee la matriz y devuelve el color del pulsador presionado
-    void mostrarColor(byte color);     // Muestra información del pulsador presionado en el monitor serial
     static void limpiarEstados();
-    
+    void procesarPulsadores();
+    bool relayButtonIsPressed() const { return relayButtonPressed; }
+    byte lastBasicColor = 0; // Inicialmente 0 (o BLACK)
+private:
+    bool relayButtonPressed = false;
+        
+    // Función auxiliar para procesar un evento de un botón
+    void processButtonEvent(int i, int j, ButtonEventType event,
+                            bool hasPulse, bool hasPassive, bool hasRelay,
+                            std::vector<byte>& target);
 };
+
+

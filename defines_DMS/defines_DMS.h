@@ -4,11 +4,11 @@
 #include <Arduino.h>
 
 //DELFINES GLOBALES
-                                                #define COLUMNA
+                                                #define NOELEM
                                                 /*COLUMNA, FIBRAS, WALLWASHER, VUMETER, ETC*/
                                                 #define PLAYER                 // -> PLAYER / NOPLAYER
                                                 #define NONFC                    // -> NFC / NONFC
-                                                #define NOMIC                    // -> Desactivar en produccion 
+                                                #define MIC                    // -> Desactivar en produccion 
                                                 #define DEBUG
                                                 #define SERIAL_NUM        0xC0CA // -> 0xVV00= VERSION + 0x00MM= MES
                                                 #define NOSERIAL_BY_FILE         // -> NOSERIAL_BY_FILE / SERIAL_BY_FILE --> Activar Serial por FileSystem, si esta definido, ignora el SERIAL_NUM.
@@ -448,6 +448,8 @@ enum COMMANDS_{
 // botonera sempre al final dels elifs
 #elif defined (BOTONERA)
   #define NUM_LEDS 9
+  #define NUM_STEPS  1 
+  #define LEDS_STEP  1
 #endif
 
 

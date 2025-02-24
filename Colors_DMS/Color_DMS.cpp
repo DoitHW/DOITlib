@@ -1066,9 +1066,10 @@ void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager)
   if (getModeFlag(modeConfig, HAS_PASSIVE)) {
       // Mapeo PASIVO: todos los LEDs a color blanco (incluyendo el LED 0)
       #ifdef DEBUG
-          Serial.println("🌟 Mapeo PASIVO: Todos los LEDs en blanco.");
+          Serial.println("🌟 Mapeo PASIVO: LED 1 en blanco.");
       #endif
-      fill_solid(leds + 1, numLeds - 1, CRGB::White);
+      fill_solid(leds + 1, numLeds - 1, CRGB::Black);
+      leds[8] = CRGB::White;
       if (getModeFlag(modeConfig, HAS_RELAY_1) || getModeFlag(modeConfig, HAS_RELAY_2)) {
         #ifdef DEBUG
             Serial.println("⚡ Aplicando efecto dinámico en LED 0 (Relay activo).");
