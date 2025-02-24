@@ -195,6 +195,8 @@ class COLORHANDLER_ {
         void setPatternBotonera(byte mode, DynamicLEDManager& ledManager);
         void set_botoneraPattern(byte patternin);
 
+        void welcomeEffect();
+
         void elem_color_action();
         CRGB* leds;
         bool transitioning; 

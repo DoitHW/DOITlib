@@ -366,7 +366,7 @@ void handleModeSelection(const String& currentFile) {
 #endif
 
     // Enviar la trama con el modo seleccionado
-    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, START_TEST));
+    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, START_CMD));
     delay(300);
     send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, elementID, realModeIndex));
 
@@ -406,9 +406,9 @@ void toggleElementSelection(const String& currentFile) {
     // Solo si es un elemento de SPIFFS se envía el comando y se actualiza el modo
     if (isElementFromSPIFFS) {
         // Determinar el comando a enviar
-        byte command = selectedStates[currentIndex] ? START_TEST : BLACKOUT;
+        byte command = selectedStates[currentIndex] ? START_CMD : BLACKOUT;
         Serial.printf("Enviando comando %s a la ID %d\n",
-                      command == START_TEST ? "START_TEST" : "BLACKOUT",
+                      command == START_CMD ? "START_CMD" : "BLACKOUT",
                       elementID[0]);
         send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, command));
 

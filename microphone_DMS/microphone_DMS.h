@@ -37,6 +37,9 @@ class MICROPHONE_{
         byte get_mic_value_BYTE_voice();
         bool detect_sound_threshold();
         byte detect_musical_note();
+        void end();
 };
+
+extern bool useMic;
 
 #endif

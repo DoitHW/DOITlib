@@ -10,6 +10,8 @@
 #include <SPIFFS_handler/SPIFFS_handler.h>
 #include <info_elements_DMS/info_elements_DMS.h>
 #include <encoder_handler/encoder_handler.h>
+#include <microphone_DMS/microphone_DMS.h>
+#include <play_DMS/play_DMS.h>
 //testing MARC 2
 //testing 2 3 4
 //testing 3
@@ -17,6 +19,7 @@
 #ifdef MIC
   extern MICROPHONE_ doitMic;
 #endif
+
 
 extern ELEMENT_ *element;
 bool colorReceived= false;
@@ -987,17 +990,20 @@ void COLORHANDLER_::welcomeEffect() {
 
   // 1. Definir los colores finales para cada LED.
   //    LED 0 se mantiene apagado.
-  CRGB targetColors[totalLEDs] = {
-      CRGB::Black,      // LED 0: apagado
-      CRGB::White,      // LED 1: blanco
-      CRGB::Red,        // LED 2: rojo
-      CRGB::Cyan,       // LED 3: celeste
-      CRGB::Yellow,     // LED 4: amarillo
-      CRGB(0xFF, 0x59, 0x00), // LED 5: naranja
-      CRGB::Green,      // LED 6: verde
-      CRGB::Purple,     // LED 7: violeta
-      CRGB::Blue        // LED 8: azul
-  };
+  if(totalLEDs != 1){
+    CRGB targetColors[totalLEDs] = {
+        CRGB::Black,      // LED 0: apagado
+        CRGB::White,      // LED 1: blanco
+        CRGB::Red,        // LED 2: rojo
+        CRGB::Cyan,       // LED 3: celeste
+        CRGB::Yellow,     // LED 4: amarillo
+        CRGB(0xFF, 0x59, 0x00), // LED 5: naranja
+        CRGB::Green,      // LED 6: verde
+        CRGB::Purple,     // LED 7: violeta
+        CRGB::Blue        // LED 8: azul
+    };
+
+}
 
   // 2. Limpiar la tira: apagar todos los LEDs.
   fill_solid(this->leds, totalLEDs, CRGB::Black);
