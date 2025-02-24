@@ -118,7 +118,9 @@ FRAME_T frameMaker_SET_ELEM_DEAF       (byte originin, std::vector<byte>targetin
 
 FRAME_T frameMaker_SEND_COLOR          (byte originin, std::vector<byte>targetin, byte colorin);
 FRAME_T frameMaker_SEND_COMMAND           (byte originin, std::vector<byte>targetin, byte commandin);
+FRAME_T frameMaker_SEND_COMMAND           (byte originin, std::vector<byte>targetin, byte commandin);
 FRAME_T frameMaker_SEND_SENSOR_VALUE   (byte originin, std::vector<byte>targetin, SENSOR_VALUE_T sensorin);
+FRAME_T frameMaker_SEND_SENSOR_VALUE_2   (byte originin, std::vector<byte>targetin, SENSOR_VALUE_T sensorin);
 FRAME_T frameMaker_SEND_FLAG_BYTE      (byte originin, std::vector<byte>targetin, byte flagin);
 FRAME_T frameMaker_SEND_PATTERN_NUM    (byte irigin, std::vector<byte>targetin, byte patternin);
 FRAME_T frameMaker_SEND_FILE_NUM       (byte originin, std::vector<byte>targetin, byte bankin, byte filein);

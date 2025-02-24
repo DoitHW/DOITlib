@@ -3,11 +3,13 @@
 #include <Frame_DMS/Frame_DMS.h>
 #include <SPIFFS_handler/SPIFFS_handler.h>
 #include <botonera_DMS/botonera_DMS.h>
+#include <encoder_handler/encoder_handler.h>
 
 // Inicialización de pines y matriz de colores
 int filas[FILAS] = {4, 5, 6, 7};
 int columnas[COLUMNAS] = {1, 2, 3};
 static bool lastState[FILAS][COLUMNAS];
+bool relay_state = true;
 
 byte pulsadorColor[FILAS][COLUMNAS] = {
     {ORANGE, GREEN, WHITE},
@@ -63,22 +65,65 @@ byte PulsadoresHandler::leerPulsador() {
 // Muestra información sobre el pulsador presionado
 void PulsadoresHandler::mostrarColor(byte color) {
     std::vector<byte> target;
-    
-    // Comprobar si el elemento está seleccionado antes de enviar la trama
-    if (!isCurrentElementSelected()) {
-                                                                                                #ifdef DEBUG
-                                                                                                Serial.println("El elemento actual no está seleccionado. No se enviará la trama.");
-                                                                                                #endif
+    String currentFile = elementFiles[currentIndex];
+
+    // Verificar si el elemento actual es "Ambientes"
+    if (currentFile == "Ambientes") {
+        // Si "Ambientes" no está seleccionado, no se envía ninguna trama
+        bool ambientesSeleccionado = false;
+        for (size_t i = 0; i < elementFiles.size(); i++) {
+            if (elementFiles[i] == "Ambientes" && selectedStates[i]) {
+                ambientesSeleccionado = true;
+                break;
+            }
+        }
+        if (!ambientesSeleccionado) return;
+        
+        // Recorrer la lista de elementos en SPIFFS y agregar sus IDs si están seleccionados
+        for (size_t i = 0; i < elementFiles.size(); i++) {
+            if (selectedStates[i] && elementFiles[i] != "Apagar" && elementFiles[i] != "Fichas") {
+                byte elementID = 0;
+
+                // Leer la ID desde SPIFFS
+            
+                fs::File f = SPIFFS.open(elementFiles[i], "r");
+                if (f) {
+                    f.seek(OFFSET_ID, SeekSet);
+                    f.read(&elementID, 1);
+                    f.close();
+                }
+
+                // Agregar al target si la ID es válida
+                if (elementID != 0) {
+                    target.push_back(elementID);
+                                                                                #ifdef DEBUG
+                                                                                Serial.printf("Elemento seleccionado agregado a la trama: ID %d\n", elementID);                                              
+                                                                                #endif
+                    
+                }
+            }
+        }
+    } else {
+        // Si no es "Ambientes", se comporta de manera normal (envío a un solo elemento seleccionado)
+        if (!isCurrentElementSelected()) {
+                                                                                            #ifdef DEBUG
+                                                                                                Serial.println("El elemento actual no está seleccionado. No se enviará la trama.");                                                                    
+                                                                                            #endif
+            return;
+        }
+        byte elementID = getCurrentElementID();
+        target.push_back(elementID);
+    }
+
+    if (target.empty()) {
+                                                                                            #ifdef DEBUG
+                                                                                            Serial.println("⚠️ No hay elementos seleccionados para recibir la trama.");                                                                          
+                                                                                            #endif
         return;
     }
 
-    byte elementID = getCurrentElementID();  // Obtener la ID solo si está seleccionado
-    elementID = 0xFF;
-    target.push_back(elementID);  
-
-    static bool relay_state = false;
+    // Obtener el nombre del color
     const char* colorNombre = "";
-
     switch (color) {
         case WHITE: colorNombre = "Blanco"; break;
         case YELLOW: colorNombre = "Amarillo"; break;
@@ -92,26 +137,21 @@ void PulsadoresHandler::mostrarColor(byte color) {
         case RELAY:
             colorNombre = "Relay";
             relay_state = !relay_state;
-            target.push_back(0xFF);
             send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, target, relay_state));
             delay(5);
-            send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA, 0x01, SPANISH_LANG, ELEM_TOTAL_SESSION_TIME_SECTOR));
             break;
         default:
-            #ifdef DEBUG
-            Serial.println("Ningún botón presionado.");
-            #endif
             return;
     }
 
     if (color != RELAY) {
         send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, color));
     }
-    #ifdef DEBUG
-    Serial.print("Botón presionado y seleccionado: ");
-    Serial.println(colorNombre);
-    #endif
+                                                                                                #ifdef DEBUG
+                                                                                                Serial.printf("🎨 Botón presionado y seleccionado: %s\n", colorNombre);                                                                              
+                                                                                                #endif
 }
+
 
 void PulsadoresHandler::limpiarEstados() {
     for (int i = 0; i < FILAS; i++) {

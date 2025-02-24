@@ -3,47 +3,31 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-#include <SPI.h>
-#include <vector>
+#include <PN532_I2C.h>
+#include <PN532.h>
 
+// Si no vas a incluir PN532 en el .h (sólo en .cpp), no lo pongas aquí.
+// Pero si necesitas usar tipos de PN532 en la declaración de la clase, sí debes incluirlo.
+// #include <PN532.h>
 
+// ----------------------------------------------------------------------------
+// Clase TOKEN_
+// ----------------------------------------------------------------------------
 class TOKEN_ {
-private:
-
-    enum TOKEN_MODES{
-
-        BASIC_TOKEN_MODE,
-        GUESS_TOKEN_MODE,
-        PARTNER_TOKEN_MODE
-    };
-    struct TOKEN_FILE_ADDR {
-        byte file;
-        byte bank;
-    };
-
-    struct TOKEN_INFO {
-        TOKEN_FILE_ADDR fileAddr;
-        byte color;
-        uint16_t timeColor;
-        byte command;
-        TOKEN_FILE_ADDR partner[8];
-    };
-
-    std::vector<byte> vctToken;
-    TOKEN_INFO proposedToken = {0, 0}; // Token propuesto
-    bool proposed = false;
-    bool buscandoPareja= false;
-
 public:
-    TOKEN_() {}
-    ~TOKEN_() {}
+    // Constructor (opcional si no necesitas lógica especial)
+    TOKEN_() : lastReadAttempt(0), readInterval(200) {}
 
+    // Inicializa el bus I2C y el PN532
     void begin();
-    bool isCardPresent();
-    TOKEN_INFO get_token(std::vector<byte> tkn);
-    void proponer_token();
-    void token_action(std::vector<byte> targets, TOKEN_INFO tokenin, byte LANG, byte tokenMode);
+
+    // Lee una tarjeta y devuelve true si se detectó, false si no
+    bool readCard(uint8_t *uid, uint8_t &uidLength);
+
+private:
+    // Variables internas para controlar el intervalo entre lecturas
+    unsigned long lastReadAttempt;
+    unsigned long readInterval;
 };
 
-
-#endif
+#endif // TOKEN_DMS_H

@@ -653,6 +653,7 @@ String ELEMENT_::get_mode_name(byte numMode) {
 
 String ELEMENT_::get_serial_from_file(){
     String serial= "";
+    
     File file = SPIFFS.open(ELEMENT_SERIALNUM_FILE_PATH, "r");
     if (!file) {
                                                                                         #ifdef DEBUG
@@ -669,6 +670,7 @@ String ELEMENT_::get_serial_from_file(){
 
 
 byte ELEMENT_::get_ID_from_file(){
+   
     File file = SPIFFS.open(ELEMENT_ID_FILE_PATH, "r");
     if (!file) {
                                                                                     #ifdef DEBUG
@@ -682,6 +684,7 @@ byte ELEMENT_::get_ID_from_file(){
 }
 
 void ELEMENT_::set_ID_to_file(byte IDin){
+    
     File file = SPIFFS.open(ELEMENT_ID_FILE_PATH, "w");
     if (!file) {
                                                                                 #ifdef DEBUG
@@ -875,17 +878,17 @@ void ELEMENT_::configurar_RF(int baudRate) {
         Serial.print(freq);
         Serial.println(" Hz");
 
-        Serial.print("⚡ Velocidad inalámbrica: ");
-        Serial.print(baudrate);
-        Serial.println(" bps");
+                                                                                    Serial.print("⚡ Velocidad inalámbrica: ");
+                                                                                    Serial.print(baudrate);
+                                                                                    Serial.println(" bps");
 
-        Serial.print("📶 Ancho de banda: ");
-        Serial.print(bw);
-        Serial.println(" kHz");
+                                                                                    Serial.print("📶 Ancho de banda: ");
+                                                                                    Serial.print(bw);
+                                                                                    Serial.println(" kHz");
 
-        Serial.print("🎛️  Desviación de frecuencia: ");
-        Serial.print(desviacionFrecuencia);
-        Serial.println(" kHz");
+                                                                                    Serial.print("🎛️  Desviación de frecuencia: ");
+                                                                                    Serial.print(desviacionFrecuencia);
+                                                                                    Serial.println(" kHz");
 
         Serial.print("🔋 Potencia de transmisión: ");
         Serial.print(potencia);

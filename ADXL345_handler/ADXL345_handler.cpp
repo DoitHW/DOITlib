@@ -1,6 +1,7 @@
 #include <ADXL345_handler/ADXL345_handler.h>
 #include <Arduino.h>
 #include <Frame_DMS/Frame_DMS.h>
+#include <SPIFFS_handler/SPIFFS_handler.h>
 
 ADXL345Handler adxl345Handler;
 
@@ -10,7 +11,7 @@ ADXL345Handler::ADXL345Handler()
 
 // Inicialización del ADXL345
 void ADXL345Handler::init() {
-    //Wire.begin(SDA_PIN, SCL_PIN);
+    Wire.begin(SDA_PIN, SCL_PIN);
     if (!accel.begin()) {
                                                                                     
         Serial.println("ADXL345 no detectado");
@@ -43,9 +44,12 @@ void ADXL345Handler::readInclination(char axis) {
     }
 
     if (abs(currentInclination - lastInclination) >= threshold) {
-        Serial.print("Inclinación detectada (");
-        Serial.print(axis);
-        Serial.print("): ");
+                                                                                                        #ifdef DEBUG
+                                                                                                            Serial.print("Inclinación detectada (");
+                                                                                                            Serial.print(axis);
+                                                                                                            Serial.print("): ");                                                                         
+                                                                                                        #endif
+       
         
         currentInclination = constrain(currentInclination, -10, 10);
         Serial.println(currentInclination);
@@ -80,9 +84,24 @@ SENSOR_VALUE_T ADXL345Handler::createSensorValue(long finalValue) {
 // Función para enviar la trama
 void ADXL345Handler::sendSensorValue(const SENSOR_VALUE_T &sensorValue) {
     std::vector<byte> targets;
-    targets.push_back(0xFF);
+    
+    // Obtener la ID del elemento actualmente mostrado en pantalla
+    byte currentElementID = getCurrentElementID();
+    
+    if (currentElementID == 0xFF) {
+                                                                                        #ifdef DEBUG
+                                                                                            Serial.println("⚠️ Advertencia: No se pudo obtener la ID del elemento actual. No se enviará la trama.");                                                                            
+                                                                                        #endif
+        return;
+    }
+
+    // Usar la ID obtenida en lugar de 0xFF
+    targets.push_back(currentElementID);
+
     send_frame(frameMaker_SEND_SENSOR_VALUE(DEFAULT_BOTONERA, targets, sensorValue));
+   
 }
+
 
 
 // Verificar si el ADXL345 está inicializado
@@ -93,4 +112,12 @@ bool ADXL345Handler::isInitialized() const {
 // Establecer un nuevo umbral
 void ADXL345Handler::setThreshold(float newThreshold) {
     threshold = newThreshold;
+}
+
+void ADXL345Handler::end() {
+    Wire.end();
+    initialized = false;
+                                                                                        #ifdef DEBUG
+                                                                                        Serial.println("I2C desactivado (acelerómetro end).");                                                                               
+                                                                                        #endif
 }

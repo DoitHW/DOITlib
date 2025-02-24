@@ -39,6 +39,64 @@ void drawNoElementsMessage() {
     uiSprite.pushSprite(0, 0);
 }
 
+void showMessageWithLoading(const char* message, unsigned long delayTime) {
+    ignoreInputs = true;
+    unsigned long startTime = millis();
+    int frameCount = 0;
+    const int maxWidth = tft.width() - 20; // Margen de 10 píxeles a cada lado
+    const int lineHeight = 20; // Altura aproximada de una línea de texto
+  
+    while (millis() - startTime < delayTime) {
+      uiSprite.fillSprite(BACKGROUND_COLOR);
+      
+      // Dibuja el mensaje con wrap
+      uiSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
+      uiSprite.setTextDatum(TL_DATUM); // Alineación arriba-izquierda
+      uiSprite.setFreeFont(&FreeSansBold9pt7b);
+      uiSprite.setTextSize(1);
+  
+      int cursorY = 10; // Empezamos 10 píxeles desde arriba
+      String currentLine = "";
+      String remainingText = String(message);
+  
+      while (remainingText.length() > 0) {
+        int spaceIndex = remainingText.indexOf(' ');
+        String word = (spaceIndex == -1) ? remainingText : remainingText.substring(0, spaceIndex);
+        
+        if (uiSprite.textWidth(currentLine + word) <= maxWidth) {
+          currentLine += word + " ";
+          remainingText = (spaceIndex == -1) ? "" : remainingText.substring(spaceIndex + 1);
+        } else {
+          uiSprite.drawString(currentLine, 10, cursorY);
+          cursorY += lineHeight;
+          currentLine = word + " ";
+          remainingText = (spaceIndex == -1) ? "" : remainingText.substring(spaceIndex + 1);
+        }
+  
+        if (spaceIndex == -1) {
+          uiSprite.drawString(currentLine, 10, cursorY);
+          break;
+        }
+      }
+  
+      // Animación de puntos girando
+      int centerX = tft.width() / 2;
+      int centerY = tft.height() - 30;
+      int radius = 10;
+      for (int i = 0; i < 8; i++) {
+        float angle = frameCount * 0.2 + i * PI / 4;
+        int x = centerX + radius * cos(angle);
+        int y = centerY + radius * sin(angle);
+        uiSprite.fillCircle(x, y, 2, TEXT_COLOR); // Puntos más grandes
+      }
+  
+      uiSprite.pushSprite(0, 0);
+  
+      frameCount++;
+      delay(33); // Aproximadamente 30 FPS
+    }
+    ignoreInputs = false;
+  }
 
 void drawErrorMessage(const char* message) {
     Serial.println(message);
@@ -59,13 +117,15 @@ void drawElementIcon(fs::File& f, int startX, int startY) {
 }
 
 void drawElementName(const char* elementName, bool isSelected) {
+    uiSprite.setFreeFont(&FreeSansBold9pt7b);  // Selecciona la fuente FreeSans12pt7b
     uiSprite.setTextColor(isSelected ? TFT_GREEN : TEXT_COLOR, BACKGROUND_COLOR);
     uiSprite.setTextDatum(TC_DATUM);
-    uiSprite.setTextSize(2);
+    uiSprite.setTextSize(1);                // Aplica el tamaño 2
     uiSprite.drawString(elementName, tft.width() / 2, tft.height() - 40);
 }
 
 void drawModeName(const char* modeName) {
+    uiSprite.setFreeFont(&FreeSans9pt7b);
     uiSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
     uiSprite.setTextDatum(TC_DATUM);
     uiSprite.setTextSize(1);
@@ -89,8 +149,156 @@ void drawNavigationArrows() {
     uiSprite.fillTriangle(tft.width() - 5, arrowY, tft.width() - 15, arrowY - 10, tft.width() - 15, arrowY + 10, TFT_WHITE);
 }
 
-void drawCurrentElement() {
+// Parámetros para el área del nombre (ajusta según necesites)
+const int DISPLAY_WIDTH = 128;            // Ancho total del display
+const int NAME_Y = tft.height() - 40;       // Posición vertical del área del nombre
+const int NAME_AREA_HEIGHT = 20;          // Altura del área donde se dibuja el nombre (más reducido)
+const int NAME_SCROLL_INTERVAL = 30;      // Intervalo de actualización en ms
 
+// Variables globales para el scroll del nombre
+bool nameScrollActive = false;            // Se activa si el nombre es demasiado largo
+String currentDisplayName = "";           // Nombre del elemento (ya procesado)
+int nameScrollOffset = 0;                 // Desplazamiento actual (en píxeles)
+int nameScrollDirection = 1;              // 1: incrementa; -1: decrementa
+unsigned long lastNameScrollUpdate = 0;   // Última actualización (ms)
+
+// Función que actualiza (redibuja) la zona del nombre según el desplazamiento actual.
+// Se configura la fuente y se limpia toda la línea horizontal de x = 0 a x = DISPLAY_WIDTH.
+void updateNameDisplay() {
+    // Establece la fuente y el tamaño antes de calcular el ancho
+    uiSprite.setFreeFont(&FreeSansBold9pt7b);
+    uiSprite.setTextSize(1);
+    int textWidth = uiSprite.textWidth(currentDisplayName);
+    // Usamos alineación izquierda: cuando nameScrollOffset es 0, el extremo izquierdo se dibuja en x=0.
+    //int drawX = 0 - nameScrollOffset;
+    int drawX = (DISPLAY_WIDTH - textWidth) / 2 - nameScrollOffset;
+
+    int drawY = NAME_Y;
+    
+    // Limpiar toda la línea horizontal donde se muestra el nombre (de x = 0 a DISPLAY_WIDTH)
+    uiSprite.fillRect(0, drawY, DISPLAY_WIDTH, NAME_AREA_HEIGHT, BACKGROUND_COLOR);
+    
+    uiSprite.setFreeFont(&FreeSansBold9pt7b);
+    uiSprite.setTextSize(1);
+    uiSprite.setTextDatum(TL_DATUM);  // Alinea a la izquierda
+    uiSprite.setTextColor(selectedStates[currentIndex] ? TFT_GREEN : TEXT_COLOR, BACKGROUND_COLOR);
+    uiSprite.drawString(currentDisplayName, drawX, drawY);
+    
+    // Actualizar la región completa a la TFT.
+    uiSprite.pushSprite(0, drawY, 0, drawY, DISPLAY_WIDTH, NAME_AREA_HEIGHT);
+}
+
+// Función que actualiza el desplazamiento (vaivén) del nombre
+void updateNameScroll() {
+    // Asegurarse de usar la fuente y tamaño correctos
+    uiSprite.setFreeFont(&FreeSansBold9pt7b);
+    uiSprite.setTextSize(1);
+    int textWidth = uiSprite.textWidth(currentDisplayName);
+    
+    // Si el texto cabe, desactivar scroll.
+    // Se añade un margen de 10 píxeles para compensar la diferencia.
+    if (textWidth <= DISPLAY_WIDTH) {
+         nameScrollActive = false;
+         nameScrollOffset = 0;
+         return;
+    }
+    
+    //int maxScroll = textWidth - (DISPLAY_WIDTH - 10);  // Ajustamos el rango con el margen
+    int centerOffset = (DISPLAY_WIDTH - textWidth) / 2;
+    int maxScroll = abs(centerOffset) + textWidth - DISPLAY_WIDTH;
+    int minScroll = -maxScroll;
+
+    if (millis() - lastNameScrollUpdate >= NAME_SCROLL_INTERVAL) {
+         nameScrollOffset += nameScrollDirection;
+         if (nameScrollOffset <= minScroll) {
+            nameScrollOffset = minScroll;
+            nameScrollDirection = 1;
+        } else if (nameScrollOffset >= maxScroll) {
+            nameScrollOffset = maxScroll;
+            nameScrollDirection = -1;
+        }
+         lastNameScrollUpdate = millis();
+         updateNameDisplay();
+    }
+}
+
+// Parámetros para el área del nombre del modo
+const int MODE_DISPLAY_WIDTH = 128;        // Ancho total del display (o zona asignada)
+const int MODE_Y = tft.height() - 15;        // Posición vertical donde se dibuja el nombre del modo (igual que drawModeName)
+const int MODE_AREA_HEIGHT = 20;             // Altura de la zona a actualizar (ajusta para que no se solape)
+const int MODE_SCROLL_INTERVAL = 60;         // Intervalo de actualización (ms)
+
+// Variables globales para el scroll del nombre del modo
+bool modeScrollActive = false;             // Se activa si el texto del modo es demasiado largo
+String currentModeDisplayName = "";        // Cadena que contiene el nombre del modo (ya procesado)
+int modeScrollOffset = 0;                  // Desplazamiento actual en píxeles para el modo
+int modeScrollDirection = 1;               // Dirección: 1 para incrementar, -1 para decrementar
+unsigned long lastModeScrollUpdate = 0;    // Última actualización en ms
+
+// Actualiza la zona del nombre del modo usando el desplazamiento actual
+void updateModeDisplay() {
+    // Establecer fuente y tamaño antes de calcular el ancho
+    uiSprite.setFreeFont(&FreeSans9pt7b);
+    uiSprite.setTextSize(1);
+
+    int textWidth = uiSprite.textWidth(currentModeDisplayName);
+    int centerX = (MODE_DISPLAY_WIDTH - textWidth) / 2;
+
+    // Ajustar desplazamiento desde el centro
+    int drawX = centerX - modeScrollOffset;
+    int drawY = MODE_Y;
+
+    // Borrar el área donde se dibuja el nombre del modo
+    uiSprite.fillRect(0, drawY, MODE_DISPLAY_WIDTH, MODE_AREA_HEIGHT, BACKGROUND_COLOR);
+
+    uiSprite.setFreeFont(&FreeSans9pt7b);
+    uiSprite.setTextSize(1);
+    uiSprite.setTextDatum(TL_DATUM); // Mantener alineación izquierda para el scroll
+    uiSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
+    uiSprite.drawString(currentModeDisplayName, drawX, drawY);
+
+    // Refrescar solo la parte afectada en la pantalla
+    uiSprite.pushSprite(0, drawY, 0, drawY, MODE_DISPLAY_WIDTH, MODE_AREA_HEIGHT);
+}
+
+// Actualiza el desplazamiento del nombre del modo y llama a updateModeDisplay()
+void updateModeScroll() {
+    uiSprite.setFreeFont(&FreeSans9pt7b);
+    uiSprite.setTextSize(1);
+    int textWidth = uiSprite.textWidth(currentModeDisplayName);
+
+    // Si el texto cabe en el área, desactivar scroll
+    if (textWidth <= MODE_DISPLAY_WIDTH) {
+         modeScrollActive = false;
+         modeScrollOffset = 0;
+         return;
+    }
+
+    int extraMargin = 10;
+    
+    // Ajuste del desplazamiento máximo para centrar correctamente
+    int maxScroll = (textWidth - MODE_DISPLAY_WIDTH) / 2 + extraMargin;
+    int minScroll = -maxScroll; // Permitir que el texto se desplace en ambas direcciones
+
+    if (millis() - lastModeScrollUpdate >= MODE_SCROLL_INTERVAL) {
+         modeScrollOffset += modeScrollDirection;
+
+         // Invertir dirección del scroll al alcanzar los límites
+         if (modeScrollOffset <= minScroll) {
+              modeScrollOffset = minScroll;
+              modeScrollDirection = 1;
+         } else if (modeScrollOffset >= maxScroll) {
+              modeScrollOffset = maxScroll;
+              modeScrollDirection = -1;
+         }
+
+         lastModeScrollUpdate = millis();
+         updateModeDisplay();
+    }
+}
+
+// Modificación de drawCurrentElement para configurar el scroll del nombre cuando corresponda
+void drawCurrentElement() {
     uiSprite.fillSprite(BACKGROUND_COLOR);
 
     // Mostrar mensaje si no hay elementos
@@ -98,83 +306,152 @@ void drawCurrentElement() {
         drawNoElementsMessage();
         return;
     }
-
-    // Corregir límites del índice actual
     currentIndex = constrain(currentIndex, 0, (int)elementFiles.size() - 1);
     String currentFile = elementFiles[currentIndex];
-
-    // Variable para almacenar el modo actual
     byte currentMode = 0;
 
+    // Función auxiliar para obtener un nombre "amigable"
+    auto getDisplayName = [](const String &fileName) -> String {
+         String baseName = fileName.substring(fileName.lastIndexOf("/") + 1, fileName.lastIndexOf(".bin"));
+         baseName.replace("element_", "");
+         int underscoreIndex = baseName.lastIndexOf("_");
+         String name;
+         if (underscoreIndex != -1) {
+             String possibleNumber = baseName.substring(underscoreIndex + 1);
+             if (possibleNumber.toInt() > 0)
+                 name = baseName.substring(0, underscoreIndex);
+             else
+                 name = baseName;
+         } else {
+             name = baseName;
+         }
+         int count = 0;
+         for (const auto &file : elementFiles) {
+             if (file.startsWith("/element_" + name)) {
+                 count++;
+                 if (file == fileName) break;
+             }
+         }
+         if (count > 1)
+             return name + "(" + String(count) + ")";
+         else
+             return name;
+    };
+
+    // Caso 1: "Ambientes" o "Fichas" (elementos fijos)
     if (currentFile == "Ambientes" || currentFile == "Fichas") {
-        // Opciones dinámicas
-        INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
-
-        // Leer y usar el modo actual desde la opción dinámica
-        currentMode = option->currentMode;
-
-        int startX = (tft.width() - 64) / 2;
-        int startY = (tft.height() - 64) / 2 - 20;
-
-        // Dibujar ícono
-        for (int y = 0; y < 64; y++) {
-            memcpy(lineBuffer, option->icono[y], 64 * 2);
-            uiSprite.pushImage(startX, startY + y, 64, 1, lineBuffer);
-        }
-
-        // Dibujar nombre y modo
-        Serial.println("Nombre elemento: " + String((char*)option->name));
-        drawElementName((char*)option->name, selectedStates[currentIndex]);
-        drawModeName((char*)option->mode[currentMode].name);
-
-        // Dibujar círculo de selección si está seleccionado
-        drawSelectionCircle(selectedStates[currentIndex], startX, startY);
-    } else {
-        // Elementos cargados desde SPIFFS
-        fs::File f = SPIFFS.open(currentFile, "r");
-        if (!f) {
-            drawErrorMessage("Error leyendo elemento");
-            return;
-        }
-
-        // Leer datos del archivo
-        char elementName[25] = {0};
-        char modeName[25] = {0};
-        int startX, startY;
-
-        if (!readElementData(f, elementName, modeName, startX, startY)) {
-            drawErrorMessage("Datos incompletos");
-            return;
-        }
-
-        Serial.println("⚡⚡⚡⚡ currentFile - drawCurrentElement: " + String(elementName));
-
-        // Dibujar ícono del elemento
-        drawElementIcon(f, startX, startY);
-
-        // Dibujar nombre y modo
-        Serial.println("Nombre elemento: " + String(elementName));
-        drawElementName(elementName, selectedStates[currentIndex]);
-        drawModeName(modeName);
-
-        // Leer el modo actual desde el archivo SPIFFS
-        f.seek(OFFSET_CURRENTMODE, SeekSet);
-        f.read(&currentMode, 1);
-        f.close();
-
-        // Dibujar círculo de selección si está seleccionado
-        drawSelectionCircle(selectedStates[currentIndex], startX, startY);
+         INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+         currentMode = option->currentMode;
+         int startX = (tft.width() - 64) / 2;
+         int startY = (tft.height() - 64) / 2 - 20;
+         for (int y = 0; y < 64; y++) {
+             memcpy(lineBuffer, option->icono[y], 64 * 2);
+             uiSprite.pushImage(startX, startY + y, 64, 1, lineBuffer);
+         }
+         // Dibujo del nombre del elemento
+         uiSprite.setFreeFont(&FreeSansBold12pt7b);
+         uiSprite.setTextSize(1);
+         String displayName = String((char*)option->name);
+         int elementTextWidth = uiSprite.textWidth(displayName);
+         Serial.println("2 Tamaño de "+String(displayName)+ " es " + String(elementTextWidth));
+         if (elementTextWidth > DISPLAY_WIDTH) {
+              nameScrollActive = true;
+              currentDisplayName = displayName;
+              nameScrollOffset = 0;
+              nameScrollDirection = 1;
+              lastNameScrollUpdate = millis();
+              updateNameDisplay();
+         } else {
+              nameScrollActive = false;
+              drawElementName(displayName.c_str(), selectedStates[currentIndex]);
+         }
+         // Dibujo del nombre del modo (scroll si es necesario)
+         uiSprite.setFreeFont(&FreeSansBold9pt7b);
+         uiSprite.setTextSize(1);
+         String modeDisplay = String((char*)option->mode[currentMode].name);
+         int modeTextWidth = uiSprite.textWidth(modeDisplay);
+         if (modeTextWidth > MODE_DISPLAY_WIDTH) {
+              modeScrollActive = true;
+              currentModeDisplayName = modeDisplay;
+              modeScrollOffset = 0;
+              modeScrollDirection = 1;
+              lastModeScrollUpdate = millis();
+              updateModeDisplay();
+         } else {
+              modeScrollActive = false;
+              drawModeName((char*)option->mode[currentMode].name);
+         }
+         drawSelectionCircle(selectedStates[currentIndex], startX, startY);
     }
-
-    // Actualizar `currentModeIndex` y reflejar el patrón en los LEDs
+    // Caso 2: "Apagar"
+    else if (currentFile == "Apagar") {
+         INFO_PACK_T* option = &apagarSala;
+         int startX = (tft.width() - 64) / 2;
+         int startY = (tft.height() - 64) / 2 - 20;
+         for (int y = 0; y < 64; y++) {
+             memcpy(lineBuffer, option->icono[y], 64 * 2);
+             uiSprite.pushImage(startX, startY + y, 64, 1, lineBuffer);
+         }
+         drawElementName((char*)option->name, false);
+         drawModeName((char*)option->mode[currentMode].name);
+         nameScrollActive = false;
+         modeScrollActive = false;
+    }
+    // Caso 3: Elemento almacenado en SPIFFS
+    else {
+         fs::File f = SPIFFS.open(currentFile, "r");
+         if (!f) {
+             drawErrorMessage("Error leyendo elemento");
+             return;
+         }
+         char elementName[25] = {0};
+         char modeName[25] = {0};
+         int startX, startY;
+         if (!readElementData(f, elementName, modeName, startX, startY)) {
+             drawErrorMessage("Datos incompletos");
+             return;
+         }
+         drawElementIcon(f, startX, startY);
+         uiSprite.setFreeFont(&FreeSansBold12pt7b);
+         uiSprite.setTextSize(1);
+         String displayName = getDisplayName(currentFile);
+         int elementTextWidth = uiSprite.textWidth(displayName);
+         Serial.println("1 Tamaño de "+String(displayName)+ " es " + String(elementTextWidth));
+         if (elementTextWidth > DISPLAY_WIDTH) {
+              nameScrollActive = true;
+              currentDisplayName = displayName;
+              nameScrollOffset = 0;
+              nameScrollDirection = 1;
+              lastNameScrollUpdate = millis();
+              updateNameDisplay();
+         } else {
+              nameScrollActive = false;
+              drawElementName(displayName.c_str(), selectedStates[currentIndex]);
+         }
+         // Para el nombre del modo, usamos la cadena ya leída en modeName
+         uiSprite.setFreeFont(&FreeSansBold9pt7b);
+         uiSprite.setTextSize(1);
+         String modeDisplay = String(modeName);
+         int modeTextWidth = uiSprite.textWidth(modeDisplay);
+         if (modeTextWidth > MODE_DISPLAY_WIDTH) {
+              modeScrollActive = true;
+              currentModeDisplayName = modeDisplay;
+              modeScrollOffset = 0;
+              modeScrollDirection = 1;
+              lastModeScrollUpdate = millis();
+              updateModeDisplay();
+         } else {
+              modeScrollActive = false;
+              drawModeName(modeName);
+         }
+         f.seek(OFFSET_CURRENTMODE, SeekSet);
+         f.read(&currentMode, 1);
+         f.close();
+         drawSelectionCircle(selectedStates[currentIndex], startX, startY);
+    }
     currentModeIndex = currentMode;
-    //colorHandler.setPatternBotonera(currentModeIndex);
-    // Llamar a setPatternBotonera con el gestor de efectos
+    colorHandler.setCurrentFile(currentFile);
     colorHandler.setPatternBotonera(currentModeIndex, ledManager);
-
-
-    // Mostrar el modo actual en el monitor serial
-    Serial.println("Modo actual!: " + String(currentModeIndex));
     drawNavigationArrows();
     uiSprite.pushSprite(0, 0);
 }
@@ -190,553 +467,387 @@ void animateTransition(int direction) {
     drawCurrentElement();
 }
 
-// Función para mostrar la pantalla MODOS
 void drawModesScreen() {
+    // Variables para scroll vertical suave
     static int scrollOffset = 0;
     static int targetScrollOffset = 0;
+    const int visibleOptions = 4; // Número máximo de opciones visibles
 
+    // Variables para el scroll horizontal de la opción seleccionada (pixel-based)
+    static int modeTickerOffset = 0;
+    static int modeTickerDirection = 1;
+    static unsigned long modeLastFrameTime = 0;
+    static int lastSelectedMode = -1;
+
+    // Limpiar el sprite completo
     uiSprite.fillSprite(BACKGROUND_COLOR);
 
-    // Título
+    // Título (usando la fuente FreeSans12pt7b)
+    uiSprite.setFreeFont(&FreeSans12pt7b);
     uiSprite.setTextColor(TEXT_COLOR);
     uiSprite.setTextDatum(TC_DATUM);
-    uiSprite.setTextSize(2);
+    uiSprite.setTextSize(1);
     uiSprite.drawString("MODOS", 64, 5);
 
-    // Obtener modos del elemento actual
+    // Obtener el archivo del elemento actual
     String currentFile = elementFiles[currentIndex];
     totalModes = 0;
 
-    // Arreglo auxiliar para mapear índices visibles a índices reales
-    int visibleModesMap[16] = {0};
-    memset(visibleModesMap, -1, sizeof(visibleModesMap));  // Inicializar con -1
+    // Mapa auxiliar: índice visible -> índice real (máximo 16 modos + 1 extra para regresar)
+    int visibleModesMap[17] = {0};
+    memset(visibleModesMap, -1, sizeof(visibleModesMap));
 
+    int visibleCurrentModeIndex = -1; // Índice visible de la opción seleccionada
+
+    // Determinar de dónde obtener los modos: de opciones fijas (Ambientes/Fichas) o desde SPIFFS
+    INFO_PACK_T* option = nullptr;
+    fs::File f;
     if (currentFile == "Ambientes" || currentFile == "Fichas") {
-        INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
-
-        // Cargar modos de las opciones dinámicas
-        for (int i = 0; i < 16; i++) {
-            if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
-                visibleModesMap[totalModes] = i;  // Mapear índice visible al índice real
-                int y = 30 + totalModes * (CARD_HEIGHT + CARD_MARGIN) - scrollOffset;
-                if (y > 20 && y < 110) {
-                    uiSprite.fillRoundRect(9, y, CARD_WIDTH, CARD_HEIGHT, 5, CARD_COLOR);
-                    uiSprite.drawRoundRect(9, y, CARD_WIDTH, CARD_HEIGHT, 5, (totalModes == currentModeIndex) ? HIGHLIGHT_COLOR : TEXT_COLOR);
-
-                    uiSprite.setTextColor((totalModes == currentModeIndex) ? HIGHLIGHT_COLOR : TEXT_COLOR);
-                    uiSprite.setTextDatum(CL_DATUM);
-                    uiSprite.setTextSize(1);
-                    uiSprite.drawString((char*)option->mode[i].name, 15, y + CARD_HEIGHT / 2);
-                }
-                totalModes++;
-            }
-        }
-    } else {
-        fs::File f = SPIFFS.open(currentFile, "r");
+        option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+    } else if (currentFile != "Apagar") {
+        f = SPIFFS.open(currentFile, "r");
         if (!f) {
             Serial.println("Error al abrir archivo para leer modos.");
             uiSprite.drawString("Error leyendo modos", 10, 25);
             uiSprite.pushSprite(0, 0);
             return;
         }
+    }
 
-        //Serial.println("⚡⚡⚡⚡ currentFile - drawModesScreen: " + String(currentFile));
+    // Recolectar los modos válidos (máximo 16) y llenar el mapa auxiliar
+    for (int i = 0; i < 16; i++) {
+        char modeName[25] = {0};
+        byte modeConfig[2] = {0};
 
-        for (int i = 0; i < 16; i++) {
-            char modeName[25] = {0};
-            char modeDesc[193] = {0};
-            byte modeConfig[2] = {0};
-
-            // Leer datos exactamente como `printElementInfo`
-            if (f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet)) {
-                f.read((uint8_t*)modeName, 24);
-                f.read((uint8_t*)modeDesc, 192);
-                f.read(modeConfig, 2);
-
-                if (strlen(modeName) > 0) {
-                    //Serial.printf("Modo %d:\n", i);
-                    //Serial.printf("  Nombre: %s\n", modeName);
-                   // Serial.printf("  Descripción: %s\n", modeDesc);
-                    //Serial.printf("  Configuración: 0x%02X%02X\n", modeConfig[0], modeConfig[1]);
-
-                    // Verificar el bit más significativo
-                    if (checkMostSignificantBit(modeConfig)) {
-                        visibleModesMap[totalModes] = i;  // Mapear índice visible al índice real
-                        Serial.printf("El bit más significativo del modo %d es 1\n", i);
-                        int y = 30 + totalModes * (CARD_HEIGHT + CARD_MARGIN) - scrollOffset;
-                        if (y > 20 && y < 110) {
-                            uiSprite.fillRoundRect(9, y, CARD_WIDTH, CARD_HEIGHT, 5, CARD_COLOR);
-                            uiSprite.drawRoundRect(9, y, CARD_WIDTH, CARD_HEIGHT, 5, (totalModes == currentModeIndex) ? HIGHLIGHT_COLOR : TEXT_COLOR);
-
-                            uiSprite.setTextColor((totalModes == currentModeIndex) ? HIGHLIGHT_COLOR : TEXT_COLOR);
-                            uiSprite.setTextDatum(CL_DATUM);
-                            uiSprite.setTextSize(1);
-                            uiSprite.drawString(modeName, 15, y + CARD_HEIGHT / 2);
-                        }
-                        totalModes++;
-                    } else {
-                        //Serial.printf("El bit más significativo del modo %d es 0\n", i);
-                    }
-                } else {
-                    //Serial.printf("Modo %d tiene nombre vacío o inválido.\n", i);
-                }
-            } else {
-                Serial.printf("Error: No se pudo buscar el offset del modo %d\n", i);
-            }
+        if (option) {
+            strncpy(modeName, (char*)option->mode[i].name, 24);
+            memcpy(modeConfig, option->mode[i].config, 2);
+        } else {
+            f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet);
+            f.read((uint8_t*)modeName, 24);
+            f.seek(OFFSET_MODES + i * SIZE_MODE + 216, SeekSet);
+            f.read(modeConfig, 2);
         }
-
+        if (strlen(modeName) > 0 && checkMostSignificantBit(modeConfig)) {
+            visibleModesMap[totalModes] = i;
+            if (totalModes == currentModeIndex) {
+                visibleCurrentModeIndex = totalModes;
+            }
+            totalModes++;
+        }
+    }
+    if (!option) {
         f.close();
     }
 
-    if (totalModes == 0) {
+    // Agregar la opción extra para regresar al menú principal
+    visibleModesMap[totalModes] = -2; // Usamos -2 como indicador de la opción "Regresar"
+    if (totalModes == currentModeIndex) {
+        visibleCurrentModeIndex = totalModes;
+    }
+    totalModes++;
+
+    if (totalModes == 0) { // Esto no debería ocurrir, ya que siempre habrá al menos la opción de regresar
         uiSprite.drawString("No hay modos disponibles", 10, 25);
         Serial.println("⚡ Advertencia: No hay modos disponibles para mostrar.");
+        uiSprite.pushSprite(0, 0);
         return;
     }
 
-    // Dibujar barra de desplazamiento
-    int cardHeightWithMargin = CARD_HEIGHT + CARD_MARGIN;
-    int scrollBarHeight = 100 * (100.0 / (totalModes * cardHeightWithMargin));
-    int scrollBarY = 25 + (100 - scrollBarHeight) * (scrollOffset / (float)(totalModes * cardHeightWithMargin - 100));
+    // Calcular el índice de inicio (startIndex) para centrar la opción seleccionada
+    int startIndex = max(0, min(currentModeIndex - visibleOptions / 2, totalModes - visibleOptions));
 
-    uiSprite.fillRoundRect(122, 25, SCROLL_BAR_WIDTH, 100, 2, TFT_DARKGREY);
-    uiSprite.fillRoundRect(122, scrollBarY, SCROLL_BAR_WIDTH, scrollBarHeight, 2, TEXT_COLOR);
+    // Parámetros de layout:
+    // La zona de texto se limita entre x = 10 y x = 120 (ancho disponible = 110 píxeles)
+    const int x = 10;
+    const int textAreaW = 110;
+    // La barra vertical se dibuja a partir de x = 120.
+    const int scrollBarX = 120;
 
+    // Dibujar cada opción visible
+    for (int i = 0; i < visibleOptions && (startIndex + i) < totalModes; i++) {
+        int currentVisibleIndex = startIndex + i;
+        int y = 30 + i * (CARD_HEIGHT + CARD_MARGIN);
+        bool isSelected = (currentVisibleIndex == currentModeIndex);
+        uint32_t textColor = isSelected ? HIGHLIGHT_COLOR : TEXT_COLOR;
+
+        uiSprite.setFreeFont(&FreeSans9pt7b);
+        uiSprite.setTextColor(textColor);
+        uiSprite.setTextSize(1);
+        uiSprite.setTextDatum(TL_DATUM);
+
+        // Obtener el valor del modo (índice real o indicador especial)
+        int realModeIndex = visibleModesMap[currentVisibleIndex];
+
+        if (realModeIndex == -2) {
+            // Dibujar la opción de regresar con un icono de flecha izquierda
+            int arrowWidth = 12;
+            int arrowHeight = 12;
+            int arrowX = x + (textAreaW - arrowWidth) / 2;
+            int arrowY = y + (CARD_HEIGHT - arrowHeight) / 2;
+            // Dibujar la flecha hacia la izquierda usando un triángulo
+            uiSprite.fillTriangle(arrowX + arrowWidth, arrowY, arrowX, arrowY + arrowHeight / 2, arrowX + arrowWidth, arrowY + arrowHeight, textColor);
+        } else {
+            // Obtener el nombre del modo (índice real)
+            char modeName[25] = {0};
+            if (option) {
+                strncpy(modeName, (char*)option->mode[realModeIndex].name, 24);
+            } else {
+                f = SPIFFS.open(currentFile, "r");
+                f.seek(OFFSET_MODES + realModeIndex * SIZE_MODE, SeekSet);
+                f.read((uint8_t*)modeName, 24);
+                f.close();
+            }
+            String modeStr = String(modeName);
+
+            if (isSelected) {
+                // Si se cambia la opción seleccionada, reiniciamos el ticker
+                if (currentModeIndex != lastSelectedMode) {
+                    modeTickerOffset = 0;
+                    modeTickerDirection = 1;
+                    lastSelectedMode = currentModeIndex;
+                }
+                uiSprite.setFreeFont(&FreeSans9pt7b);
+                uiSprite.setTextSize(1);
+                int fullTextWidth = uiSprite.textWidth(modeStr);
+                // Actualizar el desplazamiento horizontal suave
+                if (fullTextWidth > textAreaW) {
+                    const unsigned long frameInterval = 50; // 50ms para un movimiento suave
+                    unsigned long now = millis();
+                    if (now - modeLastFrameTime >= frameInterval) {
+                        modeTickerOffset += modeTickerDirection;
+                        if (modeTickerOffset < 0) {
+                            modeTickerOffset = 0;
+                            modeTickerDirection = 1;
+                        }
+                        if (modeTickerOffset > (fullTextWidth - textAreaW)) {
+                            modeTickerOffset = fullTextWidth - textAreaW;
+                            modeTickerDirection = -1;
+                        }
+                        modeLastFrameTime = now;
+                    }
+                    // Dibujar la opción seleccionada en un sprite temporal
+                    TFT_eSprite modeSprite = TFT_eSprite(&tft);
+                    modeSprite.createSprite(textAreaW, CARD_HEIGHT);
+                    modeSprite.fillSprite(BACKGROUND_COLOR);
+                    modeSprite.setFreeFont(&FreeSans9pt7b);
+                    modeSprite.setTextSize(1);
+                    modeSprite.setTextDatum(TL_DATUM);
+                    modeSprite.setTextColor(textColor, BACKGROUND_COLOR);
+                    // Dibujar el texto desplazado: se dibuja en x = -modeTickerOffset para que el extremo izquierdo sea visible
+                    modeSprite.drawString(modeStr, -modeTickerOffset, 0);
+                    // Empujar el sprite temporal sobre el sprite principal
+                    modeSprite.pushToSprite(&uiSprite, x, y);
+                    modeSprite.deleteSprite();
+                } else {
+                    // Si cabe, dibujarlo de forma normal
+                    uiSprite.drawString(modeStr, x, y);
+                }
+            } else {
+                // Para las opciones no seleccionadas, dibujar el texto y cubrir los extremos fuera del área [10,120]
+                uiSprite.drawString(modeStr, x, y);
+                uiSprite.fillRect(0, y, x, CARD_HEIGHT, BACKGROUND_COLOR);
+                uiSprite.fillRect(120, y, 128 - 120, CARD_HEIGHT, BACKGROUND_COLOR);
+            }
+        }
+    }
+
+    // Dibujar la barra de desplazamiento vertical
+    const int scrollBarMargin = 3;
+    const int scrollBarWidth = 5;
+    int scrollBarY = 30;
+    uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN, TFT_DARKGREY);
+    if (totalModes > visibleOptions) {
+        float thumbRatio = (float)visibleOptions / (float)totalModes;
+        int thumbHeight = max(20, (int)((visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN) * thumbRatio));
+        int thumbY = scrollBarY + (visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN - thumbHeight)
+                     * (float)(currentModeIndex - startIndex) / (float)(totalModes - visibleOptions);
+        uiSprite.fillRect(scrollBarX, thumbY, scrollBarWidth, thumbHeight, TFT_LIGHTGREY);
+    } else {
+        uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN, TFT_LIGHTGREY);
+    }
+
+    // Empujar el sprite principal a la pantalla (actualización única)
     uiSprite.pushSprite(0, 0);
 
-    // Actualizar desplazamiento objetivo
-    targetScrollOffset = currentModeIndex * (CARD_HEIGHT + CARD_MARGIN);
-    if (targetScrollOffset > totalModes * (CARD_HEIGHT + CARD_MARGIN) - 100) {
-        targetScrollOffset = totalModes * (CARD_HEIGHT + CARD_MARGIN) - 100;
+    // Actualizar scroll vertical suave (manteniendo la lógica original)
+    if (visibleCurrentModeIndex >= 0) {
+        targetScrollOffset = visibleCurrentModeIndex * (CARD_HEIGHT + CARD_MARGIN);
+        if (targetScrollOffset > totalModes * (CARD_HEIGHT + CARD_MARGIN) - 100) {
+            targetScrollOffset = totalModes * (CARD_HEIGHT + CARD_MARGIN) - 100;
+        }
+        if (targetScrollOffset < 0) targetScrollOffset = 0;
     }
-    if (targetScrollOffset < 0) targetScrollOffset = 0;
-
-    // Aplicar desplazamiento suave
     scrollOffset += (targetScrollOffset - scrollOffset) / 4;
 
-    // Actualizar el mapa global
     memcpy(globalVisibleModesMap, visibleModesMap, sizeof(visibleModesMap));
 }
 
 
-// void drawHiddenMenu(int selection) {
-//     // Opciones del menú oculto
-//     const char* menuOptions[] = {
-//         "Buscar elemento",
-//         "Idioma",
-//         "Sonido",
-//         "Brillo",
-//         "Respuestas muy muy largas",
-//         "Volver al menú principal"
-//     };
-//     const int numOptions = sizeof(menuOptions) / sizeof(menuOptions[0]);
+// Opciones del menú oculto
+const char* menuOptions[] = {
+    " Buscar elemento",
+    " Idioma",
+    " Sonido",
+    " Brillo",
+    " Respuestas muy muy largas",
+    " Volver al menu principal"
+};
+const int numOptions = sizeof(menuOptions) / sizeof(menuOptions[0]);
 
-//     // Número de opciones visibles a la vez (simulamos scroll vertical con startIndex)
-//     const int visibleOptions = 4;
-
-//     // Medidas de la “tarjeta” y la barra de scroll vertical
-//     const int cardWidth       = 110; 
-//     const int cardHeight      = CARD_HEIGHT;     // Asegúrate de tenerlo definido
-//     const int cardMargin      = CARD_MARGIN;     // Asegúrate de tenerlo definido
-//     const int scrollBarWidth  = 5;
-//     const int scrollBarMargin = 3;
-
-//     // Parámetros del scroll horizontal (vaivén)
-//     const int scrollSpeed    = 1;      // Velocidad de desplazamiento (px por “tick”)
-//     const int scrollUpdateMs = 40;     // Intervalo de refresco (ms) para la animación
-//     static unsigned long lastScrollTime = 0;
-
-//     // Variables estáticas para conservar estado entre llamadas
-//     // - scrollOffsets[]: posición actual (en píxeles) del desplazamiento
-//     // - scrollDirections[]: dirección de desplazamiento (+1 o -1)
-//     static int scrollOffsets[6]    = {0};
-//     static int scrollDirections[6] = {1,1,1,1,1,1};
-
-//     // Cálculo del índice inicial (startIndex) para “scroll” vertical
-//     int startIndex = max(0, min(selection - visibleOptions / 2, numOptions - visibleOptions));
-
-//     // Limpiar sprite principal con color de fondo
-//     uiSprite.fillSprite(BACKGROUND_COLOR);
-
-//     // Dibujar título (centrado arriba)
-//     uiSprite.setTextColor(TEXT_COLOR);
-//     uiSprite.setTextDatum(TC_DATUM);
-//     uiSprite.setTextSize(2);
-//     uiSprite.drawString("MENU OCULTO", 64, 5);
-
-//     // === DIBUJAR LAS OPCIONES VISIBLES ===
-//     for (int i = 0; i < visibleOptions && (startIndex + i) < numOptions; i++) {
-//         int currentIndex = startIndex + i;
-//         int y = 30 + i * (cardHeight + cardMargin);
-
-//         // Dibuja el fondo de la tarjeta
-//         uiSprite.fillRoundRect(9, y, cardWidth, cardHeight, 5, CARD_COLOR);
-
-//         // Borde resaltado si es la opción seleccionada
-//         bool isSelected = (currentIndex == selection);
-//         uint32_t borderColor = isSelected ? HIGHLIGHT_COLOR : TEXT_COLOR;
-//         uiSprite.drawRoundRect(9, y, cardWidth, cardHeight, 5, borderColor);
-
-//         // Zona disponible para el texto dentro de la tarjeta
-//         int textAreaX = 9 + 2;                // margen izquierdo dentro de la tarjeta
-//         int textAreaY = y + 2;                // margen superior
-//         int textAreaW = cardWidth - 4;        // ancho interno para el texto
-//         int textAreaH = cardHeight - 4;       // alto interno
-
-//         // Cambiar ajuste del texto para medir correctamente
-//         uiSprite.setTextColor(borderColor);
-//         uiSprite.setTextSize(1);
-//         uiSprite.setTextDatum(TL_DATUM);  // top-left para medir el ancho en pixeles
-
-//         // Medimos el ancho del texto completo con la misma fuente, tamaño, etc.
-//         int fullTextWidth = uiSprite.textWidth(menuOptions[currentIndex]);
-
-//         // Si NO está seleccionada o el texto cabe en el ancho => dibujar estático
-//         if (!isSelected || fullTextWidth <= textAreaW) {
-//             // Para evitar que se desborde, si es más largo y no está seleccionado:
-//             // recortamos con "..."
-//             String tempStr = menuOptions[currentIndex];
-//             if (!isSelected && fullTextWidth > textAreaW) {
-//                 // Reemplazar el final con "..." hasta que quepa
-//                 while (uiSprite.textWidth(tempStr + "...") > textAreaW && tempStr.length() > 0) {
-//                     tempStr.remove(tempStr.length() - 1);
-//                 }
-//                 tempStr += "...";
-//             }
-
-//             // Centrado vertical y algo aproximado horizontal (o simplemente left-justified)
-//             int yCenter = textAreaY + (textAreaH - 8) / 2;  
-//             // 8 px es aprox la altura de la fuente a textSize=1 (Fuente 1)
-
-//             uiSprite.drawString(tempStr.c_str(), textAreaX, yCenter);
-
-//             // Reset scroll si NO está seleccionada
-//             if (!isSelected) {
-//                 scrollOffsets[currentIndex]    = 0;
-//                 scrollDirections[currentIndex] = 1;
-//             }
-//         }
-//         else {
-//             // === Está seleccionada Y el texto excede el ancho => SCROLL HORIZONTAL (vaivén) ===
-
-//             // Calculamos el máximo desplazamiento
-//             // Si el texto mide 150 px y el área es 100 px => maxScroll = 50
-//             int maxScroll = fullTextWidth - textAreaW;
-
-//             // Actualizamos desplazamiento cada X ms
-//             unsigned long now = millis();
-//             if (now - lastScrollTime >= scrollUpdateMs) {
-//                 scrollOffsets[currentIndex] += scrollDirections[currentIndex] * scrollSpeed;
-//                 // Rebotar a izquierda
-//                 if (scrollOffsets[currentIndex] < 0) {
-//                     scrollOffsets[currentIndex] = 0;
-//                     scrollDirections[currentIndex] = 1;
-//                 }
-//                 // Rebotar a derecha
-//                 else if (scrollOffsets[currentIndex] > maxScroll) {
-//                     scrollOffsets[currentIndex] = maxScroll;
-//                     scrollDirections[currentIndex] = -1;
-//                 }
-//                 lastScrollTime = now;
-//             }
-
-//             // Creamos un sprite auxiliar del tamaño de textAreaW x textAreaH
-//             TFT_eSprite textSprite(&tft);
-//             if (textSprite.createSprite(textAreaW, textAreaH) == nullptr) {
-//                 // Si no hay memoria, dibuja estático para evitar reset
-//                 uiSprite.drawString(menuOptions[currentIndex], textAreaX, textAreaY);
-//                 continue; 
-//             }
-
-//             // Fondo igual al color de la tarjeta
-//             textSprite.fillSprite(CARD_COLOR);
-
-//             // Ajustamos el sprite para dibujar el texto
-//             textSprite.setTextColor(borderColor);
-//             textSprite.setTextSize(1);
-//             textSprite.setTextDatum(TL_DATUM);  // Arriba-izq
-
-//             // Calcular posición X dentro del sprite para “mover” el texto
-//             int xPos = -scrollOffsets[currentIndex];
-//             // Centrado vertical aproximado
-//             int yPos = (textAreaH - 8) / 2;  // 8 px = altura aproximada de la fuente
-
-//             // Dibujamos la cadena en el sprite
-//             textSprite.drawString(menuOptions[currentIndex], xPos, yPos);
-
-//             // Copiamos el sprite al uiSprite en la posición textAreaX, textAreaY
-//             textSprite.pushSprite(textAreaX, textAreaY);
-
-//             // Liberamos memoria
-//             textSprite.deleteSprite();
-//         }
-//     }
-
-//     // === BARRA DE DESPLAZAMIENTO VERTICAL ===
-//     const int scrollBarHeight = visibleOptions * (cardHeight + cardMargin) - cardMargin;
-//     const int scrollBarY = 30;
-//     const int scrollBarX = 128 - scrollBarWidth - scrollBarMargin;
-
-//     // Fondo de la barra
-//     uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_DARKGREY);
-
-//     // “Pulgar” de la barra
-//     if (numOptions > visibleOptions) {
-//         float thumbRatio = (float)visibleOptions / numOptions;
-//         int thumbHeight = max(20, (int)(scrollBarHeight * thumbRatio));
-//         int thumbY = scrollBarY + (scrollBarHeight - thumbHeight)
-//                      * ((float)startIndex / (numOptions - visibleOptions));
-//         uiSprite.fillRect(scrollBarX, thumbY, scrollBarWidth, thumbHeight, TFT_LIGHTGREY);
-//     }
-//     else {
-//         // Si hay menos o igual opciones que el área visible, no hace falta “pulgar”
-//         uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_LIGHTGREY);
-//     }
-
-//     // Empujar todo a pantalla
-//     uiSprite.pushSprite(0, 0);
-// }
-
-    // Opciones del menú oculto
-    const char* menuOptions[] = {
-        " Buscar elemento",
-        " Idioma",
-        " Sonido",
-        " Brillo",
-        " Respuestas muy muy largas",
-        " Volver al menu principal"
-    };
-    const int numOptions = sizeof(menuOptions) / sizeof(menuOptions[0]);
-
-    // Número máximo de opciones visibles
-    const int visibleOptions = 4;
+// Número máximo de opciones visibles
+const int visibleOptions = 3;
 
 void drawHiddenMenu(int selection)
 {
-    // Dimensiones de las tarjetas
-    const int cardWidth  = 110;
-    const int cardHeight = CARD_HEIGHT;  // ajusta con tu valor
-    const int cardMargin = CARD_MARGIN;  // ajusta con tu valor
+    const int cardWidth = 110;
+    const int cardHeight = CARD_HEIGHT;
+    const int cardMargin = CARD_MARGIN;
 
-    // Limpiar sprite principal con color de fondo
     uiSprite.fillSprite(BACKGROUND_COLOR);
 
-    // Dibujar título
+    // Draw title
+    uiSprite.setFreeFont(&FreeSans12pt7b);
     uiSprite.setTextColor(TEXT_COLOR);
     uiSprite.setTextDatum(TC_DATUM);
-    uiSprite.setTextSize(2);
+    uiSprite.setTextSize(1);
     uiSprite.drawString("AJUSTES", 64, 5);
 
-    // Cálculo de startIndex para scroll vertical
     int startIndex = max(0, min(selection - visibleOptions / 2, numOptions - visibleOptions));
 
-    // Dibujar las opciones visibles
+    // Posición X de inicio del texto
+    int x = 9;  // margen izquierdo
+    // Calcular el límite derecho a partir de la posición de la barra vertical
+    const int scrollBarMargin = 3;
+    const int scrollBarWidth = 5;
+    int scrollBarX = 128 - scrollBarWidth - scrollBarMargin;
+    // El ancho de la zona de texto es el espacio entre x y la barra vertical (dejando un pequeño margen)
+    int textAreaW = scrollBarX - x - 2; // 2 píxeles de margen extra
+
     for (int i = 0; i < visibleOptions && (startIndex + i) < numOptions; i++)
     {
         int currentIndex = startIndex + i;
         int y = 30 + i * (cardHeight + cardMargin);
 
-        // Fondo de la tarjeta
-        uiSprite.fillRoundRect(9, y, cardWidth, cardHeight, 5, CARD_COLOR);
-
-        // Color del borde (resaltar si es la seleccionada)
         bool isSelected = (currentIndex == selection);
-        uint32_t borderColor = isSelected ? HIGHLIGHT_COLOR : TEXT_COLOR;
-        uiSprite.drawRoundRect(9, y, cardWidth, cardHeight, 5, borderColor);
+        uint32_t textColor = isSelected ? HIGHLIGHT_COLOR : TEXT_COLOR;
 
-        // Área interna de texto
-        int textAreaX = 9 + 2;
-        int textAreaY = y + 2;
-        int textAreaW = cardWidth  - 4;
-        int textAreaH = cardHeight - 4;
-
-        // Ajustes de texto
-        uiSprite.setTextColor(borderColor);
+        uiSprite.setFreeFont(&FreeSans9pt7b);
+        uiSprite.setTextColor(textColor);
         uiSprite.setTextSize(1);
         uiSprite.setTextDatum(TL_DATUM);
 
-        // Medir el ancho total
-        int fullTextWidth = uiSprite.textWidth(menuOptions[currentIndex]);
-        // Copiamos el texto a un String para recortarlo si excede
+        // Siempre recortar el texto para que no se dibuje por debajo de la barra
         String tempStr = menuOptions[currentIndex];
-
-        // Si sobrepasa el ancho, lo truncamos sin añadir "..."
-        if (fullTextWidth > textAreaW) {
-            while (uiSprite.textWidth(tempStr) > textAreaW && tempStr.length() > 0) {
-                tempStr.remove(tempStr.length() - 1);
-            }
+        while (uiSprite.textWidth(tempStr) > textAreaW && tempStr.length() > 0) {
+            tempStr.remove(tempStr.length() - 1);
         }
-
-        // Centrado vertical aproximado
-        int yCenter = textAreaY + (textAreaH - 8) / 2;
-        uiSprite.drawString(tempStr, textAreaX, yCenter);
+        uiSprite.drawString(tempStr, x, y);
     }
 
-    // Barra de scroll vertical
-    const int scrollBarWidth  = 5;
-    const int scrollBarMargin = 3;
+    // Dibujar la barra vertical de scroll
     const int scrollBarHeight = visibleOptions * (cardHeight + cardMargin) - cardMargin;
-    const int scrollBarY      = 30;
-    const int scrollBarX      = 128 - scrollBarWidth - scrollBarMargin;
-
+    const int scrollBarY = 30;
     uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_DARKGREY);
 
-    // “Pulgar” en caso de haber más opciones que las visibles
     if (numOptions > visibleOptions) {
         float thumbRatio = (float)visibleOptions / (float)numOptions;
-        int thumbHeight  = max(20, (int)(scrollBarHeight * thumbRatio));
-        int thumbY       = scrollBarY + (scrollBarHeight - thumbHeight)
-                           * (float)(selection - startIndex) / (float)(numOptions - visibleOptions);
+        int thumbHeight = max(20, (int)(scrollBarHeight * thumbRatio));
+        int thumbY = scrollBarY + (scrollBarHeight - thumbHeight)
+                     * (float)(selection - startIndex) / (float)(numOptions - visibleOptions);
         uiSprite.fillRect(scrollBarX, thumbY, scrollBarWidth, thumbHeight, TFT_LIGHTGREY);
     }
     else {
-        // Si no hay scroll vertical
         uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_LIGHTGREY);
+        
     }
-
-    // Enviar todo a la pantalla
     uiSprite.pushSprite(0, 0);
 }
 
 void scrollTextTickerBounce(int selection)
 {
-    // ==========================
-    // 1. CONFIGURACIÓN
-    // ==========================
-    const int cardWidth   = 110;
-    const int cardHeight  = CARD_HEIGHT;
-    const int cardMargin  = CARD_MARGIN;
-    const int visibleOptions = 4;
+    if (!hiddenMenuActive) return;
 
-    // Intervalo de “salto” (ms) para moverse 1 carácter
-    const unsigned long frameInterval = 400;
-
-    // Tamaño máximo del substring (nº de caracteres visibles a la vez)
-    const int chunkSize = 17;
-
-    // Offsets y dirección de scroll (+1 o -1)
-    static int charOffsets[6]         = {0,0,0,0,0,0}; 
-    static int scrollDirections[6]    = {1,1,1,1,1,1};
-
-    // Control de tiempo de la última actualización
+    const int cardWidth = 110;
+    const int cardHeight = CARD_HEIGHT;
+    const int cardMargin = CARD_MARGIN;
+    const int visibleOptions = 3;
+    const unsigned long frameInterval = 200;
+    
+    static int charOffsets[6] = {0,0,0,0,0,0}; 
+    static int scrollDirections[6] = {1,1,1,1,1,1};
     static unsigned long lastFrameTime = 0;
 
-    // ==========================
-    // 2. FUENTE MONO Y WRAP OFF
-    // ==========================
-    tft.setFreeFont(nullptr);
-    tft.setTextFont(1);
+    tft.setFreeFont(&FreeSans9pt7b);
     tft.setTextWrap(false);
     tft.setTextSize(1);
 
-    // ==========================
-    // 3. CADENA Y MEDIR LONGITUD
-    // ==========================
     if (selection < 0 || selection >= numOptions) return;
     String text = menuOptions[selection];
 
     int fullTextWidth = tft.textWidth(text.c_str());
-    int textVisibleW  = cardWidth - 4; 
-    if (fullTextWidth <= textVisibleW) {
-        // Cabe sin scroll => no hacemos nada
-        return;
-    }
+    int textVisibleW = cardWidth;  // Adjusted to match drawHiddenMenu
+    if (fullTextWidth <= textVisibleW) return;
 
-    // ==========================
-    // 4. CÁLCULO DE POSICIÓN
-    // ==========================
+    int chunkSize = 0;
+    while (chunkSize < text.length() && tft.textWidth(text.substring(0, chunkSize + 1)) <= textVisibleW) {
+        chunkSize++;
+    }
+    if(chunkSize == 0) chunkSize = 1;
+
     int startIndex = max(0, min(selection - visibleOptions / 2, numOptions - visibleOptions));
-    int cardIndex  = selection - startIndex;
+    int cardIndex = selection - startIndex;
     if (cardIndex < 0 || cardIndex >= visibleOptions) return;
 
-    int cardY      = 30 + cardIndex * (cardHeight + cardMargin);
-    int textAreaX  = 9 + 2;  // = 11
-    int textAreaY  = cardY + 2;
-    int textAreaW  = textVisibleW;      // cardWidth - 4
-    int textAreaH  = cardHeight - 4;
+    int cardY = 30 + cardIndex * (cardHeight + cardMargin);
+    int textAreaX = 15;  // Adjusted to match drawHiddenMenu
+    int textAreaY = cardY + 1;
+    int textAreaW = textVisibleW - 9;
+    int textAreaH = cardHeight - 2;
 
-    // ==========================
-    // 5. CONTROL DE TIEMPO Y “VAIVÉN”
-    // ==========================
     unsigned long now = millis();
     if (now - lastFrameTime >= frameInterval) {
-        // Avanzamos / retrocedemos 1 carácter
         charOffsets[selection] += scrollDirections[selection];
 
-        // Límite izquierdo (0)
         if (charOffsets[selection] < 0) {
             charOffsets[selection] = 0;
-            scrollDirections[selection] = +1; // rebote
+            scrollDirections[selection] = +1;
         }
 
-        // Límite derecho (text.length() - chunkSize)
         int maxOffset = text.length() - chunkSize;
-        if (maxOffset < 0) maxOffset = 0; // chunkSize mayor o igual a la longitud
-
+        if (maxOffset < 0) maxOffset = 0;
         if (charOffsets[selection] > maxOffset) {
             charOffsets[selection] = maxOffset;
-            scrollDirections[selection] = -1; // rebote
+            scrollDirections[selection] = -1;
         }
-
         lastFrameTime = now;
     }
 
-    // ==========================
-    // 6. CREAR SPRITE PEQUEÑO
-    // ==========================
     TFT_eSprite tickerSprite(&tft);
-    if (tickerSprite.createSprite(textAreaW, textAreaH) == nullptr) {
-        // Sin memoria => no scroll
-        return;
-    }
+    if (tickerSprite.createSprite(textAreaW, textAreaH) == nullptr) return;
 
-    // ==========================
-    // 7. AJUSTES EN SPRITE
-    // ==========================
-    tickerSprite.setFreeFont(nullptr);
-    tickerSprite.setTextFont(1);
+    tickerSprite.setFreeFont(&FreeSans9pt7b);
     tickerSprite.setTextWrap(false);
     tickerSprite.setTextSize(1);
     tickerSprite.setTextColor(HIGHLIGHT_COLOR);
     tickerSprite.setTextDatum(TL_DATUM);
 
-    // Fondo con tu color de tarjeta
-    tickerSprite.fillSprite(CARD_COLOR);
+    tickerSprite.fillSprite(BACKGROUND_COLOR);
 
-    // ==========================
-    // 8. POSICIÓN VERTICAL (centrado)
-    // ==========================
-    int yCenter = (textAreaH - 8) / 2;
-    if (yCenter < 0) yCenter = 0;
-    if (yCenter >= textAreaH) yCenter = textAreaH - 1;
-
-    // ==========================
-    // 9. SUBSTRING SIN “...”
-    // ==========================
     int offset = charOffsets[selection];
     if (offset < 0) offset = 0;
     if (offset >= (int)text.length()) offset = text.length() - 1;
-
     int endIndex = offset + chunkSize;
     if (endIndex > (int)text.length()) {
         endIndex = text.length();
     }
-
     String sliceStr = text.substring(offset, endIndex);
-
-    // Si está vacío, mejor un string vacío que “...”
     if (sliceStr.isEmpty()) {
         sliceStr = "";
     }
 
-    // ==========================
-    // 10. DIBUJAR SUBSTRING
-    // ==========================
-    tickerSprite.drawString(sliceStr, 0, yCenter);
+    tickerSprite.drawString(sliceStr, -charOffsets[selection], 0);
 
-    // ==========================
-    // 11. Mostrar en pantalla
-    // ==========================
     tickerSprite.pushSprite(textAreaX, textAreaY);
     tickerSprite.deleteSprite();
 }

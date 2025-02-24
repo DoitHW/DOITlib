@@ -1,6 +1,7 @@
 #pragma once
 
 #include <SPIFFS_handler/SPIFFS_handler.h>
+#include <info_elements_DMS/info_elements_DMS.h>
 #include <Arduino.h>
 #include <ESP32Encoder.h>
 #include <vector>
@@ -9,6 +10,7 @@
 #define ENC_A 26
 #define ENC_B 34
 #define ENC_BUTTON 33
+
 
 // Declaración de funciones relacionadas con el encoder
 void encoder_init_func();
@@ -19,6 +21,13 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection);
 void animateTransition(int direction);
 void drawModesScreen();
 void drawCurrentElement();
+
+void handleModeSelection(const String& currentFile);
+void toggleElementSelection(const String& currentFile);
+void requestAndSyncElementMode();
+
+bool getModeFlag(const uint8_t modeConfig[2], MODE_CONFIGS flag);
+void debugModeConfig(const uint8_t modeConfig[2]);
 
 // Variables externas requeridas
 extern std::vector<String> elementFiles;
@@ -31,7 +40,9 @@ extern bool modeScreenEnteredByLongPress;
 extern bool isLongPress;
 extern bool hiddenMenuActive;
 extern unsigned long buttonPressStart;
-extern int globalVisibleModesMap[16];  // Declaración de la variable global
+extern int globalVisibleModesMap[17];  // Declaración de la variable global
+extern bool ignoreInputs;
+extern ESP32Encoder encoder;
 
 
 

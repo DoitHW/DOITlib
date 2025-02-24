@@ -16,7 +16,8 @@
                                                 #define SLOW_RF                  // -> FAST_RF= 115200 / SLOW_RF= 9600 (NO TOCAR POR DIOSSSS)
                                                 #define _ERR_THROW_START_        if(element->get_err_dbg())Serial1.println(
                                                 #define _ERR_THROW_END_          );
-/*                                                                                                  
+                                                #define ADXL 
+/*                                                                                                 
                                      .-+***+-:....                                                  
                                       .+@@@@@@@@@+:......:::.....                                   
                                         .=@@@@@@@@@@@@@@@@@@@@@@@@@@+:.                             
@@ -73,7 +74,7 @@
 
 #define RF_TX_PIN         18 
 #define RF_RX_PIN         17  
-#define RF_CONFIG_PIN     46
+#define RF_CONFIG_PIN     46 //original pin 46
 #if defined (FAST_RF)
   #define RF_BAUD_RATE      115200
 #else
@@ -81,6 +82,14 @@
 #endif
 
 #define UART_RX_BUFFER_SIZE 1024
+
+#define RESPONSE_TIME       0xFF
+
+#define SAMPLES             1024
+#define SAMPLING_FREQUENCY  44100
+
+#define MAX_BALLS 5  // Máximo de bolas simultáneas
+#define COLOR_VARIATION 30  // Variación máxima de color
 
 #define RESPONSE_TIME       0xFF
 
@@ -240,6 +249,17 @@
 #define WOMAN_VOICE 0x00
 #define MAN_VOICE   0x01
 
+// BANKS & FILES
+#define RESERVED_BANK      1      
+
+#define WIN_RESP_M_BANK   23
+#define WIN_RESP_H_BANK   24
+#define FAIL_RESP_M_BANK  25
+#define FAIL_RESP_H_BANK  26
+
+#define WOMAN_VOICE 0x00
+#define MAN_VOICE   0x01
+
 // DEFINES INFO_ELEMENTS
 #define SPANISH_LANG        0x01
 #define ENGLISH_LANG        0x02
@@ -248,6 +268,17 @@
 #define CATALAN_LANG        0x05
 #define MEXICAN_LANG        0x06
 #define EUSKERA_LANG        0x07
+
+#define SPANISH_FILE_OFFSET   10
+#define ENGLISH_FILE_OFFSET   20
+#define GERMAN_FILE_OFFSET    30
+#define FRENCH_FILE_OFFSET    40
+#define MEXICAN_FILE_OFFSET   50
+#define CATALAN_FILE_OFFSET   60
+#define EUSKERA_FILE_OFFSET   70
+
+#define MAN_VOICE_BANK_OFFSET  1
+
 
 #define SPANISH_FILE_OFFSET   10
 #define ENGLISH_FILE_OFFSET   20
@@ -368,6 +399,18 @@ enum COMMANDS_{
 
 
 #define VUMETER_LED_DATA_PIN        21
+#define BOTONERA_DATA_PIN           21
+
+//DEFINES ESCALERA
+#define VUMETER_SEL_MODE_PIN_01   1
+#define VUMETER_SEL_MODE_PIN_02   2
+#define VUMETER_SEL_MODE_PIN_03   3
+#define VUMETER_SEL_MODE_PIN_04   4
+#define VUMETER_SEL_MODE_PIN_05   5
+#define VUMETER_SEL_MODE_PIN_06   6
+
+
+#define VUMETER_LED_DATA_PIN        21
 
 
 
@@ -376,11 +419,25 @@ enum COMMANDS_{
   #define NUM_STEPS  1 
   #define LEDS_STEP  1
   #define NUM_LEDS   NUM_STEPS*LEDS_STEP 
+  #define NUM_STEPS  1 
+  #define LEDS_STEP  1
+  #define NUM_LEDS   NUM_STEPS*LEDS_STEP 
 #elif defined (FIBRAS)
   #define NUM_STEPS  1 
   #define LEDS_STEP  1
   #define NUM_LEDS   NUM_STEPS*LEDS_STEP 
+  #define NUM_STEPS  1 
+  #define LEDS_STEP  1
+  #define NUM_LEDS   NUM_STEPS*LEDS_STEP 
 #elif defined (WALLWASHER)
+  #define NUM_STEPS  1 
+  #define LEDS_STEP  576
+  #define NUM_LEDS   NUM_STEPS*LEDS_STEP 
+#elif defined (ESCALERA)
+  #define NUM_STEPS  10 // 11
+  #define LEDS_STEP  27
+  #define NUM_LEDS   NUM_STEPS*LEDS_STEP 
+// botonera sempre al final dels elifs
   #define NUM_STEPS  1 
   #define LEDS_STEP  576
   #define NUM_LEDS   NUM_STEPS*LEDS_STEP 
@@ -618,3 +675,295 @@ enum SECTOR_LIST{
 #endif
 
 
+
+
+
+/*
+
+{EV_START, 0, 0}
+{EV_MODE_CHANGE, 1, 0} 
+{EV_COLOR_CHANGE, 2, 12000} aqui se guarda un valor de 12000 por que el siguiente  EV_COLOR_CHANGE con eventVal distinto ha ocurrido 12000 ms despues de el de esta linea
+{EV_FLAG_CHANGE, 1, 40000}  aqui se guarda un valor de 40000 por que el siguiente  EV_FLAG_CHANGE con eventVal distinto ha ocurrido 40000 ms despues de el de esta linea
+{EV_COLOR_CHANGE, 6, 0} aqui se guarda 0 por que el siguiente valor de EV_COLOR_CHANGE es el mismo que el de esta linea. por lo tanto al no haber habido un cambio de color, el cronometro para este color sigue contando.
+{EV_COLOR_CHANGE, 6, 50000}  aqui se guarda un valor de 50000 por que el siguiente  EV_COLOR_CHANGE con eventVal distinto ha ocurrido 50000 ms despues de el de esta linea
+{EV_SECTOR_REQ, 9, 0} aqui se guarda simplemente el evento con su eventVal y su timeStamp igual a 0.
+{EV_MODE_CHANGE, 3, 25000} igual que  todo lo anterior, 25000 son los ms que han pasado hasta el siguiente EV_CHANGE_MODE con eventVal distinto
+{EV_MODE_CHANGE, 4, 0} etc 
+{EV_SECTOR_REQ, 9, 0} etc 
+{EV_FLAG_CHANGE, 0, 0} etc 
+{EV_COLOR_CHANGE, 7, 0} etc 
+{EV_COLOR_CHANGE, 1, 0} etc
+{EV_END, 0, 67000} // 67000 son los ms transcurridos desde el EV_START, ademas aqui termina el contador de tiempo de todos los eventos que no han recibido un evento equivalente que detenga y registre el cronometro. es decir que en el ultimo EV_COLOR_CHANGE se registrara el tiempo transcurrido hasta este EV_END
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Nombre: Columna
+Numero de serie: 67A5D48283F1
+Tiempo de trabajo: 9833 minutos
+Tiempo de vida: 6532 horas.
+numero de ciclos: 69
+
+
+--NUEVO CICLO 24-- 
+
+evento: DISPOSITIVO INICIADO EN MODO BASICO
+valor: 0
+duracion: 0
+
+evento: CAMBIO DE MODO
+valor: 1
+duracion: 2 minutos
+
+evento: CAMBIO DE COLOR
+valor: 2
+duracion: 4 minutos
+
+evento: CAMBIO DE COLOR
+valor: 6
+duracion: 16 minutos
+
+evento: CAMBIO DE MODO
+valor: 3
+duracion: 31 minutos
+
+evento: APAGANDO DISPOSITIVO
+valor: 0
+duracion: 39 minutos
+
+-- FIN DE CICLO -- 
+
+
+--NUEVO CICLO 25-- 
+
+evento: DISPOSITIVO INICIADO EN MODO BASICO
+valor: 0
+duracion: 0
+
+evento: CAMBIO DE MODO
+valor: 1
+duracion: 4 minutos
+
+evento: CAMBIO DE COLOR
+valor: 2
+duracion: 5 minutos
+
+evento: CAMBIO DE COLOR
+valor: 6
+duracion: 15 minutos
+
+evento: CAMBIO DE MODO
+valor: 3
+duracion: 32 minutos
+
+evento: APAGANDO DISPOSITIVO
+valor: 0
+duracion: 34 minutos
+
+-- FIN DE CICLO -- 
+
+--NUEVO CICLO 26-- 
+
+evento: DISPOSITIVO INICIADO EN MODO BASICO
+valor: 0
+duracion: 0
+
+evento: CAMBIO DE MODO
+valor: 1
+duracion: 9 minutos
+
+evento: CAMBIO DE COLOR
+valor: 2
+duracion: 14 minutos
+
+evento: CAMBIO DE COLOR
+valor: 6
+duracion: 18 minutos
+
+evento: CAMBIO DE MODO
+valor: 3
+duracion: 39 minutos
+
+evento: APAGANDO DISPOSITIVO
+valor: 0
+duracion: 42 minutos
+
+-- FIN DE CICLO -- 
+
+*/
+
+
+#define TT1 &TomThumb
+
+#define FM9 &FreeMono9pt7b
+#define FM12 &FreeMono12pt7b
+#define FM18 &FreeMono18pt7b
+#define FM24 &FreeMono24pt7b
+
+#define FMB9 &FreeMonoBold9pt7b
+#define FMB12 &FreeMonoBold12pt7b
+#define FMB18 &FreeMonoBold18pt7b
+#define FMB24 &FreeMonoBold24pt7b
+
+#define FMO9 &FreeMonoOblique9pt7b
+#define FMO12 &FreeMonoOblique12pt7b
+#define FMO18 &FreeMonoOblique18pt7b
+#define FMO24 &FreeMonoOblique24pt7b
+
+#define FMBO9 &FreeMonoBoldOblique9pt7b
+#define FMBO12 &FreeMonoBoldOblique12pt7b
+#define FMBO18 &FreeMonoBoldOblique18pt7b
+#define FMBO24 &FreeMonoBoldOblique24pt7b
+
+#define FSS9 &FreeSans9pt7b
+#define FSS12 &FreeSans12pt7b
+#define FSS18 &FreeSans18pt7b
+#define FSS24 &FreeSans24pt7b
+
+#define FSSB9 &FreeSansBold9pt7b
+#define FSSB12 &FreeSansBold12pt7b
+#define FSSB18 &FreeSansBold18pt7b
+#define FSSB24 &FreeSansBold24pt7b
+
+#define FSSO9 &FreeSansOblique9pt7b
+#define FSSO12 &FreeSansOblique12pt7b
+#define FSSO18 &FreeSansOblique18pt7b
+#define FSSO24 &FreeSansOblique24pt7b
+
+#define FSSBO9 &FreeSansBoldOblique9pt7b
+#define FSSBO12 &FreeSansBoldOblique12pt7b
+#define FSSBO18 &FreeSansBoldOblique18pt7b
+#define FSSBO24 &FreeSansBoldOblique24pt7b
+
+#define FS9 &FreeSerif9pt7b
+#define FS12 &FreeSerif12pt7b
+#define FS18 &FreeSerif18pt7b
+#define FS24 &FreeSerif24pt7b
+
+#define FSI9 &FreeSerifItalic9pt7b
+#define FSI12 &FreeSerifItalic12pt7b
+#define FSI19 &FreeSerifItalic18pt7b
+#define FSI24 &FreeSerifItalic24pt7b
+
+#define FSB9 &FreeSerifBold9pt7b
+#define FSB12 &FreeSerifBold12pt7b
+#define FSB18 &FreeSerifBold18pt7b
+#define FSB24 &FreeSerifBold24pt7b
+
+#define FSBI9 &FreeSerifBoldItalic9pt7b
+#define FSBI12 &FreeSerifBoldItalic12pt7b
+#define FSBI18 &FreeSerifBoldItalic18pt7b
+#define FSBI24 &FreeSerifBoldItalic24pt7b
+
+#define FF0 NULL //ff0 reserved for GLCD
+#define FF1 &FreeMono9pt7b
+#define FF2 &FreeMono12pt7b
+#define FF3 &FreeMono18pt7b
+#define FF4 &FreeMono24pt7b
+
+#define FF5 &FreeMonoBold9pt7b
+#define FF6 &FreeMonoBold12pt7b
+#define FF7 &FreeMonoBold18pt7b
+#define FF8 &FreeMonoBold24pt7b
+
+#define FF9 &FreeMonoOblique9pt7b
+#define FF10 &FreeMonoOblique12pt7b
+#define FF11 &FreeMonoOblique18pt7b
+#define FF12 &FreeMonoOblique24pt7b
+
+#define FF13 &FreeMonoBoldOblique9pt7b
+#define FF14 &FreeMonoBoldOblique12pt7b
+#define FF15 &FreeMonoBoldOblique18pt7b
+#define FF16 &FreeMonoBoldOblique24pt7b
+
+#define FF17 &FreeSans9pt7b
+#define FF18 &FreeSans12pt7b
+#define FF19 &FreeSans18pt7b
+#define FF20 &FreeSans24pt7b
+
+#define FF21 &FreeSansBold9pt7b
+#define FF22 &FreeSansBold12pt7b
+#define FF23 &FreeSansBold18pt7b
+#define FF24 &FreeSansBold24pt7b
+
+#define FF25 &FreeSansOblique9pt7b
+#define FF26 &FreeSansOblique12pt7b
+#define FF27 &FreeSansOblique18pt7b
+#define FF28 &FreeSansOblique24pt7b
+
+#define FF29 &FreeSansBoldOblique9pt7b
+#define FF30 &FreeSansBoldOblique12pt7b
+#define FF31 &FreeSansBoldOblique18pt7b
+#define FF32 &FreeSansBoldOblique24pt7b
+
+#define FF33 &FreeSerif9pt7b
+#define FF34 &FreeSerif12pt7b
+#define FF35 &FreeSerif18pt7b
+#define FF36 &FreeSerif24pt7b
+
+#define FF37 &FreeSerifItalic9pt7b
+#define FF38 &FreeSerifItalic12pt7b
+#define FF39 &FreeSerifItalic18pt7b
+#define FF40 &FreeSerifItalic24pt7b
+
+#define FF41 &FreeSerifBold9pt7b
+#define FF42 &FreeSerifBold12pt7b
+#define FF43 &FreeSerifBold18pt7b
+#define FF44 &FreeSerifBold24pt7b
+
+#define FF45 &FreeSerifBoldItalic9pt7b
+#define FF46 &FreeSerifBoldItalic12pt7b
+#define FF47 &FreeSerifBoldItalic18pt7b
+#define FF48 &FreeSerifBoldItalic24pt7b

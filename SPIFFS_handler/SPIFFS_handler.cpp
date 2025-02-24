@@ -4,13 +4,13 @@
 #include "icons_64x64_DMS/icons_64x64_DMS.h"
 
 
- INFO_PACK_T ambientesOption;
- INFO_PACK_T fichasOption;
 
 bool writeBytesChecked(fs::File &f, const uint8_t* data, size_t length) {
     size_t written = f.write(data, length);
     if(written != length) {
-        Serial.printf("Error: se esperaban escribir %u bytes, se escribieron %u\n",(unsigned)length,(unsigned)written);
+        #ifdef DEBUG
+          Serial.printf("Error: se esperaban escribir %u bytes, se escribieron %u\n",(unsigned)length,(unsigned)written);                                                                        
+        #endif
         return false;
     }
     return true;
@@ -18,17 +18,22 @@ bool writeBytesChecked(fs::File &f, const uint8_t* data, size_t length) {
 
 
 void formatSPIFFS() {
-    //Serial.print("Formateando SPIFFS...");
+    #ifdef DEBUG
+      Serial.print("Formateando SPIFFS...");                                                                            
+    #endif
+    
     SPIFFS.end();
     if (!SPIFFS.format()) {
         #ifdef DEBUG
-        Serial.println("Error al formatear SPIFFS.");
+          Serial.println("Error al formatear SPIFFS.");                                                                        
         #endif
+        
     }
     if (!SPIFFS.begin(true)) {
         #ifdef DEBUG
-        Serial.println("Error al montar SPIFFS después del formateo.");
+          Serial.println("Error al montar SPIFFS después del formateo.");                                                                        
         #endif
+        
     }
 }
 
@@ -52,12 +57,12 @@ bool saveElementFieldByField(const char* baseName, const uint16_t* iconData) {
     char elementName[24];
     memset(elementName, 0, 24);
     strncpy(elementName, uniqueElementName.c_str(), 24);
-
+    
     fs::File f = SPIFFS.open(uniqueFileName, "w");
     if (!f) {
-        #ifdef DEBUG
-        Serial.println("Error creando archivo del elemento");
-        #endif
+                                                                                                                            #ifdef DEBUG
+                                                                                                                            Serial.println("Error creando archivo del elemento");
+                                                                                                                            #endif
         return false;
     }
 
@@ -176,78 +181,13 @@ bool saveElementFieldByField(const char* baseName, const uint16_t* iconData) {
         f.flush();
         size_t finalSize = f.size();
         f.close();
-        #ifdef DEBUG
-        Serial.printf("Elemento guardado con éxito, archivo: %s, tamaño final: %u bytes\n", uniqueFileName.c_str(), (unsigned)finalSize);
-        #endif
+                                                                                                    #ifdef DEBUG
+                                                                                                    Serial.printf("Elemento guardado con éxito, archivo: %s, tamaño final: %u bytes\n", uniqueFileName.c_str(), (unsigned)finalSize);                                                                        
+                                                                                                    #endif
+        
         return true;
     }
 
-void printElementInfo(const String &fileName) {
-    
-    Serial.println("Se va a abrir el archivo: " + fileName);
-    fs::File f = SPIFFS.open(fileName, "r");
-    if (!f) {
-        Serial.println("Error al abrir el archivo del elemento para imprimir su info.");
-        return;
-    }
-
-    Serial.println("#### Mostrando elemento en SPIFFFS ####");
-    Serial.println();
-
-    // Leer campos
-    char name[25] = {0};
-    f.seek(OFFSET_NAME, SeekSet);
-    f.read((uint8_t*)name, 24);
-    Serial.printf("✍️ Nombre: %s\n", name);
-
-    char desc[193] = {0};
-    f.seek(OFFSET_DESC, SeekSet);
-    f.read((uint8_t*)desc, 192);
-    Serial.printf("📋 Descripción: %s\n", desc);
-
-    byte serialNum[4] = {0}; // Cambiado a tamaño 4 para coincidir con la lectura
-    f.seek(OFFSET_SERIAL, SeekSet);
-    f.read(serialNum, 4);
-    Serial.printf("📋 Número de serie: 0x%02X%02X%02X%02X\n", serialNum[0], serialNum[1], serialNum[2], serialNum[3]);
-
-    byte id;
-    f.seek(OFFSET_ID, SeekSet);
-    f.read(&id, 1);
-    Serial.printf("📋 ID: 0x%02X\n", id); // Corregido el formato de impresión
-
-    byte currentMode;
-    f.seek(OFFSET_CURRENTMODE, SeekSet);
-    f.read(&currentMode, 1);
-    Serial.printf("📋 Modo actual: %d\n", currentMode);
-
-    // Leer modos
-    f.seek(OFFSET_MODES, SeekSet);
-    for (int i = 0; i < 16; i++) {
-        char modeName[25] = {0};
-        char modeDesc[193] = {0};
-        byte modeConfig[2] = {0};
-
-        f.read((uint8_t*)modeName, 24);
-        f.read((uint8_t*)modeDesc, 192);
-        f.read(modeConfig, 2);
-
-        
-
-        if (strlen(modeName) > 0) {
-            Serial.printf("Modo %d:\n", i);
-            Serial.printf("  Nombre: %s\n", modeName);
-            Serial.printf("  Descripción: %s\n", modeDesc);
-            Serial.printf("  Configuración: 0x%02X%02X\n", modeConfig[0], modeConfig[1]);
-            if (checkMostSignificantBit(modeConfig)) {
-            Serial.println("El bit más significativo del modo " + String(i) + " es 1");
-        } else {
-            Serial.println("El bit más significativo del modo " + String(i) + " es 0");
-        }
-        }
-    }
-
-    f.close();
-}
 
 
 bool readElementData(fs::File& f, char* elementName, char* modeName, int& startX, int& startY) {
@@ -274,30 +214,44 @@ bool readElementData(fs::File& f, char* elementName, char* modeName, int& startX
 
 
 void initializeDynamicOptions() {
-    // Configuración de la opción "Ambientes"
+    // ----- Ambientes -----
     memset(&ambientesOption, 0, sizeof(INFO_PACK_T));
-    strncpy((char*)ambientesOption.name, "Ambientes", 24);
+    strncpy((char*)ambientesOption.name, "AMBIENTES", 24);
     strncpy((char*)ambientesOption.desc, "Configura los ambientes de la sala.", 192);
     ambientesOption.currentMode = 0;
-    strncpy((char*)ambientesOption.mode[0].name, "Basico", 24);
+    strncpy((char*)ambientesOption.mode[0].name, "BASICO", 24);
     strncpy((char*)ambientesOption.mode[0].desc, "Modo basico para ambientes.", 192);
-    ambientesOption.mode[0].config[0] = 0x01;
-    ambientesOption.mode[0].config[1] = 0x00;
+    ambientesOption.mode[0].config[0] = 0x80;
+    ambientesOption.mode[0].config[1] = 0x01;
     memcpy(ambientesOption.icono, ambientes_64x64, sizeof(ambientesOption.icono));
 
-    // Configuración de la opción "Fichas"
+    // ----- Fichas -----
     memset(&fichasOption, 0, sizeof(INFO_PACK_T));
-    strncpy((char*)fichasOption.name, "Fichas", 24);
+    strncpy((char*)fichasOption.name, "FICHAS", 24);
     strncpy((char*)fichasOption.desc, "Interacción con fichas NFC.", 192);
     fichasOption.currentMode = 0;
-    strncpy((char*)fichasOption.mode[0].name, "Basico", 24);
+    strncpy((char*)fichasOption.mode[0].name, "BASICO", 24);
     strncpy((char*)fichasOption.mode[0].desc, "Modo basico para fichas NFC.", 192);
-    fichasOption.mode[0].config[0] = 0x02;
-    fichasOption.mode[0].config[1] = 0x00;
+    fichasOption.mode[0].config[0] = 0x80;
+    fichasOption.mode[0].config[1] = 0x01;
     memcpy(fichasOption.icono, fichas_64x64, sizeof(fichasOption.icono));
-    Serial.println("Nombre de fichasOption.name después de crear el icono: " + String((char*)fichasOption.name));
+    //Serial.println("Nombre de fichasOption.name después de crear el icono: " + String((char*)fichasOption.name));
 
+    // ----- ApagarSala -----
+    memset(&apagarSala, 0, sizeof(INFO_PACK_T));
+    strncpy((char*)apagarSala.name, "APAGAR", 24);
+    strncpy((char*)apagarSala.desc, "Apaga la sala por completo.", 192);
+    apagarSala.currentMode = 0;
+    // Puedes añadir uno o varios modos, aquí un ejemplo con un solo modo "OFF".
+    // strncpy((char*)apagarSala.mode[0].name, "OFF", 24);
+    // strncpy((char*)apagarSala.mode[0].desc, "Modo para apagar la sala.", 192);
+    // apagarSala.mode[0].config[0] = 0x7F; // El valor que tú desees para este modo
+    // apagarSala.mode[0].config[1] = 0xFF;
+
+    // Asumiendo que tienes un icono llamado apagar_64x64:
+    memcpy(apagarSala.icono, apagar_sala_64x64, sizeof(apagarSala.icono));
 }
+
 
 void loadElementsFromSPIFFS() {
     elementFiles.clear();
@@ -305,14 +259,22 @@ void loadElementsFromSPIFFS() {
 
     // Agregar las opciones dinámicas
     elementFiles.push_back("Ambientes");
-    selectedStates.push_back(false); // No seleccionada inicialmente
+    selectedStates.push_back(false);
+
     elementFiles.push_back("Fichas");
-    selectedStates.push_back(false); // No seleccionada inicialmente
+    selectedStates.push_back(false);
+
+    elementFiles.push_back("Apagar");
+    selectedStates.push_back(false);
+
 
     // Cargar elementos desde SPIFFS
     fs::File root = SPIFFS.open("/");
     if (!root || !root.isDirectory()) {
-        Serial.println("Error: No se pudo abrir el directorio raíz de SPIFFS.");
+                                                                                                                #ifdef DEBUG
+                                                                                                                Serial.println("Error: No se pudo abrir el directorio raíz de SPIFFS.");                                                                           
+                                                                                                                #endif
+        
         return;
     }
 
@@ -329,31 +291,40 @@ void loadElementsFromSPIFFS() {
         file.close();
         file = root.openNextFile();
     }
-
-    Serial.println("Elementos encontrados:");
+                                                                                    #ifdef DEBUG
+                                                                                    Serial.println("Elementos encontrados:");
+                                                                                    #endif
+    
     for (size_t i = 0; i < elementFiles.size(); i++) {
         Serial.printf("%d: %s\n", (int)i, elementFiles[i].c_str());
     }
-    Serial.printf("Total de elementos: %d\n", (int)elementFiles.size());
+                                                                                    #ifdef DEBUG
+                                                                                    Serial.printf("Total de elementos: %d\n", (int)elementFiles.size());                                                                                
+                                                                                    #endif
+    
 }
 
 byte getCurrentElementID() {
     byte elementID = BROADCAST;  
     String currentFile = elementFiles[currentIndex];
 
-    if (currentFile == "Ambientes" || currentFile == "Fichas") {
+    if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Apagar") {
         INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
         return option->ID;
     }
 
     // Leer la ID desde SPIFFS solo si está seleccionado
+    
     fs::File f = SPIFFS.open(currentFile, "r");
     if (f) {
         f.seek(OFFSET_ID, SeekSet);
         f.read(&elementID, 1);
         f.close();
     } else {
-        Serial.println("Error al leer la ID del archivo.");
+                                                                                    #ifdef DEBUG
+                                                                                    Serial.println("Error al leer la ID del archivo.");                                                                           
+                                                                                    #endif
+        
     }
     return elementID;
 }
@@ -364,8 +335,76 @@ bool isCurrentElementSelected() {
 
 bool checkMostSignificantBit(byte modeConfig[2]) {
     // Devuelve true si el bit más significativo del primer byte es 1, de lo contrario false
-    Serial.println("Devolviendo el bit más significativo del modo. ");
+    //Serial.println("Devolviendo el bit más significativo del modo. ");
     return (modeConfig[0] & 0x80) != 0;
 }
 
+bool getModeConfig(const String& fileName, byte mode, byte modeConfig[2]) {
+    memset(modeConfig, 0, 2); // Inicializar en 0
 
+    if (fileName == "Ambientes" || fileName == "Fichas" || fileName == "Apagar") {
+        INFO_PACK_T* option = (fileName == "Ambientes") ? &ambientesOption : &fichasOption;
+        memcpy(modeConfig, option->mode[mode].config, 2);
+        return true;
+    } else {
+       
+        fs::File f = SPIFFS.open(fileName, "r");
+        if (!f) {
+                                                                                    #ifdef DEBUG
+                                                                                    Serial.println("❌ Error abriendo el archivo: " + fileName);                                                                       
+                                                                                    #endif
+            
+            return false;
+        }
+
+        f.seek(OFFSET_MODES + (SIZE_MODE * mode) + 24 + 192, SeekSet);
+        if (f.read(modeConfig, 2) != 2) {
+                                                                                    #ifdef DEBUG
+                                                                                    Serial.println("❌ Error leyendo configuración del modo");                                                                      
+                                                                                    #endif
+            
+            f.close();
+            return false;
+        }
+
+        f.close();
+        return true;
+    }
+}
+
+void setAllElementsToBasicMode() {
+
+    // Asegurarse de cargar la lista de elementos desde SPIFFS.
+    // Si ya se ejecutó previamente loadElementsFromSPIFFS(), se puede omitir esta línea.
+   // loadElementsFromSPIFFS();
+    
+    // Recorrer la lista de archivos obtenida
+    for (size_t i = 0; i < elementFiles.size(); i++) {
+        String fileName = elementFiles[i];
+        // Sólo queremos actualizar los archivos de SPIFFS (aquellos que comienzan con "/element_")
+        if (!fileName.startsWith("/element_")) {
+            continue;
+        }
+        // También filtramos para que sean archivos .bin
+        if (!fileName.endsWith(".bin")) {
+            continue;
+        }
+
+        fs::File f = SPIFFS.open(fileName, "r+");
+        if (!f) {
+                                                                                    #ifdef DEBUG
+                                                                                    Serial.println("❌ Error abriendo " + fileName + " para escritura.");                                                                       
+                                                                                    #endif
+            continue;
+        }
+        byte basicMode = DEFAULT_BASIC_MODE; // Modo básico, normalmente 1
+        f.seek(OFFSET_CURRENTMODE, SeekSet);
+        f.write(&basicMode, 1);
+        f.flush();
+        f.close();
+                                                                                    #ifdef DEBUG
+                                                                                    Serial.println("✅ Modo básico actualizado en " + fileName);                                                                    
+                                                                                    #endif
+        
+    }   
+}

@@ -14,7 +14,12 @@ void drawErrorMessage(const char* message);
 void drawElementIcon(fs::File& f, int startX, int startY);
 void drawHiddenMenu(int selection);
 void scrollTextTickerBounce(int selection);
+void showMessageWithLoading(const char* message, unsigned long delayTime);
+void updateNameScroll();
+void updateModeScroll();
 
-
+extern bool isScrollingText;
 extern TFT_eSPI tft;
 extern TFT_eSprite uiSprite;
+extern bool nameScrollActive;
+extern bool modeScrollActive;
