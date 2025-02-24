@@ -41,7 +41,7 @@ enum MODE_CONFIGS{
     HAS_SENS_VAL_2,     //b8
     SITUATED_HIGH,      //b9
     HAS_PASSIVE,        //b10
-    CAN_ANSWER,         //b11
+    HAS_BINARY_SENSORS, //b11
     HAS_BANK_FILE,      //b12
     HAS_PATTERNS,       //b13
     NOP_1,              //b14
