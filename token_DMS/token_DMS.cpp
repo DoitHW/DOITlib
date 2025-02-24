@@ -4,71 +4,90 @@
 #include <play_DMS/play_DMS.h>
 #include <Element_DMS/Element_DMS.h>
 #include <Wire.h>
-#include <Adafruit_PN532.h>
 
-    
+
+extern DOITSOUNDS_ doitPlayer;
+
 void TOKEN_::begin() {
-    I2C2.begin(40, 41); // Pines SDA y SCL para el bus I2C
-    Serial.println("Escaneando dispositivos I2C...");
-
-    bool dispositivoEncontrado = false;
-    for (uint8_t address = 1; address < 127; address++) {
-        I2C2.beginTransmission(address);
-        if (I2C2.endTransmission() == 0) {
-            Serial.print("Dispositivo I2C encontrado en dirección: 0x");
-            Serial.println(address, HEX);
-            dispositivoEncontrado = true;
-        }
-    }
-    if (!dispositivoEncontrado) {
-        Serial.println("Error: No se encontraron dispositivos en el bus I2C. Verifica las conexiones y el cableado.");
-    }
-
-    // Inicializa el lector NFC
-    nfc.begin();
-    uint32_t versiondata = nfc.getFirmwareVersion();
-    if (!versiondata) {
-        Serial.println("Error: No se encontró el lector PN53x. Verifica las conexiones o el módulo.");
-        while (1); // Detener el programa
-    }
-
-    // Muestra información sobre el firmware del PN532
-    Serial.print("Encontrado chip PN5");
-    Serial.println((versiondata >> 24) & 0xFF, HEX);
-    Serial.print("Firmware: v");
-    Serial.print((versiondata >> 16) & 0xFF, DEC);
-    Serial.print(".");
-    Serial.println((versiondata >> 8) & 0xFF, DEC);
-
-    // Configura el módulo NFC
-    Serial.println("Configurando SAM...");
-    nfc.SAMConfig();
-    Serial.println("Configuración SAM completada.");
-    Serial.println("El lector NFC está listo. Esperando un tag NFC...");
+    // Inicialización del objeto
 }
 
-bool TOKEN_::readCard(uint8_t *uid, uint8_t &uidLength) {
-    // Limitar la frecuencia de intentos de lectura
-    if (millis() - lastReadAttempt < readInterval) {
-        return false; // No realizar lectura todavía
-    }
-    lastReadAttempt = millis(); // Actualizar el tiempo del último intento
+bool TOKEN_::isCardPresent() {
+    // Verifica si hay una tarjeta presente
+    return true;
+}
 
-    // Intentar leer una tarjeta
-    if (nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength)) {
-        Serial.println("¡Tarjeta detectada!");
-        Serial.print("UID Length: ");
-        Serial.print(uidLength, DEC);
-        Serial.println(" bytes");
-        Serial.print("UID Value: ");
-        for (uint8_t i = 0; i < uidLength; i++) {
-            Serial.print(" 0x");
-            Serial.print(uid[i], HEX);
+// Función para proponer un nuevo token aleatorio
+void TOKEN_::proponer_token() {
+    proposedToken.fileAddr.bank = random(1, 10); // Genera un número aleatorio para "bank"
+    proposedToken.fileAddr.file = random(1, 10); // Genera un número aleatorio para "file"
+    doitPlayer.play_file(proposedToken.fileAddr.bank, proposedToken.fileAddr.file);
+    proposed = true; // Marca que ya se ha propuesto un token
+}
+
+
+void TOKEN_::token_action(std::vector<byte> targets, TOKEN_INFO tokenin, byte LANG, byte tokenMode) {
+    static TOKEN_FILE_ADDR lastToken = {0, 0}; 
+
+    doitPlayer.play_file(tokenin.fileAddr.bank, tokenin.fileAddr.file);
+    send_frame(frameMaker_SEND_COLOR(globalID, targets, tokenin.color));
+    while(doitPlayer.is_playing()){}
+    send_frame(frameMaker_SEND_COLOR(globalID, targets, BLACK));
+
+    if (tokenMode == GUESS_TOKEN_MODE) {
+        if (!proposed) {
+            proponer_token();
+            proposed= true;
+        } else {
+            if ((tokenin.fileAddr.bank == proposedToken.fileAddr.bank) && (tokenin.fileAddr.file == proposedToken.fileAddr.file)) {
+                byte num_rand = random(1, 5); // Genera una respuesta aleatoria buena
+                if     (doitPlayer.VOICE_TYPE == WOMAN_VOICE) doitPlayer.play_file(WIN_RESP_M_BANK, num_rand + LANG);
+                else if(doitPlayer.VOICE_TYPE == MAN_VOICE)   doitPlayer.play_file(WIN_RESP_H_BANK, num_rand + LANG);
+                send_frame(frameMaker_SEND_COLOR(globalID, targets, GREEN));
+                delay(RESPONSE_TIME);
+                send_frame(frameMaker_SEND_COLOR(globalID, targets, BLACK));
+                proposed= false;
+            } else {
+                byte num_rand = random(1, 5); 
+                doitPlayer.play_file(FAIL_RESP_M_BANK, num_rand + LANG);
+                send_frame(frameMaker_SEND_COLOR(globalID, targets, RED));
+                delay(RESPONSE_TIME);
+                send_frame(frameMaker_SEND_COLOR(globalID, targets, BLACK));
+                delay(500);
+                doitPlayer.play_file(proposedToken.fileAddr.bank, proposedToken.fileAddr.file);
+                
+            }
         }
-        Serial.println("");
-        return true; // Se detectó una tarjeta
+    } else if (tokenMode == PARTNER_TOKEN_MODE) {
+        if(buscandoPareja){
+            bool bankCoincidence = false;
+            bool fileCoincidence = false;
+            for (int i = 0; i < 8; i++) {
+                if (tokenin.fileAddr.bank == proposedToken.partner[i].bank) bankCoincidence = true;
+                if (tokenin.fileAddr.file == proposedToken.partner[i].file) fileCoincidence = true;
+            }
+            if (bankCoincidence && fileCoincidence) {
+                byte num_rand = random(1, 5);
+                doitPlayer.play_file(WIN_RESP_M_BANK, num_rand + LANG);
+                send_frame(frameMaker_SEND_COLOR(globalID, targets, GREEN));
+                delay(RESPONSE_TIME);
+                send_frame(frameMaker_SEND_COLOR(globalID, targets, BLACK));
+                buscandoPareja= false;
+            } else {
+                byte num_rand = random(1, 5);
+                doitPlayer.play_file(FAIL_RESP_M_BANK, num_rand + LANG);
+                send_frame(frameMaker_SEND_COLOR(globalID, targets, RED));
+                delay(RESPONSE_TIME);
+                send_frame(frameMaker_SEND_COLOR(globalID, targets, BLACK));
+                buscandoPareja= true;
+            }
+        }
+        else{
+            proposedToken.fileAddr.bank= tokenin.fileAddr.bank;
+            proposedToken.fileAddr.file= tokenin.fileAddr.file;
+            buscandoPareja= true;
+        }
     }
 
-    // No se detectó ninguna tarjeta
-    return false;
+    //lastToken = tokenin.fileAddr; // Actualiza el último token procesado OJO
 }

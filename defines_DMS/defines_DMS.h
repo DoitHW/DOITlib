@@ -2,16 +2,20 @@
 #define DEFINES_DMS_H
 
 #include <Arduino.h>
+
 //DELFINES GLOBALES
-                                                #define WALLWASHER
-                                                /*COLUMNA, FIBRAS, WALLWASHER, ETC*/
-                                                #define NOPLAYER                 // -> PLAYER / NOPLAYER
-                                                #define NFC                      // -> NFC / NONFC
-                                                #define DEBUG                    // -> Desactivar en produccion 
-                                                #define SERIAL_NUM      0xCACA   // -> 0xVV00= VERSION + 0x00MM= MES
+                                                #define COLUMNA
+                                                /*COLUMNA, FIBRAS, WALLWASHER, VUMETER, ETC*/
+                                                #define PLAYER                 // -> PLAYER / NOPLAYER
+                                                #define NONFC                    // -> NFC / NONFC
+                                                #define NOMIC                    // -> Desactivar en produccion 
+                                                #define DEBUG
+                                                #define SERIAL_NUM        0xC0CA // -> 0xVV00= VERSION + 0x00MM= MES
                                                 #define NOSERIAL_BY_FILE         // -> NOSERIAL_BY_FILE / SERIAL_BY_FILE --> Activar Serial por FileSystem, si esta definido, ignora el SERIAL_NUM.
                                                 #define SHOW_MAC                 // -> Opcional disparar MAC al inicio  (No sirve pa ná...) 
-                                                #define SLOW_RF                  // -> FAST_RF= 115200 / SLOW_RF= 9600 
+                                                #define SLOW_RF                  // -> FAST_RF= 115200 / SLOW_RF= 9600 (NO TOCAR POR DIOSSSS)
+                                                #define _ERR_THROW_START_        if(element->get_err_dbg())Serial1.println(
+                                                #define _ERR_THROW_END_          );
 /*                                                                                                  
                                      .-+***+-:....                                                  
                                       .+@@@@@@@@@+:......:::.....                                   
@@ -21,7 +25,7 @@
                                     ..#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@+..                  
                                   ..#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@+.                 
                                  .*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@#.                
-                              ..-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@+...             
+                              ..-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ .@@@@@@@@@+...             
                               .+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@+..           
                              .#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@*.           
                            ..#@@@@@@@@@@@@@@@@@@@%#+:......+@@@@@@@-.....................           
@@ -54,17 +58,19 @@
 #define I2C2_SDA 40
 #define I2C2_SCL 41
 
+#define I2S_WS   16
+#define I2S_SD   47
+#define I2S_SCK  48
 
 
 #define ELEMENT_ID_FILE_PATH             "/ID_FILE.txt"
 #define ELEMENT_SERIALNUM_FILE_PATH      "/SERIALNUM_FILE.txt"
 #define ELEMENT_EVENT_REGISTER_FILE_PATH "/EVENT_REG_FILE.txt"
+#define ELEMENT_STATISTICS_FILE_PATH     "/STATS_REG_FILE.txt"
 
-#define MAX_EVENTS     1000 
 
-#define MAX_REG_EVENTS    1000
-#define LIFETIME_UPDATE_INTERVAL  60000
-#define MAX_EXPECTED_TIME    0xF
+#define MAX_EVENT_REGISTER_FILE_SIZE     1024  //1024 * 100
+
 #define RF_TX_PIN         18 
 #define RF_RX_PIN         17  
 #define RF_CONFIG_PIN     46
@@ -76,6 +82,14 @@
 
 #define UART_RX_BUFFER_SIZE 1024
 
+#define RESPONSE_TIME       0xFF
+
+#define SAMPLES             1024
+#define SAMPLING_FREQUENCY  44100
+
+#define MAX_BALLS 5  // Máximo de bolas simultáneas
+#define COLOR_VARIATION 30  // Variación máxima de color
+
 // DEFINES FRAME
 #define NEW_START             0xE1
 #define OLD_START             0x3A
@@ -84,24 +98,19 @@
 #define BROADCAST             0xFF  
 #define OLD_FRAME             0x0F
 #define NEW_FRAME             0x01
-#define UNVALID_FRAME         0x00  
+#define INVALID_FRAME         0x00  
 #define UNDEF_DEVICE_ID       0x00  
 #define DEFAULT_BOTONERA      0xDB  
 #define DEFAULT_CONSOLE       0xDC 
 #define DEFAULT_DICE          0xDA
 #define DEFAULT_DEVICE        0xDD 
 #define DEFAULT_ERROR_ID      0xDE
-#define DEFAULT_NFC           0xDF
+#define DEFAULT_TECH_TOOL_ID  0xDF
 
 
 #define F_REQ_ELEM_SECTOR     0xA0
 #define L_REQ_ELEM_SECTOR     0x02
-#define F_REQ_ELEM_INFO       0xA1  
-#define L_REQ_ELEM_INFO       0x02
-#define F_REQ_ELEM_ICON       0xA3
-#define L_REQ_ELEM_ICON       0x01
-#define F_REQ_ELEM_STATE      0xA2
-#define L_REQ_ELEM_STATE      0x00 // OJO
+
 
 #define F_SET_ELEM_ID         0xB1
 #define L_SET_ELEM_ID         0x01
@@ -116,8 +125,8 @@
 #define L_SEND_RGB            0x05
 #define F_SEND_BRIGHTNESS     0xC3
 #define L_SEND_BRIGHTNESS     0x02
-#define F_SEND_SENSOR_VALUE   0xCA
-#define L_SEND_SENSOR_VALUE   0x06
+#define F_SEND_SENSOR_VALUE_1 0xCA
+#define L_SEND_SENSOR_VALUE_1 0x06
 #define F_SEND_SENSOR_VALUE_2 0xCB
 #define L_SEND_SENSOR_VALUE_2 0x06
 #define F_SEND_FILE_NUM       0xCC
@@ -126,8 +135,8 @@
 #define L_SEND_PATTERN_NUM    0x01  
 #define F_SEND_FLAG_BYTE      0xCE
 #define L_SEND_FLAG_BYTE      0x01
-#define F_SEND_TEST           0xCF
-#define L_SEND_TEST           0x01
+#define F_SEND_COMMAND        0xCF
+#define L_SEND_COMMAND        0x01
 
 #define F_RETURN_ELEM_SECTOR     0xD0
 #define L_RETURN_ELEM_SECTOR_01  0x01
@@ -139,24 +148,20 @@
 #define L_RETURN_ELEM_SECTOR_64  0x40
 #define L_RETURN_ELEM_SECTOR_128 0x80
 #define L_RETURN_ELEM_SECTOR_192 0xC0
-#define F_RETURN_ELEM_INFO       0xD1    
-#define L_RETURN_ELEM_INFO       0x2E7C   //          0xE7E  // OJITO que es mas grande que ROCIO JURADO.
-#define F_RETURN_ELEM_ICON       0xD3
-#define L_RETURN_ELEM_ICON       0x00 // OJO
-#define F_RETURN_ELEM_STATE      0xD2
-#define L_RETURN_ELEM_STATE       0x10
+
+
 #define F_RETURN_ELEM_ERROR      0xDE
 #define L_RETURN_ELEM_ERROR      0x60 
 
-#define MIN_DEAF_TIME         0x01  
-#define MAX_DEAF_TIME         0x05 
+#define MIN_DEAF_TIME         10000
+#define MAX_DEAF_TIME         60000 
 
-#define NORMAL_FADE           0x4FF  // original
-#define SLOWEST_FADE          0x13FF
+#define NORMAL_FADE           0x1FF  // 4ff original
+#define SLOWEST_FADE          0x19FF
 #define FASTEST_FADE          0x0A
-#define SLOW_FADE             0x32
+#define SLOW_FADE             0xFA0
 #define RB_MOTION_VAL_FADE    0xFF
-#define MOTION_VAL_FADE       0x1FF
+#define MOTION_VAL_FADE       0xFF
 
 #define MAX_BRIGHTNESS        0xFF
 #define MID_BRIGHTNESS        0x7F
@@ -172,8 +177,6 @@
 #define MAX_BUFFER_SIZE         0xFF
 #define MAX_ALLOWED_TARGETS     0xFF
 #define MAX_VALID_DEVICE_ID     0xFF
-#define MAX_DATA_LENGTH         0xFF
-#define INACTIVITY_TIMEOUT      0x0F
 
 #define MAX_INTERRUPT_DURATION   0x10
 #define MAX_FRAME_RECEPTION_TIME 0x64
@@ -226,6 +229,17 @@
 #define ICON_ROWS         64
 #define ICON_LENGTH      ICON_COLUMNS*ICON_ROWS
 
+// BANKS & FILES
+#define RESERVED_BANK      1      
+
+#define WIN_RESP_M_BANK   23
+#define WIN_RESP_H_BANK   24
+#define FAIL_RESP_M_BANK  25
+#define FAIL_RESP_H_BANK  26
+
+#define WOMAN_VOICE 0x00
+#define MAN_VOICE   0x01
+
 // DEFINES INFO_ELEMENTS
 #define SPANISH_LANG        0x01
 #define ENGLISH_LANG        0x02
@@ -234,6 +248,17 @@
 #define CATALAN_LANG        0x05
 #define MEXICAN_LANG        0x06
 #define EUSKERA_LANG        0x07
+
+#define SPANISH_FILE_OFFSET   10
+#define ENGLISH_FILE_OFFSET   20
+#define GERMAN_FILE_OFFSET    30
+#define FRENCH_FILE_OFFSET    40
+#define MEXICAN_FILE_OFFSET   50
+#define CATALAN_FILE_OFFSET   60
+#define EUSKERA_FILE_OFFSET   70
+
+#define MAN_VOICE_BANK_OFFSET  1
+
 
 #define MSB 0x00
 #define LSB 0x01
@@ -273,13 +298,8 @@
 #define ELEM_MODE_15_NAME   0x21
 #define ELEM_MODE_15_DESC   0x22
 
-// DEFINES ELEMENT
-#define EEPROM_ID_ADDRESS           0x00
-#define EEPROM_ID_FLAG_ADDRESS      0x01
-#define EEPROM_ID_PROTECT           0x01
-#define EEPROM_WORKING_TIME_ADDRESS 0x20
 
-#define DEFAULT_BASIC_MODE      0x01
+#define DEFAULT_BASIC_MODE  0x01
 
 #define TYPE_BOTONERA       0xAB
 #define TYPE_COLUMN         0x01
@@ -298,15 +318,27 @@
 
 // TESTS
 
-enum TESTS_{
+enum COMMANDS_{
   BLACKOUT= 0,
-  START_TEST,
-  HELLO_TEST
+  START_CMD,
+  TEST_CMD,
+  SEND_REG_RF_CMD,
+  SEND_STATS_RF_CMD,
+  ERR_DBG_ON,
+  ERR_DBG_OFF,
+  SET_ELEM_DEAF,
+  SET_ELEM_LONG_DEAF,
+  MAGIC_TEST_CMD,
+  MAGIC_TEST_2_CMD,
+
   // añadir mas tiestos
 };
 
 #define RELAY_1_FLAG     0x00
 #define RELAY_2_FLAG     0x01
+#define RELAY_3_FLAG     0x02
+#define RELAY_4_FLAG     0x03
+#
 // ETC
 
 #define SET_RELAY        0x01
@@ -321,20 +353,42 @@ enum TESTS_{
 #define LIGHTSOURCE_FAN_RELAY_PIN   42
 
 // DEFINES LEDSTRIPS
-#define LEDSTRIP_LED_DATA_PIN 45 // 21= oficial
+#define LEDSTRIP_LED_DATA_PIN       45 // 21= oficial 0 45 per tires super long
 
 // DEFINES BOTONERA
-#define BOTONERA_DATA_PIN     21
+#define BOTONERA_DATA_PIN           21
+
+//DEFINES ESCALERA
+#define VUMETER_SEL_MODE_PIN_01   1
+#define VUMETER_SEL_MODE_PIN_02   2
+#define VUMETER_SEL_MODE_PIN_03   3
+#define VUMETER_SEL_MODE_PIN_04   4
+#define VUMETER_SEL_MODE_PIN_05   5
+#define VUMETER_SEL_MODE_PIN_06   6
+
+
+#define VUMETER_LED_DATA_PIN        21
 
 
 
 
 #if   defined (COLUMNA)
-  #define NUM_LEDS 1
+  #define NUM_STEPS  1 
+  #define LEDS_STEP  1
+  #define NUM_LEDS   NUM_STEPS*LEDS_STEP 
 #elif defined (FIBRAS)
-  #define NUM_LEDS 1
+  #define NUM_STEPS  1 
+  #define LEDS_STEP  1
+  #define NUM_LEDS   NUM_STEPS*LEDS_STEP 
 #elif defined (WALLWASHER)
-  #define NUM_LEDS 299
+  #define NUM_STEPS  1 
+  #define LEDS_STEP  576
+  #define NUM_LEDS   NUM_STEPS*LEDS_STEP 
+#elif defined (ESCALERA)
+  #define NUM_STEPS  10 // 11
+  #define LEDS_STEP  27
+  #define NUM_LEDS   NUM_STEPS*LEDS_STEP 
+// botonera sempre al final dels elifs
 #elif defined (BOTONERA)
   #define NUM_LEDS 9
 #endif
@@ -346,22 +400,36 @@ enum COLUMN_MODE_LIST{
     COLUMN_CONTEST_MODE= 0,
     COLUMN_BASIC_MODE,
     COLUMN_SLOW_MODE,
-    COLUMN_MOTION_MODE,
-    COLUMN_RB_MOTION_MODE,
+    COLUMN_MOTION_LIGHT_MODE,
+    COLUMN_MOTION_COLOR_MODE,
     COLUMN_MIX_MODE,
+    COLUMN_PULSE_MODE,
     COLUMN_PASSIVE_MODE,
-    COLUMN_PATTERN_MODE
+    COLUMN_SLOW_PASSIVE_MODE,
+    COLUMN_VOICE_LIGHT_MODE,
+    COLUMN_VOICE_REVERSE_LIGHT_MODE,
+    COLUMN_VOICE_COLOR_MODE,
+    COLUMN_VOICE_BUBBLES_MODE,
+    COLUMN_VOICE_REVERSE_BUBBLES_MODE,
+    COLUMN_PATTERN_MODE 
 };
 
 enum LIGHTSOURCE_MODE_LIST{
-    LIGHTSOURCE_CONTEST_MODE= 0,
-    LIGHTSOURCE_BASIC_MODE,
-    LIGHTSOURCE_SLOW_MODE,
-    LIGHTSOURCE_MOTION_MODE,
-    LIGHTSOURCE_RB_MOTION_MODE,
-    LIGHTSOURCE_MIX_MODE,
-    LIGHTSOURCE_PASSIVE_MODE,
-    LIGHTSOURCE_PATTERN_MODE
+  LIGHTSOURCE_CONTEST_MODE= 0,
+  LIGHTSOURCE_BASIC_MODE,
+  LIGHTSOURCE_SLOW_MODE,
+  LIGHTSOURCE_MOTION_LIGHT_MODE,
+  LIGHTSOURCE_MOTION_COLOR_MODE,
+  LIGHTSOURCE_MIX_MODE,
+  LIGHTSOURCE_PULSE_MODE,
+  LIGHTSOURCE_PASSIVE_MODE,
+  LIGHTSOURCE_SLOW_PASSIVE_MODE,
+  LIGHTSOURCE_VOICE_LIGHT_MODE,
+  LIGHTSOURCE_VOICE_REVERSE_LIGHT_MODE,
+  LIGHTSOURCE_VOICE_COLOR_MODE,
+  LIGHTSOURCE_VOICE_BUBBLES_MODE,
+  LIGHTSOURCE_VOICE_REVERSE_BUBBLES_MODE,
+  LIGHTSOURCE_PATTERN_MODE 
 };
 
 enum LEDSTRIP_MODE_LIST{
@@ -373,6 +441,26 @@ enum LEDSTRIP_MODE_LIST{
     LEDSTRIP_MIX_MODE,
     LEDSTRIP_PASSIVE_MODE,
     LEDSTRIP_PATTERN_MODE,
+    LEDSTRIP_MIC_MODE
+};
+
+enum VUMETER_MODE_LIST{
+    VUMETER_HIDDEN_MODE= 0,
+    VUMETER_BASIC_MODE,
+    VUMETER_SLOW_MODE,
+    VUMETER_MOTION_MODE,
+    VUMETER_RB_MOTION_MODE,
+    VUMETER_MIX_MODE,
+    VUMETER_PASSIVE_MODE,
+    VUMETER_PATTERN_MODE,
+    VUMETER_MODE_8,
+    VUMETER_MODE_9,
+    VUMETER_SIMON_GAME_MODE,
+    VUMETER_SECUENCER_GAME_MODE,
+    VUMETER_SPEAK_GAME_MODE,
+    VUMETER_BLOCK_SPEAK_MODE,
+    VUMETER_TONE_DETECT_MODE,
+    VUMETER_METEOR_VOICE_MODE
 };
 
 enum PATTERN_LIST{
@@ -505,9 +593,14 @@ enum SECTOR_LIST{
   ELEM_ICON_ROW_61_SECTOR,
   ELEM_ICON_ROW_62_SECTOR,
   ELEM_ICON_ROW_63_SECTOR,
-  ELEM_WORK_TIME_SECTOR,
-  ELEM_LIFE_TIME_SECTOR,
+  ELEM_MOST_USED_MODE_SECTOR,
+  ELEM_MOST_USED_COLOR_SECTOR,
+  ELEM_MOST_USED_PATTERN_SECTOR,
+  ELEM_TOTAL_SESSION_TIME_SECTOR,
   ELEM_CURRENT_COLOR_SECTOR,
+  ELEM_CURRENT_RED_SECTOR,
+  ELEM_CURRENT_GREEN_SECTOR,
+  ELEM_CURRENT_BLUE_SECTOR,
   ELEM_CURRENT_BRIGHTNESS_SECTOR,
   ELEM_CURRENT_FLAGS_SECTOR,
   ELEM_CURRENT_PATTERN_SECTOR,
@@ -525,171 +618,3 @@ enum SECTOR_LIST{
 #endif
 
 
-
-
-
-/*
-
-{EV_START, 0, 0}
-{EV_MODE_CHANGE, 1, 0} 
-{EV_COLOR_CHANGE, 2, 12000} aqui se guarda un valor de 12000 por que el siguiente  EV_COLOR_CHANGE con eventVal distinto ha ocurrido 12000 ms despues de el de esta linea
-{EV_FLAG_CHANGE, 1, 40000}  aqui se guarda un valor de 40000 por que el siguiente  EV_FLAG_CHANGE con eventVal distinto ha ocurrido 40000 ms despues de el de esta linea
-{EV_COLOR_CHANGE, 6, 0} aqui se guarda 0 por que el siguiente valor de EV_COLOR_CHANGE es el mismo que el de esta linea. por lo tanto al no haber habido un cambio de color, el cronometro para este color sigue contando.
-{EV_COLOR_CHANGE, 6, 50000}  aqui se guarda un valor de 50000 por que el siguiente  EV_COLOR_CHANGE con eventVal distinto ha ocurrido 50000 ms despues de el de esta linea
-{EV_SECTOR_REQ, 9, 0} aqui se guarda simplemente el evento con su eventVal y su timeStamp igual a 0.
-{EV_MODE_CHANGE, 3, 25000} igual que  todo lo anterior, 25000 son los ms que han pasado hasta el siguiente EV_CHANGE_MODE con eventVal distinto
-{EV_MODE_CHANGE, 4, 0} etc 
-{EV_SECTOR_REQ, 9, 0} etc 
-{EV_FLAG_CHANGE, 0, 0} etc 
-{EV_COLOR_CHANGE, 7, 0} etc 
-{EV_COLOR_CHANGE, 1, 0} etc
-{EV_END, 0, 67000} // 67000 son los ms transcurridos desde el EV_START, ademas aqui termina el contador de tiempo de todos los eventos que no han recibido un evento equivalente que detenga y registre el cronometro. es decir que en el ultimo EV_COLOR_CHANGE se registrara el tiempo transcurrido hasta este EV_END
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Nombre: Columna
-Numero de serie: 67A5D48283F1
-Tiempo de trabajo: 9833 minutos
-Tiempo de vida: 6532 horas.
-numero de ciclos: 69
-
-
---NUEVO CICLO 24-- 
-
-evento: DISPOSITIVO INICIADO EN MODO BASICO
-valor: 0
-duracion: 0
-
-evento: CAMBIO DE MODO
-valor: 1
-duracion: 2 minutos
-
-evento: CAMBIO DE COLOR
-valor: 2
-duracion: 4 minutos
-
-evento: CAMBIO DE COLOR
-valor: 6
-duracion: 16 minutos
-
-evento: CAMBIO DE MODO
-valor: 3
-duracion: 31 minutos
-
-evento: APAGANDO DISPOSITIVO
-valor: 0
-duracion: 39 minutos
-
--- FIN DE CICLO -- 
-
-
---NUEVO CICLO 25-- 
-
-evento: DISPOSITIVO INICIADO EN MODO BASICO
-valor: 0
-duracion: 0
-
-evento: CAMBIO DE MODO
-valor: 1
-duracion: 4 minutos
-
-evento: CAMBIO DE COLOR
-valor: 2
-duracion: 5 minutos
-
-evento: CAMBIO DE COLOR
-valor: 6
-duracion: 15 minutos
-
-evento: CAMBIO DE MODO
-valor: 3
-duracion: 32 minutos
-
-evento: APAGANDO DISPOSITIVO
-valor: 0
-duracion: 34 minutos
-
--- FIN DE CICLO -- 
-
---NUEVO CICLO 26-- 
-
-evento: DISPOSITIVO INICIADO EN MODO BASICO
-valor: 0
-duracion: 0
-
-evento: CAMBIO DE MODO
-valor: 1
-duracion: 9 minutos
-
-evento: CAMBIO DE COLOR
-valor: 2
-duracion: 14 minutos
-
-evento: CAMBIO DE COLOR
-valor: 6
-duracion: 18 minutos
-
-evento: CAMBIO DE MODO
-valor: 3
-duracion: 39 minutos
-
-evento: APAGANDO DISPOSITIVO
-valor: 0
-duracion: 42 minutos
-
--- FIN DE CICLO -- 
-
-*/

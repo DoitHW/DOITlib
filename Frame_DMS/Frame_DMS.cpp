@@ -18,7 +18,7 @@ volatile bool partialFrameReceived=  false;
 volatile bool frameReceived=         false;
 
 std::vector<byte> uartBuffer;
-
+bool BCframe= false;
 volatile unsigned long last_received_time = 0;
 int lastReceivedTime = 0;
 
@@ -115,6 +115,7 @@ void IRAM_ATTR onUartInterrupt() {
                                 uint8_t targetID = uartBuffer[5 + i];
                                 if (targetID == globalID || targetID == BROADCAST || targetID == xManager)  {
                                     isTarget = true;
+                                    if(targetID == BROADCAST) BCframe= true;
                                     break;
                                 }
                             }
@@ -187,6 +188,107 @@ byte checksum_calc(const FRAME_T &framein) {
     return (byte)sum;
 }
 
+void printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
+    Serial.println("\n==== 📨 Trama Recibida 📨 ====");
+
+    // Determinar origen
+    String origenStr;
+    if (LEF.origin == 0xDB) origenStr = "BOTONERA";
+    else if (LEF.origin == 0xDC) origenStr = "CONSOLA";
+    else if (LEF.origin == 0xFF) origenStr = "BROADCAST";
+    else origenStr = "DESCONOCIDO";
+
+    Serial.printf("📌 Origen: %s (0x%02X)\n", origenStr.c_str(), LEF.origin);
+
+    // Determinar función
+    String functionStr;
+    switch (LEF.function) {
+        case 0xA0: functionStr = "F_REQ_ELEM_SECTOR"; break;
+        case 0xA1: functionStr = "F_REQ_ELEM_INFO"; break;
+        case 0xA2: functionStr = "F_REQ_ELEM_STATE"; break;
+        case 0xA3: functionStr = "F_REQ_ELEM_ICON"; break;
+        case 0xB1: functionStr = "F_SET_ELEM_ID"; break;
+        case 0xB2: functionStr = "F_SET_ELEM_MODE"; break;
+        case 0xB3: functionStr = "F_SET_ELEM_DEAF"; break;
+        case 0xC1: functionStr = "F_SEND_COLOR"; break;
+        case 0xC2: functionStr = "F_SEND_RGB"; break;
+        case 0xC3: functionStr = "F_SEND_BRIGHTNESS"; break;
+        case 0xCA: functionStr = "F_SEND_SENSOR_VALUE"; break;
+        case 0xCB: functionStr = "F_SEND_SENSOR_VALUE_2"; break;
+        case 0xCC: functionStr = "F_SEND_FILE_NUM"; break;
+        case 0xCD: functionStr = "F_SEND_PATTERN_NUM"; break;
+        case 0xCE: functionStr = "F_SEND_FLAG_BYTE"; break;
+        case 0xCF: functionStr = "F_SEND_COMMAND"; break;
+        case 0xD0: functionStr = "F_RETURN_ELEM_SECTOR"; break;
+        case 0xD1: functionStr = "F_RETURN_ELEM_INFO"; break;
+        case 0xD2: functionStr = "F_RETURN_ELEM_STATE"; break;
+        case 0xD3: functionStr = "F_RETURN_ELEM_ICON"; break;
+        case 0xDE: functionStr = "F_RETURN_ELEM_ERROR"; break;
+        default: functionStr = "FUNCIÓN DESCONOCIDA";
+    }
+
+    Serial.printf("🛠️  Función: %s (0x%02X)\n", functionStr.c_str(), LEF.function);
+
+    // Interpretación de datos
+    Serial.print("📦 Data: ");
+    if (LEF.data.empty()) {
+        Serial.println("No hay datos para esta función.");
+    } else {
+        if (LEF.function == 0xCA || LEF.function == 0xCB) { // Sensores
+            int minVal = (LEF.data[0] << 8) | LEF.data[1];
+            int maxVal = (LEF.data[2] << 8) | LEF.data[3];
+            int sensedVal = (LEF.data[4] << 8) | LEF.data[5];
+
+            Serial.printf("MIN = %d, MAX= %d, VAL= %d\n", minVal, maxVal, sensedVal);
+        } 
+        else if (LEF.function == 0xC1) { // Color recibido
+            String colorName;
+            switch (LEF.data[0]) {
+                case 0: colorName = "BLANCO"; break;
+                case 1: colorName = "AMARILLO"; break;
+                case 2: colorName = "NARANJA"; break;
+                case 3: colorName = "ROJO"; break;
+                case 4: colorName = "VIOLETA"; break;
+                case 5: colorName = "AZUL"; break;
+                case 6: colorName = "CELESTE"; break;
+                case 7: colorName = "VERDE"; break;
+                case 8: colorName = "NEGRO"; break;
+                default: colorName = "COLOR DESCONOCIDO";
+            }
+            Serial.printf("%s (0x%02X)\n", colorName.c_str(), LEF.data[0]);
+        } 
+        else if (LEF.function == F_SEND_COMMAND) { // Color recibido
+            String cmdName;
+            switch (LEF.data[0]) {
+                case BLACKOUT:        cmdName = "DESACTIVAR"; break;
+                case START_CMD:       cmdName = "ACTIVAR"; break;
+                case TEST_CMD:        cmdName = "TEST"; break;
+                case SEND_REG_RF_CMD: cmdName = "ENVIAR REG POR RF"; break;
+                default: cmdName = "A SABER...";
+            }
+            Serial.printf("%s (0x%02X)\n", cmdName.c_str(), LEF.data[0]);
+        } 
+        else if (LEF.function == 0xCE) { // Cambio en el relé
+            Serial.println("Cambio de estado en el relé.");
+        } 
+        else if (LEF.function == 0xA0) { // Petición de sector
+            String idioma = (LEF.data[0] == 1) ? "ES" : "OTRO";
+            Serial.printf("Idioma: %s, Sector: %d\n", idioma.c_str(), LEF.data[1]);
+        } 
+        else if (LEF.function == 0xCC) { // Petición de archivo
+            Serial.printf("Carpeta (Bank): %d, Archivo (File): %d\n", LEF.data[0], LEF.data[1]);
+        } 
+        else {
+            // Imprimir todos los datos si no hay interpretación específica
+            for (size_t i = 0; i < LEF.data.size(); i++) {
+                Serial.printf("0x%02X ", LEF.data[i]);
+            }
+            Serial.println();
+        }
+    }
+
+    Serial.println("=============================");
+}
 
 LAST_ENTRY_FRAME_T extract_info_from_frameIn(std::vector<byte> vectorin) {
     LAST_ENTRY_FRAME_T LEF;
@@ -201,7 +303,7 @@ LAST_ENTRY_FRAME_T extract_info_from_frameIn(std::vector<byte> vectorin) {
 
 void send_frame(const FRAME_T &framein) {
     int i = 0;
-    byte dTime = 6;
+    byte dTime = 5;
                                                                                                 #ifdef DEBUG
                                                                                                     Serial.println(" #### Trama enviada ####");
                                                                                                 #endif
@@ -285,6 +387,31 @@ byte get_mapped_sensor_value(byte minMSB, byte minLSB, byte maxMSB, byte maxLSB,
     uint16_t val = (valuePos * 255UL) / totalRange;
 
     return (val > 255) ? 255 : val;
+}
+
+byte get_brightness_from_sensorValue_simetric(LAST_ENTRY_FRAME_T LEFin) {
+    byte minMSB = LEFin.data[0];
+    byte minLSB = LEFin.data[1];
+    byte maxMSB = LEFin.data[2];
+    byte maxLSB = LEFin.data[3];
+    byte valMSB = LEFin.data[4];
+    byte valLSB = LEFin.data[5];
+    uint16_t minVal = (minMSB << 8) | minLSB;
+    uint16_t maxVal = (maxMSB << 8) | maxLSB;
+    uint16_t currentVal = (valMSB << 8) | valLSB;
+
+    uint16_t midPoint = (maxVal + minVal) / 2;
+    uint16_t val;
+
+    if (currentVal <= midPoint) {
+        // De 0 a 1000 (midPoint), el brillo va de 255 a 0
+        val = 255 - ((currentVal - minVal) * 255UL) / (midPoint - minVal);
+    } else {
+        // De 1000 (midPoint) a 2000, el brillo va de 0 a 255
+        val = ((currentVal - midPoint) * 255UL) / (maxVal - midPoint);
+    }
+
+    return (byte)val;
 }
 
 byte get_brightness_from_sensorValue(LAST_ENTRY_FRAME_T LEFin) {
@@ -398,7 +525,9 @@ void  get_sector_data(byte *sector_data, byte lang, byte sector){
 
         case ELEM_DESC_SECTOR:
             data = get_string_from_info_DB(ELEM_DESC, lang);
-            Serial.println("Data: " + String(data));
+                                                                                                    #ifdef DEBUG
+                                                                                                    Serial.println("Data: " + String(data));
+                                                                                                    #endif
             data.toCharArray((char*)sector_data, 192);
             break;
 
@@ -684,38 +813,58 @@ void  get_sector_data(byte *sector_data, byte lang, byte sector){
             sector_data[1]=  get_config_flag_mode(15) & 0xFF;
             break;
 
-     case ELEM_WORK_TIME_SECTOR:
-            // sector_data[0] = (element->get_workTime() >> 24) & 0xFF;  // MSB ARREGLAR
-            // sector_data[1] = (element->get_workTime() >> 16) & 0xFF;  
-            // sector_data[2] = (element->get_workTime() >> 8)  & 0xFF;   
-            // sector_data[3] = (element->get_workTime())       & 0xFF;       
-            break;
+     case ELEM_MOST_USED_MODE_SECTOR:{
+        sector_data[0]= (element->get_most_used_mode()) & 0xFF;
+         break;
+     }
 
-    case ELEM_LIFE_TIME_SECTOR:
-            // sector_data[0] = (element->get_lifeTime() >> 24) & 0xFF;  // ARREGLAR
-            // sector_data[1] = (element->get_lifeTime() >> 16) & 0xFF;  
-            // sector_data[2] = (element->get_lifeTime() >> 8)  & 0xFF;   
-            // sector_data[3] = (element->get_lifeTime())       & 0xFF;      
+    case ELEM_MOST_USED_COLOR_SECTOR:{
+        sector_data[0]= (element->get_most_used_color()) & 0xFF;
             break;
+    }
+    case ELEM_MOST_USED_PATTERN_SECTOR:{
+// pending
+        break;
+    }
+    case ELEM_TOTAL_SESSION_TIME_SECTOR:{
+        sector_data[0]= (element->get_total_session_time() >> 24) & 0xFF;
+        sector_data[1]= (element->get_total_session_time() >> 16) & 0xFF;
+        sector_data[2]= (element->get_total_session_time() >> 8) & 0xFF;
+        sector_data[3]=  element->get_total_session_time() & 0xFF;
+        break;
+    }
     
-    // case ELEM_CURRENT_COLOR_SECTOR:
-    //         sector_data[0] = element->get_currentRed();
-    //         sector_data[1] = element->get_currentGreen();
-    //         sector_data[2] = element->get_currentBlue();
-    //         break;
+    case ELEM_CURRENT_COLOR_SECTOR:
+        sector_data[0]= 0x00;
+        sector_data[1]= colorHandler.get_current_red(colorHandler.get_currentColor());
+        sector_data[2]= colorHandler.get_current_green(colorHandler.get_currentColor());
+        sector_data[3]= colorHandler.get_current_blue(colorHandler.get_currentColor());
+        break;
 
-    // case ELEM_CURRENT_BRIGHTNESS_SECTOR:
-    //         sector_data[0] = element->get_currentBrightness();
-    //         break;  
+    case ELEM_CURRENT_RED_SECTOR:
+        sector_data[0]= colorHandler.get_current_red(colorHandler.get_currentColor());
+        break;
 
-    // case ELEM_CURRENT_PATTERN_SECTOR:
-    //         sector_data[0] = element->get_currentPattern();
-    //         break;      
+    case ELEM_CURRENT_GREEN_SECTOR:
+        sector_data[0]= colorHandler.get_current_green(colorHandler.get_currentColor());
+
+        break;
+
+    case ELEM_CURRENT_BLUE_SECTOR:
+        sector_data[0]= colorHandler.get_current_blue(colorHandler.get_currentColor());
+        break;
+
+    case ELEM_CURRENT_BRIGHTNESS_SECTOR:
+        sector_data[0] = colorHandler.get_currentBrightness();
+        break;  
+
+    case ELEM_CURRENT_PATTERN_SECTOR:
+        sector_data[0] = element->activePattern;
+        break;      
         
-    // case ELEM_CURRENT_FLAGS_SECTOR:
-    //         sector_data[0] =  element->get_currentFlags()       & 0xFF;
-    //         sector_data[1] = (element->get_currentFlags() >> 8) & 0xFF;
-    //         break;      
+    case ELEM_CURRENT_FLAGS_SECTOR:
+        sector_data[0]= element->get_flag();
+        break;      
 
     // case ELEM_CURRENT_FILE_SECTOR:
     //         sector_data[0] = element->get_currentFile()        & 0xFF;
@@ -745,35 +894,6 @@ void  get_sector_data(byte *sector_data, byte lang, byte sector){
 
 
 
-
-
-
-
-FRAME_T frameMaker_REQ_ELEM_INFO(byte originin, byte targetin, byte idiomain, byte sectorin){
-
-    FRAME_T frame;
-    memset(&frame, 0, sizeof(FRAME_T));
-    frame.data.resize(L_REQ_ELEM_INFO);
-    uint16_t  frameLength = 0x08 + L_REQ_ELEM_INFO;
-
-    frame.start= NEW_START;
-    frame.frameLengthLsb = frameLength & 0xFF;      
-    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
-    frame.origin= originin;
-    frame.numTargets = 0x01;
-    frame.target.push_back(targetin);
-    frame.function= F_REQ_ELEM_INFO;
-    frame.dataLengthMsb = (L_REQ_ELEM_INFO >> 8) & 0xFF; 
-    frame.dataLengthLsb = L_REQ_ELEM_INFO & 0xFF;   
-    frame.data[0]= idiomain;
-    frame.data[1]= sectorin;
-    frame.checksum= checksum_calc(frame);
-    frame.end= NEW_END;
-
-    return frame;
-}
-
-
 FRAME_T frameMaker_REQ_ELEM_SECTOR(byte originin, byte targetin, byte idiomain, byte sectorin){
 
     FRAME_T frame;
@@ -798,27 +918,7 @@ FRAME_T frameMaker_REQ_ELEM_SECTOR(byte originin, byte targetin, byte idiomain, 
     return frame;
 }
 
-FRAME_T frameMaker_REQ_ELEM_STATE(byte originin, byte targetin){
 
-    FRAME_T frame;
-    memset(&frame, 0, sizeof(FRAME_T));
-    frame.data.resize(L_REQ_ELEM_INFO);
-    uint16_t  frameLength = 0x08 + L_REQ_ELEM_STATE;
-
-    frame.start= NEW_START;
-    frame.frameLengthLsb = frameLength & 0xFF;        
-    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
-    frame.origin= originin;
-    frame.numTargets = 0x01;
-    frame.target.push_back(targetin);
-    frame.function= F_REQ_ELEM_STATE;
-    frame.dataLengthMsb = (L_REQ_ELEM_STATE >> 8) & 0xFF; 
-    frame.dataLengthLsb = L_REQ_ELEM_STATE & 0xFF;   
-    frame.checksum= checksum_calc(frame);
-    frame.end= NEW_END;
-
-    return frame;
-}
 
 FRAME_T frameMaker_SET_ELEM_ID(byte originin, byte targetin, byte IDin){
 
@@ -843,8 +943,8 @@ FRAME_T frameMaker_SET_ELEM_ID(byte originin, byte targetin, byte IDin){
     return frame;
 }
 
-FRAME_T frameMaker_SET_ELEM_MODE(byte originin, std::vector<byte>targetin, byte modein)
-{
+FRAME_T frameMaker_SET_ELEM_MODE(byte originin, std::vector<byte>targetin, byte modein){
+
     FRAME_T frame;
     memset(&frame, 0, sizeof(FRAME_T));
     frame.data.resize(L_SET_ELEM_MODE);
@@ -864,6 +964,29 @@ FRAME_T frameMaker_SET_ELEM_MODE(byte originin, std::vector<byte>targetin, byte 
     frame.end= NEW_END;
 
     return frame;
+}
+
+FRAME_T frameMaker_SET_ELEM_DEAF(byte originin, std::vector<byte>targetin, byte timein){
+
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    frame.data.resize(L_SET_ELEM_MODE);
+    uint16_t  frameLength = 0x07 + targetin.size() + L_SET_ELEM_DEAF;
+
+    frame.start= NEW_START;
+    frame.frameLengthLsb = frameLength & 0xFF;        
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin= originin;
+    frame.numTargets = targetin.size();
+    frame.target= targetin;
+    frame.function= F_SET_ELEM_DEAF;
+    frame.dataLengthMsb = (L_SET_ELEM_DEAF >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_SET_ELEM_DEAF & 0xFF;   
+    frame.data[0]= timein;
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+
+    return frame;    
 }
 //////////////////////////////////////////////////////////////////////
 
@@ -991,12 +1114,12 @@ FRAME_T frameMaker_SEND_FILE_NUM(byte originin, std::vector<byte>targetin, byte 
 }
 
 
-FRAME_T frameMaker_SEND_TEST(byte originin, std::vector<byte>targetin, byte testin){
+FRAME_T frameMaker_SEND_COMMAND(byte originin, std::vector<byte>targetin, byte commandin){
 
     FRAME_T frame;
     memset(&frame, 0, sizeof(FRAME_T));
-    frame.data.resize(L_SEND_TEST);
-    uint16_t  frameLength = 0x07 + targetin.size() + L_SEND_TEST;
+    frame.data.resize(L_SEND_COMMAND);
+    uint16_t  frameLength = 0x07 + targetin.size() + L_SEND_COMMAND;
 
     frame.start= NEW_START;
     frame.frameLengthLsb = frameLength & 0xFF;     
@@ -1004,10 +1127,10 @@ FRAME_T frameMaker_SEND_TEST(byte originin, std::vector<byte>targetin, byte test
     frame.origin= originin;
     frame.numTargets = targetin.size();
     frame.target= targetin;
-    frame.function= F_SEND_TEST;
-    frame.dataLengthMsb = (L_SEND_TEST >> 8) & 0xFF; 
-    frame.dataLengthLsb = L_SEND_TEST & 0xFF;   
-    frame.data[0]= testin;
+    frame.function= F_SEND_COMMAND;
+    frame.dataLengthMsb = (L_SEND_COMMAND >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_SEND_COMMAND & 0xFF;   
+    frame.data[0]= commandin;
     frame.checksum= checksum_calc(frame);
     frame.end= NEW_END;
 
@@ -1028,7 +1151,9 @@ FRAME_T frameMaker_RETURN_ELEM_SECTOR (byte originin, byte targetin, byte *secto
     frame.target.push_back(targetin);
     frame.data.resize(0);
     frame.function= F_RETURN_ELEM_SECTOR;
-    Serial.println("Sectorin: " + String(sectorin, HEX));
+                                                                                        #ifdef DEBUG
+                                                                                            Serial.println("Sector a enviar: " + String(sectorin, HEX));
+                                                                                        #endif
     frame.data.push_back(sectorin);
     switch (sectorin) {
             
@@ -1045,6 +1170,14 @@ FRAME_T frameMaker_RETURN_ELEM_SECTOR (byte originin, byte targetin, byte *secto
 
             case ELEM_ID_SECTOR:
             case ELEM_CMODE_SECTOR:
+            case ELEM_MOST_USED_MODE_SECTOR:
+            case ELEM_MOST_USED_COLOR_SECTOR:
+            case ELEM_MOST_USED_PATTERN_SECTOR:
+            case ELEM_CURRENT_RED_SECTOR:
+            case ELEM_CURRENT_GREEN_SECTOR:
+            case ELEM_CURRENT_BLUE_SECTOR:
+            case ELEM_CURRENT_BRIGHTNESS_SECTOR:
+            case ELEM_CURRENT_PATTERN_SECTOR:
                 frameLength = 0x08 + L_RETURN_ELEM_SECTOR_01 + 1;
                 frame.frameLengthLsb = frameLength & 0xFF;     
                 frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
@@ -1056,7 +1189,9 @@ FRAME_T frameMaker_RETURN_ELEM_SECTOR (byte originin, byte targetin, byte *secto
                 break;
 // serial falta
             case ELEM_DESC_SECTOR:
-                Serial.println("Se ha pedido una descripción del elemento. ");
+                                                                                        #ifdef DEBUG
+                                                                                        Serial.println("Se ha pedido una descripción del elemento. ");
+                                                                                        #endif
                 frameLength = 0x08 + L_RETURN_ELEM_SECTOR_192 + 1;
                 frame.frameLengthLsb = frameLength & 0xFF;     
                 frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
@@ -1221,8 +1356,8 @@ FRAME_T frameMaker_RETURN_ELEM_SECTOR (byte originin, byte targetin, byte *secto
                 }
                 break;
 
-            case ELEM_WORK_TIME_SECTOR:
-            case ELEM_LIFE_TIME_SECTOR:
+            case ELEM_TOTAL_SESSION_TIME_SECTOR:
+            case ELEM_CURRENT_COLOR_SECTOR:
                 frameLength = 0x08 + L_RETURN_ELEM_SECTOR_04 + 1;
                 frame.frameLengthLsb = frameLength & 0xFF;     
                 frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
@@ -1233,7 +1368,10 @@ FRAME_T frameMaker_RETURN_ELEM_SECTOR (byte originin, byte targetin, byte *secto
                 }
                 break;
 
-        default: Serial.println("Sector no valido");
+        default:
+        #ifdef DEBUG
+         Serial.println("Sector no valido");
+         #endif
                 break;
     }
     frame.checksum= checksum_calc(frame);
@@ -1242,52 +1380,6 @@ FRAME_T frameMaker_RETURN_ELEM_SECTOR (byte originin, byte targetin, byte *secto
 }
 
 
-
-
-
-
-
-
-
-
-
-FRAME_T frameMaker_RETURN_ELEM_STATE(byte originin, byte targetin, INFO_STATE_T infoState){
-
-    FRAME_T frame;
-    uint16_t length = 0x06 + 0x01 + L_RETURN_ELEM_STATE;
-    uint16_t dataLength = L_RETURN_ELEM_STATE;
-
-    frame.start= NEW_START;
-    frame.frameLengthMsb= (length >> 8) & 0xFF;
-    frame.frameLengthLsb= length & 0xFF;
-    frame.origin= originin; 
-    frame.numTargets= 0x01;
-    frame.target.push_back(targetin);
-    frame.function= F_RETURN_ELEM_STATE;
-    frame.dataLengthMsb = (dataLength >> 8) & 0xFF;
-    frame.dataLengthLsb = dataLength & 0xFF;
-    frame.data.push_back(infoState.exclusiveOrigins);
-    frame.data.push_back(infoState.currentMode);
-    frame.data.push_back(infoState.settedFlags);
-    frame.data.push_back(infoState.currentRed);
-    frame.data.push_back(infoState.currentGreen);
-    frame.data.push_back(infoState.currentBlue);
-    frame.data.push_back(infoState.serialNum[0]);
-    frame.data.push_back(infoState.serialNum[1]);
-    frame.data.push_back(infoState.lifeTime[0]);
-    frame.data.push_back(infoState.lifeTime[1]);
-    frame.data.push_back(infoState.lifeTime[2]);
-    frame.data.push_back(infoState.lifeTime[3]);
-    frame.data.push_back(infoState.workingTime[0]);
-    frame.data.push_back(infoState.workingTime[1]);
-    frame.data.push_back(infoState.workingTime[2]);
-    frame.data.push_back(infoState.workingTime[3]);
-    frame.checksum= checksum_calc(frame);  // OJO
-    frame.end= NEW_END;
-
-    return frame;
-
-}
 
 
 

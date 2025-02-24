@@ -21,10 +21,14 @@ void formatSPIFFS() {
     //Serial.print("Formateando SPIFFS...");
     SPIFFS.end();
     if (!SPIFFS.format()) {
+        #ifdef DEBUG
         Serial.println("Error al formatear SPIFFS.");
+        #endif
     }
     if (!SPIFFS.begin(true)) {
+        #ifdef DEBUG
         Serial.println("Error al montar SPIFFS después del formateo.");
+        #endif
     }
 }
 
@@ -51,7 +55,9 @@ bool saveElementFieldByField(const char* baseName, const uint16_t* iconData) {
 
     fs::File f = SPIFFS.open(uniqueFileName, "w");
     if (!f) {
+        #ifdef DEBUG
         Serial.println("Error creando archivo del elemento");
+        #endif
         return false;
     }
 
@@ -170,7 +176,9 @@ bool saveElementFieldByField(const char* baseName, const uint16_t* iconData) {
         f.flush();
         size_t finalSize = f.size();
         f.close();
+        #ifdef DEBUG
         Serial.printf("Elemento guardado con éxito, archivo: %s, tamaño final: %u bytes\n", uniqueFileName.c_str(), (unsigned)finalSize);
+        #endif
         return true;
     }
 

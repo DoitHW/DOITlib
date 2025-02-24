@@ -14,12 +14,15 @@
 class DOITSOUNDS_ : public ELEMENT_{
 
     public:
-        DOITSOUNDS_();
+        DOITSOUNDS_(byte voiceType= WOMAN_VOICE) : VOICE_TYPE(voiceType) {}
         DFRobotDFPlayerMini player;
+        byte VOICE_TYPE;
+
         
         void begin();
-        bool readCard();
         void play_file(byte bankin, byte filein);
+        void stop_file();
+        bool is_playing();
 
 };
 

@@ -12,7 +12,9 @@ ADXL345Handler::ADXL345Handler()
 void ADXL345Handler::init() {
     //Wire.begin(SDA_PIN, SCL_PIN);
     if (!accel.begin()) {
+                                                                                    
         Serial.println("ADXL345 no detectado");
+                                                        
         initialized = false;
         return;
     }

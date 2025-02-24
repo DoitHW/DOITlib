@@ -1,26 +1,38 @@
 #include <play_DMS/play_DMS.h>
 
 
-DOITSOUNDS_::DOITSOUNDS_(){
 
-}
 
 void DOITSOUNDS_::begin(){
     
-
   if (player.begin(Serial2)) {
-    player.volume(20);
-    player.playFolder(01, 001);
-    Serial.println("DFPlayer Mini inicializado");
+    player.volume(26);
+    player.playFolder(01, 8);
+                                                                        #ifdef DEBUG
+                                                                        Serial.println("DFPlayer Mini inicializado");
+                                                                        #endif
   } else {
-    Serial.println("Error al inicializar DFPlayer Mini");
+                                                                        #ifdef DEBUG
+                                                                        Serial.println("Error al inicializar DFPlayer Mini");
+                                                                        #endif
   }
   delay(10);
-  play_file(1,10);
 
 }
 
 void DOITSOUNDS_::play_file(byte bankin, byte filein){
+  player.playFolder(bankin, filein);
+}
 
-    player.playFolder(bankin, filein);
+void DOITSOUNDS_::stop_file(){
+  player.stop();
+}
+
+bool DOITSOUNDS_::is_playing(){   // devuelve true mientras este sonando.
+  if(player.available()){
+    byte type= player.readType();
+    int value= player.read();
+    if(type == DFPlayerPlayFinished) return false;
+  }
+  return true;
 }

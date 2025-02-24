@@ -3,15 +3,24 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-#include <Adafruit_PN532.h>
+#include <SPI.h>
+#include <vector>
 
 
 class TOKEN_ {
 private:
+
+    enum TOKEN_MODES{
+
+        BASIC_TOKEN_MODE,
+        GUESS_TOKEN_MODE,
+        PARTNER_TOKEN_MODE
+    };
     struct TOKEN_FILE_ADDR {
         byte file;
         byte bank;
     };
+
     struct TOKEN_INFO {
         TOKEN_FILE_ADDR fileAddr;
         byte color;
@@ -19,17 +28,22 @@ private:
         byte command;
         TOKEN_FILE_ADDR partner[8];
     };
-    TwoWire I2C2;                      // Instancia de I2C personalizada
-    Adafruit_PN532 nfc;
-    unsigned long lastReadAttempt;     // Último intento de lectura
-    unsigned long readInterval;
+
+    std::vector<byte> vctToken;
+    TOKEN_INFO proposedToken = {0, 0}; // Token propuesto
+    bool proposed = false;
+    bool buscandoPareja= false;
 
 public:
-    TOKEN_() : I2C2(1), nfc(-1, -1, &I2C2) {}
-
+    TOKEN_() {}
     ~TOKEN_() {}
-    void begin();
-    bool readCard(uint8_t *uid, uint8_t &uidLength);
 
+    void begin();
+    bool isCardPresent();
+    TOKEN_INFO get_token(std::vector<byte> tkn);
+    void proponer_token();
+    void token_action(std::vector<byte> targets, TOKEN_INFO tokenin, byte LANG, byte tokenMode);
 };
+
+
 #endif

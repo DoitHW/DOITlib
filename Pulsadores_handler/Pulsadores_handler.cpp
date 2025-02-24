@@ -66,7 +66,9 @@ void PulsadoresHandler::mostrarColor(byte color) {
     
     // Comprobar si el elemento está seleccionado antes de enviar la trama
     if (!isCurrentElementSelected()) {
-        Serial.println("El elemento actual no está seleccionado. No se enviará la trama.");
+                                                                                                #ifdef DEBUG
+                                                                                                Serial.println("El elemento actual no está seleccionado. No se enviará la trama.");
+                                                                                                #endif
         return;
     }
 
@@ -93,19 +95,22 @@ void PulsadoresHandler::mostrarColor(byte color) {
             target.push_back(0xFF);
             send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, target, relay_state));
             delay(5);
-            send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA, 0x01, SPANISH_LANG, ELEM_LIFE_TIME_SECTOR));
+            send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA, 0x01, SPANISH_LANG, ELEM_TOTAL_SESSION_TIME_SECTOR));
             break;
         default:
+            #ifdef DEBUG
             Serial.println("Ningún botón presionado.");
+            #endif
             return;
     }
 
     if (color != RELAY) {
         send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, color));
     }
-
+    #ifdef DEBUG
     Serial.print("Botón presionado y seleccionado: ");
     Serial.println(colorNombre);
+    #endif
 }
 
 void PulsadoresHandler::limpiarEstados() {
