@@ -127,22 +127,25 @@ void COLORHANDLER_::begin(int numLeds) {
 
 
 void COLORHANDLER_::set_step(int numStep, CRGB color){
- 
-    int inicio = numStep * LEDS_STEP;       // Primer LED del tramo
-    int fin = inicio + LEDS_STEP;         // Último LED del tramo
-    for (int i = inicio; i < fin; i++) colorHandler.leds[i] = color;
-    FastLED.show();
+    #if defined(ESCALERA) || defined(WALLWASHER)
+      int inicio = numStep * LEDS_STEP;       // Primer LED del tramo
+      int fin = inicio + LEDS_STEP;         // Último LED del tramo
+      for (int i = inicio; i < fin; i++) colorHandler.leds[i] = color;
+      FastLED.show();
+    #endif
 }
 
 void COLORHANDLER_::reset_step(int numStep){
- 
+  #if defined(ESCALERA) || defined(WALLWASHER)
     int inicio = numStep * LEDS_STEP;       // Primer LED del tramo
     int fin = inicio + LEDS_STEP;         // Último LED del tramo
     for (int i = inicio; i < fin; i++) colorHandler.leds[i] = CRGB::Black;
     FastLED.show();
+  #endif
 }
 
 void COLORHANDLER_::simon_game(byte& colorin) {
+  #if defined(ESCALERA) || defined(WALLWASHER)
     static byte currentLevel = 0;
     const byte maxLevel = NUM_STEPS;
     static byte sequence[maxLevel];
@@ -234,13 +237,8 @@ void COLORHANDLER_::simon_game(byte& colorin) {
         }
         colorin = INVALID_COLOR;
     }
+  #endif
 }
-
-
-
-
-
-
 
 void COLORHANDLER_::result_win(bool superWin){
     delay(200);
@@ -985,12 +983,13 @@ void COLORHANDLER_::set_botoneraPattern (byte patternin){
   }
 }
 
+#ifdef NOELEM
 void COLORHANDLER_::welcomeEffect() {
+ 
   const int totalLEDs = NUM_LEDS;  // Asumimos 9 LEDs
 
   // 1. Definir los colores finales para cada LED.
   //    LED 0 se mantiene apagado.
-  if(totalLEDs != 1){
     CRGB targetColors[totalLEDs] = {
         CRGB::Black,      // LED 0: apagado
         CRGB::White,      // LED 1: blanco
@@ -1002,8 +1001,6 @@ void COLORHANDLER_::welcomeEffect() {
         CRGB::Purple,     // LED 7: violeta
         CRGB::Blue        // LED 8: azul
     };
-
-}
 
   // 2. Limpiar la tira: apagar todos los LEDs.
   fill_solid(this->leds, totalLEDs, CRGB::Black);
@@ -1037,7 +1034,9 @@ void COLORHANDLER_::welcomeEffect() {
       this->leds[i] = targetColors[i];
   }
   FastLED.show();
+  
 }
+#endif
 
 void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager) {
   ledManager.clearEffects(); // Limpiar efectos dinámicos previos

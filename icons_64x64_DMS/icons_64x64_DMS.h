@@ -1003,7 +1003,7 @@ const uint16_t elem_icon [ICON_LENGTH] PROGMEM = {
 #endif
 
 #ifdef BOTONERA
-	#ifdef NO_ELEM
+	#ifdef NOELEM
 		const uint16_t elem_icon [ICON_LENGTH] PROGMEM = {};
 	#endif
 	const uint16_t doitPlaypad_64x64 [ICON_LENGTH] PROGMEM = {

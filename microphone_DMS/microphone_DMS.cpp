@@ -23,7 +23,7 @@ void MICROPHONE_::begin(){
                     .sample_rate = 44100,
                     .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,
                     .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,
-                    .communication_format = I2S_COMM_FORMAT_I2S,
+                    .communication_format = I2S_COMM_FORMAT_STAND_I2S,
                     .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
                     .dma_buf_count = 8,
                     .dma_buf_len = 64,
@@ -123,7 +123,7 @@ bool MICROPHONE_::detect_sound_threshold() {
         sample >>= 14; // Ajusta el valor a 16 bits
         sample = abs(sample); // Tomar el valor absoluto
                                                                 #ifdef DEBUG
-                                                                    Serial.println("Detectado sonido, Umbral=" +String(THRESHOLD));
+                                                                  //  Serial.println("Detectado sonido, Umbral=" +String(THRESHOLD));
                                                                 #endif
         return sample > THRESHOLD;
     }
@@ -206,9 +206,9 @@ byte MICROPHONE_::detect_musical_note() {
                                                                             Serial.printf("DEBUG: maxPeak=%.2f, maxIndex=%d\n", maxPeak, maxIndex);
                                                                             #endif
     if (maxPeak <= 200) {
-        #ifdef DEBUG
-        Serial.println("DEBUG: maxPeak demasiado bajo");
-        #endif
+                                                                            #ifdef DEBUG
+                                                                            Serial.println("DEBUG: maxPeak demasiado bajo");
+                                                                            #endif
         return 0;
     }
     
@@ -239,23 +239,22 @@ byte MICROPHONE_::detect_musical_note() {
         double gamma = vReal[maxIndex + 1];
         float delta = (alpha - gamma) / (2.0 * (alpha - 2.0 * beta + gamma));
         interpIndex = maxIndex + delta;
-        #ifdef DEBUG
-        Serial.printf("DEBUG: Interpolación delta=%.2f, interpIndex=%.2f\n", delta, interpIndex);
-        #endif
+                                                                                                #ifdef DEBUG
+                                                                                                Serial.printf("DEBUG: Interpolación delta=%.2f, interpIndex=%.2f\n", delta, interpIndex);
+                                                                                                #endif
     }
     
     // Calcular la frecuencia usando el índice interpolado:
     float freq = interpIndex * actualSamplingFreq / SAMPLES_det;
-    #ifdef DEBUG
-    Serial.printf("DEBUG: Frecuencia detectada: %.2f Hz\n", freq);
-    #endif
+                                                                                                #ifdef DEBUG
+                                                                                                Serial.printf("DEBUG: Frecuencia detectada: %.2f Hz\n", freq);
+                                                                                                #endif
 
-    
     // Filtro: ignorar frecuencias fuera del rango de interés (100 Hz a 10 kHz)
     if (freq < 100 || freq > 10000) {
-        #ifdef DEBUG
-        Serial.println("DEBUG: Frecuencia fuera del rango de interés (100Hz - 10kHz)");
-        #endif
+                                                                                                #ifdef DEBUG
+                                                                                                Serial.println("DEBUG: Frecuencia fuera del rango de interés (100Hz - 10kHz)");
+                                                                                                #endif
         return 0;
     }
     
@@ -267,7 +266,9 @@ byte MICROPHONE_::detect_musical_note() {
     while (normFreq >= noteFrequencies[0] * 2) {
         normFreq /= 2;
     }
-    Serial.printf("DEBUG: Frecuencia normalizada: %.2f\n", normFreq);
+                                                                                                #ifdef DEBUG
+                                                                                                Serial.printf("DEBUG: Frecuencia normalizada: %.2f\n", normFreq);                                                                               
+                                                                                                #endif
     
     // Determinar la nota comparando con las frecuencias base:
     int nota = 0;
@@ -279,8 +280,18 @@ byte MICROPHONE_::detect_musical_note() {
             nota = i;
         }
     }
-    Serial.printf("DEBUG: Nota determinada (índice): %d, frecuencia base: %.2f Hz\n", nota, noteFrequencies[nota]);
+                                                                                                #ifdef DEBUG
+                                                                                                Serial.printf("DEBUG: Nota determinada (índice): %d, frecuencia base: %.2f Hz\n", nota, noteFrequencies[nota]);                                                                               
+                                                                                                #endif
+    
     
     // Se retorna un número entre 1 y 7 (1: DO, 2: RE, …, 7: SI)
     return nota + 1;
+}
+
+void MICROPHONE_::end() {
+    i2s_driver_uninstall(I2S_NUM_0);
+                                                                                                #ifdef DEBUG
+                                                                                                Serial.println("I2S desactivado (micrófono end).");                                                                              
+                                                                                                #endif
 }
