@@ -17,9 +17,11 @@ void scrollTextTickerBounce(int selection);
 void showMessageWithLoading(const char* message, unsigned long delayTime);
 void updateNameScroll();
 void updateModeScroll();
+String getModeDisplayName(const String &fullModeName, bool alternateActive);
 
 extern bool isScrollingText;
 extern TFT_eSPI tft;
 extern TFT_eSprite uiSprite;
 extern bool nameScrollActive;
 extern bool modeScrollActive;
+extern std::vector<bool> currentAlternateStates;

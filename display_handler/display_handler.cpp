@@ -851,3 +851,14 @@ void scrollTextTickerBounce(int selection)
     tickerSprite.pushSprite(textAreaX, textAreaY);
     tickerSprite.deleteSprite();
 }
+
+String getModeDisplayName(const String &fullModeName, bool alternateActive) {
+    int sepIndex = fullModeName.indexOf('/');
+    // Si no hay separador, se devuelve la cadena completa
+    if (sepIndex == -1) {
+        return fullModeName;
+    }
+    // Devuelve la primera parte si no está activa la alternativa,
+    // o la segunda parte si alternateActive es true.
+    return alternateActive ? fullModeName.substring(sepIndex + 1) : fullModeName.substring(0, sepIndex);
+}

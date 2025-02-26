@@ -554,7 +554,7 @@ void debugModeConfig(const uint8_t modeConfig[2]) {
             case HAS_BINARY_SENSORS:Serial.print("HAS_BINARY_SENSORS"); break;
             case HAS_BANK_FILE:     Serial.print("HAS_BANK_FILE"); break;
             case HAS_PATTERNS:      Serial.print("HAS_PATTERNS"); break;
-            case NOP_1:             Serial.print("NOP_1"); break;
+            case HAS_ALTERNATIVE_MODE:Serial.print("HAS_ALTERNATIVE_MODE"); break;
             case MODE_EXIST:        Serial.print("MODE_EXIST"); break;
         }
         Serial.print(" = ");

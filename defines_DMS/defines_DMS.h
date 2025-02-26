@@ -74,7 +74,7 @@
 
 #define RF_TX_PIN         18 
 #define RF_RX_PIN         17  
-#define RF_CONFIG_PIN     46 //original pin 46
+#define RF_CONFIG_PIN     45 //original pin 46
 #if defined (FAST_RF)
   #define RF_BAUD_RATE      115200
 #else
@@ -361,7 +361,8 @@ enum COMMANDS_{
   SET_ELEM_LONG_DEAF,
   MAGIC_TEST_CMD,
   MAGIC_TEST_2_CMD,
-
+  ALTERNATE_MODE_ON,
+  ALTERNATE_MODE_OFF
   // añadir mas tiestos
 };
 
@@ -369,7 +370,7 @@ enum COMMANDS_{
 #define RELAY_2_FLAG     0x01
 #define RELAY_3_FLAG     0x02
 #define RELAY_4_FLAG     0x03
-#
+
 // ETC
 
 #define SET_RELAY        0x01
@@ -384,7 +385,7 @@ enum COMMANDS_{
 #define LIGHTSOURCE_FAN_RELAY_PIN   42
 
 // DEFINES LEDSTRIPS
-#define LEDSTRIP_LED_DATA_PIN       45 // 21= oficial 0 45 per tires super long
+#define LEDSTRIP_LED_DATA_PIN       46 // 21= oficial 0 45 per tires super long
 
 // DEFINES BOTONERA
 #define BOTONERA_DATA_PIN           21

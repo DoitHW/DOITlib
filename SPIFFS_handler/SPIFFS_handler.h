@@ -25,12 +25,10 @@ bool readElementData(fs::File& f, char* elementName, char* modeName, int& startX
 bool writeBytesChecked(fs::File &f, const uint8_t* data, size_t length);
 void formatSPIFFS();
 String generateUniqueFileName(const char* baseName);
-bool saveElementFieldByField(const char* baseName, const uint16_t* iconData);
 
 bool readElementData(fs::File& f, char* elementName, char* modeName, int& startX, int& startY);
 void loadElementsFromSPIFFS();
 void initializeDynamicOptions();
-void loadElementsFromSPIFFS();
 byte getCurrentElementID();
 bool isCurrentElementSelected();
 bool checkMostSignificantBit(byte modeConfig[2]);

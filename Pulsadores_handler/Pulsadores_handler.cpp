@@ -60,7 +60,7 @@ void PulsadoresHandler::procesarPulsadores() {
         }
         if (ambientesSeleccionado) {
             for (size_t i = 0; i < elementFiles.size(); i++) {
-                if (selectedStates[i] && elementFiles[i] != "Apagar" && elementFiles[i] != "Fichas") {
+                if (selectedStates[i] && elementFiles[i].startsWith("/"))  {
                     byte elementID = 0;
                     fs::File f = SPIFFS.open(elementFiles[i], "r");
                     if (f) {

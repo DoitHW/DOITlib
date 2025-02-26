@@ -305,7 +305,7 @@ void send_frame(const FRAME_T &framein) {
     int i = 0;
     byte dTime = 5;
                                                                                                 #ifdef DEBUG
-                                                                                                    Serial.println(" #### Trama enviada ####");
+                                                                                                Serial.println(" #### Trama enviada ####");
                                                                                                 #endif
     Serial1.write(framein.start);
     delay(dTime);
