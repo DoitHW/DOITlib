@@ -4,6 +4,7 @@
 #include <TFT_eSPI.h>
 #include <SPIFFS.h>
 #include <vector>
+#include <map>
 #include <string>
 
 // Declaración adelantada (forward) para no generar bucle de includes.
@@ -24,4 +25,5 @@ extern TFT_eSPI tft;
 extern TFT_eSprite uiSprite;
 extern bool nameScrollActive;
 extern bool modeScrollActive;
+extern std::map<String, std::vector<bool>> elementAlternateStates;
 extern std::vector<bool> currentAlternateStates;

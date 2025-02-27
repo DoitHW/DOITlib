@@ -310,7 +310,13 @@ void drawCurrentElement() {
     String currentFile = elementFiles[currentIndex];
     byte currentMode = 0;
 
-    // Función auxiliar para obtener un nombre "amigable"
+    // Cargar el vector de estados alternativos desde el mapa si existe,
+    // de lo contrario se inicializará en el bloque correspondiente
+    if (elementAlternateStates.find(currentFile) != elementAlternateStates.end()) {
+        currentAlternateStates = elementAlternateStates[currentFile];
+    }
+    
+    // Función auxiliar para obtener un nombre "amigable" de un archivo
     auto getDisplayName = [](const String &fileName) -> String {
          String baseName = fileName.substring(fileName.lastIndexOf("/") + 1, fileName.lastIndexOf(".bin"));
          baseName.replace("element_", "");
@@ -332,13 +338,10 @@ void drawCurrentElement() {
                  if (file == fileName) break;
              }
          }
-         if (count > 1)
-             return name + "(" + String(count) + ")";
-         else
-             return name;
+         return (count > 1) ? (name + "(" + String(count) + ")") : name;
     };
 
-    // Caso 1: "Ambientes" o "Fichas" (elementos fijos)
+    // --- Caso 1: Elementos fijos ("Ambientes" o "Fichas") ---
     if (currentFile == "Ambientes" || currentFile == "Fichas") {
          INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
          currentMode = option->currentMode;
@@ -348,12 +351,12 @@ void drawCurrentElement() {
              memcpy(lineBuffer, option->icono[y], 64 * 2);
              uiSprite.pushImage(startX, startY + y, 64, 1, lineBuffer);
          }
-         // Dibujo del nombre del elemento
+         // Dibujar el nombre del elemento
          uiSprite.setFreeFont(&FreeSansBold12pt7b);
          uiSprite.setTextSize(1);
          String displayName = String((char*)option->name);
          int elementTextWidth = uiSprite.textWidth(displayName);
-         Serial.println("2 Tamaño de "+String(displayName)+ " es " + String(elementTextWidth));
+         Serial.println("DEBUG: Tamaño de elemento '" + displayName + "' = " + String(elementTextWidth));
          if (elementTextWidth > DISPLAY_WIDTH) {
               nameScrollActive = true;
               currentDisplayName = displayName;
@@ -365,10 +368,48 @@ void drawCurrentElement() {
               nameScrollActive = false;
               drawElementName(displayName.c_str(), selectedStates[currentIndex]);
          }
-         // Dibujo del nombre del modo (scroll si es necesario)
-         uiSprite.setFreeFont(&FreeSansBold9pt7b);
-         uiSprite.setTextSize(1);
-         String modeDisplay = String((char*)option->mode[currentMode].name);
+         // --- Construcción del vector de estados alternativos visible ---
+         int visibleModeIndex = -1;
+         if (elementAlternateStates.find(currentFile) == elementAlternateStates.end()) {
+             // Inicializar el vector para este elemento
+             std::vector<bool> tempAlternate;
+             int count = 0;
+             for (int i = 0; i < 16; i++) {
+                 if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
+                     // Inicializar todos en false (modo básico)
+                     tempAlternate.push_back(false);
+                     if (i == option->currentMode) {
+                         visibleModeIndex = count;
+                     }
+                     count++;
+                 }
+             }
+             currentAlternateStates = tempAlternate;
+             elementAlternateStates[currentFile] = currentAlternateStates;
+         } else {
+             currentAlternateStates = elementAlternateStates[currentFile];
+             // Calcular el índice visible
+             int count = 0;
+             for (int i = 0; i < 16; i++) {
+                 if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
+                     if (i == option->currentMode) {
+                         visibleModeIndex = count;
+                         break;
+                     }
+                     count++;
+                 }
+             }
+         }
+         Serial.println("DEBUG: [Fijos] currentAlternateStates.size() = " + String(currentAlternateStates.size()));
+         Serial.println("DEBUG: [Fijos] visibleModeIndex para currentMode (" + String(option->currentMode) + ") = " + String(visibleModeIndex));
+         
+         // Mostrar el nombre del modo en la pantalla principal usando el índice visible
+         String modeDisplay;
+         if (visibleModeIndex >= 0 && currentAlternateStates.size() > (size_t)visibleModeIndex) {
+             modeDisplay = getModeDisplayName(String((char*)option->mode[option->currentMode].name), currentAlternateStates[visibleModeIndex]);
+         } else {
+             modeDisplay = String((char*)option->mode[option->currentMode].name);
+         }
          int modeTextWidth = uiSprite.textWidth(modeDisplay);
          if (modeTextWidth > MODE_DISPLAY_WIDTH) {
               modeScrollActive = true;
@@ -379,11 +420,15 @@ void drawCurrentElement() {
               updateModeDisplay();
          } else {
               modeScrollActive = false;
-              drawModeName((char*)option->mode[currentMode].name);
+              uiSprite.setFreeFont(&FreeSansBold9pt7b);
+              uiSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
+              uiSprite.setTextDatum(TC_DATUM);
+              uiSprite.setTextSize(1);
+              uiSprite.drawString(modeDisplay, tft.width() / 2, tft.height() - 15);
          }
          drawSelectionCircle(selectedStates[currentIndex], startX, startY);
     }
-    // Caso 2: "Apagar"
+    // --- Caso 2: "Apagar" ---
     else if (currentFile == "Apagar") {
          INFO_PACK_T* option = &apagarSala;
          int startX = (tft.width() - 64) / 2;
@@ -392,12 +437,15 @@ void drawCurrentElement() {
              memcpy(lineBuffer, option->icono[y], 64 * 2);
              uiSprite.pushImage(startX, startY + y, 64, 1, lineBuffer);
          }
+         currentAlternateStates.clear();
+         currentAlternateStates.push_back(false);
+         elementAlternateStates[currentFile] = currentAlternateStates;
          drawElementName((char*)option->name, false);
          drawModeName((char*)option->mode[currentMode].name);
          nameScrollActive = false;
          modeScrollActive = false;
     }
-    // Caso 3: Elemento almacenado en SPIFFS
+    // --- Caso 3: Elemento almacenado en SPIFFS ---
     else {
          fs::File f = SPIFFS.open(currentFile, "r");
          if (!f) {
@@ -416,7 +464,7 @@ void drawCurrentElement() {
          uiSprite.setTextSize(1);
          String displayName = getDisplayName(currentFile);
          int elementTextWidth = uiSprite.textWidth(displayName);
-         Serial.println("1 Tamaño de "+String(displayName)+ " es " + String(elementTextWidth));
+         Serial.println("DEBUG: Tamaño de elemento '" + displayName + "' = " + String(elementTextWidth));
          if (elementTextWidth > DISPLAY_WIDTH) {
               nameScrollActive = true;
               currentDisplayName = displayName;
@@ -428,10 +476,68 @@ void drawCurrentElement() {
               nameScrollActive = false;
               drawElementName(displayName.c_str(), selectedStates[currentIndex]);
          }
-         // Para el nombre del modo, usamos la cadena ya leída en modeName
-         uiSprite.setFreeFont(&FreeSansBold9pt7b);
-         uiSprite.setTextSize(1);
+         // Leer el modo actual de SPIFFS
+         int realModeIndex = 0;
+         f.seek(OFFSET_CURRENTMODE, SeekSet);
+         f.read((uint8_t*)&realModeIndex, 1);
+
+         // Leer estados alternativos guardados en SPIFFS si existen
+         const int OFFSET_ALTERNATE_STATES = OFFSET_CURRENTMODE + 1;
+         byte storedStates[16] = {0};
+         f.seek(OFFSET_ALTERNATE_STATES, SeekSet);
+         size_t bytesRead = f.read(storedStates, 16);
+
+         if (elementAlternateStates.find(currentFile) == elementAlternateStates.end()) {
+             std::vector<bool> tempAlternate;
+             int visibleModeIndex = -1;
+             int count = 0;
+             for (int i = 0; i < 16; i++) {
+                 char modeBuf[25] = {0};
+                 byte modeConfig[2] = {0};
+                 f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet);
+                 f.read((uint8_t*)modeBuf, 24);
+                 f.seek(OFFSET_MODES + i * SIZE_MODE + 216, SeekSet);
+                 f.read(modeConfig, 2);
+                 if (strlen(modeBuf) > 0 && checkMostSignificantBit(modeConfig)) {
+                     bool hasAlt = getModeFlag(modeConfig, HAS_ALTERNATIVE_MODE);
+                     bool altState = (bytesRead > 0 && count < 16) ? (storedStates[count] > 0) : false;
+                     tempAlternate.push_back(hasAlt ? altState : false);
+                     if (i == realModeIndex) {
+                         visibleModeIndex = count;
+                     }
+                     count++;
+                 }
+             }
+             currentAlternateStates = tempAlternate;
+             elementAlternateStates[currentFile] = currentAlternateStates;
+             Serial.println("DEBUG: [SPIFFS] currentAlternateStates.size() = " + String(currentAlternateStates.size()));
+         } else {
+             currentAlternateStates = elementAlternateStates[currentFile];
+         }
+         // Calcular visibleIndex para el modo actual
+         int visibleIndex = -1;
+         {
+             int count = 0;
+             for (int i = 0; i < 16; i++) {
+                 char modeBuf[25] = {0};
+                 byte tempConfig[2] = {0};
+                 f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet);
+                 f.read((uint8_t*)modeBuf, 24);
+                 f.seek(OFFSET_MODES + i * SIZE_MODE + 216, SeekSet);
+                 f.read(tempConfig, 2);
+                 if (strlen(modeBuf) > 0 && checkMostSignificantBit(tempConfig)) {
+                     if (i == realModeIndex) {
+                         visibleIndex = count;
+                         break;
+                     }
+                     count++;
+                 }
+             }
+         }
          String modeDisplay = String(modeName);
+         if (visibleIndex >= 0 && currentAlternateStates.size() > (size_t)visibleIndex) {
+             modeDisplay = getModeDisplayName(modeDisplay, currentAlternateStates[visibleIndex]);
+         }
          int modeTextWidth = uiSprite.textWidth(modeDisplay);
          if (modeTextWidth > MODE_DISPLAY_WIDTH) {
               modeScrollActive = true;
@@ -442,12 +548,11 @@ void drawCurrentElement() {
               updateModeDisplay();
          } else {
               modeScrollActive = false;
-              drawModeName(modeName);
+              drawModeName(modeDisplay.c_str());
          }
-         f.seek(OFFSET_CURRENTMODE, SeekSet);
-         f.read(&currentMode, 1);
          f.close();
          drawSelectionCircle(selectedStates[currentIndex], startX, startY);
+         currentMode = realModeIndex;
     }
     currentModeIndex = currentMode;
     colorHandler.setCurrentFile(currentFile);
@@ -466,6 +571,10 @@ void animateTransition(int direction) {
     currentIndex = nextIndex;
     drawCurrentElement();
 }
+
+
+std::map<String, std::vector<bool>> elementAlternateStates;
+std::vector<bool> currentAlternateStates;
 
 void drawModesScreen() {
     // Variables para scroll vertical suave
@@ -511,6 +620,38 @@ void drawModesScreen() {
             uiSprite.drawString("Error leyendo modos", 10, 25);
             uiSprite.pushSprite(0, 0);
             return;
+        }
+        
+        // Si estamos abriendo un elemento de SPIFFS, asegurarnos de leer los estados alternativos
+        if (currentAlternateStates.size() == 0) {
+            const int OFFSET_ALTERNATE_STATES = OFFSET_CURRENTMODE + 1;
+            byte storedStates[16] = {0};
+            f.seek(OFFSET_ALTERNATE_STATES, SeekSet);
+            f.read(storedStates, 16);
+            
+            // Cargar los estados almacenados en un vector temporal
+            std::vector<byte> tempStates(storedStates, storedStates + 16);
+            
+            // Los estados se usarán más adelante al construir currentAlternateStates
+            int count = 0;
+            for (int i = 0; i < 16; i++) {
+                char modeBuf[25] = {0};
+                byte modeConfig[2] = {0};
+                f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet);
+                f.read((uint8_t*)modeBuf, 24);
+                f.seek(OFFSET_MODES + i * SIZE_MODE + 216, SeekSet);
+                f.read(modeConfig, 2);
+                if (strlen(modeBuf) > 0 && checkMostSignificantBit(modeConfig)) {
+                    bool hasAlt = getModeFlag(modeConfig, HAS_ALTERNATIVE_MODE);
+                    // Usar el estado guardado si existe y el modo tiene alternativa
+                    if (hasAlt && count < tempStates.size()) {
+                        currentAlternateStates.push_back(tempStates[count] > 0);
+                    } else {
+                        currentAlternateStates.push_back(false);
+                    }
+                    count++;
+                }
+            }
         }
     }
 
@@ -599,6 +740,16 @@ void drawModesScreen() {
                 f.close();
             }
             String modeStr = String(modeName);
+            // --- Integración del parseo de nombre de modo ---
+            // Se consulta el estado alternativo del modo en el vector currentAlternateStates.
+            // Se asume que currentAlternateStates está indexado según las opciones visibles, excluyendo la opción "Regresar".
+            bool modeAlternateState = false;
+            if (currentAlternateStates.size() > (size_t)currentVisibleIndex && visibleModesMap[currentVisibleIndex] != -2) {
+                modeAlternateState = currentAlternateStates[currentVisibleIndex];
+            }
+            // Obtener la parte correcta del nombre usando el helper.
+            modeStr = getModeDisplayName(modeStr, modeAlternateState);
+            // --- Fin integración ---
 
             if (isSelected) {
                 // Si se cambia la opción seleccionada, reiniciamos el ticker

@@ -493,6 +493,8 @@ void BOTONERA_::validar_elemento() {
             // Error al leer el serial
             Serial.println("❌ No se obtuvo respuesta");
             mostrarMensajeTemporal(0, 3000);
+            byte existingID = getIdFromSPIFFS(lastSerial);
+            send_frame(frameMaker_SET_ELEM_ID(DEFAULT_BOTONERA, existingID, 0xDD));
             return;
         }
 
@@ -547,7 +549,7 @@ void BOTONERA_::validar_elemento() {
                 return;
             }
             Serial.printf("✅ Nueva ID asignada y confirmada: 0x%02X\n", lastAssignedID);
-            iniciarEscaneoElemento("Agregando ...");
+            iniciarEscaneoElemento("Agregando");
             actualizarBarraProgreso(0);
             // 4) Descargamos la información completa del elemento (nombre, desc, modos...)
             delay(500);

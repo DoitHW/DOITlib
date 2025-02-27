@@ -74,7 +74,7 @@
 
 #define RF_TX_PIN         18 
 #define RF_RX_PIN         17  
-#define RF_CONFIG_PIN     45 //original pin 46
+#define RF_CONFIG_PIN     46 //botonera marc pin 45
 #if defined (FAST_RF)
   #define RF_BAUD_RATE      115200
 #else
