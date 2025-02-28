@@ -1057,27 +1057,24 @@ void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager)
   }
 
   #ifdef DEBUG
-      // Llamar a la función de depuración para imprimir todos los flags
-      Serial.println("Mode "+String(mode) + " - Byte Config: 0x"+ String(modeConfig[0],HEX)+String(modeConfig[1],HEX));
+      Serial.println("Mode " + String(mode) + " - Byte Config: 0x" + String(modeConfig[0], HEX) + String(modeConfig[1], HEX));
       debugModeConfig(modeConfig);
   #endif
 
   // --- Bloque modular para asignar colores a la botonera (LEDs 1 a NUM_LEDS-1) ---
-  if (getModeFlag(modeConfig, HAS_PASSIVE)) {
-      // Mapeo PASIVO: todos los LEDs a color blanco (incluyendo el LED 0)
+  if (getModeFlag(modeConfig, HAS_PATTERNS)) {
+      // Si el modo tiene el flag HAS_PATTERNS, se pintan los LEDs de blanco
+      #ifdef DEBUG
+          Serial.println("✨ Mapeo de patrones: todos los LEDs en blanco.");
+      #endif
+      fill_solid(leds + 1, numLeds - 1, CRGB::White);
+  } else if (getModeFlag(modeConfig, HAS_PASSIVE)) {
       #ifdef DEBUG
           Serial.println("🌟 Mapeo PASIVO: LED 1 en blanco.");
       #endif
       fill_solid(leds + 1, numLeds - 1, CRGB::Black);
       leds[8] = CRGB::White;
-      if (getModeFlag(modeConfig, HAS_RELAY_1) || getModeFlag(modeConfig, HAS_RELAY_2)) {
-        #ifdef DEBUG
-            Serial.println("⚡ Aplicando efecto dinámico en LED 0 (Relay activo).");
-        #endif
-        ledManager.addEffect(new FadeEffect(*this, 0, CRGB::Blue, CRGB::Cyan, 50));
-    }
   } else if (getModeFlag(modeConfig, HAS_BASIC_COLOR) || getModeFlag(modeConfig, HAS_ADVANCED_COLOR)) {
-      // Mapeo de colores básicos/avanzados
       #ifdef DEBUG
           Serial.println("🎨 Mapeo de colores básicos/avanzados.");
       #endif
@@ -1092,7 +1089,6 @@ void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager)
           leds[i] = colorMap[i];
       }
   } else {
-      // Si no se acepta color, se apagan los LEDs de la botonera (excluyendo el LED 0)
       #ifdef DEBUG
           Serial.println("🕶 Apagando todos los LEDs de la botonera.");
       #endif
@@ -1100,23 +1096,20 @@ void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager)
   }
 
   // --- Bloque modular para el LED 0 (efecto de relé) ---
-  if (!getModeFlag(modeConfig, HAS_PASSIVE)) {
-      if (getModeFlag(modeConfig, HAS_RELAY_1) || getModeFlag(modeConfig, HAS_RELAY_2)) {
-          #ifdef DEBUG
-              Serial.println("⚡ Aplicando efecto dinámico en LED 0 (Relay activo).");
-          #endif
-          ledManager.addEffect(new FadeEffect(*this, 0, CRGB::Blue, CRGB::Cyan, 50));
-      } else {
-          #ifdef DEBUG
-              Serial.println("❌ No hay relé activo, apagando LED 0.");
-          #endif
-          leds[0] = CRGB::Black;
-      }
+  if (getModeFlag(modeConfig, HAS_RELAY_1) || getModeFlag(modeConfig, HAS_RELAY_2)) {
+      #ifdef DEBUG
+          Serial.println("⚡ Aplicando efecto dinámico en LED 0 (Relay activo).");
+      #endif
+      ledManager.addEffect(new FadeEffect(*this, 0, CRGB::Blue, CRGB::Cyan, 50));
+  } else {
+      #ifdef DEBUG
+          Serial.println("❌ No hay relé activo, apagando LED 0.");
+      #endif
+      leds[0] = CRGB::Black;
   }
 
   FastLED.show();
 }
-
 
 void COLORHANDLER_::sequencer_game(byte& colorin) {
     static std::vector<byte> sequence;
