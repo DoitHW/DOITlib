@@ -10,6 +10,12 @@
                                                 #define NONFC                    // -> NFC / NONFC
                                                 #define MIC                    // -> Desactivar en produccion 
                                                 #define DEBUG
+                                                #define NODEBUG_
+                                                #ifdef DEBUG_
+                                                  #define DEBUG__________(x) Serial.println("DEBUG: " + String(x));
+                                                #else
+                                                  #define DEBUG__________(x)
+                                                #endif
                                                 #define SERIAL_NUM        0xC0CA // -> 0xVV00= VERSION + 0x00MM= MES
                                                 #define NOSERIAL_BY_FILE         // -> NOSERIAL_BY_FILE / SERIAL_BY_FILE --> Activar Serial por FileSystem, si esta definido, ignora el SERIAL_NUM.
                                                 #define SHOW_MAC                 // -> Opcional disparar MAC al inicio  (No sirve pa ná...) 
@@ -205,32 +211,32 @@
 #define NEGRO                    0x00
 #define RELAY                    0x09
 ////////////////////////////////
-#define CREMA                    0x09 //0x806600 //0x8b4513 //0xFEFBEA //0xffcd80
-#define ROSA                     0x0A //0xFF00D2 //0xFF8080
-#define LILA                     0x0B //0x8F00FF //0xFF80E9 
-#define CELESTE_CLARO            0x0C //0x5080FF //0x8080FF
-#define TURQUESA                 0x0D //0x40E0D0 //0x80FFE4
-#define VERDE_CLARO              0x0E //0x66FF00 //0x80FF80
-#define NARANJA                  0x0F //0xFF4500 //0xFF7F00
-#define ROSA_OSCURO              0x10 //0xFF1493 //0xFF4FD1
-#define VERDE_OLIVA              0x11 //0x758A00 //0x808000 //0x7F7F80
-#define VERDE_LIMA               0x12 //0x7FFF64 //0x7FFF64
-#define VERDE_AMARILLO           0x13 //0xFFDF00 //0x7FFF00
-#define MAGENTA                  0x14 //0xD9017A //0xFF0081
-#define MORADO                   0x15 //0x9400d3 //0x9F00C5 //0x9B26B6 //0x800080
-#define VERDE_AZULADO            0x16 //0x0DBA98 //0x80FFC4
-#define MARRON                   0x17 //0xff4005 //0x8b4513
-#define INDIGO                   0x18 //0x330099 //0x8000F1
-#define AZUL_VERDOSO             0x19 //0x1f3438 //0x80FFD5
-#define ESMERALDA                0x1A //0x50C878 //0x80FF81
-#define CYAN                     0x1B //0x00FFFF
-#define VERDE_MENTA              0x1C //0x98FF98 //0x80FFC8
-#define AMARILLO_ANARANJADO      0x1D //0xFF7E00 //0xFFA300
-#define ROJO_ANARANJADO          0x1E //0xFF2300
-#define ROSA_FUERTE              0x1F //0xe4007c //0xFF23D1
-#define MARRON_OSCURO            0x20 //0xff2500 //0x7F2380
-#define VERDE_GRISACEO           0x21 //0x7FA364
-#define VERDE_OLIVA_CLARO        0x22 //0x7FA300
+#define CREMA                    0x0F //0x806600 //0x8b4513 //0xFEFBEA //0xffcd80
+#define ROSA                     0x1F //0xFF00D2 //0xFF8080
+#define LILA                     0x1E //0x8F00FF //0xFF80E9 
+#define CELESTE_CLARO            0x1B //0x5080FF //0x8080FF
+#define TURQUESA                 0x19 //0x40E0D0 //0x80FFE4
+#define VERDE_CLARO              0x10 //0x66FF00 //0x80FF80
+#define NARANJA                  0x02 //0xFF4500 //0xFF7F00
+#define ROSA_OSCURO              0x20 //0xFF1493 //0xFF4FD1
+#define VERDE_OLIVA              0x12 //0x758A00 //0x808000 //0x7F7F80
+#define VERDE_LIMA               0x14 //0x7FFF64 //0x7FFF64
+#define VERDE_AMARILLO           0x0E //0xFFDF00 //0x7FFF00
+#define MAGENTA                  0x22 //0xD9017A //0xFF0081
+#define MORADO                   0x1D //0x9400d3 //0x9F00C5 //0x9B26B6 //0x800080
+#define VERDE_AZULADO            0x17 //0x0DBA98 //0x80FFC4
+#define MARRON                   0x0B //0xff4005 //0x8b4513
+#define INDIGO                   0x1C //0x330099 //0x8000F1
+#define AZUL_VERDOSO             0x18 //0x1f3438 //0x80FFD5
+#define ESMERALDA                0x16 //0x50C878 //0x80FF81
+#define CYAN                     0x1A //0x00FFFF
+#define VERDE_MENTA              0x15 //0x98FF98 //0x80FFC8
+#define AMARILLO_ANARANJADO      0x0D //0xFF7E00 //0xFFA300
+#define ROJO_ANARANJADO          0x09 //0xFF2300
+#define ROSA_FUERTE              0x21 //0xe4007c //0xFF23D1
+#define MARRON_OSCURO            0x0A //0xff2500 //0x7F2380
+#define VERDE_GRISACEO           0x13 //0x7FA364
+#define VERDE_OLIVA_CLARO        0x11 //0x7FA300
 #define SALMON                   0x23 //0xe73410
 //
 

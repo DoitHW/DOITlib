@@ -113,39 +113,39 @@ const unsigned int listaColores[36] =
     0x00FF00, // green_t 7
     0x000000, // black_t 8
 
-    0xFF2300, // rojo_anaranjado_t
-    0xFF2500, // marron_oscuro_t
-    0xFF4005, // marron_t
+    0xFF2300, // 9 rojo_anaranjado_t (mezcla entre red y orange)
+    0xFF2500, // 10 marron_oscuro_t   (mezcla entre )
+    0xFF4005, // 11 marron_t
 
-    0xFF4500, // naranja_t
-    0xFF7E00, // amarillo_anaranjado_t
+    0xFF4500, // 12 naranja_t (mezcla entre yellow y red)
+    0xFF7E00, // 13 amarillo_anaranjado_t
 
-    0xFFDF00, // verde_amarillo_t
-    0x806600, // crema_t
+    0xFFDF00, // 14 verde_amarillo_t (mezcla entre yellow y green)
+    0x806600, // 15 crema_t (mezcla entre white y yellow)
 
-    0x66FF00, // verde_claro_t
-    0x7FA300, // verde_oliva_claro_t
-    0x758A00, // verde_oliva_t
-    0x7FA364, // verde_grisaceo_t
-    0x7FFF64, // verde_lima_t
-    0x98FF98, // verde_menta_t
-    0x50C878, // esmeralda_t
-    0x0DBA98, // verde_azulado_t
+    0x66FF00, // 16 verde_claro_t (mezcla entre white y green)
+    0x7FA300, // 17 verde_oliva_claro_t
+    0x758A00, // 18 verde_oliva_t (mezcla entre yellow y blue)
+    0x7FA364, // 19 verde_grisaceo_t
+    0x7FFF64, // 20 verde_lima_t (mezcla entre yellow y light_blue)
+    0x98FF98, // 21 verde_menta_t 
+    0x50C878, // 22 esmeralda_t
+    0x0DBA98, // 23 verde_azulado_t
 
-    0x1F3438, // azul_verdoso_t
-    0x40E0D0, // turquesa_t
-    0x00FFFF, // cyan_t
-    0x5080FF, // celeste_claro_t
+    0x1F3438, // 24 azul_verdoso_t
+    0x40E0D0, // 25 turquesa_t (mezcla entre white y light_blue)
+    0x00FFFF, // 26 cyan_t
+    0x5080FF, // 27 celeste_claro_t (mezcla entre white y blue)
 
-    0x330099, // indigo_t
+    0x330099, // 28 indigo_t
 
-    0x9400D3, // morado_t
-    0x8F00FF, // lila_t
-    0xFF00D2, // rosa_t
-    0xFF1493, // rosa_oscuro_t
-    0xE4007C, // rosa_fuerte_t
-    0xD9017A, // magenta_t
-    0xE73410  // salmon_t
+    0x9400D3, // 29 morado_t
+    0x8F00FF, // 30 lila_t (mezcla entre white y violet)
+    0xFF00D2, // 31 rosa_t (mezcla entre white y red)
+    0xFF1493, // 32 rosa_oscuro_t  (mezcla entre yellow y violet)
+    0xE4007C, // 33 rosa_fuerte_t
+    0xD9017A, // 34 magenta_t (mezcla entre red y violet)
+    0xE73410  // 35 salmon_t (blanco y naranja)
 };
 
 
@@ -246,6 +246,7 @@ class COLORHANDLER_ {
         #endif
         int numLeds;
         void setCurrentFile(const String& file) { currentFile = file; } 
+        bool color_mix_handler(int color1, int color2, byte *resultado);
     private:
 
     unsigned long lastUpdate = 0;

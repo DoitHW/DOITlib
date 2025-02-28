@@ -314,6 +314,9 @@ void drawCurrentElement() {
     // de lo contrario se inicializará en el bloque correspondiente
     if (elementAlternateStates.find(currentFile) != elementAlternateStates.end()) {
         currentAlternateStates = elementAlternateStates[currentFile];
+    } else {
+        currentAlternateStates = initializeAlternateStates(currentFile);
+        elementAlternateStates[currentFile] = currentAlternateStates;
     }
     
     // Función auxiliar para obtener un nombre "amigable" de un archivo

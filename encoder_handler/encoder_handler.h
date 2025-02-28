@@ -29,6 +29,8 @@ void requestAndSyncElementMode();
 bool getModeFlag(const uint8_t modeConfig[2], MODE_CONFIGS flag);
 void debugModeConfig(const uint8_t modeConfig[2]);
 
+std::vector<bool> initializeAlternateStates(const String &currentFile);
+
 // Variables externas requeridas
 extern std::vector<String> elementFiles;
 extern std::vector<bool> selectedStates;
@@ -43,6 +45,7 @@ extern unsigned long buttonPressStart;
 extern int globalVisibleModesMap[17];  // Declaración de la variable global
 extern bool ignoreInputs;
 extern ESP32Encoder encoder;
+extern bool modeAlternateActive;
 
 
 

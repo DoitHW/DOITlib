@@ -27,7 +27,7 @@ volatile bool uartInterruptTriggered= false;
 // LA FUNCION DIOS
 
 void IRAM_ATTR onUartInterrupt() {
-    unsigned long startTime = millis();
+    // No Serial.println() or String inside ISR for efficiency!
     static enum {
         WAITING_START,
         RECEIVING_LENGTH_MSB,
@@ -35,75 +35,101 @@ void IRAM_ATTR onUartInterrupt() {
         RECEIVING_FRAME
     } receiveState = WAITING_START;
 
-    static uint16_t expectedFrameLength = 0;    // Longitud del frame (sin NEW_START y LENGTH bytes)
+    static uint16_t expectedFrameLength = 0;
     static uint16_t totalFrameLength = 0;       // Longitud total (frameLength + 3)
     static uint16_t receivedBytes = 0;          // OJO con los statics, danger.
     static uint16_t calculatedChecksum = 0;
     static uint8_t receivedChecksum = 0;
-
+    static unsigned long frameStartTime = 0; // Timestamp for timeout
+    
     uint8_t bytesProcessed = 0;
-
+    unsigned long currentTime = millis();
+    
+    
     while (Serial1.available()) {
-
         byte receivedByte = Serial1.read();
-                                                                                                    #ifdef DEBUG
-                                                                                                        Serial.print("0x");
-                                                                                                        Serial.print(receivedByte, HEX);
-                                                                                                        Serial.print(" ");
-                                                                                                    #endif
-        bytesProcessed++;
+        bytesProcessed++; // Increment bytes processed count
+        Serial.print((" 0x"+String(receivedByte, HEX)).c_str());
+            DEBUG__________(("\n\n0x" +String(receivedByte, HEX)).c_str())
+            DEBUG__________(("expectedFrameLength str = " +String(expectedFrameLength)).c_str())
+            DEBUG__________(("Recieve state: " +String(receiveState)).c_str())
+            DEBUG__________(("UartBuffer.size()" +String(uartBuffer.size())).c_str())
+    
         lastReceivedTime = millis();
-        if (receiveState == WAITING_START && receivedByte != NEW_START) continue;
-
+        if (receiveState == WAITING_START && receivedByte != NEW_START){
+            
+                DEBUG__________("if (receiveState == WAITING_START && receivedByte != NEW_START)")
+            
+            continue;}
+    
+         // --- ADDED BUFFER SIZE CHECK ---
+        if ((uartBuffer.size() > 0xFF) || (expectedFrameLength > 0xFF)) { // Check if buffer is already full or larger
+            receiveState = WAITING_START;
+            uartBuffer.clear();
+            expectedFrameLength= 0;
+            DEBUG__________( " ISR Error: UART buffer MAX SIZE reached - Resetting\n\n\n\n\n\n\n\n\n");
+            DEBUG__________( " ISR Error: UART buffer MAX SIZE reached - Resetting\n\n\n\n\n\n\n\n\n");
+            DEBUG__________( " ISR Error: UART buffer MAX SIZE reached - Resetting\n\n\n\n\n\n\n\n\n");
+            return; // Exit ISR to prevent buffer overflow
+        }
+        // --- END OF ADDED BUFFER SIZE CHECK ---
+    
         switch (receiveState) {
             case WAITING_START:
+                DEBUG__________("fase waiting")
                 if (receivedByte == NEW_START) {
                     uartBuffer.reserve(MAX_FRAME_LENGTH);
                     uartBuffer.clear();
                     uartBuffer.push_back(receivedByte);
-
+    
                     calculatedChecksum = receivedByte;
                     receiveState = RECEIVING_LENGTH_MSB;
                     expectedFrameLength = 0;
                     receivedBytes = 1;
+                    frameStartTime = currentTime; // Start timeout timer
                 }
                 break;
-
+    
             case RECEIVING_LENGTH_MSB:
+                DEBUG__________("rec_L_MSB")
                 uartBuffer.push_back(receivedByte);
                 calculatedChecksum += receivedByte;
                 while (calculatedChecksum > 0xFF) calculatedChecksum = (calculatedChecksum & 0xFF) + (calculatedChecksum >> 8);
                 expectedFrameLength = receivedByte << 8;  // Guardamos el MSB
                 receiveState = RECEIVING_LENGTH_LSB;
                 break;
-
+    
             case RECEIVING_LENGTH_LSB:
-                uartBuffer.push_back(receivedByte);
-                calculatedChecksum += receivedByte;
-                while (calculatedChecksum > 0xFF) calculatedChecksum = (calculatedChecksum & 0xFF) + (calculatedChecksum >> 8);
-                expectedFrameLength |= receivedByte;  
-                totalFrameLength = expectedFrameLength + 3;  
-
+            DEBUG__________("rec_L_LSB")
+            uartBuffer.push_back(receivedByte);
+            calculatedChecksum += receivedByte;
+            while (calculatedChecksum > 0xFF) calculatedChecksum = (calculatedChecksum & 0xFF) + (calculatedChecksum >> 8);
+            expectedFrameLength |= receivedByte;
+            // Move the debug print HERE, after LSB processing:
+            DEBUG__________("expectedFrameLength = " +String(expectedFrameLength))
+            totalFrameLength = expectedFrameLength + 3;
+    
                 if (totalFrameLength > MAX_FRAME_LENGTH || totalFrameLength < MIN_FRAME_LENGTH) {
-                                                                                                #ifdef DEBUG
-                                                                                                    Serial.println("❌ Error: Longitud de trama inv\xE1lida");
-                                                                                                #endif
                     receiveState = WAITING_START;
                     uartBuffer.clear();
+                   
+                        DEBUG__________("❌ Error: Longitud de trama inv\xE1lida - Resetting");
+                  
                     return;
                 }
-
+    
                 receiveState = RECEIVING_FRAME;
                 receivedBytes = 3;  // Contamos NEW_START, LENGTH_MSB y LENGTH_LSB
                 break;
-
+    
             case RECEIVING_FRAME:
+                DEBUG__________("rec_FRAME")
                 uartBuffer.push_back(receivedByte);
                 receivedBytes++;
                 if (receivedBytes != totalFrameLength - 1) calculatedChecksum += receivedByte;
                 else receivedChecksum = receivedByte;
                 while (calculatedChecksum > 0xFF) calculatedChecksum = (calculatedChecksum & 0xFF) + (calculatedChecksum >> 8);
-
+    
                 if (receivedBytes == totalFrameLength) {  // Último byte: NEW_END
                     if (receivedByte == NEW_END) {
                         if (calculatedChecksum == receivedChecksum) {
@@ -119,54 +145,51 @@ void IRAM_ATTR onUartInterrupt() {
                                     break;
                                 }
                             }
-
+    
                             if (isTarget) {
-                                frameReceived = true;
-                                                                #ifdef DEBUG
-                                                                    Serial.println();
-                                                                    Serial.println("✅ Trama recibida correctamente y ✅ dirigida al dispositivo");
-                                                                #endif
+                                Serial.println();
+                                frameReceived = true; // Set flag for loop() to process
+                                
+                                    DEBUG__________(" ISR: Frame Received OK, targeted to device");
+                                
                             } else {
-                                                                #ifdef DEBUG
-                                                                    Serial.println();
-                                                                    Serial.println("✅ Trama recibida correctamente pero ❌ no dirigida al dispositivo");
-                                                                #endif
+                                
+                                    DEBUG__________(" ISR: Frame Received OK, not targeted to device");
+                               
                             }
                         } else {
-                                                                #ifdef DEBUG
-                                                                    Serial.println("❗ Error: Checksum inválido");
-                                                                #endif
+                            
+                                DEBUG__________(" ISR Error: Checksum invalid - Frame discarded");
+                           
                         }
                     } else {
-                                                                #ifdef DEBUG
-                                                                    Serial.println("❗ Error: Byte de fin incorrecto");
-                                                                #endif
+                      
+                            DEBUG__________(" ISR Error: Invalid END byte - Frame discarded");
+                       
                     }
-                    receiveState = WAITING_START;
-                    return;
+                    receiveState = WAITING_START; // Reset state for next frame
+                    return; // Exit ISR after frame processing or error
                 } 
-
+    
                 if (uartBuffer.size() >= MAX_BUFFER_SIZE) {
-                                                                #ifdef DEBUG
-                                                                    Serial.println("❌ Error: Desbordamiento de buffer UART");
-                                                                #endif
-                    receiveState = WAITING_START;
+    
+                    DEBUG__________("Superado tamaño uartbuffer")
+                    receiveState = WAITING_START; // Reset state on buffer overflow
                     uartBuffer.clear();
-                    return;
+                    return; // Exit ISR on buffer overflow
                 }
-
+    
                 break;
         }
     }
-
+    
     if (Serial1.available() && bytesProcessed >= MAX_BYTES_PER_INTERRUPT) {
-        partialFrameReceived = true;
-                                                            #ifdef DEBUG
-                                                                Serial.println("Trama parcial recibida");
-                                                            #endif
+        partialFrameReceived = true; // Set flag for partial frame (not used in current loop() logic)
+       
+            DEBUG__________(" ISR: Partial frame received (more bytes available)");
+        
     }
 }
-
 
 
 byte checksum_calc(const FRAME_T &framein) {

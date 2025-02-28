@@ -24,7 +24,7 @@
 extern ELEMENT_ *element;
 bool colorReceived= false;
 
-bool color_mix_handler(int color1, int color2, byte *resultado) {
+bool COLORHANDLER_::color_mix_handler(int color1, int color2, byte *resultado) {
  
   static std::map <std::pair<int, int>, int> colorMixMap = {
     {{WHITE, YELLOW},       CREMA},

@@ -229,14 +229,21 @@ void handleEncoder() {
             if (pressDuration < 2000) {
                 String currentFile = elementFiles[currentIndex];
                 if (currentFile == "Apagar") {
+                    // Reiniciar la selección de todos los elementos
                     for (size_t i = 0; i < selectedStates.size(); i++) {
                         selectedStates[i] = false;
+                    }
+                    // Reinicializar los modos alternativos para TODOS los elementos
+                    for (auto &entry : elementAlternateStates) {
+                        entry.second = initializeAlternateStates(entry.first);
                     }
                     std::vector<byte> elementID;
                     elementID.push_back(0xFF);
                     send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, BLACKOUT));
                     setAllElementsToBasicMode();
+
                     showMessageWithLoading("Apagando Sala...", 5000);
+
                     currentIndex = 0;
                     inModesScreen = false;
                     drawCurrentElement();
@@ -246,7 +253,7 @@ void handleEncoder() {
                 }
                 if (inModesScreen) {
                     // Al confirmar (pulsación corta) se envían los comandos a través de handleModeSelection,
-                    // que ahora gestionará el envío del comando de alternancia según el estado almacenado.
+                    // que gestionará el envío del comando de alternancia según el estado almacenado.
                     handleModeSelection(elementFiles[currentIndex]);
                 } else {
                     toggleElementSelection(elementFiles[currentIndex]);
@@ -294,6 +301,7 @@ void requestAndSyncElementMode() {
     
 }
 
+bool modeAlternateActive = false;
 // Función handleModeSelection modificada
 void handleModeSelection(const String& currentFile) {
     // Si se selecciona la opción de regresar (icono de flecha), salimos inmediatamente
@@ -427,27 +435,31 @@ void handleModeSelection(const String& currentFile) {
         }
     }
 
-    // Confirmación normal (pulsación corta): aquí se envían los comandos, incluyendo el de modo alternativo
-    if (!selectedStates[currentIndex]) {
+    // Confirmación normal (pulsación corta)
+    // Se guarda si el elemento ya estaba seleccionado.
+    bool wasAlreadySelected = selectedStates[currentIndex];
+    if (!wasAlreadySelected) {
         selectedStates[currentIndex] = true;
 #ifdef DEBUG
         Serial.println("DEBUG: Elemento seleccionado automáticamente.");
 #endif
     }
 
-    // En este punto, ya sea que no se haya hecho long press o se haya hecho y solo se haya actualizado la visual,
-    // se envía el comando correspondiente al estado alternativo (si corresponde) cuando se confirma la selección.
+    // En este punto, se envía el comando de alternancia (según el estado) siempre,
+    // y se envían los demás comandos de confirmación.
     if (visibleModeIndex >= 0 && currentAlternateStates.size() > (size_t)visibleModeIndex) {
         if (getModeFlag(modeConfig, HAS_ALTERNATIVE_MODE)) {
             if (currentAlternateStates[visibleModeIndex]) {
+                modeAlternateActive = true;
                 send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, ALTERNATE_MODE_ON));
-                delay(20);
+                delay(300);
 #ifdef DEBUG
                 Serial.println("DEBUG: [Confirmación] Se envió ALTERNATE_MODE_ON");
 #endif
             } else {
+                modeAlternateActive = false;
                 send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, ALTERNATE_MODE_OFF));
-                delay(20);
+                delay(300);
 #ifdef DEBUG
                 Serial.println("DEBUG: [Confirmación] Se envió ALTERNATE_MODE_OFF");
 #endif
@@ -455,31 +467,49 @@ void handleModeSelection(const String& currentFile) {
         }
     }
 
-#ifdef DEBUG
-    Serial.printf("DEBUG: Nombre del elemento: %s\n", elementName[0] ? elementName : currentFile.c_str());
-    Serial.printf("DEBUG: ID del elemento: %d\n", elementID[0]);
-    Serial.printf("DEBUG: Modo seleccionado: %s (Modo %d)\n", modeName.c_str(), modeNumber);
-    Serial.printf("DEBUG: Estado alternativo: %s\n", 
-                  (visibleModeIndex >= 0 && currentAlternateStates.size() > (size_t)visibleModeIndex) ? 
-                  (currentAlternateStates[visibleModeIndex] ? "ACTIVO" : "INACTIVO") : "NO APLICABLE");
-#endif
-
-    // Enviar comandos para iniciar y configurar el modo (estos se envían siempre al confirmar)
-    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, START_CMD));
-    delay(300);
+    // Solo enviar START_CMD si el elemento no estaba ya seleccionado
+    if (!wasAlreadySelected) {
+        send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, START_CMD));
+        delay(300);
+    }
     send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, elementID, realModeIndex));
 
     inModesScreen = false;
     drawCurrentElement();
 }
 
+std::vector<bool> initializeAlternateStates(const String &currentFile) {
+    std::vector<bool> states;
+    // Para elementos fijos ("Ambientes" o "Fichas")
+    if (currentFile == "Ambientes" || currentFile == "Fichas") {
+        INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+        for (int i = 0; i < 16; i++) {
+            if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
+                // Iniciar en false = versión NO alterna (modo básico)
+                states.push_back(false);
+            }
+        }
+    }
+    // Para elementos almacenados en SPIFFS (excepto "Apagar")
+    else if (currentFile != "Apagar") {
+        // Si queremos leer algún valor guardado, lo haríamos aquí; de lo contrario, se inicializa en false.
+        for (int i = 0; i < 16; i++) {
+            states.push_back(false);
+        }
+    }
+    // Para "Apagar" se puede definir un vector simple
+    else {
+        states.push_back(false);
+    }
+    return states;
+}
+
 void toggleElementSelection(const String& currentFile) {
     // Alternar el estado de selección del elemento actual
     selectedStates[currentIndex] = !selectedStates[currentIndex];
 
-    // Crear el vector para almacenar la ID del elemento
+    // Obtener la ID del elemento (si es de SPIFFS; si es fijo, usamos ID 0)
     std::vector<byte> elementID;
-    // Determinar si el elemento proviene de SPIFFS
     bool isElementFromSPIFFS = !currentFile.startsWith("Ambientes") &&
                                !currentFile.startsWith("Fichas") &&
                                !currentFile.startsWith("Apagar");
@@ -494,16 +524,47 @@ void toggleElementSelection(const String& currentFile) {
             f.close();
         } else {
             Serial.println("Error al leer la ID del archivo.");
-            elementID.push_back(0); // Valor por defecto en caso de error
+            elementID.push_back(0);
         }
     } else {
-        // Si es "Ambientes", "Fichas" o "Apagar", no hacemos nada con SPIFFS
         elementID.push_back(0);
     }
 
-    // Solo si es un elemento de SPIFFS se envía el comando y se actualiza el modo
+    // Si se deselecciona el elemento (estado false), reiniciamos el vector de modos para ese elemento
+    if (!selectedStates[currentIndex]) {
+        // Para elementos que NO sean "Apagar"
+        if (!currentFile.startsWith("Apagar")) {
+            // Reinicializar el vector de estados alternativos para el elemento actual
+            std::vector<bool> newStates = initializeAlternateStates(currentFile);
+            // Actualizar tanto el map global como el vector local
+            elementAlternateStates[currentFile] = newStates;
+            currentAlternateStates = newStates;
+        }
+    }
+
+    // Si se presiona el botón "Apagar", reiniciamos los modos de TODOS los elementos
+    if (currentFile == "Apagar") {
+        // Reiniciar la selección de todos los elementos
+        for (size_t i = 0; i < selectedStates.size(); i++) {
+            selectedStates[i] = false;
+        }
+        // Reinicializar los estados alternativos para cada elemento en el map global
+        for (auto &entry : elementAlternateStates) {
+            entry.second = initializeAlternateStates(entry.first);
+        }
+        std::vector<byte> elementID;
+        elementID.push_back(0xFF);
+        send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, BLACKOUT));
+        setAllElementsToBasicMode();
+        showMessageWithLoading("Apagando Sala...", 5000);
+        currentIndex = 0;
+        inModesScreen = false;
+        drawCurrentElement();
+        return;
+    }
+    
+    // Para elementos de SPIFFS, se envía el comando de selección según el estado
     if (isElementFromSPIFFS) {
-        // Determinar el comando a enviar
         byte command = selectedStates[currentIndex] ? START_CMD : BLACKOUT;
         Serial.printf("Enviando comando %s a la ID %d\n",
                       command == START_CMD ? "START_CMD" : "BLACKOUT",
@@ -514,7 +575,7 @@ void toggleElementSelection(const String& currentFile) {
             showMessageWithLoading("Apagando Elemento", 3000);
         }
 
-        // Actualizar el modo del elemento a "básico"
+        // Actualizar el modo del elemento a "básico" en SPIFFS
         fs::File f = SPIFFS.open(currentFile, "r+");
         if (f) {
             byte basicMode = DEFAULT_BASIC_MODE;  // modo 1
@@ -527,8 +588,6 @@ void toggleElementSelection(const String& currentFile) {
         }
     }
     
-    // En el caso de "Ambientes", "Fichas" o "Apagar", únicamente se alterna el estado de selección
-
     // Redibujar el elemento actual para reflejar la selección/deselección
     drawCurrentElement();
 }

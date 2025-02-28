@@ -16,11 +16,7 @@ BOTONERA_::BOTONERA_() : ELEMENT_() {
             set_type(TYPE_BOTONERA);
         }
 
-void BOTONERA_::botonera_begin(){
-
-    
-            
-}
+void BOTONERA_::botonera_begin(){}
 
 void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
     Serial.println("\n==== 📨 Trama Recibida 📨 ====");
@@ -61,7 +57,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
         default: functionStr = "FUNCIÓN DESCONOCIDA";
     }
 
-    Serial.printf("🛠️  Función: %s (0x%02X)\n", functionStr.c_str(), LEF.function);
+    Serial.printf("🛠️ Función: %s (0x%02X)\n", functionStr.c_str(), LEF.function);
 
     // Interpretación de datos
     Serial.print("📦 Data: ");
@@ -804,18 +800,6 @@ bool BOTONERA_::serialExistsInSPIFFS(byte serialNum[5]) {
     return false;
 }
 
-// void BOTONERA_::iniciarEscaneoElemento(const char* mensajeInicial) {
-//     tft.fillScreen(TFT_BLACK);
-//     dibujarMarco(TFT_WHITE);
-    
-//     tft.setTextColor(TFT_WHITE);
-//     tft.setTextDatum(MC_DATUM);
-//     tft.setTextFont(2); // Usa Font 2
-//     tft.drawString(mensajeInicial, 64, 30);
-//     delay(100);
-    
-// }
-
 void BOTONERA_::iniciarEscaneoElemento(const char* mensajeInicial) {
     tft.fillScreen(TFT_BLACK);
     dibujarMarco(TFT_WHITE);
@@ -873,7 +857,6 @@ void BOTONERA_::iniciarEscaneoElemento(const char* mensajeInicial) {
     
     delay(100);
 }
-
 
 void BOTONERA_::actualizarBarraProgreso(float progreso) {
     int barraAnchoMax = 100;
