@@ -54,13 +54,11 @@ void handleEncoder() {
     if (newEncoderValue != lastEncoderValue) {
         int32_t direction = (newEncoderValue > lastEncoderValue) ? 1 : -1;
         lastEncoderValue = newEncoderValue;
-
-        // Navegar por elementos (cuando no se está en el menú de modos)
+        
+        // Navegar por elementos cuando NO estamos en el menú de modos.
         if (!inModesScreen && elementFiles.size() > 1) {
             currentIndex = (currentIndex + direction + elementFiles.size()) % elementFiles.size();
             String currentFile = elementFiles[currentIndex];
-
-            // Si el elemento cambió, cargar su vector de estados alternativos desde el mapa
             static String lastElementFile = "";
             if (currentFile != lastElementFile) {
                 if (elementAlternateStates.find(currentFile) != elementAlternateStates.end()) {
@@ -73,7 +71,6 @@ void handleEncoder() {
             
             int realModeIndex = 0;
             byte modeConfig[2] = {0};
-
             if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Apagar") {
                 INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
                 realModeIndex = option->currentMode;
@@ -88,19 +85,16 @@ void handleEncoder() {
                     f.close();
                 }
             }
-
             adxl = getModeFlag(modeConfig, HAS_SENS_VAL_1);
             useMic = getModeFlag(modeConfig, HAS_SENS_VAL_2);
-
 #ifdef DEBUG
             Serial.println("🚀 Cambió de elemento, actualizando flags:");
             Serial.println("adxl status: " + String(adxl ? "true" : "false"));
             Serial.println("useMic status: " + String(useMic ? "true" : "false"));
 #endif
-
-            drawCurrentElement();  
+            drawCurrentElement();
         }
-        // Navegar por modos cuando estamos en el menú de modos
+        // Navegar por modos cuando estamos en el menú de modos.
         else if (inModesScreen && totalModes > 0) {
             currentModeIndex = (currentModeIndex + direction + totalModes) % totalModes;
             int realModeIndex = globalVisibleModesMap[currentModeIndex];
@@ -112,152 +106,116 @@ void handleEncoder() {
             drawModesScreen();
         }
     }
-
-    // Lectura del botón del encoder
+    
+    // Lectura del botón del encoder.
     if (digitalRead(ENC_BUTTON) == LOW) {
         if (buttonPressStart == 0) {
             buttonPressStart = millis();
-        }
-        // Caso 1: Desde la pantalla principal: Long press para entrar al menú de modos
-        else if (!inModesScreen && millis() - buttonPressStart >= 2000 && !isLongPress) {
-            Serial.println("DEBUG: Long press detectado en pantalla principal - entrando en menú de modos");
-            isLongPress = true;
-            modeScreenEnteredByLongPress = true;
-            String currentFile = elementFiles[currentIndex];
-            if (currentFile == "Apagar") {
-                Serial.println("DEBUG: Long press detectado sobre 'Apagar' - se ignora");
-                return;
-            }
-            int realModeIndex = 0;
-            if (currentFile == "Ambientes" || currentFile == "Fichas") {
-                INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
-                realModeIndex = option->currentMode;
-            } else {
-                fs::File f = SPIFFS.open(currentFile, "r");
-                if (f) {
-                    f.seek(OFFSET_CURRENTMODE, SeekSet);
-                    realModeIndex = f.read();
-                    f.close();
-                }
-            }
-            // Determinar el índice visible en la lista de modos
-            int tempCurrentModeIndex = 0;
-            int foundVisibleIndex = -1;
-            if (currentFile == "Ambientes" || currentFile == "Fichas") {
-                INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
-                for (int i = 0; i < 16; i++) {
-                    if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
-                        if (i == realModeIndex) {
-                            foundVisibleIndex = tempCurrentModeIndex;
-                            break;
-                        }
-                        tempCurrentModeIndex++;
-                    }
-                }
-            } else {
-                fs::File f = SPIFFS.open(currentFile, "r");
-                if (f) {
-                    for (int i = 0; i < 16; i++) {
-                        char modeName[25] = {0};
-                        char modeDesc[193] = {0};
-                        byte modeConfig[2] = {0};
-                        if (f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet)) {
-                            f.read((uint8_t*)modeName, 24);
-                            f.read((uint8_t*)modeDesc, 192);
-                            f.read(modeConfig, 2);
-                            if (strlen(modeName) > 0 && checkMostSignificantBit(modeConfig)) {
-                                if (i == realModeIndex) {
-                                    foundVisibleIndex = tempCurrentModeIndex;
+        } else {
+            // Si estamos en el menú de modos y han pasado 2s, realizar el toggle inmediato del nombre alternativo.
+            if (inModesScreen && !isLongPress && (millis() - buttonPressStart >= 2000)) {
+                // Se aplica solo a opciones que no sean "Encender/Apagar" (índice 0) ni "Regresar" (último índice).
+                if (currentModeIndex != 0 && currentModeIndex != totalModes - 1) {
+                    int adjustedIndex = currentModeIndex - 1;
+                    String currFile = elementFiles[currentIndex];
+                    uint8_t modeConfig[2] = {0};
+                    bool canToggle = false;
+                    if (currFile == "Ambientes" || currFile == "Fichas") {
+                        INFO_PACK_T* option = (currFile == "Ambientes") ? &ambientesOption : &fichasOption;
+                        int count = 0;
+                        for (int i = 0; i < 16; i++) {
+                            if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
+                                if (count == adjustedIndex) {
+                                    memcpy(modeConfig, option->mode[i].config, 2);
                                     break;
                                 }
-                                tempCurrentModeIndex++;
+                                count++;
                             }
                         }
-                    }
-                    f.close();
-                }
-            }
-            if (foundVisibleIndex >= 0) {
-                currentModeIndex = foundVisibleIndex;
-            } else {
-                currentModeIndex = 0;
-            }
-            inModesScreen = true;
-            drawModesScreen();
-        }
-        // Caso 2: Dentro del menú de modos: Long press para togglear estado alternativo
-        else if (inModesScreen && millis() - buttonPressStart >= 2000 && !isLongPress) {
-            Serial.println("DEBUG: Long press detectado en menú de modos - procesando toggle");
-            isLongPress = true;
-            String currentFile = elementFiles[currentIndex];
-            // No se envía ningún comando en este bloque; solo se actualiza el estado y se guarda.
-            if (currentAlternateStates.size() > (size_t)currentModeIndex) {
-                currentAlternateStates[currentModeIndex] = !currentAlternateStates[currentModeIndex];
-                // Actualizar el mapa para el elemento actual
-                elementAlternateStates[currentFile] = currentAlternateStates;
-                // Guardar el estado alternativo en SPIFFS para elementos que no son fijos
-                if (currentFile != "Ambientes" && currentFile != "Fichas" && currentFile != "Apagar") {
-                    fs::File f = SPIFFS.open(currentFile, "r+");
-                    if (f) {
-                        const int OFFSET_ALTERNATE_STATES = OFFSET_CURRENTMODE + 1;
-                        f.seek(OFFSET_ALTERNATE_STATES, SeekSet);
-                        byte states[16] = {0};
-                        for (size_t i = 0; i < min(currentAlternateStates.size(), (size_t)16); i++) {
-                            states[i] = currentAlternateStates[i] ? 1 : 0;
+                        canToggle = getModeFlag(modeConfig, HAS_ALTERNATIVE_MODE);
+                    } else if (currFile != "Apagar") {
+                        fs::File f = SPIFFS.open(currFile, "r");
+                        if (f) {
+                            int count = 0;
+                            for (int i = 0; i < 16; i++) {
+                                char modeName[25] = {0};
+                                byte tempConfig[2] = {0};
+                                f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet);
+                                f.read((uint8_t*)modeName, 24);
+                                f.seek(OFFSET_MODES + i * SIZE_MODE + 216, SeekSet);
+                                f.read(tempConfig, 2);
+                                if (strlen(modeName) > 0 && checkMostSignificantBit(tempConfig)) {
+                                    if (count == adjustedIndex) {
+                                        memcpy(modeConfig, tempConfig, 2);
+                                        break;
+                                    }
+                                    count++;
+                                }
+                            }
+                            f.close();
+                            canToggle = getModeFlag(modeConfig, HAS_ALTERNATIVE_MODE);
                         }
-                        f.write(states, 16);
-                        f.close();
+                    }
+                    if (canToggle && adjustedIndex >= 0 && currentAlternateStates.size() > (size_t)adjustedIndex) {
+                        currentAlternateStates[adjustedIndex] = !currentAlternateStates[adjustedIndex];
+                        elementAlternateStates[currFile] = currentAlternateStates;
+                        if (currFile != "Ambientes" && currFile != "Fichas" && currFile != "Apagar") {
+                            fs::File f = SPIFFS.open(currFile, "r+");
+                            if (f) {
+                                const int OFFSET_ALTERNATE_STATES = OFFSET_CURRENTMODE + 1;
+                                f.seek(OFFSET_ALTERNATE_STATES, SeekSet);
+                                byte states[16] = {0};
+                                for (size_t i = 0; i < min(currentAlternateStates.size(), (size_t)16); i++) {
+                                    states[i] = currentAlternateStates[i] ? 1 : 0;
+                                }
+                                f.write(states, 16);
+                                f.close();
+                            }
+                        }
+                        drawModesScreen();
+                        isLongPress = true;
                     }
                 }
-                if (currentAlternateStates[currentModeIndex]) {
-                    Serial.println("DEBUG: Modo alternativo activado (solo toggle, comando diferido)");
-                } else {
-                    Serial.println("DEBUG: Modo alternativo desactivado (solo toggle, comando diferido)");
-                }
             }
-            drawModesScreen();
         }
     }
-    // Cuando se suelta el botón
-    else {
-        if (!hiddenMenuActive && buttonPressStart > 0) {
+    else { // Al soltar el botón.
+        if (buttonPressStart > 0) {
             unsigned long pressDuration = millis() - buttonPressStart;
 #ifdef DEBUG
             Serial.println("DEBUG: Botón soltado, duración: " + String(pressDuration) + " ms");
 #endif
-            // Solo procesar pulsaciones cortas (<2000 ms) para confirmar selección
-            if (pressDuration < 2000) {
-                String currentFile = elementFiles[currentIndex];
+            String currentFile = elementFiles[currentIndex];
+            // Si no estamos en el menú de modos, se verifica si el elemento es "Apagar".
+            if (!inModesScreen) {
                 if (currentFile == "Apagar") {
-                    // Reiniciar la selección de todos los elementos
+                    // Ejecutar comando BLACKOUT en broadcast y mostrar mensaje temporal.
                     for (size_t i = 0; i < selectedStates.size(); i++) {
                         selectedStates[i] = false;
-                    }
-                    // Reinicializar los modos alternativos para TODOS los elementos
-                    for (auto &entry : elementAlternateStates) {
-                        entry.second = initializeAlternateStates(entry.first);
                     }
                     std::vector<byte> elementID;
                     elementID.push_back(0xFF);
                     send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, BLACKOUT));
                     setAllElementsToBasicMode();
-
                     showMessageWithLoading("Apagando Sala...", 5000);
-
                     currentIndex = 0;
-                    inModesScreen = false;
                     drawCurrentElement();
                     buttonPressStart = 0;
                     isLongPress = false;
                     return;
-                }
-                if (inModesScreen) {
-                    // Al confirmar (pulsación corta) se envían los comandos a través de handleModeSelection,
-                    // que gestionará el envío del comando de alternancia según el estado almacenado.
-                    handleModeSelection(elementFiles[currentIndex]);
                 } else {
-                    toggleElementSelection(elementFiles[currentIndex]);
+                    // Para otros elementos, abrir el menú de modos.
+                    inModesScreen = true;
+                    currentModeIndex = 0;
+                    drawModesScreen();
                 }
+            }
+            else { // Si ya estamos en el menú de modos.
+                // Si no se activó el toggle previo y la pulsación fue corta, confirmar la selección.
+                if (!isLongPress && pressDuration < 2000) {
+                    handleModeSelection(elementFiles[currentIndex]);
+                }
+                // Si ya se activó el toggle, no se realiza acción adicional.
             }
         }
         buttonPressStart = 0;
@@ -304,176 +262,131 @@ void requestAndSyncElementMode() {
 bool modeAlternateActive = false;
 // Función handleModeSelection modificada
 void handleModeSelection(const String& currentFile) {
-    // Si se selecciona la opción de regresar (icono de flecha), salimos inmediatamente
+    // Si se selecciona la opción "Regresar" (valor -2), salir del menú.
     if (globalVisibleModesMap[currentModeIndex] == -2) {
         inModesScreen = false;
         drawCurrentElement();
         return;
     }
-  
-    // Variables necesarias para procesar el modo seleccionado
-    std::vector<byte> elementID;
-    char elementName[25] = {0};
+    
+    // Si se selecciona la opción "Encender/Apagar" (índice 0, valor -3).
+    if (currentModeIndex == 0) {
+        bool wasSelected = selectedStates[currentIndex];
+        selectedStates[currentIndex] = !wasSelected;
+        if (currentFile != "Ambientes" && currentFile != "Fichas" && currentFile != "Apagar") {
+            fs::File f = SPIFFS.open(currentFile, "r+");
+            if (f) {
+                if (selectedStates[currentIndex]) {
+                    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{getCurrentElementID()}, START_CMD));
+                } else {
+                    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{getCurrentElementID()}, BLACKOUT));
+                    fs::File f2 = SPIFFS.open(currentFile, "r+");
+                    if (f2) {
+                        byte basicMode = DEFAULT_BASIC_MODE;
+                        f2.seek(OFFSET_CURRENTMODE, SeekSet);
+                        f2.write(&basicMode, 1);
+                        f2.close();
+                    }
+                    setAllElementsToBasicMode();
+                    showMessageWithLoading("Apagando elemento...", 3000);
+                }
+                f.close();
+            }
+        }
+        inModesScreen = false;
+        drawCurrentElement();
+        return;
+    }
+    
+    // Para las opciones de modo (índices > 0, excepto "Regresar").
+    int adjustedVisibleIndex = currentModeIndex - 1;
     String modeName;
     uint8_t modeConfig[2] = {0};
-
-    // Obtener el índice real del modo a partir del índice visible
-    int realModeIndex = globalVisibleModesMap[currentModeIndex];
-    int modeNumber = currentModeIndex + 1; // Número del modo en la lista visible
-
-    // Calcular el índice visible para el modo actual (necesario para saber qué posición en currentAlternateStates usar)
-    int visibleModeIndex = -1;
-    int count = 0;
-
+    int realModeIndex = 0;
+    
     if (currentFile == "Ambientes" || currentFile == "Fichas") {
-        // Procesar elementos fijos
         INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
-        option->currentMode = realModeIndex;
-        // Se asume que ya está el nombre completo (ej. "BASICO/BASICO LENTO")
-        modeName = String((char*)option->mode[realModeIndex].name);
-        memcpy(modeConfig, option->mode[realModeIndex].config, 2);
-        elementID.push_back(0); // ID predeterminada
-
-        // Calcular el índice visible para el modo actual
+        int count = 0;
         for (int i = 0; i < 16; i++) {
             if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
-                if (i == option->currentMode) {
-                    visibleModeIndex = count;
+                if (count == adjustedVisibleIndex) {
+                    realModeIndex = i;
                     break;
                 }
                 count++;
             }
         }
-        Serial.println("DEBUG: [handleModeSelection] visibleModeIndex (fijos) = " + String(visibleModeIndex));
+        option->currentMode = realModeIndex;
+        modeName = String((char*)option->mode[realModeIndex].name);
+        memcpy(modeConfig, option->mode[realModeIndex].config, 2);
     } else {
-        // Procesar elementos de SPIFFS
         fs::File f = SPIFFS.open(currentFile, "r+");
         if (f) {
-            f.seek(OFFSET_CURRENTMODE, SeekSet);
-            f.write((uint8_t*)&realModeIndex, 1);
-
-            f.seek(OFFSET_NAME, SeekSet);
-            f.read((uint8_t*)elementName, 24);
-
-            byte id = 0;
-            f.seek(OFFSET_ID, SeekSet);
-            f.read(&id, 1);
-            elementID.push_back(id);
-
-            int modoOffset = OFFSET_MODES + (SIZE_MODE * realModeIndex);
-            f.seek(modoOffset, SeekSet);
-            char modeNameBuf[25] = {0};
-            f.read((uint8_t*)modeNameBuf, 24);
-            modeName = String(modeNameBuf);
-
-            f.seek(modoOffset + 24 + 192, SeekSet);
-            f.read(modeConfig, 2);
-            f.close();
-        }
-        
-        // Calcular el índice visible para el modo actual en SPIFFS
-        fs::File f2 = SPIFFS.open(currentFile, "r");
-        if (f2) {
+            int count = 0;
             for (int i = 0; i < 16; i++) {
                 char modeBuf[25] = {0};
                 byte tempConfig[2] = {0};
-                f2.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet);
-                f2.read((uint8_t*)modeBuf, 24);
-                f2.seek(OFFSET_MODES + i * SIZE_MODE + 216, SeekSet);
-                f2.read(tempConfig, 2);
+                f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet);
+                f.read((uint8_t*)modeBuf, 24);
+                f.seek(OFFSET_MODES + i * SIZE_MODE + 216, SeekSet);
+                f.read(tempConfig, 2);
                 if (strlen(modeBuf) > 0 && checkMostSignificantBit(tempConfig)) {
-                    if (i == realModeIndex) {
-                        visibleModeIndex = count;
+                    if (count == adjustedVisibleIndex) {
+                        realModeIndex = i;
                         break;
                     }
                     count++;
                 }
             }
-            f2.close();
+            f.seek(OFFSET_CURRENTMODE, SeekSet);
+            f.write((uint8_t*)&realModeIndex, 1);
+            f.close();
         }
-        Serial.println("DEBUG: [handleModeSelection] visibleModeIndex (SPIFFS) = " + String(visibleModeIndex));
     }
-
-    // Extraer los flags usando getModeFlag()
+    
     adxl = getModeFlag(modeConfig, HAS_SENS_VAL_1);
     useMic = getModeFlag(modeConfig, HAS_SENS_VAL_2);
-
 #ifdef DEBUG
-    Serial.println("DEBUG: Mode Name (procesado): " + modeName);  
+    Serial.println("DEBUG: Mode Name (procesado): " + modeName);
     Serial.println("DEBUG: adxl status: " + String(adxl ? "true" : "false"));
-    Serial.println("DEBUG: useMic status: " + String(useMic ? "true" : "false"));    
+    Serial.println("DEBUG: useMic status: " + String(useMic ? "true" : "false"));
 #endif
-
-    // Lógica de alternancia para long press:
-    // En long press, solo se cambia el estado alternativo (y se guarda en SPIFFS) sin enviar comandos.
-    if (getModeFlag(modeConfig, HAS_ALTERNATIVE_MODE)) {
-        if (isLongPress) {
-            if (visibleModeIndex >= 0 && currentAlternateStates.size() > (size_t)visibleModeIndex) {
-                currentAlternateStates[visibleModeIndex] = !currentAlternateStates[visibleModeIndex];
-                
-                // Guardar el estado alternativo en SPIFFS para elementos que no son fijos
-                if (currentFile != "Ambientes" && currentFile != "Fichas" && currentFile != "Apagar") {
-                    fs::File f = SPIFFS.open(currentFile, "r+");
-                    if (f) {
-                        const int OFFSET_ALTERNATE_STATES = OFFSET_CURRENTMODE + 1;
-                        f.seek(OFFSET_ALTERNATE_STATES, SeekSet);
-                        byte states[16] = {0};
-                        for (size_t i = 0; i < min(currentAlternateStates.size(), (size_t)16); i++) {
-                            states[i] = currentAlternateStates[i] ? 1 : 0;
-                        }
-                        f.write(states, 16);
-                        f.close();
-                    }
-                }
-#ifdef DEBUG
-                Serial.println("DEBUG: Estado alternativo cambiado a: " + String(currentAlternateStates[visibleModeIndex] ? "ACTIVO" : "INACTIVO"));
-#endif
-            }
-            isLongPress = false;
-            drawModesScreen();
-            return;
-        }
-    }
-
-    // Confirmación normal (pulsación corta)
-    // Se guarda si el elemento ya estaba seleccionado.
+    
+    // Confirmación normal (pulsación corta) para el modo seleccionado.
     bool wasAlreadySelected = selectedStates[currentIndex];
     if (!wasAlreadySelected) {
         selectedStates[currentIndex] = true;
-#ifdef DEBUG
-        Serial.println("DEBUG: Elemento seleccionado automáticamente.");
-#endif
     }
-
-    // En este punto, se envía el comando de alternancia (según el estado) siempre,
-    // y se envían los demás comandos de confirmación.
-    if (visibleModeIndex >= 0 && currentAlternateStates.size() > (size_t)visibleModeIndex) {
-        if (getModeFlag(modeConfig, HAS_ALTERNATIVE_MODE)) {
-            if (currentAlternateStates[visibleModeIndex]) {
+    if (currentFile == "Ambientes" || currentFile == "Fichas") {
+        send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{0}, START_CMD));
+        delay(300);
+        send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, std::vector<byte>{0}, realModeIndex));
+    } else {
+        fs::File f = SPIFFS.open(currentFile, "r");
+        byte modeConfigTemp[2] = {0};
+        if (f) {
+            int modoOffset = OFFSET_MODES + (SIZE_MODE * realModeIndex);
+            f.seek(modoOffset + 24 + 192, SeekSet);
+            f.read(modeConfigTemp, 2);
+            f.close();
+        }
+        if (getModeFlag(modeConfigTemp, HAS_ALTERNATIVE_MODE)) {
+            if (currentAlternateStates.size() > (size_t)adjustedVisibleIndex && currentAlternateStates[adjustedVisibleIndex]) {
                 modeAlternateActive = true;
-                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, ALTERNATE_MODE_ON));
+                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{getCurrentElementID()}, ALTERNATE_MODE_ON));
                 delay(300);
-#ifdef DEBUG
-                Serial.println("DEBUG: [Confirmación] Se envió ALTERNATE_MODE_ON");
-#endif
             } else {
                 modeAlternateActive = false;
-                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, ALTERNATE_MODE_OFF));
+                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{getCurrentElementID()}, ALTERNATE_MODE_OFF));
                 delay(300);
-#ifdef DEBUG
-                Serial.println("DEBUG: [Confirmación] Se envió ALTERNATE_MODE_OFF");
-#endif
             }
         }
+        if (!wasAlreadySelected) {
+            send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{getCurrentElementID()}, START_CMD));
+            delay(300);
+        }
+        send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, std::vector<byte>{getCurrentElementID()}, realModeIndex));
     }
-
-    // Solo enviar START_CMD si el elemento no estaba ya seleccionado
-    if (!wasAlreadySelected) {
-        send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, START_CMD));
-        delay(300);
-    }
-    send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, elementID, realModeIndex));
-
     inModesScreen = false;
     drawCurrentElement();
 }

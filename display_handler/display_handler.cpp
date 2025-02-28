@@ -580,135 +580,86 @@ std::map<String, std::vector<bool>> elementAlternateStates;
 std::vector<bool> currentAlternateStates;
 
 void drawModesScreen() {
-    // Variables para scroll vertical suave
+    // Variables para scroll vertical suave.
     static int scrollOffset = 0;
     static int targetScrollOffset = 0;
-    const int visibleOptions = 4; // Número máximo de opciones visibles
+    const int visibleOptions = 4; // Número máximo de opciones visibles.
 
-    // Variables para el scroll horizontal de la opción seleccionada (pixel-based)
+    // Variables para scroll horizontal del texto de la opción seleccionada.
     static int modeTickerOffset = 0;
     static int modeTickerDirection = 1;
     static unsigned long modeLastFrameTime = 0;
     static int lastSelectedMode = -1;
 
-    // Limpiar el sprite completo
+    // Limpiar el sprite completo.
     uiSprite.fillSprite(BACKGROUND_COLOR);
 
-    // Título (usando la fuente FreeSans12pt7b)
+    // Título.
     uiSprite.setFreeFont(&FreeSans12pt7b);
     uiSprite.setTextColor(TEXT_COLOR);
     uiSprite.setTextDatum(TC_DATUM);
     uiSprite.setTextSize(1);
     uiSprite.drawString("MODOS", 64, 5);
 
-    // Obtener el archivo del elemento actual
     String currentFile = elementFiles[currentIndex];
-    totalModes = 0;
-
-    // Mapa auxiliar: índice visible -> índice real (máximo 16 modos + 1 extra para regresar)
-    int visibleModesMap[17] = {0};
-    memset(visibleModesMap, -1, sizeof(visibleModesMap));
-
-    int visibleCurrentModeIndex = -1; // Índice visible de la opción seleccionada
-
-    // Determinar de dónde obtener los modos: de opciones fijas (Ambientes/Fichas) o desde SPIFFS
-    INFO_PACK_T* option = nullptr;
-    fs::File f;
+    
+    // Construir el mapa auxiliar de modos visibles.
+    // La primera opción siempre será "Encender/Apagar" (valor especial -3).
+    int visibleModesMap[18]; // Espacio para: "Encender/Apagar" + hasta 16 modos + "Regresar".
+    visibleModesMap[0] = -3; // -3 indica "Encender/Apagar".
+    int count = 1;
+    
+    // Para elementos fijos ("Ambientes" o "Fichas").
     if (currentFile == "Ambientes" || currentFile == "Fichas") {
-        option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
-    } else if (currentFile != "Apagar") {
-        f = SPIFFS.open(currentFile, "r");
-        if (!f) {
-            Serial.println("Error al abrir archivo para leer modos.");
-            uiSprite.drawString("Error leyendo modos", 10, 25);
-            uiSprite.pushSprite(0, 0);
-            return;
+        INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+        for (int i = 0; i < 16; i++) {
+            if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
+                visibleModesMap[count] = i;
+                count++;
+            }
         }
-        
-        // Si estamos abriendo un elemento de SPIFFS, asegurarnos de leer los estados alternativos
-        if (currentAlternateStates.size() == 0) {
-            const int OFFSET_ALTERNATE_STATES = OFFSET_CURRENTMODE + 1;
-            byte storedStates[16] = {0};
-            f.seek(OFFSET_ALTERNATE_STATES, SeekSet);
-            f.read(storedStates, 16);
-            
-            // Cargar los estados almacenados en un vector temporal
-            std::vector<byte> tempStates(storedStates, storedStates + 16);
-            
-            // Los estados se usarán más adelante al construir currentAlternateStates
-            int count = 0;
+    }
+    // Para elementos almacenados en SPIFFS (excepto "Apagar").
+    else if (currentFile != "Apagar") {
+        fs::File f = SPIFFS.open(currentFile, "r");
+        if (f) {
             for (int i = 0; i < 16; i++) {
-                char modeBuf[25] = {0};
+                char modeName[25] = {0};
                 byte modeConfig[2] = {0};
                 f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet);
-                f.read((uint8_t*)modeBuf, 24);
+                f.read((uint8_t*)modeName, 24);
                 f.seek(OFFSET_MODES + i * SIZE_MODE + 216, SeekSet);
                 f.read(modeConfig, 2);
-                if (strlen(modeBuf) > 0 && checkMostSignificantBit(modeConfig)) {
-                    bool hasAlt = getModeFlag(modeConfig, HAS_ALTERNATIVE_MODE);
-                    // Usar el estado guardado si existe y el modo tiene alternativa
-                    if (hasAlt && count < tempStates.size()) {
-                        currentAlternateStates.push_back(tempStates[count] > 0);
-                    } else {
-                        currentAlternateStates.push_back(false);
-                    }
+                if (strlen(modeName) > 0 && checkMostSignificantBit(modeConfig)) {
+                    visibleModesMap[count] = i;
                     count++;
                 }
             }
+            f.close();
         }
     }
+    // Agregar la opción "Regresar" al final.
+    visibleModesMap[count] = -2; // -2 indica "Regresar".
+    count++;
+    totalModes = count;
 
-    // Recolectar los modos válidos (máximo 16) y llenar el mapa auxiliar
-    for (int i = 0; i < 16; i++) {
-        char modeName[25] = {0};
-        byte modeConfig[2] = {0};
-
-        if (option) {
-            strncpy(modeName, (char*)option->mode[i].name, 24);
-            memcpy(modeConfig, option->mode[i].config, 2);
-        } else {
-            f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet);
-            f.read((uint8_t*)modeName, 24);
-            f.seek(OFFSET_MODES + i * SIZE_MODE + 216, SeekSet);
-            f.read(modeConfig, 2);
-        }
-        if (strlen(modeName) > 0 && checkMostSignificantBit(modeConfig)) {
-            visibleModesMap[totalModes] = i;
-            if (totalModes == currentModeIndex) {
-                visibleCurrentModeIndex = totalModes;
-            }
-            totalModes++;
-        }
+    // Validar currentModeIndex.
+    if (currentModeIndex < 0 || currentModeIndex >= totalModes) {
+        currentModeIndex = 0;
     }
-    if (!option) {
-        f.close();
-    }
-
-    // Agregar la opción extra para regresar al menú principal
-    visibleModesMap[totalModes] = -2; // Usamos -2 como indicador de la opción "Regresar"
-    if (totalModes == currentModeIndex) {
-        visibleCurrentModeIndex = totalModes;
-    }
-    totalModes++;
-
-    if (totalModes == 0) { // Esto no debería ocurrir, ya que siempre habrá al menos la opción de regresar
-        uiSprite.drawString("No hay modos disponibles", 10, 25);
-        Serial.println("⚡ Advertencia: No hay modos disponibles para mostrar.");
-        uiSprite.pushSprite(0, 0);
-        return;
-    }
-
-    // Calcular el índice de inicio (startIndex) para centrar la opción seleccionada
+    
+    // Copiar el mapa visible a la variable global.
+    memcpy(globalVisibleModesMap, visibleModesMap, sizeof(int) * totalModes);
+    
+    // Calcular el índice de inicio para centrar la opción seleccionada.
     int startIndex = max(0, min(currentModeIndex - visibleOptions / 2, totalModes - visibleOptions));
 
-    // Parámetros de layout:
-    // La zona de texto se limita entre x = 10 y x = 120 (ancho disponible = 110 píxeles)
+    // Parámetros de layout.
     const int x = 10;
     const int textAreaW = 110;
-    // La barra vertical se dibuja a partir de x = 120.
     const int scrollBarX = 120;
 
-    // Dibujar cada opción visible
+    // Dibujar cada opción visible.
     for (int i = 0; i < visibleOptions && (startIndex + i) < totalModes; i++) {
         int currentVisibleIndex = startIndex + i;
         int y = 30 + i * (CARD_HEIGHT + CARD_MARGIN);
@@ -720,42 +671,19 @@ void drawModesScreen() {
         uiSprite.setTextSize(1);
         uiSprite.setTextDatum(TL_DATUM);
 
-        // Obtener el valor del modo (índice real o indicador especial)
-        int realModeIndex = visibleModesMap[currentVisibleIndex];
-
-        if (realModeIndex == -2) {
-            // Dibujar la opción de regresar con un icono de flecha izquierda
+        int modeVal = visibleModesMap[currentVisibleIndex];
+        if (modeVal == -2) {
+            // Dibujar la opción "Regresar" como un icono de flecha izquierda.
             int arrowWidth = 12;
             int arrowHeight = 12;
             int arrowX = x + (textAreaW - arrowWidth) / 2;
             int arrowY = y + (CARD_HEIGHT - arrowHeight) / 2;
-            // Dibujar la flecha hacia la izquierda usando un triángulo
             uiSprite.fillTriangle(arrowX + arrowWidth, arrowY, arrowX, arrowY + arrowHeight / 2, arrowX + arrowWidth, arrowY + arrowHeight, textColor);
-        } else {
-            // Obtener el nombre del modo (índice real)
-            char modeName[25] = {0};
-            if (option) {
-                strncpy(modeName, (char*)option->mode[realModeIndex].name, 24);
-            } else {
-                f = SPIFFS.open(currentFile, "r");
-                f.seek(OFFSET_MODES + realModeIndex * SIZE_MODE, SeekSet);
-                f.read((uint8_t*)modeName, 24);
-                f.close();
-            }
-            String modeStr = String(modeName);
-            // --- Integración del parseo de nombre de modo ---
-            // Se consulta el estado alternativo del modo en el vector currentAlternateStates.
-            // Se asume que currentAlternateStates está indexado según las opciones visibles, excluyendo la opción "Regresar".
-            bool modeAlternateState = false;
-            if (currentAlternateStates.size() > (size_t)currentVisibleIndex && visibleModesMap[currentVisibleIndex] != -2) {
-                modeAlternateState = currentAlternateStates[currentVisibleIndex];
-            }
-            // Obtener la parte correcta del nombre usando el helper.
-            modeStr = getModeDisplayName(modeStr, modeAlternateState);
-            // --- Fin integración ---
-
+        }
+        else if (modeVal == -3) {
+            // Dibujar la opción "Encender/Apagar".
+            String label = selectedStates[currentIndex] ? "Apagar" : "Encender";
             if (isSelected) {
-                // Si se cambia la opción seleccionada, reiniciamos el ticker
                 if (currentModeIndex != lastSelectedMode) {
                     modeTickerOffset = 0;
                     modeTickerDirection = 1;
@@ -763,10 +691,9 @@ void drawModesScreen() {
                 }
                 uiSprite.setFreeFont(&FreeSans9pt7b);
                 uiSprite.setTextSize(1);
-                int fullTextWidth = uiSprite.textWidth(modeStr);
-                // Actualizar el desplazamiento horizontal suave
+                int fullTextWidth = uiSprite.textWidth(label);
                 if (fullTextWidth > textAreaW) {
-                    const unsigned long frameInterval = 50; // 50ms para un movimiento suave
+                    const unsigned long frameInterval = 50;
                     unsigned long now = millis();
                     if (now - modeLastFrameTime >= frameInterval) {
                         modeTickerOffset += modeTickerDirection;
@@ -780,7 +707,6 @@ void drawModesScreen() {
                         }
                         modeLastFrameTime = now;
                     }
-                    // Dibujar la opción seleccionada en un sprite temporal
                     TFT_eSprite modeSprite = TFT_eSprite(&tft);
                     modeSprite.createSprite(textAreaW, CARD_HEIGHT);
                     modeSprite.fillSprite(BACKGROUND_COLOR);
@@ -788,26 +714,85 @@ void drawModesScreen() {
                     modeSprite.setTextSize(1);
                     modeSprite.setTextDatum(TL_DATUM);
                     modeSprite.setTextColor(textColor, BACKGROUND_COLOR);
-                    // Dibujar el texto desplazado: se dibuja en x = -modeTickerOffset para que el extremo izquierdo sea visible
-                    modeSprite.drawString(modeStr, -modeTickerOffset, 0);
-                    // Empujar el sprite temporal sobre el sprite principal
+                    modeSprite.drawString(label, -modeTickerOffset, 0);
                     modeSprite.pushToSprite(&uiSprite, x, y);
                     modeSprite.deleteSprite();
                 } else {
-                    // Si cabe, dibujarlo de forma normal
+                    uiSprite.drawString(label, x, y);
+                }
+            } else {
+                uiSprite.drawString(label, x, y);
+                uiSprite.fillRect(0, y, x, CARD_HEIGHT, BACKGROUND_COLOR);
+                uiSprite.fillRect(120, y, 128 - 120, CARD_HEIGHT, BACKGROUND_COLOR);
+            }
+        }
+        else {
+            // Dibujar una opción normal de modo.
+            char modeName[25] = {0};
+            if (currentFile == "Ambientes" || currentFile == "Fichas") {
+                INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+                strncpy(modeName, (char*)option->mode[modeVal].name, 24);
+            } else {
+                fs::File f = SPIFFS.open(currentFile, "r");
+                if (f) {
+                    f.seek(OFFSET_MODES + modeVal * SIZE_MODE, SeekSet);
+                    f.read((uint8_t*)modeName, 24);
+                    f.close();
+                }
+            }
+            String modeStr = String(modeName);
+            // Para opciones normales, se accede al estado alternativo usando (índice visible - 1).
+            bool modeAlternateState = false;
+            if (currentAlternateStates.size() > (size_t)(currentVisibleIndex - 1) && visibleModesMap[currentVisibleIndex] != -2) {
+                modeAlternateState = currentAlternateStates[currentVisibleIndex - 1];
+            }
+            modeStr = getModeDisplayName(modeStr, modeAlternateState);
+            if (isSelected) {
+                if (currentModeIndex != lastSelectedMode) {
+                    modeTickerOffset = 0;
+                    modeTickerDirection = 1;
+                    lastSelectedMode = currentModeIndex;
+                }
+                uiSprite.setFreeFont(&FreeSans9pt7b);
+                uiSprite.setTextSize(1);
+                int fullTextWidth = uiSprite.textWidth(modeStr);
+                if (fullTextWidth > textAreaW) {
+                    const unsigned long frameInterval = 50;
+                    unsigned long now = millis();
+                    if (now - modeLastFrameTime >= frameInterval) {
+                        modeTickerOffset += modeTickerDirection;
+                        if (modeTickerOffset < 0) {
+                            modeTickerOffset = 0;
+                            modeTickerDirection = 1;
+                        }
+                        if (modeTickerOffset > (fullTextWidth - textAreaW)) {
+                            modeTickerOffset = fullTextWidth - textAreaW;
+                            modeTickerDirection = -1;
+                        }
+                        modeLastFrameTime = now;
+                    }
+                    TFT_eSprite modeSprite = TFT_eSprite(&tft);
+                    modeSprite.createSprite(textAreaW, CARD_HEIGHT);
+                    modeSprite.fillSprite(BACKGROUND_COLOR);
+                    modeSprite.setFreeFont(&FreeSans9pt7b);
+                    modeSprite.setTextSize(1);
+                    modeSprite.setTextDatum(TL_DATUM);
+                    modeSprite.setTextColor(textColor, BACKGROUND_COLOR);
+                    modeSprite.drawString(modeStr, -modeTickerOffset, 0);
+                    modeSprite.pushToSprite(&uiSprite, x, y);
+                    modeSprite.deleteSprite();
+                } else {
                     uiSprite.drawString(modeStr, x, y);
                 }
             } else {
-                // Para las opciones no seleccionadas, dibujar el texto y cubrir los extremos fuera del área [10,120]
                 uiSprite.drawString(modeStr, x, y);
                 uiSprite.fillRect(0, y, x, CARD_HEIGHT, BACKGROUND_COLOR);
                 uiSprite.fillRect(120, y, 128 - 120, CARD_HEIGHT, BACKGROUND_COLOR);
             }
         }
     }
-
-    // Dibujar la barra de desplazamiento vertical
-    const int scrollBarMargin = 3;
+    
+    // Dibujar la barra de desplazamiento vertical.
     const int scrollBarWidth = 5;
     int scrollBarY = 30;
     uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN, TFT_DARKGREY);
@@ -820,11 +805,11 @@ void drawModesScreen() {
     } else {
         uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN, TFT_LIGHTGREY);
     }
-
-    // Empujar el sprite principal a la pantalla (actualización única)
+    
     uiSprite.pushSprite(0, 0);
-
-    // Actualizar scroll vertical suave (manteniendo la lógica original)
+    
+    // Actualizar scroll vertical suave.
+    int visibleCurrentModeIndex = currentModeIndex;
     if (visibleCurrentModeIndex >= 0) {
         targetScrollOffset = visibleCurrentModeIndex * (CARD_HEIGHT + CARD_MARGIN);
         if (targetScrollOffset > totalModes * (CARD_HEIGHT + CARD_MARGIN) - 100) {
@@ -833,8 +818,6 @@ void drawModesScreen() {
         if (targetScrollOffset < 0) targetScrollOffset = 0;
     }
     scrollOffset += (targetScrollOffset - scrollOffset) / 4;
-
-    memcpy(globalVisibleModesMap, visibleModesMap, sizeof(visibleModesMap));
 }
 
 
