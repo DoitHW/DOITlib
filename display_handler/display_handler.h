@@ -19,6 +19,8 @@ void showMessageWithLoading(const char* message, unsigned long delayTime);
 void updateNameScroll();
 void updateModeScroll();
 String getModeDisplayName(const String &fullModeName, bool alternateActive);
+void display_sleep();
+void display_wakeup();
 
 extern bool isScrollingText;
 extern TFT_eSPI tft;

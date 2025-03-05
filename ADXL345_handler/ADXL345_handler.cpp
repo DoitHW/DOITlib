@@ -21,7 +21,7 @@ void ADXL345Handler::init() {
     }
     accel.setRange(ADXL345_RANGE_16_G);
     initialized = true;
-    //Serial.println("ADXL345 inicializado correctamente");
+    Serial.println("ADXL345 inicializado correctamente");
 }
 
 // Leer la inclinación del ADXL345

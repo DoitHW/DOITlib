@@ -47,6 +47,12 @@ extern bool ignoreInputs;
 extern ESP32Encoder encoder;
 extern bool modeAlternateActive;
 
+extern unsigned long lastDisplayInteraction; // Última vez que se interactuó con la pantalla
+extern bool displayOn;                    // Estado de la pantalla (encendida por defecto)
+extern unsigned long encoderIgnoreUntil; // Tiempo hasta el cual se ignoran las entradas del encoder
+extern bool systemLocked;
+
+
 
 
 

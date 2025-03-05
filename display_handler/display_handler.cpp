@@ -4,6 +4,7 @@
 #include <Colors_DMS/Color_DMS.h>
 #include <DynamicLEDManager_DMS/DynamicLEDManager_DMS.h>
 #include "rom/rtc.h"    // Opcional, si quieres info de reset
+#include <icons_64x64_DMS/icons_64x64_DMS.h>
 
 // Definir dimensiones
 #define CARD_WIDTH 110
@@ -359,7 +360,6 @@ void drawCurrentElement() {
          uiSprite.setTextSize(1);
          String displayName = String((char*)option->name);
          int elementTextWidth = uiSprite.textWidth(displayName);
-         Serial.println("DEBUG: Tamaño de elemento '" + displayName + "' = " + String(elementTextWidth));
          if (elementTextWidth > DISPLAY_WIDTH) {
               nameScrollActive = true;
               currentDisplayName = displayName;
@@ -374,12 +374,10 @@ void drawCurrentElement() {
          // --- Construcción del vector de estados alternativos visible ---
          int visibleModeIndex = -1;
          if (elementAlternateStates.find(currentFile) == elementAlternateStates.end()) {
-             // Inicializar el vector para este elemento
              std::vector<bool> tempAlternate;
              int count = 0;
              for (int i = 0; i < 16; i++) {
                  if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
-                     // Inicializar todos en false (modo básico)
                      tempAlternate.push_back(false);
                      if (i == option->currentMode) {
                          visibleModeIndex = count;
@@ -391,7 +389,6 @@ void drawCurrentElement() {
              elementAlternateStates[currentFile] = currentAlternateStates;
          } else {
              currentAlternateStates = elementAlternateStates[currentFile];
-             // Calcular el índice visible
              int count = 0;
              for (int i = 0; i < 16; i++) {
                  if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
@@ -403,9 +400,6 @@ void drawCurrentElement() {
                  }
              }
          }
-         Serial.println("DEBUG: [Fijos] currentAlternateStates.size() = " + String(currentAlternateStates.size()));
-         Serial.println("DEBUG: [Fijos] visibleModeIndex para currentMode (" + String(option->currentMode) + ") = " + String(visibleModeIndex));
-         
          // Mostrar el nombre del modo en la pantalla principal usando el índice visible
          String modeDisplay;
          if (visibleModeIndex >= 0 && currentAlternateStates.size() > (size_t)visibleModeIndex) {
@@ -479,17 +473,13 @@ void drawCurrentElement() {
               nameScrollActive = false;
               drawElementName(displayName.c_str(), selectedStates[currentIndex]);
          }
-         // Leer el modo actual de SPIFFS
          int realModeIndex = 0;
          f.seek(OFFSET_CURRENTMODE, SeekSet);
          f.read((uint8_t*)&realModeIndex, 1);
-
-         // Leer estados alternativos guardados en SPIFFS si existen
          const int OFFSET_ALTERNATE_STATES = OFFSET_CURRENTMODE + 1;
          byte storedStates[16] = {0};
          f.seek(OFFSET_ALTERNATE_STATES, SeekSet);
          size_t bytesRead = f.read(storedStates, 16);
-
          if (elementAlternateStates.find(currentFile) == elementAlternateStates.end()) {
              std::vector<bool> tempAlternate;
              int visibleModeIndex = -1;
@@ -517,7 +507,6 @@ void drawCurrentElement() {
          } else {
              currentAlternateStates = elementAlternateStates[currentFile];
          }
-         // Calcular visibleIndex para el modo actual
          int visibleIndex = -1;
          {
              int count = 0;
@@ -561,8 +550,107 @@ void drawCurrentElement() {
     colorHandler.setCurrentFile(currentFile);
     colorHandler.setPatternBotonera(currentModeIndex, ledManager);
     drawNavigationArrows();
+    
+    // Si el sistema está bloqueado, dibujar el icono de candado en la esquina superior izquierda.
+    // Se asume que 'device_lock' es la imagen almacenada en RAM y sus dimensiones son 16x16 (ajustar si es necesario).
+    if (!inModesScreen && systemLocked) {
+         uiSprite.pushImage(0, 0, 16, 16, device_lock);
+    }
+    
     uiSprite.pushSprite(0, 0);
+    lastDisplayInteraction = millis();
+    displayOn = true;
 }
+
+void display_sleep() {
+    tft.fillScreen(TFT_BLACK);
+    displayOn = false;
+    Serial.println("Pantalla apagada por inactividad.");
+  }
+  
+void display_wakeup() {
+    displayOn = true;
+    // Vuelve a dibujar el menú principal para “despertar” la interfaz
+    drawCurrentElement();
+    lastDisplayInteraction = millis();
+    Serial.println("Pantalla reactivada por interacción.");
+  }
+
+
+//  void display_sleep() {
+//     // Asumimos que la pantalla ya muestra el fondo actual (por drawCurrentElement())
+//     int cx = tft.width() / 2;
+//     int cy = tft.height() / 2;
+//     int maxRadius = sqrt(cx * cx + cy * cy);
+//     // Animación iris-out: el "hueco" (la zona visible) se reduce hasta desaparecer.
+//     for (int r = maxRadius; r >= 0; r -= 5) {
+//         // Para cada fila, se dibuja negro en las zonas que quedan fuera del círculo de radio r
+//         for (int y = 0; y < tft.height(); y++) {
+//             int dy = abs(y - cy);
+//             if (dy > r) {
+//                 // Toda la fila queda fuera del círculo: se pinta toda de negro.
+//                 tft.drawFastHLine(0, y, tft.width(), TFT_BLACK);
+//             } else {
+//                 // Dentro de la fila, calcular la distancia horizontal máxima para quedar dentro del círculo.
+//                 int dx = sqrt((float)r * r - (float)dy * dy);
+//                 int left = cx - dx;
+//                 int right = cx + dx;
+//                 // Pinta a la izquierda y a la derecha de la zona visible.
+//                 if (left > 0) tft.drawFastHLine(0, y, left, TFT_BLACK);
+//                 if (right < tft.width()) tft.drawFastHLine(right, y, tft.width() - right, TFT_BLACK);
+//             }
+//         }
+//         delay(10); // Retardo para suavizar la animación.
+//     }
+//     displayOn = false;
+//     Serial.println("Pantalla apagada por inactividad.");
+// }
+
+// void display_wakeup() {
+//     displayOn = true;
+    
+//     int cx = tft.width() / 2;
+//     int cy = tft.height() / 2;
+//     int maxRadius = sqrt(cx * cx + cy * cy);
+    
+//     // Dibujar primero el fondo completo
+//     drawCurrentElement();
+//     lastDisplayInteraction = millis();
+    
+//     // Comenzamos con la pantalla negra
+//     tft.fillScreen(TFT_BLACK);
+    
+//     // Animación iris-in: se "abre" el iris mostrando el fondo en el centro que crece hasta revelar toda la imagen
+//     for (int r = 0; r <= maxRadius; r += 5) {
+//         // Redraw the background to prevent flickering
+//         drawCurrentElement();
+        
+//         // Pintar de negro todo lo que esté fuera del círculo
+//         for (int y = 0; y < tft.height(); y++) {
+//             int dy = abs(y - cy);
+//             if (dy > r) {
+//                 // Línea completa negra si está fuera del radio
+//                 tft.drawFastHLine(0, y, tft.width(), TFT_BLACK);
+//             } else {
+//                 // Calcular ancho del círculo en este punto
+//                 int dx = sqrt((float)r * r - (float)dy * dy);
+//                 int left = cx - dx;
+//                 int right = cx + dx;
+                
+//                 // Pintar de negro las zonas fuera del círculo
+//                 if (left > 0) 
+//                     tft.drawFastHLine(0, y, left, TFT_BLACK);
+//                 if (right < tft.width()) 
+//                     tft.drawFastHLine(right, y, tft.width() - right, TFT_BLACK);
+//             }
+//         }
+        
+//         delay(10);
+//     }
+    
+//     lastDisplayInteraction = millis();
+//     Serial.println("Pantalla reactivada por interacción.");
+// }
 
 void animateTransition(int direction) {
     if (elementFiles.size() <= 1) return;

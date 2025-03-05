@@ -27,6 +27,11 @@ std::vector<String> elementFiles;
 std::vector<bool> selectedStates;
 int globalVisibleModesMap[17] = {0};  // Definición e inicialización 
 
+unsigned long lastDisplayInteraction = 0; // Última vez que se interactuó con la pantalla
+bool displayOn = true;                    // Estado de la pantalla (encendida por defecto)
+unsigned long encoderIgnoreUntil = 0; // Tiempo hasta el cual se ignoran las entradas del encoder
+
+
 void encoder_init_func() {
     pinMode(ENC_BUTTON, INPUT_PULLUP);
     ESP32Encoder::useInternalWeakPullResistors = UP;
@@ -38,6 +43,7 @@ void encoder_init_func() {
 
 bool ignoreInputs = false;
 bool ignoreEncoderClick = false;
+bool systemLocked = false;
 
 void handleEncoder() {
     // Si se debe ignorar el click residual, chequea si ya se soltó el botón.
@@ -50,8 +56,46 @@ void handleEncoder() {
     }
     
     if (ignoreInputs) return;
+    
+    // Si la pantalla está apagada, SOLO reactivar si hay una acción real (movimiento o pulsación)
+    if (!displayOn) {
+        if ((encoder.getCount() != lastEncoderValue) || (digitalRead(ENC_BUTTON) == LOW)) {
+            display_wakeup();
+            encoderIgnoreUntil = millis() + 500; // Ignorar entradas durante 500 ms
+            lastDisplayInteraction = millis();
+            // **Reiniciamos lastEncoderValue para que el giro realizado mientras la pantalla estaba apagada no se procese**
+            lastEncoderValue = encoder.getCount();
+        }
+        return; // No procesamos ningún otro evento.
+    }
+    
+    // Si estamos en el menú principal (drawCurrentElement) y el sistema está bloqueado,
+    // se ignoran rotaciones y clicks simples; solo se permite la pulsación larga para desbloquear.
+    if (!inModesScreen && systemLocked) {
+        if (digitalRead(ENC_BUTTON) == LOW) {
+            if (buttonPressStart == 0) {
+                buttonPressStart = millis();
+            } else if ((millis() - buttonPressStart >= 3000) && !isLongPress) {
+                // Desbloquear el sistema
+                systemLocked = false;
+                isLongPress = true;
+                drawCurrentElement(); // Actualiza el display para quitar el icono de candado
+            }
+        } else { // Al soltar el botón
+            buttonPressStart = 0;
+            isLongPress = false;
+        }
+        return;
+    }
+    
+    if (millis() < encoderIgnoreUntil) {
+        lastDisplayInteraction = millis();
+        return;
+    }
+    
     int32_t newEncoderValue = encoder.getCount();
     if (newEncoderValue != lastEncoderValue) {
+        lastDisplayInteraction = millis();
         int32_t direction = (newEncoderValue > lastEncoderValue) ? 1 : -1;
         lastEncoderValue = newEncoderValue;
         
@@ -112,9 +156,8 @@ void handleEncoder() {
         if (buttonPressStart == 0) {
             buttonPressStart = millis();
         } else {
-            // Si estamos en el menú de modos y han pasado 2s, realizar el toggle inmediato del nombre alternativo.
+            // En menú de modos, pulsación larga de 2s para alternar el nombre alternativo.
             if (inModesScreen && !isLongPress && (millis() - buttonPressStart >= 2000)) {
-                // Se aplica solo a opciones que no sean "Encender/Apagar" (índice 0) ni "Regresar" (último índice).
                 if (currentModeIndex != 0 && currentModeIndex != totalModes - 1) {
                     int adjustedIndex = currentModeIndex - 1;
                     String currFile = elementFiles[currentIndex];
@@ -177,6 +220,12 @@ void handleEncoder() {
                     }
                 }
             }
+            // En menú principal, si el sistema está desbloqueado, pulsación larga de 3s para bloquear.
+            if (!inModesScreen && !systemLocked && (millis() - buttonPressStart >= 3000) && !isLongPress) {
+                systemLocked = true;
+                isLongPress = true;
+                drawCurrentElement(); // Actualiza el display para mostrar el candado
+            }
         }
     }
     else { // Al soltar el botón.
@@ -186,10 +235,9 @@ void handleEncoder() {
             Serial.println("DEBUG: Botón soltado, duración: " + String(pressDuration) + " ms");
 #endif
             String currentFile = elementFiles[currentIndex];
-            // Si no estamos en el menú de modos, se verifica si el elemento es "Apagar".
             if (!inModesScreen) {
+                // Si se presionó "Apagar"
                 if (currentFile == "Apagar") {
-                    // Ejecutar comando BLACKOUT en broadcast y mostrar mensaje temporal.
                     for (size_t i = 0; i < selectedStates.size(); i++) {
                         selectedStates[i] = false;
                     }
@@ -204,18 +252,19 @@ void handleEncoder() {
                     isLongPress = false;
                     return;
                 } else {
-                    // Para otros elementos, abrir el menú de modos.
-                    inModesScreen = true;
-                    currentModeIndex = 0;
-                    drawModesScreen();
+                    // Solo cambiar a pantalla de modos si la pulsación fue corta (<3000ms)
+                    if (pressDuration < 3000) {
+                        inModesScreen = true;
+                        currentModeIndex = 0;
+                        drawModesScreen();
+                    }
+                    // Si la pulsación fue larga (>=3000ms), ya se gestionó el bloqueo
                 }
             }
-            else { // Si ya estamos en el menú de modos.
-                // Si no se activó el toggle previo y la pulsación fue corta, confirmar la selección.
+            else {
                 if (!isLongPress && pressDuration < 2000) {
                     handleModeSelection(elementFiles[currentIndex]);
                 }
-                // Si ya se activó el toggle, no se realiza acción adicional.
             }
         }
         buttonPressStart = 0;
@@ -311,15 +360,15 @@ void handleModeSelection(const String& currentFile) {
             if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
                 if (count == adjustedVisibleIndex) {
                     realModeIndex = i;
+                    modeName = String((char*)option->mode[i].name);
+                    memcpy(modeConfig, option->mode[i].config, 2);
                     break;
                 }
                 count++;
             }
         }
         option->currentMode = realModeIndex;
-        modeName = String((char*)option->mode[realModeIndex].name);
-        memcpy(modeConfig, option->mode[realModeIndex].config, 2);
-    } else {
+    } else if (currentFile != "Apagar") {
         fs::File f = SPIFFS.open(currentFile, "r+");
         if (f) {
             int count = 0;
@@ -333,6 +382,8 @@ void handleModeSelection(const String& currentFile) {
                 if (strlen(modeBuf) > 0 && checkMostSignificantBit(tempConfig)) {
                     if (count == adjustedVisibleIndex) {
                         realModeIndex = i;
+                        modeName = String(modeBuf);
+                        memcpy(modeConfig, tempConfig, 2);
                         break;
                     }
                     count++;
@@ -344,12 +395,15 @@ void handleModeSelection(const String& currentFile) {
         }
     }
     
+    // Actualizar las variables adxl y useMic según la configuración del modo
     adxl = getModeFlag(modeConfig, HAS_SENS_VAL_1);
     useMic = getModeFlag(modeConfig, HAS_SENS_VAL_2);
 #ifdef DEBUG
+    Serial.println("🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻");
     Serial.println("DEBUG: Mode Name (procesado): " + modeName);
     Serial.println("DEBUG: adxl status: " + String(adxl ? "true" : "false"));
     Serial.println("DEBUG: useMic status: " + String(useMic ? "true" : "false"));
+    Serial.println("🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻");
 #endif
     
     // Confirmación normal (pulsación corta) para el modo seleccionado.
@@ -361,15 +415,10 @@ void handleModeSelection(const String& currentFile) {
         send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{0}, START_CMD));
         delay(300);
         send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, std::vector<byte>{0}, realModeIndex));
-    } else {
-        fs::File f = SPIFFS.open(currentFile, "r");
+    } else if (currentFile != "Apagar") {
         byte modeConfigTemp[2] = {0};
-        if (f) {
-            int modoOffset = OFFSET_MODES + (SIZE_MODE * realModeIndex);
-            f.seek(modoOffset + 24 + 192, SeekSet);
-            f.read(modeConfigTemp, 2);
-            f.close();
-        }
+        memcpy(modeConfigTemp, modeConfig, 2);  // Usar la configuración que ya tenemos
+        
         if (getModeFlag(modeConfigTemp, HAS_ALTERNATIVE_MODE)) {
             if (currentAlternateStates.size() > (size_t)adjustedVisibleIndex && currentAlternateStates[adjustedVisibleIndex]) {
                 modeAlternateActive = true;
