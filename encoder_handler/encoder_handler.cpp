@@ -79,6 +79,7 @@ void handleEncoder() {
                 // Desbloquear el sistema
                 systemLocked = false;
                 isLongPress = true;
+                lastEncoderValue = encoder.getCount();
                 drawCurrentElement(); // Actualiza el display para quitar el icono de candado
             }
         } else { // Al soltar el botón

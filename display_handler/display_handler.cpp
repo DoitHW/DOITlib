@@ -417,7 +417,7 @@ void drawCurrentElement() {
               updateModeDisplay();
          } else {
               modeScrollActive = false;
-              uiSprite.setFreeFont(&FreeSansBold9pt7b);
+              uiSprite.setFreeFont(&FreeSans9pt7b);
               uiSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
               uiSprite.setTextDatum(TC_DATUM);
               uiSprite.setTextSize(1);
