@@ -1087,3 +1087,4 @@ String getModeDisplayName(const String &fullModeName, bool alternateActive) {
     // o la segunda parte si alternateActive es true.
     return alternateActive ? fullModeName.substring(sepIndex + 1) : fullModeName.substring(0, sepIndex);
 }
+//Probando cambios en esta rama. 
