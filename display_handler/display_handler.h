@@ -21,6 +21,7 @@ void updateModeScroll();
 String getModeDisplayName(const String &fullModeName, bool alternateActive);
 void display_sleep();
 void display_wakeup();
+void drawLanguageMenu(int selection);
 
 extern bool isScrollingText;
 extern TFT_eSPI tft;

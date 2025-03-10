@@ -26,6 +26,7 @@ private:
     float lastInclination;  // Última inclinación leída
     float threshold;        // Umbral de cambio significativo
     bool initialized;       // Estado de inicialización
+    int errorCount;
 };
 
 // Declaración de variable global para el control del ADXL345

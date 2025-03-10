@@ -17,14 +17,11 @@ extern COLORHANDLER_ colorHandler;
 void ELEMENT_::begin() {
 
     Serial.begin(115200);
-    Serial.println("ATENCION!!!!!!!!!!!!!!");
 
     configurar_RF(RF_BAUD_RATE);
     delay(100);
     #ifdef PLAYER
         Serial2.begin(9600, SERIAL_8N1, 8, 9);
-        if (!Serial2) Serial.println("ERROR INIT SERIAL 2");
-        else          Serial.println("Serial 2 inciciado para DFPlayer");
     #endif
     pinMode (0, INPUT_PULLUP);
     delay(100);

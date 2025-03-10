@@ -53,6 +53,9 @@ extern unsigned long encoderIgnoreUntil; // Tiempo hasta el cual se ignoran las 
 extern bool systemLocked;
 
 
+// Variables para el submenú de selección de idioma
+extern bool languageMenuActive;
+extern int languageMenuSelection;  // Índice de la opción seleccionada (0 a 5)
 
 
 

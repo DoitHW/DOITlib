@@ -5,6 +5,7 @@
 #include <DynamicLEDManager_DMS/DynamicLEDManager_DMS.h>
 #include "rom/rtc.h"    // Opcional, si quieres info de reset
 #include <icons_64x64_DMS/icons_64x64_DMS.h>
+#include <Translations_handler/translations.h>
 
 // Definir dimensiones
 #define CARD_WIDTH 110
@@ -356,9 +357,15 @@ void drawCurrentElement() {
              uiSprite.pushImage(startX, startY + y, 64, 1, lineBuffer);
          }
          // Dibujar el nombre del elemento
+                  // **** MODIFICACIÓN: Obtener el nombre traducido ****
+         // Si es "Ambientes" usamos la clave "AMBIENTES", si es "Fichas", "FICHAS"
+         String displayName = (currentFile == "Ambientes") ? String(getTranslation("AMBIENTES")) 
+                                                           : String(getTranslation("FICHAS"));
+         // ******************************************************
+         
          uiSprite.setFreeFont(&FreeSansBold12pt7b);
          uiSprite.setTextSize(1);
-         String displayName = String((char*)option->name);
+         //String displayName = String((char*)option->name);
          int elementTextWidth = uiSprite.textWidth(displayName);
          if (elementTextWidth > DISPLAY_WIDTH) {
               nameScrollActive = true;
@@ -401,12 +408,17 @@ void drawCurrentElement() {
              }
          }
          // Mostrar el nombre del modo en la pantalla principal usando el índice visible
-         String modeDisplay;
-         if (visibleModeIndex >= 0 && currentAlternateStates.size() > (size_t)visibleModeIndex) {
-             modeDisplay = getModeDisplayName(String((char*)option->mode[option->currentMode].name), currentAlternateStates[visibleModeIndex]);
-         } else {
-             modeDisplay = String((char*)option->mode[option->currentMode].name);
-         }
+        // Obtener el nombre del modo en formato String (clave de traducción)
+        String modeNameStr = String((char*)option->mode[option->currentMode].name);
+        // Traducir el nombre del modo según el idioma actual
+        modeNameStr = String(getTranslation(modeNameStr.c_str()));
+
+        String modeDisplay;
+        if (visibleModeIndex >= 0 && currentAlternateStates.size() > (size_t)visibleModeIndex) {
+            modeDisplay = getModeDisplayName(modeNameStr, currentAlternateStates[visibleModeIndex]);
+        } else {
+            modeDisplay = modeNameStr;
+        }
          int modeTextWidth = uiSprite.textWidth(modeDisplay);
          if (modeTextWidth > MODE_DISPLAY_WIDTH) {
               modeScrollActive = true;
@@ -437,7 +449,10 @@ void drawCurrentElement() {
          currentAlternateStates.clear();
          currentAlternateStates.push_back(false);
          elementAlternateStates[currentFile] = currentAlternateStates;
-         drawElementName((char*)option->name, false);
+         //drawElementName((char*)option->name, false);
+        // **** MODIFICACIÓN: Dibujar el nombre traducido para "Apagar" ****
+         drawElementName(getTranslation("APAGAR"), false);
+        // *********************************************************************
          drawModeName((char*)option->mode[currentMode].name);
          nameScrollActive = false;
          modeScrollActive = false;
@@ -687,7 +702,7 @@ void drawModesScreen() {
     uiSprite.setTextColor(TEXT_COLOR);
     uiSprite.setTextDatum(TC_DATUM);
     uiSprite.setTextSize(1);
-    uiSprite.drawString("MODOS", 64, 5);
+    uiSprite.drawString(getTranslation("MODOS"), 64, 5);
 
     String currentFile = elementFiles[currentIndex];
     
@@ -770,7 +785,7 @@ void drawModesScreen() {
         }
         else if (modeVal == -3) {
             // Dibujar la opción "Encender/Apagar".
-            String label = selectedStates[currentIndex] ? "Apagar" : "Encender";
+            String label = selectedStates[currentIndex] ? getTranslation("APAGAR") : getTranslation("ENCENDER");
             if (isSelected) {
                 if (currentModeIndex != lastSelectedMode) {
                     modeTickerOffset = 0;
@@ -829,6 +844,9 @@ void drawModesScreen() {
                 }
             }
             String modeStr = String(modeName);
+            if (currentFile == "Ambientes" || currentFile == "Fichas") {
+                modeStr = String(getTranslation(modeStr.c_str()));
+            }
             // Para opciones normales, se accede al estado alternativo usando (índice visible - 1).
             bool modeAlternateState = false;
             if (currentAlternateStates.size() > (size_t)(currentVisibleIndex - 1) && visibleModesMap[currentVisibleIndex] != -2) {
@@ -911,17 +929,17 @@ void drawModesScreen() {
 
 // Opciones del menú oculto
 const char* menuOptions[] = {
-    " Buscar elemento",
-    " Idioma",
-    " Sonido",
-    " Brillo",
-    " Respuestas muy muy largas",
-    " Volver al menu principal"
+    "BUSCAR_ELEMENTO",
+    "IDIOMA",
+    "SONIDO",
+    "BRILLO",
+    "FORMATEAR",
+    "VOLVER"
 };
 const int numOptions = sizeof(menuOptions) / sizeof(menuOptions[0]);
 
 // Número máximo de opciones visibles
-const int visibleOptions = 3;
+const int visibleOptions = 4;
 
 void drawHiddenMenu(int selection)
 {
@@ -931,12 +949,12 @@ void drawHiddenMenu(int selection)
 
     uiSprite.fillSprite(BACKGROUND_COLOR);
 
-    // Draw title
+    // Dibujar el título (ya traducido)
     uiSprite.setFreeFont(&FreeSans12pt7b);
     uiSprite.setTextColor(TEXT_COLOR);
     uiSprite.setTextDatum(TC_DATUM);
     uiSprite.setTextSize(1);
-    uiSprite.drawString("AJUSTES", 64, 5);
+    uiSprite.drawString(getTranslation("MENU_AJUSTES"), 64, 5);
 
     int startIndex = max(0, min(selection - visibleOptions / 2, numOptions - visibleOptions));
 
@@ -962,8 +980,8 @@ void drawHiddenMenu(int selection)
         uiSprite.setTextSize(1);
         uiSprite.setTextDatum(TL_DATUM);
 
-        // Siempre recortar el texto para que no se dibuje por debajo de la barra
-        String tempStr = menuOptions[currentIndex];
+        // Se obtiene la cadena traducida a partir de la clave
+        String tempStr = String(getTranslation(menuOptions[currentIndex]));
         while (uiSprite.textWidth(tempStr) > textAreaW && tempStr.length() > 0) {
             tempStr.remove(tempStr.length() - 1);
         }
@@ -984,7 +1002,6 @@ void drawHiddenMenu(int selection)
     }
     else {
         uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_LIGHTGREY);
-        
     }
     uiSprite.pushSprite(0, 0);
 }
@@ -1008,7 +1025,7 @@ void scrollTextTickerBounce(int selection)
     tft.setTextSize(1);
 
     if (selection < 0 || selection >= numOptions) return;
-    String text = menuOptions[selection];
+    String text = String(getTranslation(menuOptions[selection]));
 
     int fullTextWidth = tft.textWidth(text.c_str());
     int textVisibleW = cardWidth;  // Adjusted to match drawHiddenMenu
@@ -1025,9 +1042,9 @@ void scrollTextTickerBounce(int selection)
     if (cardIndex < 0 || cardIndex >= visibleOptions) return;
 
     int cardY = 30 + cardIndex * (cardHeight + cardMargin);
-    int textAreaX = 15;  // Adjusted to match drawHiddenMenu
-    int textAreaY = cardY + 1;
-    int textAreaW = textVisibleW - 9;
+    int textAreaX = 10;  // Adjusted to match drawHiddenMenu
+    int textAreaY = cardY;
+    int textAreaW = textVisibleW - 2;
     int textAreaH = cardHeight - 2;
 
     unsigned long now = millis();
@@ -1087,4 +1104,50 @@ String getModeDisplayName(const String &fullModeName, bool alternateActive) {
     // o la segunda parte si alternateActive es true.
     return alternateActive ? fullModeName.substring(sepIndex + 1) : fullModeName.substring(0, sepIndex);
 }
-//Probando cambios en esta rama. 
+
+// Función para dibujar el menú de selección de idioma con scroll vertical
+void drawLanguageMenu(int selection) {
+    // Opciones de idioma: se definen 8 opciones
+    const char* languageOptions[] = {"ES", "ES(MX)", "CA", "EU", "FR", "DE", "EN", "IT"};
+    const int numLanguages = 8;
+    const int visibleOptions = 4; // Mostrar 4 opciones a la vez
+
+    // Calcular el índice de inicio de las opciones visibles.
+    // Si la selección es menor que el número de opciones visibles, comenzamos en 0;
+    // de lo contrario, desplazamos para que la opción seleccionada esté al final de la lista visible.
+    int startIndex = 0;
+    if (selection >= visibleOptions) {
+        startIndex = selection - visibleOptions + 1;
+    }
+
+    // Limpiar el sprite
+    uiSprite.fillSprite(BACKGROUND_COLOR);
+
+    // Título del submenú (puedes traducir "Idioma" si lo prefieres)
+    uiSprite.setFreeFont(&FreeSans12pt7b);
+    uiSprite.setTextColor(TEXT_COLOR);
+    uiSprite.setTextDatum(TC_DATUM);
+    uiSprite.setTextSize(1);
+    uiSprite.drawString(getTranslation("IDIOMA"), 64, 5);
+
+    // Parámetros para la lista de opciones
+    const int startY = 30; 
+    const int cardHeight = CARD_HEIGHT;  
+    const int cardMargin = CARD_MARGIN;
+
+    // Dibujar solo las opciones visibles (desde startIndex hasta startIndex + visibleOptions)
+    for (int i = 0; i < visibleOptions; i++) {
+        int optionIndex = startIndex + i;
+        if (optionIndex >= numLanguages) break;
+        int y = startY + i * (cardHeight + cardMargin);
+        bool isSelected = (optionIndex == selection);
+        uint32_t textColor = isSelected ? HIGHLIGHT_COLOR : TEXT_COLOR;
+
+        uiSprite.setFreeFont(&FreeSans9pt7b);
+        uiSprite.setTextColor(textColor);
+        uiSprite.setTextSize(1);
+        uiSprite.setTextDatum(TL_DATUM);
+        uiSprite.drawString(languageOptions[optionIndex], 10, y);
+    }
+    uiSprite.pushSprite(0, 0);
+}

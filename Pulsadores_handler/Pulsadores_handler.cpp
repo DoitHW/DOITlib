@@ -122,9 +122,6 @@ void PulsadoresHandler::procesarPulsadores() {
         currentActiveColor = BLACK;
         blackSent = false;
         lastModeIndex = currentModeIndex;
-#ifdef DEBUG
-        Serial.println("Cambio de modo detectado. Reiniciando estado de pulsadores.");
-#endif
     }
 
     // --- Escanear la matriz de pulsadores ---
@@ -164,7 +161,7 @@ void PulsadoresHandler::procesarPulsadores() {
     relayButtonPressed = currentRelayState;
     
     // --- Lógica de envío en modo PULSE ---
-    if (hasPulse) {
+    if (!inModesScreen && hasPulse) {
         if (hasAdvanced) {
             // Modo ADVANCED + PULSE: máximo 2 botones simultáneos.
             int count = 0;
@@ -205,18 +202,12 @@ void PulsadoresHandler::procesarPulsadores() {
                 if (colorHandler.color_mix_handler(color1, color2, &mixColor) ) {
                     if (currentActiveColor != mixColor) {
                         send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, mixColor));
-#ifdef DEBUG
-                        Serial.printf("ADVANCED PULSE: Dos botones activos, enviando color mezcla %d.\n", mixColor);
-#endif
                         currentActiveColor = mixColor;
                         blackSent = false;
                     }
                 } else {
                     if (!blackSent) {
                         send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, BLACK));
-#ifdef DEBUG
-                        Serial.println("ADVANCED PULSE: Combinación no definida, enviando Negro.");
-#endif
                         currentActiveColor = BLACK;
                         blackSent = true;
                     }
@@ -224,9 +215,6 @@ void PulsadoresHandler::procesarPulsadores() {
             } else { // Más de 2 botones: enviar BLACK.
                 if (!blackSent) {
                     send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, BLACK));
-#ifdef DEBUG
-                    Serial.println("ADVANCED PULSE: Más de dos botones, enviando Negro.");
-#endif
                     currentActiveColor = BLACK;
                     blackSent = true;
                 }

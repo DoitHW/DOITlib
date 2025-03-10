@@ -9,6 +9,7 @@
 #include <ADXL345_handler/ADXL345_handler.h>
 #include <microphone_DMS/microphone_DMS.h>
 #include <info_elements_DMS/info_elements_DMS.h>
+#include <Translations_handler/translations.h>
 
 #define MODE_BACK -2
 // Variables globales para el manejo del encoder
@@ -30,6 +31,11 @@ int globalVisibleModesMap[17] = {0};  // Definición e inicialización
 unsigned long lastDisplayInteraction = 0; // Última vez que se interactuó con la pantalla
 bool displayOn = true;                    // Estado de la pantalla (encendida por defecto)
 unsigned long encoderIgnoreUntil = 0; // Tiempo hasta el cual se ignoran las entradas del encoder
+
+// Variables para el submenú de selección de idioma
+bool languageMenuActive = false;
+int languageMenuSelection = 0;  // Índice de la opción seleccionada (0 a 5)
+
 
 
 void encoder_init_func() {
@@ -92,6 +98,43 @@ void handleEncoder() {
     if (millis() < encoderIgnoreUntil) {
         lastDisplayInteraction = millis();
         return;
+    }
+
+    if (languageMenuActive) {
+        int32_t newEncoderValue = encoder.getCount();
+        if (newEncoderValue != lastEncoderValue) {
+            lastDisplayInteraction = millis();
+            int32_t direction = (newEncoderValue > lastEncoderValue) ? 1 : -1;
+            lastEncoderValue = newEncoderValue;
+            // Actualizar el índice de selección (asumiendo 6 opciones: índices 0 a 5)
+            languageMenuSelection = (languageMenuSelection + direction + 8) % 8;
+            drawLanguageMenu(languageMenuSelection);
+        }
+        // Lectura del botón: si se presiona y luego se suelta, se confirma la selección
+        if (digitalRead(ENC_BUTTON) == LOW) {
+            if (buttonPressStart == 0) {
+                buttonPressStart = millis();
+            }
+        } else {
+            if (buttonPressStart > 0) {
+                // Confirmar selección del idioma
+                switch (languageMenuSelection) {
+                    case 0: currentLanguage = Language::ES; break;
+                    case 1: currentLanguage = Language::ES_MX; break;
+                    case 2: currentLanguage = Language::CA; break;
+                    case 3: currentLanguage = Language::EU; break;
+                    case 4: currentLanguage = Language::FR; break;
+                    case 5: currentLanguage = Language::DE; break;
+                    case 6: currentLanguage = Language::EN; break;
+                    case 7: currentLanguage = Language::IT; break;
+                    default: currentLanguage = Language::ES; break;
+                }
+                languageMenuActive = false;
+                buttonPressStart = 0;
+                drawCurrentElement();
+            }
+        }
+        return; // Evitar que se procese el resto del handleEncoder
     }
     
     int32_t newEncoderValue = encoder.getCount();
@@ -246,7 +289,7 @@ void handleEncoder() {
                     elementID.push_back(0xFF);
                     send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, BLACKOUT));
                     setAllElementsToBasicMode();
-                    showMessageWithLoading("Apagando Sala...", 5000);
+                    showMessageWithLoading(getTranslation("APAGANDO_SALA"), 5000);
                     currentIndex = 0;
                     drawCurrentElement();
                     buttonPressStart = 0;
@@ -338,7 +381,7 @@ void handleModeSelection(const String& currentFile) {
                         f2.close();
                     }
                     setAllElementsToBasicMode();
-                    showMessageWithLoading("Apagando elemento...", 3000);
+                    showMessageWithLoading(getTranslation("APAGANDO_ELEMENTO"), 3000);
                 }
                 f.close();
             }
@@ -519,7 +562,7 @@ void toggleElementSelection(const String& currentFile) {
         elementID.push_back(0xFF);
         send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, BLACKOUT));
         setAllElementsToBasicMode();
-        showMessageWithLoading("Apagando Sala...", 5000);
+        showMessageWithLoading(getTranslation("APAGANDO_SALA"), 5000);
         currentIndex = 0;
         inModesScreen = false;
         drawCurrentElement();
@@ -535,7 +578,7 @@ void toggleElementSelection(const String& currentFile) {
         send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, command));
 
         if (command == BLACKOUT) {
-            showMessageWithLoading("Apagando Elemento", 3000);
+            showMessageWithLoading(getTranslation("APAGANDO_ELEMENTO"), 3000);
         }
 
         // Actualizar el modo del elemento a "básico" en SPIFFS
@@ -594,22 +637,20 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
             break;
         }
         case 1: // Cambiar idioma
-                                                                                            #ifdef DEBUG
-                                                                                            Serial.println("Cambiando idioma...");
-                                                                                            #endif
-            // Lógica para cambiar idioma
-            formatSPIFFS();
-            loadElementsFromSPIFFS();
-            drawCurrentElement();
-            hiddenMenuActive = false;
+        // Activar el submenú de idioma
+        languageMenuActive = true;
+        languageMenuSelection = 0;  // Inicialmente se selecciona la primera opción (ES)
+        // Dibujar el submenú
+        drawLanguageMenu(languageMenuSelection);
+        hiddenMenuActive = false;
             break;
+            
         case 2: // Sonido
-                                                                                            #ifdef DEBUG
-                                                                                            Serial.println("Ajustando sonido...");
-                                                                                            #endif
-            // Lógica para ajustar sonido
             drawCurrentElement();
             hiddenMenuActive = false;
+                                                                                            #ifdef DEBUG
+                                                                                            Serial.println("Cambiando Sonido...");
+                                                                                            #endif
             break;
         case 3: // Brillo
                                                                                             #ifdef DEBUG
@@ -619,11 +660,13 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
             drawCurrentElement();
             hiddenMenuActive = false;
             break;
-        case 4: // Respuestas
+        case 4: // Formatear SPIFFS
                                                                                             #ifdef DEBUG
-                                                                                            Serial.println("Configurando respuestas...");
+                                                                                            Serial.println("Formateando SPIFFS...");
                                                                                             #endif
-            // Lógica para configurar respuestas
+            // Lógica para formatear SPIFFS
+            formatSPIFFS();
+            loadElementsFromSPIFFS();
             drawCurrentElement();
             hiddenMenuActive = false;
             break;
