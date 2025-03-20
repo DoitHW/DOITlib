@@ -245,7 +245,7 @@ void COLORHANDLER_::result_win(bool superWin){
 
     #ifdef PLAYER
       byte res= rand() % 4;
-      doitPlayer.play_file(WIN_RESP_M_BANK, 11 + res);
+      doitPlayer.play_file(WIN_RESP_BANK, 11 + res);
     #endif
 
     const int cycles = superWin ? 2 : 1;
@@ -316,7 +316,7 @@ void COLORHANDLER_::result_fail(){
     delay(200);
     #ifdef PLAYER
       byte res= rand() % 4;
-      doitPlayer.play_file(FAIL_RESP_M_BANK, 11 + res);
+      doitPlayer.play_file(FAIL_RESP_BANK, 11 + res);
     #endif
 
     const int cycles = 1;
@@ -1057,16 +1057,30 @@ void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager)
   }
 
   #ifdef DEBUG
-      Serial.println("Mode " + String(mode) + " - Byte Config: 0x" + String(modeConfig[0], HEX) + String(modeConfig[1], HEX));
-      //debugModeConfig(modeConfig);
+  Serial.printf("Mode %d - Byte Config: 0x%02X%02X\n", mode, modeConfig[0], modeConfig[1]);
   #endif
 
-  // --- Bloque modular para asignar colores a la botonera (LEDs 1 a NUM_LEDS-1) ---
+  // --- Verificar si el elemento actual es "Fichas" ---
+  if (currentFile == "Fichas") {
+      fill_solid(leds, NUM_LEDS, CRGB::Black); // Apagar todos los LEDs
+
+      if (mode == 0) { // Modo Básico: solo el LED 0 con efecto
+          ledManager.addEffect(new FadeEffect(*this, 0, CRGB::Blue, CRGB::Cyan, 50));
+      } 
+      else if (mode == 1 || mode == 2) { // Modo Parejas o Adivina
+          ledManager.addEffect(new FadeEffect(*this, 0, CRGB::Blue, CRGB::Cyan, 50)); // LED 0 con efecto dinámico
+          leds[8] = CRGB::White; // LED 9 en blanco
+      }
+
+      FastLED.show();
+      return; // Salir para evitar aplicar la lógica general
+  }
+
+  // --- Bloque modular para asignar colores a la botonera ---
   if (getModeFlag(modeConfig, HAS_PATTERNS)) {
-      // Si el modo tiene el flag HAS_PATTERNS, se pintan los LEDs de blanco
-      fill_solid(leds + 1, numLeds - 1, CRGB::White);
+      fill_solid(leds + 1, NUM_LEDS - 1, CRGB::White);
   } else if (getModeFlag(modeConfig, HAS_PASSIVE)) {
-      fill_solid(leds + 1, numLeds - 1, CRGB::Black);
+      fill_solid(leds + 1, NUM_LEDS - 1, CRGB::Black);
       leds[8] = CRGB::White;
   } else if (getModeFlag(modeConfig, HAS_BASIC_COLOR) || getModeFlag(modeConfig, HAS_ADVANCED_COLOR)) {
       CRGB colorMap[] = {
@@ -1075,12 +1089,11 @@ void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager)
           CRGB(0xFF, 0x00, 0xD2), CRGB::Blue
       };
 
-      // Se mapean los LEDs del 1 al NUM_LEDS-1 (el LED 0 se tratará luego)
       for (int i = 1; i < NUM_LEDS; i++) {
           leds[i] = colorMap[i];
       }
   } else {
-      fill_solid(leds + 1, numLeds - 1, CRGB::Black);
+      fill_solid(leds + 1, NUM_LEDS - 1, CRGB::Black);
   }
 
   // --- Bloque modular para el LED 0 (efecto de relé) ---

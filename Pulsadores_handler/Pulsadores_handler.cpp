@@ -43,6 +43,22 @@ void PulsadoresHandler::limpiarEstados() {
     }
 }
 
+bool PulsadoresHandler::isButtonPressed(byte color) {
+    for (int i = 0; i < FILAS; i++) {
+        digitalWrite(filas[i], LOW); // Activamos la fila
+        delayMicroseconds(10); // Pequeña pausa para asegurar estabilidad en la lectura
+        
+        for (int j = 0; j < COLUMNAS; j++) {
+            if (pulsadorColor[i][j] == color && digitalRead(columnas[j]) == LOW) {
+                digitalWrite(filas[i], HIGH); // Restauramos la fila antes de salir
+                return true; // Se encontró el botón presionado
+            }
+        }
+        
+        digitalWrite(filas[i], HIGH); // Restauramos la fila antes de continuar
+    }
+    return false; // Ningún botón con ese color está presionado
+}
 
 // Función que recorre la matriz y procesa cada pulsador de forma independiente.
 // Esta función debe llamarse desde el loop principal en cada iteración.
@@ -51,33 +67,39 @@ void PulsadoresHandler::procesarPulsadores() {
     std::vector<byte> target;
     String currentFile = elementFiles[currentIndex];
     
-    if (currentFile == "Ambientes") {
-        bool ambientesSeleccionado = false;
-        for (size_t i = 0; i < elementFiles.size(); i++) {
-            if (elementFiles[i] == "Ambientes" && selectedStates[i]) {
-                ambientesSeleccionado = true;
-                break;
-            }
-        }
-        if (ambientesSeleccionado) {
+    // Verificar si estamos en "Fichas" para manejar de forma especial
+    bool isFichas = (currentFile == "Fichas");
+    
+    if (!isFichas) {
+        // Solo construir target para elementos que no son "Fichas"
+        if (currentFile == "Ambientes") {
+            bool ambientesSeleccionado = false;
             for (size_t i = 0; i < elementFiles.size(); i++) {
-                if (selectedStates[i] && elementFiles[i].startsWith("/"))  {
-                    byte elementID = 0;
-                    fs::File f = SPIFFS.open(elementFiles[i], "r");
-                    if (f) {
-                        f.seek(OFFSET_ID, SeekSet);
-                        f.read(&elementID, 1);
-                        f.close();
-                    }
-                    if (elementID != 0) {
-                        target.push_back(elementID);
+                if (elementFiles[i] == "Ambientes" && selectedStates[i]) {
+                    ambientesSeleccionado = true;
+                    break;
+                }
+            }
+            if (ambientesSeleccionado) {
+                for (size_t i = 0; i < elementFiles.size(); i++) {
+                    if (selectedStates[i] && elementFiles[i].startsWith("/"))  {
+                        byte elementID = 0;
+                        fs::File f = SPIFFS.open(elementFiles[i], "r");
+                        if (f) {
+                            f.seek(OFFSET_ID, SeekSet);
+                            f.read(&elementID, 1);
+                            f.close();
+                        }
+                        if (elementID != 0) {
+                            target.push_back(elementID);
+                        }
                     }
                 }
             }
-        }
-    } else {
-        if (isCurrentElementSelected()) {
-            target.push_back(getCurrentElementID());
+        } else {
+            if (isCurrentElementSelected()) {
+                target.push_back(getCurrentElementID());
+            }
         }
     }
     // --- Fin construcción target ---
@@ -110,6 +132,7 @@ void PulsadoresHandler::procesarPulsadores() {
 
     // --- Estado actual del botón RELAY ---
     bool currentRelayState = false;
+    bool blueButtonState = false;  // Agregamos variable para el estado del botón azul
     
     // --- Reiniciar estado si hubo cambio de modo ---
     static int lastModeIndex = -1;
@@ -145,23 +168,49 @@ void PulsadoresHandler::procesarPulsadores() {
                 currentRelayState |= currentPressed;
             }
             
+            // Actualizar estado del botón BLUE
+            if (pulsadorColor[i][j] == BLUE) {
+                blueButtonState |= currentPressed;
+            }
+            
             // Detectar eventos: PRESIÓN y LIBERACIÓN.
             if (!lastState[i][j] && currentPressed) {
-                processButtonEvent(i, j, BUTTON_PRESSED, hasPulse, hasPassive, hasRelay, target);
+                if (isFichas) {
+                    // En "Fichas" solo actualizamos el estado de los botones sin enviar tramas
+                    if (pulsadorColor[i][j] == RELAY) {
+                        relayButtonPressed = true;
+                    } else if (pulsadorColor[i][j] == BLUE) {
+                        blueButtonPressed = true;
+                    }
+                } else {
+                    // Comportamiento normal para otros elementos
+                    processButtonEvent(i, j, BUTTON_PRESSED, hasPulse, hasPassive, hasRelay, target);
+                }
             }
             if (lastState[i][j] && !currentPressed) {
-                processButtonEvent(i, j, BUTTON_RELEASED, hasPulse, hasPassive, hasRelay, target);
+                if (isFichas) {
+                    // En "Fichas" solo actualizamos el estado de los botones sin enviar tramas
+                    if (pulsadorColor[i][j] == RELAY) {
+                        relayButtonPressed = false;
+                    } else if (pulsadorColor[i][j] == BLUE) {
+                        blueButtonPressed = false;
+                    }
+                } else {
+                    // Comportamiento normal para otros elementos
+                    processButtonEvent(i, j, BUTTON_RELEASED, hasPulse, hasPassive, hasRelay, target);
+                }
             }
             lastState[i][j] = currentPressed;
         }
         digitalWrite(filas[i], HIGH);
     }
     
-    // Actualizar estado del botón RELAY.
+    // Actualizar estado del botón RELAY y BLUE
     relayButtonPressed = currentRelayState;
+    blueButtonPressed = blueButtonState;
     
     // --- Lógica de envío en modo PULSE ---
-    if (!inModesScreen && hasPulse) {
+    if (!inModesScreen && hasPulse && !isFichas) {  // No enviar en "Fichas"
         if (hasAdvanced) {
             // Modo ADVANCED + PULSE: máximo 2 botones simultáneos.
             int count = 0;
@@ -265,6 +314,15 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
 {
     byte buttonColor = pulsadorColor[i][j];
 
+
+    // Verificar si estamos en "Fichas"
+    String currentFile = elementFiles[currentIndex];
+    if (currentFile == "Fichas") {
+        // No hacemos nada aquí, ya que manejamos "Fichas" directamente en procesarPulsadores()
+        return;
+    }
+
+
     // 1. Procesar el botón RELAY (botón especial)
     if (buttonColor == RELAY)
     {
@@ -316,7 +374,7 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
 
     // --- Nuevo: Comprobar el flag HAS_PATTERNS ---
     // Se obtiene el modo actual para poder leer este flag
-    String currentFile = elementFiles[currentIndex];
+    currentFile = elementFiles[currentIndex];
     byte modeConfig[2] = {0};
     if (!getModeConfig(currentFile, currentModeIndex, modeConfig))
     {

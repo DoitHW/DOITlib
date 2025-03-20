@@ -9,7 +9,7 @@
 #include <display_handler/display_handler.h>
 
 
-
+extern std::vector<uint8_t> printTargetID;
 
 
 BOTONERA_::BOTONERA_() : ELEMENT_() {
@@ -26,9 +26,20 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
     if (LEF.origin == 0xDB) origenStr = "BOTONERA";
     else if (LEF.origin == 0xDC) origenStr = "CONSOLA";
     else if (LEF.origin == 0xFF) origenStr = "BROADCAST";
+    else if (LEF.origin == 0xDF) origenStr = "HACKING BOX";
     else origenStr = "DESCONOCIDO";
 
     Serial.printf("📌 Origen: %s (0x%02X)\n", origenStr.c_str(), LEF.origin);
+
+    Serial.print("🎯 Targets: ");
+    if (printTargetID.empty()) {
+        Serial.println("Ninguno (posible broadcast)");
+    } else {
+        for (size_t i = 0; i < printTargetID.size(); i++) {
+            Serial.printf("0x%02X ", printTargetID[i]);
+        }
+        Serial.println();
+    }
 
     // Determinar función
     String functionStr;
@@ -57,7 +68,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
         default: functionStr = "FUNCIÓN DESCONOCIDA";
     }
 
-    Serial.printf("🛠️ Función: %s (0x%02X)\n", functionStr.c_str(), LEF.function);
+    Serial.printf("🛠️  Función: %s (0x%02X)\n", functionStr.c_str(), LEF.function);
 
     // Interpretación de datos
     Serial.print("📦 Data: ");
@@ -118,10 +129,9 @@ void BOTONERA_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
     }
     printFrameInfo(LEF);
     // Depuración del estado de la pila
-    Serial.println("Inicio de RX_main_handler");
     UBaseType_t stackSize = uxTaskGetStackHighWaterMark(NULL);
                                                             #ifdef DEBUG
-                                                                Serial.println("Stack restante: " + String(stackSize));
+                                                               // Serial.println("Stack restante: " + String(stackSize));
                                                             #endif
 
     byte currentMode_ = element->get_currentMode();
@@ -165,7 +175,7 @@ void BOTONERA_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
     // Depuración al final de la función
     stackSize = uxTaskGetStackHighWaterMark(NULL);
                                                                 #ifdef DEBUG
-                                                                    Serial.println("Stack restante al final: " + String(stackSize));
+                                                                   // Serial.println("Stack restante al final: " + String(stackSize));
                                                                 #endif
 }
 

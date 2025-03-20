@@ -21,14 +21,16 @@ public:
     static void limpiarEstados();
     void procesarPulsadores();
     bool relayButtonIsPressed() const { return relayButtonPressed; }
+    bool isButtonPressed(byte color);
     byte lastBasicColor = 0; // Inicialmente 0 (o BLACK)
+    bool isBlueButtonPressed() { return blueButtonPressed; }
 private:
     bool relayButtonPressed = false;
-        
+    bool blueButtonPressed = false;  // Estado del botón azul
     // Función auxiliar para procesar un evento de un botón
     void processButtonEvent(int i, int j, ButtonEventType event,
                             bool hasPulse, bool hasPassive, bool hasRelay,
                             std::vector<byte>& target);
 };
 
-
+extern PulsadoresHandler pulsadores;

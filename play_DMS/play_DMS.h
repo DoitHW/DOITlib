@@ -17,12 +17,13 @@ class DOITSOUNDS_ : public ELEMENT_{
         DOITSOUNDS_(byte voiceType= WOMAN_VOICE) : VOICE_TYPE(voiceType) {}
         DFRobotDFPlayerMini player;
         byte VOICE_TYPE;
-
+        byte availableFolders[99];
         
         void begin();
         void play_file(byte bankin, byte filein);
         void stop_file();
         bool is_playing();
+        void get_available_folders();
 
 };
 

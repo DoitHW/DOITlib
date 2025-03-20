@@ -38,7 +38,6 @@ const char* getTranslation(const char* key) {
         case Language::FR:     return translations[i].fr;
         case Language::DE:     return translations[i].de;
         case Language::EN:     return translations[i].en;
-        case Language::IT:     return translations[i].it;
         default:               return translations[i].es;
       }
     }

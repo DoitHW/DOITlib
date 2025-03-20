@@ -5,16 +5,18 @@
 #include <string.h>
 
 // Enumerado de idiomas disponibles
+
 enum class Language {
-    ES,      // Español
-    ES_MX,   // Español (México)
-    CA,      // Català
-    EU,      // Euskera
-    FR,      // Français
-    DE,      // Deutsch
-    EN,      // English
-    IT       // Italian
-  };
+  ES = 1,  // Español
+  EN,      // English
+  DE,      // Deutch
+  FR,      // Français
+  ES_MX,   // Mex
+  CA,      // Català
+  EU,      // Euskera
+  X,       // X
+  X1       // X1
+};
 // Variable global para almacenar el idioma actual (por defecto ES)
 extern Language currentLanguage;
 

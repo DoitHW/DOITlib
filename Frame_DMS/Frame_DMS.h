@@ -55,9 +55,6 @@ struct SENSOR_VALUE_T{
 };
 
 struct COLOR_T{
-
-    byte fade;
-    byte brightness;
     byte red;
     byte green;
     byte blue;
@@ -117,6 +114,7 @@ FRAME_T frameMaker_SET_ELEM_ID         (byte originin, byte targetin, byte IDin)
 FRAME_T frameMaker_SET_ELEM_DEAF       (byte originin, std::vector<byte>targetin, byte timein);
 
 FRAME_T frameMaker_SEND_COLOR          (byte originin, std::vector<byte>targetin, byte colorin);
+FRAME_T frameMaker_SEND_RGB             (byte originin, std::vector<byte>targetin, COLOR_T colorin);
 FRAME_T frameMaker_SEND_COMMAND           (byte originin, std::vector<byte>targetin, byte commandin);
 FRAME_T frameMaker_SEND_COMMAND           (byte originin, std::vector<byte>targetin, byte commandin);
 FRAME_T frameMaker_SEND_SENSOR_VALUE   (byte originin, std::vector<byte>targetin, SENSOR_VALUE_T sensorin);

@@ -435,7 +435,7 @@ void drawCurrentElement() {
               uiSprite.setTextSize(1);
               uiSprite.drawString(modeDisplay, tft.width() / 2, tft.height() - 15);
          }
-         drawSelectionCircle(selectedStates[currentIndex], startX, startY);
+         //drawSelectionCircle(selectedStates[currentIndex], startX, startY);
     }
     // --- Caso 2: "Apagar" ---
     else if (currentFile == "Apagar") {
@@ -1108,8 +1108,8 @@ String getModeDisplayName(const String &fullModeName, bool alternateActive) {
 // Función para dibujar el menú de selección de idioma con scroll vertical
 void drawLanguageMenu(int selection) {
     // Opciones de idioma: se definen 8 opciones
-    const char* languageOptions[] = {"ES", "ES(MX)", "CA", "EU", "FR", "DE", "EN", "IT"};
-    const int numLanguages = 8;
+    const char* languageOptions[] = {"ES", "ES(MX)", "CA", "EU", "FR", "DE", "EN"};
+    const int numLanguages = 7;
     const int visibleOptions = 4; // Mostrar 4 opciones a la vez
 
     // Calcular el índice de inicio de las opciones visibles.

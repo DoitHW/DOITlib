@@ -93,15 +93,15 @@ void initializeDynamicOptions() {
     strncpy((char*)fichasOption.mode[0].name, "BASICO", 24);
     strncpy((char*)fichasOption.mode[0].desc, "Modo basico para fichas NFC.", 192);
     fichasOption.mode[0].config[0] = 0x80;
-    fichasOption.mode[0].config[1] = 0x01;
+    fichasOption.mode[0].config[1] = 0x08;
     strncpy((char*)fichasOption.mode[1].name, "PAREJAS", 24);
     strncpy((char*)fichasOption.mode[1].desc, "Modo parejas para fichas NFC.", 192);
     fichasOption.mode[1].config[0] = 0x80;
-    fichasOption.mode[1].config[1] = 0x01;
+    fichasOption.mode[1].config[1] = 0x08;
     strncpy((char*)fichasOption.mode[2].name, "ADIVINAR", 24);
     strncpy((char*)fichasOption.mode[2].desc, "Modo adivinar para fichas NFC.", 192);
     fichasOption.mode[2].config[0] = 0x80;
-    fichasOption.mode[2].config[1] = 0x01;
+    fichasOption.mode[2].config[1] = 0x08;
 
     memcpy(fichasOption.icono, fichas_64x64, sizeof(fichasOption.icono));
     //Serial.println("Nombre de fichasOption.name después de crear el icono: " + String((char*)fichasOption.name));

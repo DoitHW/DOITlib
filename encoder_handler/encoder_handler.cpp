@@ -10,6 +10,7 @@
 #include <microphone_DMS/microphone_DMS.h>
 #include <info_elements_DMS/info_elements_DMS.h>
 #include <Translations_handler/translations.h>
+#include <token_DMS/token_DMS.h>
 
 #define MODE_BACK -2
 // Variables globales para el manejo del encoder
@@ -35,7 +36,7 @@ unsigned long encoderIgnoreUntil = 0; // Tiempo hasta el cual se ignoran las ent
 // Variables para el submenú de selección de idioma
 bool languageMenuActive = false;
 int languageMenuSelection = 0;  // Índice de la opción seleccionada (0 a 5)
-
+extern TOKEN_ token;
 
 
 void encoder_init_func() {
@@ -126,8 +127,8 @@ void handleEncoder() {
                     case 4: currentLanguage = Language::FR; break;
                     case 5: currentLanguage = Language::DE; break;
                     case 6: currentLanguage = Language::EN; break;
-                    case 7: currentLanguage = Language::IT; break;
-                    default: currentLanguage = Language::ES; break;
+                    case 7: currentLanguage = Language::X; break;
+                    default: currentLanguage = Language::X1; break;
                 }
                 languageMenuActive = false;
                 buttonPressStart = 0;
@@ -176,9 +177,9 @@ void handleEncoder() {
             adxl = getModeFlag(modeConfig, HAS_SENS_VAL_1);
             useMic = getModeFlag(modeConfig, HAS_SENS_VAL_2);
 #ifdef DEBUG
-            Serial.println("🚀 Cambió de elemento, actualizando flags:");
-            Serial.println("adxl status: " + String(adxl ? "true" : "false"));
-            Serial.println("useMic status: " + String(useMic ? "true" : "false"));
+            //Serial.println("🚀 Cambió de elemento, actualizando flags:");
+            //erial.println("adxl status: " + String(adxl ? "true" : "false"));
+            //Serial.println("useMic status: " + String(useMic ? "true" : "false"));
 #endif
             drawCurrentElement();
         }
@@ -459,6 +460,17 @@ void handleModeSelection(const String& currentFile) {
         send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{0}, START_CMD));
         delay(300);
         send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, std::vector<byte>{0}, realModeIndex));
+        if (currentFile == "Fichas") {// Mapear el modo real seleccionado a un TOKEN_MODE_
+        TOKEN_MODE_ tokenMode;
+        switch (realModeIndex) {
+            case 0: tokenMode  = TOKEN_BASIC_MODE;   break;
+            case 1: tokenMode  = TOKEN_PARTNER_MODE; break;
+            case 2: tokenMode  = TOKEN_GUESS_MODE;   break;
+            default: tokenMode = TOKEN_BASIC_MODE;   break;
+        }
+
+            // Llamar a la función set_mode de la instancia token
+            token.set_mode(tokenMode);}
     } else if (currentFile != "Apagar") {
         byte modeConfigTemp[2] = {0};
         memcpy(modeConfigTemp, modeConfig, 2);  // Usar la configuración que ya tenemos

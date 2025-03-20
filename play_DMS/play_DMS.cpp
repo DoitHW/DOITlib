@@ -29,10 +29,14 @@ void DOITSOUNDS_::stop_file(){
 }
 
 bool DOITSOUNDS_::is_playing(){   // devuelve true mientras este sonando.
-  if(player.available()){
-    byte type= player.readType();
-    int value= player.read();
-    if(type == DFPlayerPlayFinished) return false;
+ 
+  return (player.readState() == 513);
+}
+
+void DOITSOUNDS_::get_available_folders(){
+  int j= 0;
+  for(int i= 1; i < 100; i++){
+
+    if(player.readFileCountsInFolder(i)) availableFolders[j++]= i;
   }
-  return true;
 }

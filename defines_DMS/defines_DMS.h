@@ -7,7 +7,7 @@
                                                 #define NOELEM
                                                 /*COLUMNA, FIBRAS, WALLWASHER, VUMETER, ETC*/
                                                 #define PLAYER                 // -> PLAYER / NOPLAYER
-                                                #define NONFC                    // -> NFC / NONFC
+                                                #define NFC                    // -> NFC / NONFC
                                                 #define MIC                    // -> Desactivar en produccion 
                                                 #define DEBUG
                                                 #define NODEBUG_
@@ -22,7 +22,7 @@
                                                 #define SLOW_RF                  // -> FAST_RF= 115200 / SLOW_RF= 9600 (NO TOCAR POR DIOSSSS)
                                                 #define _ERR_THROW_START_        if(element->get_err_dbg())Serial1.println(
                                                 #define _ERR_THROW_END_          );
-                                                #define ADXL 
+                                                #define NOADXL 
 /*                                                                                                 
                                      .-+***+-:....                                                  
                                       .+@@@@@@@@@+:......:::.....                                   
@@ -137,7 +137,7 @@
 #define F_SEND_COLOR          0xC1
 #define L_SEND_COLOR          0x01 
 #define F_SEND_RGB            0xC2
-#define L_SEND_RGB            0x05
+#define L_SEND_RGB            0x03
 #define F_SEND_BRIGHTNESS     0xC3
 #define L_SEND_BRIGHTNESS     0x02
 #define F_SEND_SENSOR_VALUE_1 0xCA
@@ -245,27 +245,14 @@
 #define ICON_LENGTH      ICON_COLUMNS*ICON_ROWS
 
 // BANKS & FILES
-#define RESERVED_BANK      1      
+#define RESERVED_BANK   1
+#define SYSTEM_FX_BANK  99
 
-#define WIN_RESP_M_BANK   23
-#define WIN_RESP_H_BANK   24
-#define FAIL_RESP_M_BANK  25
-#define FAIL_RESP_H_BANK  26
+#define WIN_RESP_BANK   2
+#define FAIL_RESP_BANK  4
 
-#define WOMAN_VOICE 0x00
-#define MAN_VOICE   0x01
-
-// BANKS & FILES
-#define RESERVED_BANK      1      
-
-#define WIN_RESP_M_BANK   23
-#define WIN_RESP_H_BANK   24
-#define FAIL_RESP_M_BANK  25
-#define FAIL_RESP_H_BANK  26
-
-#define WOMAN_VOICE 0x00
-#define MAN_VOICE   0x01
-
+#define WOMAN_VOICE     0
+#define MAN_VOICE       1
 // DEFINES INFO_ELEMENTS
 #define SPANISH_LANG        0x01
 #define ENGLISH_LANG        0x02
@@ -368,8 +355,20 @@ enum COMMANDS_{
   MAGIC_TEST_CMD,
   MAGIC_TEST_2_CMD,
   ALTERNATE_MODE_ON,
-  ALTERNATE_MODE_OFF
-  // añadir mas tiestos
+  ALTERNATE_MODE_OFF,
+  OTA_AP_ON,
+  OTA_AP_OFF
+};
+
+enum TOKEN_TYPE_{
+  TOKEN_CMD, 
+  TOKEN_NOFX
+};
+
+enum TOKEN_CONFIG_{
+  TEMP_COLOR_CONF,
+  PERM_COLOR_CONF,
+  AMBIENT_CONF
 };
 
 #define RELAY_1_FLAG     0x00
@@ -542,7 +541,7 @@ enum PATTERN_LIST{
 
 enum SECTOR_LIST{
 
-  ELEM_NAME_SECTOR= 0,
+  ELEM_NAME_SECTOR= 0, //0
   ELEM_DESC_SECTOR,
   ELEM_SERIAL_SECTOR,
   ELEM_ID_SECTOR,
@@ -594,7 +593,7 @@ enum SECTOR_LIST{
   ELEM_MODE_14_FLAG_SECTOR,
   ELEM_MODE_15_NAME_SECTOR,
   ELEM_MODE_15_DESC_SECTOR,
-  ELEM_MODE_15_FLAG_SECTOR,
+  ELEM_MODE_15_FLAG_SECTOR, //52
   ELEM_ICON_ROW_0_SECTOR,
   ELEM_ICON_ROW_1_SECTOR,
   ELEM_ICON_ROW_2_SECTOR,

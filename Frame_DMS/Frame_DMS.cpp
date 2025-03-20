@@ -8,7 +8,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 
-
+std::vector<uint8_t> printTargetID;
 extern LAST_ENTRY_FRAME_T            LEF;
 extern byte globalID;
 extern byte xManager;
@@ -135,17 +135,18 @@ void IRAM_ATTR onUartInterrupt() {
                         if (calculatedChecksum == receivedChecksum) {
                             // Verificar destinatarios
                             uint8_t numTargets = uartBuffer[4];
-                            bool isTarget = false;
-                            
+                            bool isTarget = false; 
+                            printTargetID.clear();
                             for (uint8_t i = 0; i < numTargets; i++) {
                                 uint8_t targetID = uartBuffer[5 + i];
+                                printTargetID.push_back(targetID);
                                 if (targetID == globalID || targetID == BROADCAST || targetID == xManager)  {
                                     isTarget = true;
                                     if(targetID == BROADCAST) BCframe= true;
                                     break;
                                 }
                             }
-    
+                            isTarget = true; //eliminar esta línea
                             if (isTarget) {
                                 Serial.println();
                                 frameReceived = true; // Set flag for loop() to process
@@ -1032,6 +1033,30 @@ FRAME_T frameMaker_SEND_COLOR(byte originin, std::vector<byte>targetin, byte col
     frame.dataLengthMsb = (L_SEND_COLOR >> 8) & 0xFF; 
     frame.dataLengthLsb = L_SEND_COLOR & 0xFF;   
     frame.data[0]= colorin;
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+
+    return frame;
+}
+
+FRAME_T frameMaker_SEND_RGB (byte originin, std::vector<byte>targetin, COLOR_T colorin){
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    frame.data.resize(L_SEND_RGB);
+    uint16_t  frameLength = 0x07 + targetin.size() + L_SEND_RGB;
+
+    frame.start= NEW_START;
+    frame.frameLengthLsb = frameLength & 0xFF;
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin= originin;
+    frame.numTargets = targetin.size();
+    frame.target= targetin;
+    frame.function= F_SEND_RGB;
+    frame.dataLengthMsb = (L_SEND_RGB >> 8) & 0xFF; 
+    frame.dataLengthLsb = L_SEND_RGB & 0xFF;
+    frame.data[0]= colorin.red;
+    frame.data[1]= colorin.green;
+    frame.data[2]= colorin.blue;
     frame.checksum= checksum_calc(frame);
     frame.end= NEW_END;
 
