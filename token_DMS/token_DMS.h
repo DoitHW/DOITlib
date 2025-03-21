@@ -67,7 +67,6 @@ public:
     void handleCardDetected();
     bool isCardPresent();
     void resetReader();
-    void resetReaderWithDelay();
 
     // Función auxiliar para convertir dos caracteres ASCII hex a un byte
     byte asciiHexToByte(char high, char low);

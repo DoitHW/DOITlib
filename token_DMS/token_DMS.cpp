@@ -23,6 +23,7 @@ extern int irqPrev;
 extern const int DELAY_BETWEEN_CARDS;  // Si lo defines globalmente en main o aquí
 extern unsigned long timeLastCardRead; // Lo mismo para estas variables
 extern boolean readerDisabled;         // Estas pueden definirse globalmente en main
+extern bool cardIsRead;
 
 TOKEN_::TOKEN_() : lastReadAttempt(0), readInterval(200), genre(0), lang(static_cast<uint8_t>(currentLanguage)) {
     currentUID = "";
@@ -40,7 +41,7 @@ void TOKEN_::begin() {
 
   while (retryCount < MAX_RETRIES) {
     nfc.begin();
-
+    Serial.println("Intentando inicializar PN532...");  
     uint32_t versiondata = nfc.getFirmwareVersion();
     if (versiondata) {
       Serial.print("Found chip PN5");
@@ -59,7 +60,6 @@ void TOKEN_::begin() {
 
     Serial.printf("ERROR: No se encontró el módulo PN532 (intento %d de %d). Reintentando...\n", retryCount + 1, MAX_RETRIES);
     retryCount++;
-    delay(1000); // Espera entre reintentos
   }
 
   Serial.println("FATAL: No se pudo inicializar el PN532 tras múltiples intentos. Reiniciando dispositivo...");
@@ -103,11 +103,13 @@ void TOKEN_::startListeningToNFC() {
   // Reiniciar los indicadores de IRQ
   irqPrev = HIGH;
   irqCurr = HIGH;
-  
+
   // Cancelar cualquier operación pendiente primero
   nfc.inListPassiveTarget();
   
-  // Pequeña pausa para estabilizar  
+  // Pequeña pausa para estabilizar
+  delay(5);
+  
   Serial.println("Starting passive read for an ISO14443A Card ...");
   
   // Reintentar varias veces si falla
@@ -117,7 +119,7 @@ void TOKEN_::startListeningToNFC() {
     if (success) {
       Serial.println("Detección iniciada correctamente.");
     }
-  
+      
   if (!success) {
     Serial.println("No card found. Waiting...");
   } else {
@@ -156,6 +158,7 @@ void TOKEN_::handleCardDetected() {
   }
   timeLastCardRead = millis();
 }
+
 bool TOKEN_::readCard(String &uid) {
   // Se utiliza un timeout corto (por ejemplo, 100 ms) para la lectura
   uint8_t _uid[7] = {0};

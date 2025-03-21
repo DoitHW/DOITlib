@@ -27,7 +27,9 @@ struct LAST_ENTRY_FRAME_T{
     byte origin;
     byte function;
     std::vector<byte> data;
+    LAST_ENTRY_FRAME_T() : origin(0), function(0), data() {}
 };
+
 
 struct FRAME_T{
 
@@ -96,7 +98,7 @@ struct INFO_STATE_T{
 };
 
 
-LAST_ENTRY_FRAME_T extract_info_from_frameIn (std::vector<byte> vectorin);
+LAST_ENTRY_FRAME_T extract_info_from_frameIn(const std::vector<uint8_t> &frame);
 byte checksum_calc                           (const FRAME_T &framein);
 void send_frame                              (const FRAME_T &framein);
 

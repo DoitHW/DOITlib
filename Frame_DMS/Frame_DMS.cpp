@@ -314,16 +314,34 @@ void printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
     Serial.println("=============================");
 }
 
-LAST_ENTRY_FRAME_T extract_info_from_frameIn(std::vector<byte> vectorin) {
-    LAST_ENTRY_FRAME_T LEF;
-    LEF.origin = vectorin[3]; 
-    LEF.function = vectorin[5 + vectorin[4]];
-    int dataLength = (vectorin[5 + vectorin[4] + 1] << 8) | vectorin[5 + vectorin[4] + 2];
-    for (int i = 0; i < dataLength; i++)  LEF.data.push_back(vectorin[5 + vectorin[4] + 3 + i]);
+LAST_ENTRY_FRAME_T extract_info_from_frameIn(const std::vector<uint8_t> &frame)
+{
+    LAST_ENTRY_FRAME_T result = {};
 
-    return LEF;
+    if (frame.size() < 6)
+        return result;
+
+    uint8_t payloadOffset = frame[4];
+    if (frame.size() < 5 + payloadOffset + 3) // Accederemos hasta headerOffset+2
+        return result;
+
+    size_t headerOffset = 5 + payloadOffset;
+    result.origin = frame[3];
+    result.function = frame[headerOffset];
+
+    uint16_t dataLength = (frame[headerOffset + 1] << 8) | frame[headerOffset + 2];
+    size_t dataStartIndex = headerOffset + 3;
+
+    if (dataStartIndex + dataLength <= frame.size())
+    {
+        result.data.reserve(dataLength);
+        result.data.insert(result.data.begin(),
+                           frame.begin() + dataStartIndex,
+                           frame.begin() + dataStartIndex + dataLength);
+    }
+
+    return result;
 }
-
 
 void send_frame(const FRAME_T &framein) {
     int i = 0;
