@@ -24,6 +24,7 @@ extern const int DELAY_BETWEEN_CARDS;  // Si lo defines globalmente en main o aq
 extern unsigned long timeLastCardRead; // Lo mismo para estas variables
 extern boolean readerDisabled;         // Estas pueden definirse globalmente en main
 extern bool cardIsRead;
+extern TOKEN_ token;
 
 TOKEN_::TOKEN_() : lastReadAttempt(0), readInterval(200), genre(0), lang(static_cast<uint8_t>(currentLanguage)) {
     currentUID = "";
@@ -200,54 +201,108 @@ String TOKEN_::decodeNdefText(const byte* payload, int payloadLength) {
   return decodedText;
 }
 
-bool TOKEN_::leerMensajeNFC(String& mensaje) {
+
+// Función modificada para leer el mensaje NDEF (token) desde las páginas 6 a 18
+bool TOKEN_::leerMensajeNFC(String &mensaje) {
   Serial.println("DEBUG: Procesando mensaje NDEF para la tarjeta con UID: " + currentUID);
 
-  uint8_t buffer[128] = {0};
+  uint8_t rawBuffer[128] = {0};
   int len = 0;
-  for (uint8_t page = 4; page < 4 + 32; page++) { // Leer hasta 32 páginas (máximo 128 bytes)
+  // Leer de la página 6 a la 18 (13 páginas * 4 bytes = 52 bytes)
+  for (uint8_t page = 6; page <= 18; page++) {
     uint8_t pageBuffer[4] = {0};
     if (!nfc.ntag2xx_ReadPage(page, pageBuffer)) {
-      Serial.println("⚠️ ERROR: Falló la lectura de la página");
+      Serial.print("⚠️ ERROR: Falló la lectura de la página ");
+      Serial.println(page);
       mensaje = "";
       return false;
     }
-    memcpy(buffer + len, pageBuffer, 4);
+    memcpy(rawBuffer + len, pageBuffer, 4);
     len += 4;
-    for (int j = 0; j < 4; j++) {
-      if (pageBuffer[j] == 0xFE) {
-        len = len - (4 - j);
-        goto end_read;
-      }
-    }
   }
-end_read:
-  if (buffer[0] != 0x03) {
-      Serial.println("⚠️ ERROR: No se encontró el inicio del mensaje NDEF.");
-      mensaje = "";
-      return false;
+  
+  // Convertir el buffer a una cadena completa (cada byte se interpreta como carácter)
+  String fullData = "";
+  for (int i = 0; i < len; i++) {
+    fullData += (char)rawBuffer[i];
   }
-  uint8_t ndefLength = buffer[1];
-  if (ndefLength == 0 || ndefLength > 52) {
-      Serial.println("⚠️ ERROR: Longitud del mensaje NDEF fuera de rango.");
-      mensaje = "";
-      return false;
+  Serial.println("Dump completo (páginas 6 a 18): " + fullData);
+  
+  // Buscar los delimitadores '#' en la cadena
+  int firstHash = fullData.indexOf('#');
+  if (firstHash < 0) {
+    Serial.println("⚠️ ERROR: No se encontró el delimitador de inicio '#'.");
+    mensaje = "";
+    return false;
   }
+  int secondHash = fullData.indexOf('#', firstHash + 1);
+  if (secondHash < 0) {
+    Serial.println("⚠️ ERROR: No se encontró el delimitador de fin '#'.");
+    mensaje = "";
+    return false;
+  }
+  
+  // Extraer la cadena entre los dos delimitadores
+  String tokenStr = fullData.substring(firstHash + 1, secondHash);
+  Serial.println("Token string extraído: " + tokenStr);
+  
+  // Se espera que el token tenga 46 dígitos hexadecimales (23 bytes)
+  if (tokenStr.length() != 46) {
+    Serial.println("⚠️ ERROR: Longitud del token inválida. Se esperaba 46 dígitos hexadecimales, se obtuvo: " + String(tokenStr.length()));
+    mensaje = "";
+    return false;
+  }
+  
+  // Función lambda para convertir dos caracteres ASCII hex a un byte
+  auto hexToByte = [](const String &str) -> byte {
+    return (byte)strtol(str.c_str(), nullptr, 16);
+  };
 
-  byte payloadBuffer[256] = {0};
-  memcpy(payloadBuffer, buffer + 2, ndefLength);
-  mensaje = decodeNdefText(payloadBuffer, ndefLength);
-
-  if (mensaje.startsWith("#") && mensaje.endsWith("#")) {
-      currentToken = parseTokenString(mensaje);
-      lastProcessedUID = currentUID;
-      return true;
-  } else {
-      Serial.println("⚠️ ERROR: El formato del token es inválido.");
-      mensaje = "";
-      return false;
+  // Nuevo orden:
+  // Bytes 0-1: CMD
+  // Bytes 2-3: CMD2
+  // Bytes 4-5: Bank
+  // Bytes 6-7: File
+  // Bytes 8-9: Color R
+  // Bytes 10-11: Color G
+  // Bytes 12-13: Color B
+  // Bytes 14-45: 8 parejas para los partners (8×4 dígitos = 32 dígitos)
+  token.currentToken.cmd = hexToByte(tokenStr.substring(0, 2));
+  token.currentToken.cmd2 = hexToByte(tokenStr.substring(2, 4));
+  token.currentToken.addr.bank = hexToByte(tokenStr.substring(4, 6));
+  token.currentToken.addr.file = hexToByte(tokenStr.substring(6, 8));
+  token.currentToken.color.r = hexToByte(tokenStr.substring(8, 10));
+  token.currentToken.color.g = hexToByte(tokenStr.substring(10, 12));
+  token.currentToken.color.b = hexToByte(tokenStr.substring(12, 14));
+  
+  for (int i = 0; i < 8; i++) {
+    int startIdx = 14 + i * 4;
+    token.currentToken.partner[i].bank = hexToByte(tokenStr.substring(startIdx, startIdx + 2));
+    token.currentToken.partner[i].file = hexToByte(tokenStr.substring(startIdx + 2, startIdx + 4));
   }
+  
+  // Imprimir valores para depuración
+  Serial.println("Token decodificado:");
+  Serial.print("CMD: 0x"); Serial.println(token.currentToken.cmd, HEX);
+  Serial.print("CMD2: 0x"); Serial.println(token.currentToken.cmd2, HEX);
+  Serial.print("Bank: 0x"); Serial.println(token.currentToken.addr.bank, HEX);
+  Serial.print("File: 0x"); Serial.println(token.currentToken.addr.file, HEX);
+  Serial.print("Color R: 0x"); Serial.println(token.currentToken.color.r, HEX);
+  Serial.print("Color G: 0x"); Serial.println(token.currentToken.color.g, HEX);
+  Serial.print("Color B: 0x"); Serial.println(token.currentToken.color.b, HEX);
+  for (int i = 0; i < 8; i++) {
+    Serial.print("Partner "); Serial.print(i); Serial.print(": Bank=0x");
+    Serial.print(token.currentToken.partner[i].bank, HEX);
+    Serial.print(", File=0x");
+    Serial.println(token.currentToken.partner[i].file, HEX);
+  }
+  
+  mensaje = tokenStr;
+  // Actualizar el UID procesado para evitar relecturas mientras la misma tarjeta esté presente
+  lastProcessedUID = currentUID;
+  return true;
 }
+
 bool TOKEN_::leerPagina(uint8_t pagina, uint8_t *buffer) {
     // En la nueva lógica se utiliza la lectura completa de NDEF, por lo que esta función queda sin implementar.
     return false;
@@ -289,14 +344,8 @@ void TOKEN_::token_handler(TOKEN_DATA token, uint8_t lang_in, bool genre_in, uin
       doitPlayer.play_file(token.addr.bank + genre, token.addr.file + lang);
       delay(50);
 
-      // Verificar si el audio está reproduciéndose
-      for (int i = 0; i < 10; i++) {
-          if (doitPlayer.is_playing()) {
-              audioStarted = true;
-              break;
-          }
-          delay(50);
-      }
+
+      while (doitPlayer.is_playing()) { delay(10); }
 
       // Modo PAREJAS
       if (tokenCurrentMode == TOKEN_PARTNER_MODE) {
@@ -328,11 +377,12 @@ void TOKEN_::token_handler(TOKEN_DATA token, uint8_t lang_in, bool genre_in, uin
           bool isCorrect = (token.addr.bank == propossedToken.addr.bank && token.addr.file == propossedToken.addr.file);
 
           while (doitPlayer.is_playing()) { delay(10); }
+          delay(600); //dejarlo en 500
           send_frame(frameMaker_SEND_COLOR(myid, targets, isCorrect ? 7 : 3)); // verde si es correcto, rojo si no
           doitPlayer.play_file((isCorrect ? WIN_RESP_BANK : FAIL_RESP_BANK) + genre_in, random(1, isCorrect ? 4 : 3) + lang);
           while (doitPlayer.is_playing()) { delay(10); }
 
-          send_frame(frameMaker_SEND_COLOR(myid, targets, 8));
+          //send_frame(frameMaker_SEND_COLOR(myid, targets, 8));
       }
   }
 
