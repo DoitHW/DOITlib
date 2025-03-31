@@ -22,6 +22,7 @@ String getModeDisplayName(const String &fullModeName, bool alternateActive);
 void display_sleep();
 void display_wakeup();
 void drawLanguageMenu(int selection);
+void drawBankSelectionMenu(const std::vector<byte>& bankList, const std::vector<bool>& selectedBanks, int currentSelection, int windowOffset);
 
 extern bool isScrollingText;
 extern TFT_eSPI tft;

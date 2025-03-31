@@ -476,7 +476,7 @@ void drawCurrentElement() {
          uiSprite.setTextSize(1);
          String displayName = getDisplayName(currentFile);
          int elementTextWidth = uiSprite.textWidth(displayName);
-         Serial.println("DEBUG: Tamaño de elemento '" + displayName + "' = " + String(elementTextWidth));
+         //Serial.println("DEBUG: Tamaño de elemento '" + displayName + "' = " + String(elementTextWidth));
          if (elementTextWidth > DISPLAY_WIDTH) {
               nameScrollActive = true;
               currentDisplayName = displayName;
@@ -1149,5 +1149,105 @@ void drawLanguageMenu(int selection) {
         uiSprite.setTextDatum(TL_DATUM);
         uiSprite.drawString(languageOptions[optionIndex], 10, y);
     }
+    uiSprite.pushSprite(0, 0);
+}
+
+extern int bankMenuCurrentSelection;   // 0: Confirmar, 1..n: banks
+extern int bankMenuWindowOffset;       // Índice del primer elemento visible en la ventana
+extern int bankMenuVisibleItems;
+
+void drawBankSelectionMenu(const std::vector<byte>& bankList, const std::vector<bool>& selectedBanks, int currentSelection, int windowOffset) {
+    // Limpiar el sprite completo.
+    uiSprite.fillSprite(BACKGROUND_COLOR);
+    
+    // Título centrado
+    uiSprite.setFreeFont(&FreeSans12pt7b);
+    uiSprite.setTextColor(TEXT_COLOR);
+    uiSprite.setTextDatum(TC_DATUM);
+    uiSprite.setTextSize(1);
+    uiSprite.drawString("Familia", 64, 5);
+    
+    // Total de opciones: 1 para "Confirmar" + cantidad de banks
+    int totalItems = bankList.size() + 1;
+    const int visibleOptions = 4; // Número de opciones visibles
+    const int x = 10;
+    const int textAreaW = 110;
+    const int scrollBarX = 120;
+    
+    // Dibujar cada opción visible dentro de la ventana determinada por windowOffset
+    for (int i = 0; i < visibleOptions && (windowOffset + i) < totalItems; i++) {
+        int menuIndex = windowOffset + i;  // Índice global del item
+        int y = 30 + i * (CARD_HEIGHT + CARD_MARGIN); // Usando CARD_HEIGHT=20 y CARD_MARGIN=5, como en drawModesScreen
+        bool isSelected = (menuIndex == currentSelection);
+        uint32_t textColor = isSelected ? HIGHLIGHT_COLOR : TEXT_COLOR;
+        
+        uiSprite.setFreeFont(&FreeSans9pt7b);
+        uiSprite.setTextSize(1);
+        uiSprite.setTextDatum(TL_DATUM);
+        uiSprite.setTextColor(textColor);
+        
+        String label;
+        if (menuIndex == 0) {
+            label = "Confirmar";
+        } else {
+            // Formatear el bank en hexadecimal
+            char buf[10];
+            sprintf(buf, "%02d", bankList[menuIndex - 1]);
+            label = String(buf);
+            // Agregar marca de selección si está seleccionado
+            if (selectedBanks.size() > (size_t)(menuIndex - 1) && selectedBanks[menuIndex - 1]) {
+                label += " [X]";
+            }
+        }
+        
+        // Si la opción seleccionada tiene texto muy largo, aplicar ticker horizontal similar a drawModesScreen.
+        int fullTextWidth = uiSprite.textWidth(label);
+        if (isSelected && fullTextWidth > textAreaW) {
+            static int tickerOffset = 0;
+            static int tickerDirection = 1;
+            static unsigned long lastFrameTime = 0;
+            const unsigned long frameInterval = 50;
+            unsigned long now = millis();
+            if (now - lastFrameTime >= frameInterval) {
+                tickerOffset += tickerDirection;
+                if (tickerOffset < 0) {
+                    tickerOffset = 0;
+                    tickerDirection = 1;
+                }
+                if (tickerOffset > (fullTextWidth - textAreaW)) {
+                    tickerOffset = fullTextWidth - textAreaW;
+                    tickerDirection = -1;
+                }
+                lastFrameTime = now;
+            }
+            TFT_eSprite tickerSprite = TFT_eSprite(&tft);
+            tickerSprite.createSprite(textAreaW, CARD_HEIGHT);
+            tickerSprite.fillSprite(BACKGROUND_COLOR);
+            tickerSprite.setFreeFont(&FreeSans9pt7b);
+            tickerSprite.setTextSize(1);
+            tickerSprite.setTextDatum(TL_DATUM);
+            tickerSprite.setTextColor(textColor, BACKGROUND_COLOR);
+            tickerSprite.drawString(label, -tickerOffset, 0);
+            tickerSprite.pushToSprite(&uiSprite, x, y);
+            tickerSprite.deleteSprite();
+        } else {
+            uiSprite.drawString(label, x, y);
+        }
+    }
+    
+    // Dibujar la barra de desplazamiento vertical, similar a drawModesScreen.
+    const int scrollBarWidth = 5;
+    int scrollBarY = 30;
+    uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN, TFT_DARKGREY);
+    if (totalItems > visibleOptions) {
+        float thumbRatio = (float)visibleOptions / (float)totalItems;
+        int thumbHeight = max(20, (int)((visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN) * thumbRatio));
+        int thumbY = scrollBarY + ((visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN - thumbHeight) *
+                        (float)(currentSelection - windowOffset) / (float)(totalItems - visibleOptions));
+        uiSprite.fillRect(scrollBarX, thumbY, scrollBarWidth, thumbHeight, TFT_LIGHTGREY);
+    } else {
+        uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN, TFT_LIGHTGREY);
+    }
+    
     uiSprite.pushSprite(0, 0);
 }

@@ -34,4 +34,5 @@ bool isCurrentElementSelected();
 bool checkMostSignificantBit(byte modeConfig[2]);
 bool getModeConfig(const String& fileName, byte mode, byte modeConfig[2]);
 void setAllElementsToBasicMode();
-
+void updateBankList(byte bank);
+std::vector<byte> readBankList();

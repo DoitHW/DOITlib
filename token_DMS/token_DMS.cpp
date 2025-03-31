@@ -5,6 +5,7 @@
 #include <Element_DMS/Element_DMS.h>
 #include <encoder_handler/encoder_handler.h>
 #include <Pulsadores_handler/Pulsadores_handler.h>
+#include <SPIFFS_handler/SPIFFS_handler.h>
 
 // Definición de pines I2C para ESP32 (ajústalos según tu hardware)
 #define SDA_PIN 40
@@ -35,25 +36,14 @@ void TOKEN_::begin() {
   const int MAX_RETRIES = 5;
   int retryCount = 0;
 
-  Serial.println("DEBUG: Inicializando token_DMS con PN532 (Adafruit)");
-
   Wire.begin(SDA_PIN, SCL_PIN);
   delay(100);
 
   while (retryCount < MAX_RETRIES) {
     nfc.begin();
-    Serial.println("Intentando inicializar PN532...");  
     uint32_t versiondata = nfc.getFirmwareVersion();
     if (versiondata) {
-      Serial.print("Found chip PN5");
-      Serial.println((versiondata >> 24) & 0xFF, HEX);
-      Serial.print("Firmware ver. ");
-      Serial.print((versiondata >> 16) & 0xFF, DEC);
-      Serial.print('.');
-      Serial.println((versiondata >> 8) & 0xFF, DEC);
-
       nfc.SAMConfig();
-      Serial.println("DEBUG: PN532 configurado correctamente. Esperando tarjeta NFC...");
 
       startListeningToNFC();
       return; // Salir si inicialización fue exitosa
@@ -110,9 +100,7 @@ void TOKEN_::startListeningToNFC() {
   
   // Pequeña pausa para estabilizar
   delay(5);
-  
-  Serial.println("Starting passive read for an ISO14443A Card ...");
-  
+    
   // Reintentar varias veces si falla
   bool success = false;
  
@@ -270,6 +258,8 @@ bool TOKEN_::leerMensajeNFC(String &mensaje) {
   token.currentToken.cmd = hexToByte(tokenStr.substring(0, 2));
   token.currentToken.cmd2 = hexToByte(tokenStr.substring(2, 4));
   token.currentToken.addr.bank = hexToByte(tokenStr.substring(4, 6));
+  updateBankList(token.currentToken.addr.bank);
+  Serial.println("SPIFFS: Bank actualizado: " + String(token.currentToken.addr.bank, HEX));
   token.currentToken.addr.file = hexToByte(tokenStr.substring(6, 8));
   token.currentToken.color.r = hexToByte(tokenStr.substring(8, 10));
   token.currentToken.color.g = hexToByte(tokenStr.substring(10, 12));
@@ -311,8 +301,6 @@ bool TOKEN_::leerPagina(uint8_t pagina, uint8_t *buffer) {
 void TOKEN_::proponer_token(byte guessbank) {
     lang = 0;
     int fileRand = random(1, 8);  // Genera un número aleatorio entre 1 y 7
-    guessbank = 0x0E; // eliminar esta línea
-    fileRand = 0x02;  // eliminar esta línea
     if (guessbank > 0x09 && guessbank < 0x63) lang = static_cast<uint8_t>(currentLanguage) * 10;
     doitPlayer.play_file(guessbank + genre, fileRand + lang);
     propossedToken.addr.bank = guessbank;
@@ -320,86 +308,118 @@ void TOKEN_::proponer_token(byte guessbank) {
 }
 
 void TOKEN_::token_handler(TOKEN_DATA token, uint8_t lang_in, bool genre_in, uint8_t myid, std::vector<uint8_t> targets) {
+  // Calcular offset de lenguaje si corresponde
   byte lang = 0;
-  bool audioStarted = false;
-  if (token.addr.bank > 0x09 && token.addr.bank < 0x63) lang = lang_in * 10;
+  if (token.addr.bank > 0x09 && token.addr.bank < 0x63) {
+      lang = lang_in * 10;
+  }
   
-  if (token.cmd == TOKEN_CMD) {
-      // Enviar color
+  // Procesamos si la ficha es de efecto (TOKEN_FX) o sin efecto (TOKEN_NOFX)
+  if (token.cmd == TOKEN_FX || token.cmd == TOKEN_NOFX) {
+      // Enviar el color de la ficha
       COLOR_T colorout;
       colorout.red   = token.color.r;
       colorout.green = token.color.g;
       colorout.blue  = token.color.b;
       send_frame(frameMaker_SEND_RGB(myid, targets, colorout));
 
-      // Pequeña pausa para asegurar que el color se aplica antes de iniciar el audio
-      delay(100);
+      delay(200); // Pausa para asegurar que se aplique el color
 
-      // Iniciar reproducción de audio sin género y con lenguaje añadido
-      byte lang = 0;
-      if (token.addr.bank > 0x09 && token.addr.bank < 0x63) {
-          lang = static_cast<uint8_t>(currentLanguage) * 10;
-      }
-          
-      doitPlayer.play_file(token.addr.bank + genre, token.addr.file + lang);
+      // Iniciar reproducción de audio (usa bank + genre y file + lang)
+      doitPlayer.play_file(token.addr.bank + genre_in, token.addr.file + lang);
       delay(50);
-
-
       while (doitPlayer.is_playing()) { delay(10); }
-
-      // Modo PAREJAS
-      if (tokenCurrentMode == TOKEN_PARTNER_MODE) {
-          if (!waitingForPartner) {
-              currentToken = token;
-              waitingForPartner = true;
-          } else {
-              bool match = false;
-              for (auto &partner : currentToken.partner) {
-                  if (token.addr.bank == partner.bank && token.addr.file == partner.file) {
-                      match = true;
-                      break;
-                  }
-              }
-
-              while (doitPlayer.is_playing()) { delay(10); }
-              int fileNum = match ? random(1, 4) : random(1, 3);
-              send_frame(frameMaker_SEND_COLOR(myid, targets, match ? 7 : 3)); // verde si hay match, rojo si no
-              doitPlayer.play_file((match ? WIN_RESP_BANK : FAIL_RESP_BANK) + genre_in, fileNum + lang);
-              while (doitPlayer.is_playing()) { delay(10); }
-
-              send_frame(frameMaker_SEND_COLOR(myid, targets, 8));
-              waitingForPartner = false;
+      delay(500);
+      // Procesar según el modo actual
+      if (tokenCurrentMode == TOKEN_BASIC_MODE) {
+          // En BASIC: al terminar el audio, si el color es temporal se apaga (se envía negro)
+          if (token.cmd2 == TEMP_COLOR_CONF) {
+              send_frame(frameMaker_SEND_COLOR(myid, targets, 8)); // negro
           }
+          // Si es PERM_COLOR_CONF, no se realiza ningún cambio (se mantiene el color)
       }
-
-      // Modo ADIVINAR
-      if (tokenCurrentMode == TOKEN_GUESS_MODE) {
+      else if (tokenCurrentMode == TOKEN_PARTNER_MODE) {
+        // Declaración estática para retener los datos de la primera ficha
+        static bool firstTokenStored = false;
+        static byte firstTokenBank = 0;
+        static byte firstTokenFile = 0;
+        
+        if (!waitingForPartner) {
+            // Primera ficha: guardar bank y file permanentemente
+            firstTokenBank = token.addr.bank;
+            firstTokenFile = token.addr.file;
+            firstTokenStored = true;
+            Serial.printf("Primer token registrado: Bank = 0x%02X, File = 0x%02X\n", firstTokenBank, firstTokenFile);
+            
+            waitingForPartner = true;
+            
+            // Al finalizar la reproducción de la primera ficha, si es temporal se apaga el color
+            if (token.cmd2 == TEMP_COLOR_CONF) {
+                delay(50);
+                send_frame(frameMaker_SEND_COLOR(myid, targets, 8)); // Enviar negro
+                Serial.println("Primer token: Color temporal, apagando después del audio.");
+            }
+        } else {
+            // Segunda ficha: verificar si alguno de sus partners coincide con el primer token
+            if (!firstTokenStored) {
+                Serial.println("Error: No se encontró el primer token almacenado.");
+                return;
+            }
+            bool match = false;
+            Serial.printf("Comparando primer token (Bank = 0x%02X, File = 0x%02X) con los partners de la segunda ficha:\n", firstTokenBank, firstTokenFile);
+            for (int i = 0; i < 8; i++) {
+                Serial.printf("Partner %d: Bank = 0x%02X, File = 0x%02X\n", i, token.partner[i].bank, token.partner[i].file);
+                if (token.partner[i].bank == firstTokenBank && token.partner[i].file == firstTokenFile) {
+                    match = true;
+                    Serial.printf("Match encontrado en partner %d\n", i);
+                    break;
+                }
+            }
+            
+            delay(50);
+            while (doitPlayer.is_playing()) { delay(10); }
+            delay(200);
+            int fileNum = match ? random(1, 4) : random(1, 3);
+            send_frame(frameMaker_SEND_COLOR(myid, targets, match ? 7 : 3));  // 7: verde (match), 3: rojo (fail)
+            doitPlayer.play_file((match ? WIN_RESP_BANK : FAIL_RESP_BANK) + genre_in, fileNum + lang);
+            delay(50);
+            while (doitPlayer.is_playing()) { delay(10); }
+            delay(600);
+            
+            // Según el tipo de configuración de color
+            if (token.cmd2 == TEMP_COLOR_CONF) {
+                send_frame(frameMaker_SEND_COLOR(myid, targets, 8)); // Apagar color (negro)
+                Serial.println("Segundo token: TEMP_COLOR_CONF, apagando color.");
+            } else if (token.cmd2 == PERM_COLOR_CONF) {
+                COLOR_T colorout;
+                colorout.red   = token.color.r;
+                colorout.green = token.color.g;
+                colorout.blue  = token.color.b;
+                send_frame(frameMaker_SEND_RGB(myid, targets, colorout)); // Mantener el color
+                Serial.println("Segundo token: PERM_COLOR_CONF, manteniendo color.");
+            }
+            
+            waitingForPartner = false;
+            firstTokenStored = false; // Reiniciamos para la próxima pareja
+        }
+    }    
+      else if (tokenCurrentMode == TOKEN_GUESS_MODE) {
           bool isCorrect = (token.addr.bank == propossedToken.addr.bank && token.addr.file == propossedToken.addr.file);
-
           while (doitPlayer.is_playing()) { delay(10); }
-          delay(600); //dejarlo en 500
-          send_frame(frameMaker_SEND_COLOR(myid, targets, isCorrect ? 7 : 3)); // verde si es correcto, rojo si no
+          delay(600);
+          // Enviar color de respuesta: verde (7) si es correcto, rojo (3) si no
+          send_frame(frameMaker_SEND_COLOR(myid, targets, isCorrect ? 7 : 3));
           doitPlayer.play_file((isCorrect ? WIN_RESP_BANK : FAIL_RESP_BANK) + genre_in, random(1, isCorrect ? 4 : 3) + lang);
           while (doitPlayer.is_playing()) { delay(10); }
-
-          //send_frame(frameMaker_SEND_COLOR(myid, targets, 8));
+          delay(600);
+          if (token.cmd2 == TEMP_COLOR_CONF) {
+              send_frame(frameMaker_SEND_COLOR(myid, targets, 8)); // color temporal: apagar
+          } else if (token.cmd2 == PERM_COLOR_CONF) {
+              send_frame(frameMaker_SEND_RGB(myid, targets, colorout)); // color permanente: reenvía el color de la ficha
+          }
       }
   }
-
-  // Esperar a que termine la reproducción del audio si se inició correctamente
-  if (doitPlayer.is_playing())
-  {
-    Serial.println("Esperando a que termine el audio...");
-    while (doitPlayer.is_playing())
-    {
-      delay(10);
-    }
-  }
-  else
-  {
-    Serial.println("No se detectó reproducción de audio o terminó rápidamente");
-  }
-  send_frame(frameMaker_SEND_COLOR(myid, targets, 8));
+  // (No se incluye aquí la lógica de reproducción al presionar el botón del relé, que se gestionará en el loop)
 }
 
 void TOKEN_::printFicha(const TOKEN_DATA &f) {
@@ -469,3 +489,5 @@ TOKEN_::TOKEN_DATA TOKEN_::parseTokenString(const String &tokenStr) {
   }
   return data;
 }
+
+

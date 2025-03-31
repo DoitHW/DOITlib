@@ -31,6 +31,8 @@ void debugModeConfig(const uint8_t modeConfig[2]);
 
 std::vector<bool> initializeAlternateStates(const String &currentFile);
 
+void handleBankSelectionMenu(std::vector<byte>& bankList, std::vector<bool>& selectedBanks);
+
 // Variables externas requeridas
 extern std::vector<String> elementFiles;
 extern std::vector<bool> selectedStates;

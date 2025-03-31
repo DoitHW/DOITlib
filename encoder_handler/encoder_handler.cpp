@@ -37,7 +37,13 @@ unsigned long encoderIgnoreUntil = 0; // Tiempo hasta el cual se ignoran las ent
 bool languageMenuActive = false;
 int languageMenuSelection = 0;  // Índice de la opción seleccionada (0 a 5)
 extern TOKEN_ token;
+bool bankSelectionActive = false;
+std::vector<byte> bankList;
+std::vector<bool> selectedBanks;
 
+int bankMenuCurrentSelection = 0;   // 0: Confirmar, 1..n: banks
+int bankMenuWindowOffset = 0;       // Índice del primer elemento visible en la ventana
+int bankMenuVisibleItems = 4;
 
 void encoder_init_func() {
     pinMode(ENC_BUTTON, INPUT_PULLUP);
@@ -63,6 +69,13 @@ void handleEncoder() {
     }
     
     if (ignoreInputs) return;
+
+    if (bankSelectionActive) {
+        // Suponiendo que bankList y selectedBanks están definidos globalmente y ya se han cargado:
+        handleBankSelectionMenu(bankList, selectedBanks);
+        // Evitamos procesar el resto de la función mientras estemos en este modo.
+        return;
+    }
     
     // Si la pantalla está apagada, SOLO reactivar si hay una acción real (movimiento o pulsación)
     if (!displayOn) {
@@ -353,6 +366,7 @@ void requestAndSyncElementMode() {
     
 }
 
+
 bool modeAlternateActive = false;
 // Función handleModeSelection modificada
 void handleModeSelection(const String& currentFile) {
@@ -463,10 +477,10 @@ void handleModeSelection(const String& currentFile) {
         if (currentFile == "Fichas") {// Mapear el modo real seleccionado a un TOKEN_MODE_
         TOKEN_MODE_ tokenMode;
         switch (realModeIndex) {
-            case 0: tokenMode  = TOKEN_BASIC_MODE;   break;
-            case 1: tokenMode  = TOKEN_PARTNER_MODE; break;
-            case 2: tokenMode  = TOKEN_GUESS_MODE;   break;
-            default: tokenMode = TOKEN_BASIC_MODE;   break;
+            case 0: tokenMode  = TOKEN_BASIC_MODE;   bankSelectionActive = false; break;
+            case 1: tokenMode  = TOKEN_PARTNER_MODE; bankSelectionActive = false; break;
+            case 2: tokenMode  = TOKEN_GUESS_MODE;   bankSelectionActive = true;  break;
+            default: tokenMode = TOKEN_BASIC_MODE;   bankSelectionActive = false; break;
         }
 
             // Llamar a la función set_mode de la instancia token
@@ -492,8 +506,17 @@ void handleModeSelection(const String& currentFile) {
         }
         send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, std::vector<byte>{getCurrentElementID()}, realModeIndex));
     }
-    inModesScreen = false;
-    drawCurrentElement();
+
+    if (!bankSelectionActive) {
+        inModesScreen = false;
+        drawCurrentElement();
+    } else {
+        // Si estamos en modo ADIVINAR, permanecemos en este submenú.
+        inModesScreen = false;
+        // Por ejemplo, podrías llamar a la función que dibuja el menú de banks:
+        // (suponiendo que bankList y selectedBanks sean variables globales o accesibles)
+        drawBankSelectionMenu(bankList, selectedBanks, bankMenuCurrentSelection, bankMenuWindowOffset); // El índice inicial puede ser 0
+    }
 }
 
 std::vector<bool> initializeAlternateStates(const String &currentFile) {
@@ -737,5 +760,65 @@ void debugModeConfig(const uint8_t modeConfig[2]) {
     }
 }
 
+void handleBankSelectionMenu(std::vector<byte>& bankList, std::vector<bool>& selectedBanks) {
+    // Calcular total de opciones (Confirmar + banks)
+    int totalItems = bankList.size() + 1;
 
+    // Leer el valor actual del encoder y actualizar bankMenuCurrentSelection
+    int32_t newEncoderValue = encoder.getCount();
+    if (newEncoderValue != lastEncoderValue) {
+        int32_t direction = (newEncoderValue > lastEncoderValue) ? 1 : -1;
+        bankMenuCurrentSelection += direction;
+        if (bankMenuCurrentSelection < 0) bankMenuCurrentSelection = totalItems - 1;
+        if (bankMenuCurrentSelection >= totalItems) bankMenuCurrentSelection = 0;
+        lastEncoderValue = newEncoderValue;
+
+        // Ajustar window offset para que currentSelection sea visible
+        if (bankMenuCurrentSelection < bankMenuWindowOffset) {
+            bankMenuWindowOffset = bankMenuCurrentSelection;
+        } else if (bankMenuCurrentSelection >= bankMenuWindowOffset + bankMenuVisibleItems) {
+            bankMenuWindowOffset = bankMenuCurrentSelection - bankMenuVisibleItems + 1;
+        }
+        // Redibujar el menú con los parámetros actualizados
+        drawBankSelectionMenu(bankList, selectedBanks, bankMenuCurrentSelection, bankMenuWindowOffset);
+    }
+
+    // Detectar pulsación del botón del encoder (con debounce)
+    if (digitalRead(ENC_BUTTON) == LOW) {
+        delay(200);
+        // Si la opción actual es "Confirmar" (índice 0), finalizar el menú
+        if (bankMenuCurrentSelection == 0) {
+            // Aquí podrías imprimir la selección para depuración
+            Serial.println("Bancos seleccionados:");
+            for (size_t i = 0; i < selectedBanks.size(); i++) {
+                if (selectedBanks[i]) {
+                    Serial.print("0x");
+                    Serial.print(bankList[i], HEX);
+                    Serial.print(" ");
+                }
+            }
+            Serial.println();
+            // Reiniciar el encoder para el siguiente uso
+            encoder.clearCount();
+            lastEncoderValue = encoder.getCount();
+            // Desactivar el menú de selección y regresar al menú principal
+            bankSelectionActive = false;
+            drawCurrentElement();
+            return;
+        } else {
+            // Si no es Confirmar, alternar el estado del bank correspondiente
+            int bankIndex = bankMenuCurrentSelection - 1;
+            if (bankIndex >= 0 && bankIndex < (int)bankList.size()) {
+                selectedBanks[bankIndex] = !selectedBanks[bankIndex];
+            }
+            // Redibujar el menú para reflejar el cambio
+            drawBankSelectionMenu(bankList, selectedBanks, bankMenuCurrentSelection, bankMenuWindowOffset);
+            // Esperar a que se suelte el botón para evitar múltiples toggles
+            while (digitalRead(ENC_BUTTON) == LOW) {
+                delay(10);
+            }
+            delay(200);
+        }
+    }
+}
 

@@ -85,11 +85,11 @@ public:
     TOKEN_DATA propossedToken;
     TOKEN_MODE_ tokenCurrentMode = TOKEN_BASIC_MODE;
 
-    void leerTodasLasPaginas();
+    bool waitingForPartner = false;
 
 private:
     // Variables internas para controlar el estado
-    bool waitingForPartner = false;
+    
     bool reset_partner = false;
     unsigned long lastReadAttempt;
     unsigned long readInterval;

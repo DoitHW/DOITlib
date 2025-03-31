@@ -361,7 +361,7 @@ enum COMMANDS_{
 };
 
 enum TOKEN_TYPE_{
-  TOKEN_CMD, 
+  TOKEN_FX, 
   TOKEN_NOFX
 };
 

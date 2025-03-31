@@ -45,7 +45,7 @@ void MICROPHONE_::begin(){
         i2s_driver_install(I2S_NUM_0, &i2s_config, 0, NULL);
         i2s_set_pin(I2S_NUM_0, &pin_config);
         micInitialized = true;
-        Serial.println("Micrófono activado.");
+        //Serial.println("Micrófono activado.");
     }
     else {
         Serial.println("Micrófono ya estaba activado.");
@@ -54,7 +54,79 @@ void MICROPHONE_::begin(){
 
 
 
+// byte MICROPHONE_::get_mic_value_BYTE(){
+//     int32_t sample = 0;
+//     size_t bytes_read = 0;
+
+//     // Leer una muestra del micrófono
+//     i2s_read(I2S_NUM_0, &sample, sizeof(int32_t), &bytes_read, portMAX_DELAY);
+
+//     if (bytes_read > 0) {
+//         sample >>= 14; // Ajusta el valor a 16 bits
+//         sample = abs(sample); // Tomar el valor absoluto
+//         sample = map(sample, 0, 5000, 0, 255); // Mapear a un rango de 0 a 255
+//         sample = constrain(sample, 0, 255); // Asegurarse de que esté en el rango 0-255
+//     }
+
+//     return (byte)sample; // Devolver el valor mapeado
+// }
+
+int MICROPHONE_::readMicRaw() {
+    int32_t sample = 0;
+    size_t bytes_read = 0;
+    // Leer una muestra del micrófono
+    i2s_read(I2S_NUM_0, &sample, sizeof(int32_t), &bytes_read, portMAX_DELAY);
+    if (bytes_read > 0) {
+        sample >>= 14;      // Ajusta el valor (según el hardware, aquí se adapta a 16 bits)
+        sample = abs(sample); // Valor absoluto
+        return sample;
+    }
+    return 0;
+}
+
+void MICROPHONE_::calibracionInicial(unsigned long duracionCalibracion) {
+    unsigned long startTime = millis();
+    int rawMin = 4097;  // Valor inicial mayor al máximo posible del ADC (4096)
+    int rawMax = 0;
+    long suma = 0;
+    int lectura = 0;
+    int contador = 0;
+    
+    Serial.println("Iniciando calibración...");
+    
+    while (millis() - startTime < duracionCalibracion) {
+        lectura = readMicRaw();
+        suma += lectura;
+        contador++;
+        
+        if (lectura < rawMin) {
+            rawMin = lectura;
+        }
+        if (lectura > rawMax) {
+            rawMax = lectura;
+        }
+        delay(10); // Intervalo entre lecturas (ajusta según la frecuencia deseada)
+    }
+    
+    float promedio = (contador > 0) ? (float)suma / contador : 0;
+    
+    Serial.println("Calibración finalizada:");
+    Serial.print("Valor mínimo: ");
+    Serial.println(rawMin);
+    Serial.print("Valor máximo: ");
+    Serial.println(rawMax);
+    Serial.print("Valor promedio: ");
+    Serial.println(promedio);
+}
+
 byte MICROPHONE_::get_mic_value_BYTE(){
+    // Inicializamos raw_min con un valor superior al máximo posible del ADC (4096) 
+    // y raw_max en 0. 
+    // Si reinicias el sistema (o llamas a una función de reinicio) entre pruebas, 
+    // estos valores se reiniciarán.
+    static int raw_min = 4097;  
+    static int raw_max = 0;      
+
     int32_t sample = 0;
     size_t bytes_read = 0;
 
@@ -62,14 +134,37 @@ byte MICROPHONE_::get_mic_value_BYTE(){
     i2s_read(I2S_NUM_0, &sample, sizeof(int32_t), &bytes_read, portMAX_DELAY);
 
     if (bytes_read > 0) {
-        sample >>= 14; // Ajusta el valor a 16 bits
-        sample = abs(sample); // Tomar el valor absoluto
-        sample = map(sample, 0, 5000, 0, 255); // Mapear a un rango de 0 a 255
-        sample = constrain(sample, 0, 255); // Asegurarse de que esté en el rango 0-255
+        sample >>= 14;           // Ajusta el valor (según tu hardware)
+        Serial.println(sample);
+        sample = abs(sample);      // Se toma el valor absoluto
+        
+        // Actualizar el mínimo y el máximo "crudos"
+        if(sample < raw_min){
+            raw_min = sample;
+        }
+        if(sample > raw_max){
+            raw_max = sample;
+        }
+
+        // Calcular el promedio entre el mínimo y el máximo
+        int average = (raw_min + raw_max) / 2;
+
+        // Imprimir los valores para conocer la calibración en cada entorno
+        Serial.print("Min: ");
+        Serial.print(raw_min);
+        Serial.print(" | Max: ");
+        Serial.print(raw_max);
+        Serial.print(" | Promedio: ");
+        Serial.println(average);
+
+        // Mapear el valor del ADC (de 0 a 4096) a un rango de 0 a 255
+        sample = map(sample, 0, 4096, 0, 255);
+        sample = constrain(sample, 0, 255);  // Asegurarse que esté en el rango 0-255
     }
 
     return (byte)sample; // Devolver el valor mapeado
 }
+
 
 byte MICROPHONE_::get_mic_value_BYTE_voice() {
     static double vReal[SAMPLES];

@@ -38,6 +38,8 @@ class MICROPHONE_{
         bool detect_sound_threshold();
         byte detect_musical_note();
         void end();
+        int readMicRaw();
+        void calibracionInicial(unsigned long duracionCalibracion);
 };
 
 extern bool useMic;

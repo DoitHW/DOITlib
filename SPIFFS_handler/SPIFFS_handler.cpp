@@ -161,14 +161,14 @@ void loadElementsFromSPIFFS() {
         file = root.openNextFile();
     }
                                                                                     #ifdef DEBUG
-                                                                                    Serial.println("Elementos encontrados:");
+                                                                                    //Serial.println("Elementos encontrados:");
                                                                                     #endif
     
-    for (size_t i = 0; i < elementFiles.size(); i++) {
-        Serial.printf("%d: %s\n", (int)i, elementFiles[i].c_str());
-    }
+    // for (size_t i = 0; i < elementFiles.size(); i++) {
+    //     Serial.printf("%d: %s\n", (int)i, elementFiles[i].c_str());
+    // }
                                                                                     #ifdef DEBUG
-                                                                                    Serial.printf("Total de elementos: %d\n", (int)elementFiles.size());                                                                                
+                                                                                    //Serial.printf("Total de elementos: %d\n", (int)elementFiles.size());                                                                                
                                                                                     #endif
     
 }
@@ -272,8 +272,82 @@ void setAllElementsToBasicMode() {
         f.flush();
         f.close();
                                                                                     #ifdef DEBUG
-                                                                                    Serial.println("✅ Modo básico actualizado en " + fileName);                                                                    
+                                                                                    //Serial.println("✅ Modo básico actualizado en " + fileName);                                                                    
                                                                                     #endif
         
     }   
+}
+
+void updateBankList(byte bank) {
+    const char* bankFilePath = "/bank_list.bin";
+    std::vector<byte> bankList;
+
+    // Si el archivo existe, lo abrimos en modo lectura para recuperar la lista actual
+    if (SPIFFS.exists(bankFilePath)) {
+        File f = SPIFFS.open(bankFilePath, "r");
+        if (f) {
+            while (f.available()) {
+                bankList.push_back(f.read());
+            }
+            f.close();
+        } else {
+            Serial.println("Error al abrir el archivo de banks para lectura.");
+        }
+    }
+
+    // Verificar si el bank ya se encuentra en la lista
+    bool exists = false;
+    for (byte b : bankList) {
+        if (b == bank) {
+            exists = true;
+            break;
+        }
+    }
+
+    // Si el bank no está en la lista, agregarlo, ordenar y reescribir el archivo
+    if (!exists) {
+        bankList.push_back(bank);
+        std::sort(bankList.begin(), bankList.end());
+
+        File f = SPIFFS.open(bankFilePath, "w");
+        if (f) {
+            for (byte b : bankList) {
+                f.write(b);
+            }
+            f.close();
+
+            Serial.print("Bank list updated: ");
+            for (byte b : bankList) {
+                Serial.print("0x");
+                Serial.print(b, HEX);
+                Serial.print(" ");
+            }
+            Serial.println();
+        } else {
+            Serial.println("Error al abrir el archivo de banks para escritura.");
+        }
+    } else {
+        Serial.println("El bank ya existe en la lista.");
+    }
+}
+
+std::vector<byte> readBankList() {
+    std::vector<byte> bankList;
+    const char* bankFilePath = "/bank_list.bin";
+    
+    if (SPIFFS.exists(bankFilePath)) {
+        File f = SPIFFS.open(bankFilePath, "r");
+        if (f) {
+            while (f.available()) {
+                bankList.push_back(f.read());
+            }
+            f.close();
+        } else {
+            Serial.println("Error al abrir el archivo de banks para lectura.");
+        }
+    }
+    
+    // Ordenar la lista, por si no está ordenada
+    std::sort(bankList.begin(), bankList.end());
+    return bankList;
 }
