@@ -87,6 +87,11 @@ public:
 
     bool waitingForPartner = false;
 
+    bool uidDetected = false;
+    bool mensajeLeido = false;
+    unsigned long uidDetectionTime = 0;
+
+
 private:
     // Variables internas para controlar el estado
     

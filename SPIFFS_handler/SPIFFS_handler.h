@@ -35,4 +35,6 @@ bool checkMostSignificantBit(byte modeConfig[2]);
 bool getModeConfig(const String& fileName, byte mode, byte modeConfig[2]);
 void setAllElementsToBasicMode();
 void updateBankList(byte bank);
+void saveBrightnessToSPIFFS(uint8_t value);
+uint8_t loadBrightnessFromSPIFFS();
 std::vector<byte> readBankList();

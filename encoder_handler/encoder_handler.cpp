@@ -45,6 +45,15 @@ int bankMenuCurrentSelection = 0;   // 0: Confirmar, 1..n: banks
 int bankMenuWindowOffset = 0;       // Índice del primer elemento visible en la ventana
 int bankMenuVisibleItems = 4;
 
+bool soundMenuActive = false;
+int soundMenuSelection = 0;
+
+byte selectedVoiceGender = 0; // 0 = Mujer, 1 = Hombre
+bool negativeResponse = true;
+byte selectedVolume = 0; // 0 = Normal, 1 = Atenuado
+
+
+
 void encoder_init_func() {
     pinMode(ENC_BUTTON, INPUT_PULLUP);
     ESP32Encoder::useInternalWeakPullResistors = UP;
@@ -67,6 +76,10 @@ void handleEncoder() {
             return;
         }
     }
+
+    if (soundMenuActive) return;
+
+    if (brightnessMenuActive) return;
     
     if (ignoreInputs) return;
 
@@ -633,6 +646,89 @@ void toggleElementSelection(const String& currentFile) {
     drawCurrentElement();
 }
 
+// Variables globales para brillo
+int lastEncoderCount = 0;
+bool encoderPressed = false;
+bool ignoreFirstRelease = true;
+
+void handleBrightnessMenu() {
+    int currentCount = encoder.getCount();
+
+    if (currentCount != lastEncoderCount) {
+        int delta = currentCount - lastEncoderCount;
+        lastEncoderCount = currentCount;
+
+        int newBrightness = constrain((int)tempBrightness + delta, 0, 100);
+        if (newBrightness != tempBrightness) {
+            tempBrightness = newBrightness;
+            drawBrightnessMenu(tempBrightness);
+
+            FastLED.setBrightness(map(tempBrightness, 0, 100, 0, 255));
+            FastLED.show();
+        }
+    }
+
+    bool currentEncoderState = (digitalRead(ENC_BUTTON) == LOW);
+
+    if (encoderPressed && !currentEncoderState) {
+        if (ignoreFirstRelease) {
+            ignoreFirstRelease = false;
+        } else {
+            currentBrightness = tempBrightness;
+            saveBrightnessToSPIFFS(currentBrightness);
+            brightnessMenuActive = false;
+            drawCurrentElement();
+        }
+    }
+
+    encoderPressed = currentEncoderState;
+}
+
+const int soundOptions[] = {0, 1, 3, 4, 6, 7, 9}; // Índices seleccionables
+const int numSoundOptions = sizeof(soundOptions) / sizeof(soundOptions[0]);
+
+void handleSoundMenu() {
+    static int currentIndex = 0;
+    int32_t newEncoderValue = encoder.getCount();
+    static int32_t lastValue = newEncoderValue;
+
+    if (newEncoderValue != lastValue) {
+        int dir = (newEncoderValue > lastValue) ? 1 : -1;
+        lastValue = newEncoderValue;
+        currentIndex = (currentIndex + dir + numSoundOptions) % numSoundOptions;
+        soundMenuSelection = soundOptions[currentIndex];
+        drawSoundMenu(soundMenuSelection);
+    }
+
+    if (digitalRead(ENC_BUTTON) == LOW) {
+        if (buttonPressStart == 0) {
+            buttonPressStart = millis();
+        }
+    } else {
+        if (buttonPressStart > 0 && millis() - buttonPressStart < 1000) {
+            int sel = soundMenuSelection;
+            switch (sel) {
+                case 0: selectedVoiceGender = 0; token.genre = 0; break;
+                case 1: selectedVoiceGender = 1; token.genre = 1; break;
+                case 3: negativeResponse = true; break;
+                case 4: negativeResponse = false; break;
+                case 6: selectedVolume = 0; doitPlayer.player.volume(26); break;
+                case 7: selectedVolume = 1; doitPlayer.player.volume(20); break;
+                case 9: 
+                soundMenuActive = false;
+                drawCurrentElement();
+                Serial.println("✅ Ajustes de sonido confirmados:");
+                Serial.printf(" - Tipo de voz: %s\n", selectedVoiceGender == 0 ? "Mujer" : "Hombre");
+                Serial.printf(" - Respuesta negativa: %s\n", negativeResponse ? "Con" : "Sin");
+                Serial.printf(" - Volumen: %s\n", selectedVolume == 0 ? "Normal" : "Atenuado");
+                break;
+            }
+            drawSoundMenu(soundMenuSelection); // Refrescar para mostrar nuevo estado
+        }
+        buttonPressStart = 0;
+    }
+}
+
 void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
     int32_t newEncoderValue = encoder.getCount();
     static bool encoderButtonPressed = false;
@@ -681,8 +777,10 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
             break;
             
         case 2: // Sonido
-            drawCurrentElement();
-            hiddenMenuActive = false;
+        soundMenuActive = true;
+        soundMenuSelection = 0;
+        drawSoundMenu(soundMenuSelection);
+        hiddenMenuActive = false;
                                                                                             #ifdef DEBUG
                                                                                             Serial.println("Cambiando Sonido...");
                                                                                             #endif
@@ -691,9 +789,20 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
                                                                                             #ifdef DEBUG
                                                                                             Serial.println("Ajustando brillo...");
                                                                                             #endif
-            // Lógica para ajustar brillo
-            drawCurrentElement();
-            hiddenMenuActive = false;
+
+        hiddenMenuActive = false;                // 🛑 Desactivar menú oculto
+        brightnessMenuActive = true;             // ✅ Activar menú brillo
+    
+        currentBrightness = loadBrightnessFromSPIFFS();
+        tempBrightness = currentBrightness;
+        encoder.setCount(currentBrightness);
+    
+        // 🔄 Reiniciar estados
+        lastEncoderCount = currentBrightness;
+        encoderPressed = (digitalRead(ENC_BUTTON) == LOW);
+        ignoreFirstRelease = true;
+    
+        drawBrightnessMenu(currentBrightness);
             break;
         case 4: // Formatear SPIFFS
                                                                                             #ifdef DEBUG
@@ -729,7 +838,6 @@ bool getModeFlag(const uint8_t modeConfig[2], MODE_CONFIGS flag) {
     // Extraer el bit (el enum indica el offset desde el bit 0, LSB)
     return (config >> flag) & 1;
 }
-
 
 
 void debugModeConfig(const uint8_t modeConfig[2]) {

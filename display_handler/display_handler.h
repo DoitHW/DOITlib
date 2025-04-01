@@ -23,11 +23,17 @@ void display_sleep();
 void display_wakeup();
 void drawLanguageMenu(int selection);
 void drawBankSelectionMenu(const std::vector<byte>& bankList, const std::vector<bool>& selectedBanks, int currentSelection, int windowOffset);
+void drawBrightnessMenu(uint8_t brightness);
+void drawSunIcon(int16_t x, int16_t y, uint16_t color);
+void scrollTextTickerBounceSound(int selection);
 
 extern bool isScrollingText;
 extern TFT_eSPI tft;
 extern TFT_eSprite uiSprite;
 extern bool nameScrollActive;
 extern bool modeScrollActive;
+extern bool brightnessMenuActive;
 extern std::map<String, std::vector<bool>> elementAlternateStates;
 extern std::vector<bool> currentAlternateStates;
+extern uint8_t currentBrightness;       // Valor actual en porcentaje
+extern uint8_t tempBrightness; 

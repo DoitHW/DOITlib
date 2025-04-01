@@ -21,6 +21,66 @@
 TFT_eSPI tft = TFT_eSPI();
 TFT_eSprite uiSprite = TFT_eSprite(&tft);
 
+bool brightnessMenuActive = false;
+uint8_t currentBrightness = 100;       // Valor actual en porcentaje
+uint8_t tempBrightness = currentBrightness;  // Valor temporal mientras se ajusta
+
+void drawBrightnessMenu(uint8_t brightness) {
+    // Clear the sprite with background color
+    uiSprite.fillSprite(BACKGROUND_COLOR);
+    
+    // Draw header with proper centering
+    uiSprite.setTextColor(TFT_WHITE, BACKGROUND_COLOR);
+    uiSprite.setTextSize(1);
+    // Use text datum to center text properly
+    uiSprite.setTextDatum(MC_DATUM); // Middle-Center alignment
+    uiSprite.drawString("Ajustar Brillo", 64, 15, 2); // Centered at x=64 (middle of 128px screen)
+    
+    // Draw sun icon, moved slightly left for better balance
+    drawSunIcon(30, 45, TFT_YELLOW);
+    
+    // Draw rounded background bar, adjusted position
+    uiSprite.fillRoundRect(45, 45, 70, 10, 5, TFT_DARKGREY);
+    
+    // Draw active progress bar with rounded corners
+    int barWidth = map(brightness, 0, 100, 0, 70);
+    if (barWidth > 0) {
+        // Use gradient color based on brightness
+        uint16_t barColor = brightness < 30 ? TFT_ORANGE : 
+                           (brightness < 70 ? TFT_YELLOW : TFT_WHITE);
+        uiSprite.fillRoundRect(45, 45, barWidth, 10, 5, barColor);
+    }
+    
+    // Draw percentage with proper centering
+    uiSprite.drawString(String(brightness) + "%", 64, 70, 2); // Centered text
+    
+    // Draw control hints at bottom, properly centered
+    uiSprite.setTextSize(1);
+    uiSprite.drawString("- / +", 64, 100, 1); // Control hints
+    
+    // Draw border around the entire interface, properly centered
+    uiSprite.drawRoundRect(4, 4, 120, 120, 8, TFT_DARKGREY);
+    
+    // Push sprite to display
+    uiSprite.pushSprite(0, 0);
+}
+
+// Helper function to draw a sun icon
+void drawSunIcon(int16_t x, int16_t y, uint16_t color) {
+    // Center circle
+    uiSprite.fillCircle(x, y, 6, color);
+    
+    // Sun rays
+    for (int i = 0; i < 8; i++) {
+        float angle = i * PI / 4;
+        int x1 = x + 8 * cos(angle);
+        int y1 = y + 8 * sin(angle);
+        int x2 = x + 12 * cos(angle);
+        int y2 = y + 12 * sin(angle);
+        uiSprite.drawLine(x1, y1, x2, y2, color);
+    }
+}
+
 void display_init() {
     //Serial.println("Inicializando display...");
     tft.init();
@@ -30,6 +90,7 @@ void display_init() {
     uiSprite.createSprite(tft.width(), tft.height());
     uiSprite.setSwapBytes(true);
     //Serial.println("Display inicializado.");
+    
 }
 
 void drawNoElementsMessage() {
@@ -1008,7 +1069,7 @@ void drawHiddenMenu(int selection)
 
 void scrollTextTickerBounce(int selection)
 {
-    if (!hiddenMenuActive) return;
+    if (!hiddenMenuActive && !soundMenuActive) return;
 
     const int cardWidth = 110;
     const int cardHeight = CARD_HEIGHT;
@@ -1250,4 +1311,211 @@ void drawBankSelectionMenu(const std::vector<byte>& bankList, const std::vector<
     }
     
     uiSprite.pushSprite(0, 0);
+}
+
+void drawSoundMenu(int selection) {
+    const int scrollBarWidth = 5;
+    const int visibleOptions = 4;
+    const int totalOptions = 10;
+    const char* options[] = {
+        getTranslation("MUJER"),
+        getTranslation("HOMBRE"),
+        "---------",
+        getTranslation("CON_NEG"),
+        getTranslation("SIN_NEG"),
+        "---------",
+        getTranslation("VOL_NORMAL"),
+        getTranslation("VOL_ATENUADO"),
+        "---------",
+        getTranslation("CONFIRMAR")
+    };
+
+    uiSprite.fillSprite(BACKGROUND_COLOR);
+
+    // Título
+    uiSprite.setFreeFont(&FreeSans12pt7b);
+    uiSprite.setTextColor(TEXT_COLOR);
+    uiSprite.setTextDatum(TC_DATUM);
+    uiSprite.setTextSize(1);
+    uiSprite.drawString(getTranslation("SONIDO"), 64, 5);
+
+    // Scroll vertical
+    int startIndex = max(0, min(selection - visibleOptions / 2, totalOptions - visibleOptions));
+    const int x = 9;
+    const int scrollBarX = 128 - scrollBarWidth - 3;
+    int textAreaW = scrollBarX - x - 2;
+
+    // Actualizar índice visible para scrollTextTickerBounce
+
+    for (int i = 0; i < visibleOptions && (startIndex + i) < totalOptions; i++) {
+        int idx = startIndex + i;
+        int y = 30 + i * (CARD_HEIGHT + CARD_MARGIN);
+        const char* label = options[idx];
+
+        // -------- delimitador
+        if (strcmp(label, "---------") == 0) {
+            uiSprite.setFreeFont(&FreeSans9pt7b);
+            uiSprite.setTextSize(1);
+            uiSprite.setTextDatum(TL_DATUM);
+            uiSprite.setTextColor(TFT_DARKGREY);
+            uiSprite.drawString("---------", x, y);
+            continue;
+        }
+
+        // ¿Está seleccionada por el usuario?
+        bool isLogicallySelected =
+            (idx == 0 && selectedVoiceGender == 0) ||
+            (idx == 1 && selectedVoiceGender == 1) ||
+            (idx == 3 && negativeResponse) ||
+            (idx == 4 && !negativeResponse) ||
+            (idx == 6 && selectedVolume == 0) ||
+            (idx == 7 && selectedVolume == 1);
+
+        // ¿Está siendo navegada con el cursor?
+        bool isCursor = (idx == selection);
+
+        // Color de fondo si está bajo el cursor
+        if (isCursor) {
+            uiSprite.fillRoundRect(x - 3, y - 1, textAreaW + 6, CARD_HEIGHT + 2, 3, CARD_COLOR);
+        }
+
+        // Color del texto
+        uint16_t textColor = (isCursor && isLogicallySelected) ? HIGHLIGHT_COLOR :
+                     isCursor ? TEXT_COLOR :
+                     isLogicallySelected ? HIGHLIGHT_COLOR : TEXT_COLOR;
+
+        uiSprite.setFreeFont(&FreeSans9pt7b);
+        uiSprite.setTextSize(1);
+        uiSprite.setTextDatum(TL_DATUM);
+        uiSprite.setTextColor(textColor);
+
+        String text = String(label);
+
+        // Verifica si el texto sobrepasa el área visible para hacer scroll
+        if (isCursor && uiSprite.textWidth(text) > textAreaW) {
+            scrollTextTickerBounce(selection); // <-- llamada directa como pediste
+        }
+
+        // Recorte para evitar desbordes si no se va a scrollear
+        while (!isCursor && uiSprite.textWidth(text) > textAreaW && text.length() > 0) {
+            text.remove(text.length() - 1);
+        }
+
+        uiSprite.drawString(text, x, y);
+    }
+
+    // Barra de scroll
+    int scrollBarY = 30;
+    int scrollBarHeight = visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN;
+    uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_DARKGREY);
+
+    if (totalOptions > visibleOptions) {
+        float thumbRatio = (float)visibleOptions / (float)totalOptions;
+        int thumbHeight = max(20, (int)(scrollBarHeight * thumbRatio));
+        int thumbY = scrollBarY + (scrollBarHeight - thumbHeight)
+                    * (float)(selection - startIndex) / (float)(totalOptions - visibleOptions);
+        uiSprite.fillRect(scrollBarX, thumbY, scrollBarWidth, thumbHeight, TFT_LIGHTGREY);
+    } else {
+        uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_LIGHTGREY);
+    }
+
+    uiSprite.pushSprite(0, 0);
+}
+
+void scrollTextTickerBounceSound(int selection)
+{
+    if (!soundMenuActive) return;
+
+    const int cardWidth = 110;
+    const int cardHeight = CARD_HEIGHT;
+    const int cardMargin = CARD_MARGIN;
+    const int visibleOptions = 4;
+    const unsigned long frameInterval = 10;
+    const int scrollMargin = 10; // Permite mostrar margen extra para el final del texto
+
+    static int pixelOffsets[10] = {0}; 
+    static int scrollDirections[10] = {1}; 
+    static unsigned long lastFrameTime = 0;
+
+    const char* options[] = {
+        getTranslation("MUJER"),
+        getTranslation("HOMBRE"),
+        "---------",
+        getTranslation("CON_NEG"),
+        getTranslation("SIN_NEG"),
+        "---------",
+        getTranslation("VOL_NORMAL"),
+        getTranslation("VOL_ATENUADO"),
+        "---------",
+        getTranslation("CONFIRMAR")
+    };
+
+    if (selection < 0 || selection >= 10) return;
+
+    String text = String(options[selection]);
+
+
+    TFT_eSprite measureSprite(&tft);
+    measureSprite.setFreeFont(&FreeSans9pt7b);
+    measureSprite.setTextWrap(false);
+    measureSprite.setTextSize(1);
+    measureSprite.setTextDatum(TL_DATUM);
+
+    int fullTextWidth = measureSprite.textWidth(text.c_str());
+    if (fullTextWidth <= cardWidth) return;
+
+    int startIndex = max(0, min(selection - visibleOptions / 2, 10 - visibleOptions));
+    int cardIndex = selection - startIndex;
+    if (cardIndex < 0 || cardIndex >= visibleOptions) return;
+
+    int cardY = 30 + cardIndex * (cardHeight + cardMargin);
+    int textAreaX = 10;
+    int textAreaY = cardY;
+    int textAreaW = cardWidth;      // Ahora igual al ancho total de la tarjeta
+    int textAreaH = cardHeight - 2;
+
+    bool isLogicallySelected =
+        (selection == 0 && selectedVoiceGender == 0) ||
+        (selection == 1 && selectedVoiceGender == 1) ||
+        (selection == 3 && negativeResponse) ||
+        (selection == 4 && !negativeResponse) ||
+        (selection == 6 && selectedVolume == 0) ||
+        (selection == 7 && selectedVolume == 1);
+
+    uint16_t textColor = isLogicallySelected ? HIGHLIGHT_COLOR : TEXT_COLOR;
+
+    // Scroll automático
+    unsigned long now = millis();
+    if (now - lastFrameTime >= frameInterval) {
+        pixelOffsets[selection] += scrollDirections[selection];
+
+        if (pixelOffsets[selection] <= 0) {
+            pixelOffsets[selection] = 0;
+            scrollDirections[selection] = 1;
+        }
+
+        int maxOffset = fullTextWidth - cardWidth + scrollMargin;
+        if (pixelOffsets[selection] >= maxOffset) {
+            pixelOffsets[selection] = maxOffset;
+            scrollDirections[selection] = -1;
+        }
+
+        lastFrameTime = now;
+    }
+
+    TFT_eSprite tickerSprite(&tft);
+    if (tickerSprite.createSprite(textAreaW, textAreaH) == nullptr) return;
+
+    tickerSprite.setFreeFont(&FreeSans9pt7b);
+    tickerSprite.setTextWrap(false);
+    tickerSprite.setTextSize(1);
+    tickerSprite.setTextDatum(TL_DATUM);
+    tickerSprite.setTextColor(textColor);
+    tickerSprite.fillSprite(CARD_COLOR); // Fondo azul completo
+
+    tickerSprite.drawString(text, -pixelOffsets[selection], 0);  // Mueve el texto dentro del sprite
+
+    tickerSprite.pushSprite(textAreaX, textAreaY);
+    tft.fillRect(textAreaX + textAreaW +5, textAreaY, 128 - (textAreaX + textAreaW), textAreaH, BACKGROUND_COLOR);
+    tickerSprite.deleteSprite();
 }

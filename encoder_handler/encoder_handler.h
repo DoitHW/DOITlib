@@ -33,6 +33,11 @@ std::vector<bool> initializeAlternateStates(const String &currentFile);
 
 void handleBankSelectionMenu(std::vector<byte>& bankList, std::vector<bool>& selectedBanks);
 
+void handleBrightnessMenu();
+
+void handleSoundMenu();
+void drawSoundMenu(int selection);
+
 // Variables externas requeridas
 extern std::vector<String> elementFiles;
 extern std::vector<bool> selectedStates;
@@ -58,6 +63,14 @@ extern bool systemLocked;
 // Variables para el submenú de selección de idioma
 extern bool languageMenuActive;
 extern int languageMenuSelection;  // Índice de la opción seleccionada (0 a 5)
+
+extern bool soundMenuActive;
+extern int soundMenuSelection;
+extern byte selectedVoiceGender;
+extern bool negativeResponse;
+extern byte selectedVolume;
+
+
 
 
 

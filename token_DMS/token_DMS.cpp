@@ -139,6 +139,10 @@ void TOKEN_::handleCardDetected() {
     }
     newUID.toUpperCase();
     currentUID = newUID;
+    uidDetected = true;
+    mensajeLeido = false;
+    uidDetectionTime = millis();
+
     Serial.print("Found an ISO14443A card, UID: ");
     Serial.println(currentUID);
   } else {
@@ -290,6 +294,8 @@ bool TOKEN_::leerMensajeNFC(String &mensaje) {
   mensaje = tokenStr;
   // Actualizar el UID procesado para evitar relecturas mientras la misma tarjeta esté presente
   lastProcessedUID = currentUID;
+  mensajeLeido = true;
+
   return true;
 }
 

@@ -351,3 +351,31 @@ std::vector<byte> readBankList() {
     std::sort(bankList.begin(), bankList.end());
     return bankList;
 }
+
+void saveBrightnessToSPIFFS(uint8_t value) {
+    File file = SPIFFS.open("/brightness.txt", FILE_WRITE);
+    if (file) {
+        file.printf("%d", value);  // Guardamos como texto
+        file.close();
+        Serial.println("💾 Brillo guardado en SPIFFS: " + String(value));
+    } else {
+        Serial.println("❌ Error al guardar brillo en SPIFFS");
+    }
+}
+
+uint8_t loadBrightnessFromSPIFFS() {
+    if (!SPIFFS.exists("/brightness.txt")) return 100;  // Valor por defecto
+
+    File file = SPIFFS.open("/brightness.txt", FILE_READ);
+    if (file) {
+        String content = file.readStringUntil('\n');
+        file.close();
+        int value = content.toInt();
+        value = constrain(value, 0, 100);
+        Serial.println("🔆 Brillo cargado desde SPIFFS: " + String(value));
+        return value;
+    } else {
+        Serial.println("❌ Error al leer brillo desde SPIFFS");
+        return 100;
+    }
+}
