@@ -25,7 +25,13 @@ void drawLanguageMenu(int selection);
 void drawBankSelectionMenu(const std::vector<byte>& bankList, const std::vector<bool>& selectedBanks, int currentSelection, int windowOffset);
 void drawBrightnessMenu(uint8_t brightness);
 void drawSunIcon(int16_t x, int16_t y, uint16_t color);
+void drawSoundMenu(int selection);
 void scrollTextTickerBounceSound(int selection);
+void drawFormatMenu(int selection);
+void drawDeleteElementMenu(int selection);
+void drawConfirmDelete(const String& fileName);
+void scrollTextTickerBounceFormat(int selection);
+void scrollTextTickerBounceDelete(int selection);
 
 extern bool isScrollingText;
 extern TFT_eSPI tft;
@@ -37,3 +43,5 @@ extern std::map<String, std::vector<bool>> elementAlternateStates;
 extern std::vector<bool> currentAlternateStates;
 extern uint8_t currentBrightness;       // Valor actual en porcentaje
 extern uint8_t tempBrightness; 
+extern bool forceDrawDeleteElementMenu;
+

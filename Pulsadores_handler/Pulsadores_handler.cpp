@@ -46,7 +46,7 @@ void PulsadoresHandler::limpiarEstados() {
 bool PulsadoresHandler::isButtonPressed(byte color) {
     for (int i = 0; i < FILAS; i++) {
         digitalWrite(filas[i], LOW); // Activamos la fila
-        delayMicroseconds(10); // Pequeña pausa para asegurar estabilidad en la lectura
+        delayMicroseconds(1); // Pequeña pausa para asegurar estabilidad en la lectura
         
         for (int j = 0; j < COLUMNAS; j++) {
             if (pulsadorColor[i][j] == color && digitalRead(columnas[j]) == LOW) {

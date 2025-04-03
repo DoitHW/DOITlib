@@ -105,6 +105,8 @@
 #define MAX_BALLS 5  // Máximo de bolas simultáneas
 #define COLOR_VARIATION 30  // Variación máxima de color
 
+#define MIC_SENS 1500
+
 // DEFINES FRAME
 #define NEW_START             0xE1
 #define OLD_START             0x3A
@@ -670,7 +672,8 @@ enum SECTOR_LIST{
   ELEM_CURRENT_FLAGS_SECTOR,
   ELEM_CURRENT_PATTERN_SECTOR,
   ELEM_CURRENT_FILE_SECTOR,
-  ELEM_CURRENT_XMANAGER_SECTOR
+  ELEM_CURRENT_XMANAGER_SECTOR,
+  ACTIVE_ELEM_LIST //length 33 array[33] omplirlo amb IDS seleccionades 0x00 0x21, enviar un return elem sector amb sector + array, a target DC
 };
 
 

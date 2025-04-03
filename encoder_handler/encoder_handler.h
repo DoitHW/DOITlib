@@ -24,7 +24,7 @@ void drawCurrentElement();
 
 void handleModeSelection(const String& currentFile);
 void toggleElementSelection(const String& currentFile);
-void requestAndSyncElementMode();
+//void requestAndSyncElementMode();
 
 bool getModeFlag(const uint8_t modeConfig[2], MODE_CONFIGS flag);
 void debugModeConfig(const uint8_t modeConfig[2]);
@@ -36,7 +36,12 @@ void handleBankSelectionMenu(std::vector<byte>& bankList, std::vector<bool>& sel
 void handleBrightnessMenu();
 
 void handleSoundMenu();
-void drawSoundMenu(int selection);
+
+void handleFormatMenu();
+
+void handleDeleteElementMenu();
+
+void handleConfirmDelete();
 
 // Variables externas requeridas
 extern std::vector<String> elementFiles;
@@ -64,11 +69,23 @@ extern bool systemLocked;
 extern bool languageMenuActive;
 extern int languageMenuSelection;  // Índice de la opción seleccionada (0 a 5)
 
+extern bool formatSubMenuActive;
+extern int formatMenuSelection;
+
+
 extern bool soundMenuActive;
 extern int soundMenuSelection;
 extern byte selectedVoiceGender;
 extern bool negativeResponse;
 extern byte selectedVolume;
+
+extern bool deleteElementMenuActive;
+extern int deleteElementSelection;
+extern std::vector<String> deletableElementFiles;
+extern bool confirmDeleteActive;
+extern int confirmSelection;
+extern bool confirmDeleteMenuActive;
+
 
 
 

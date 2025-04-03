@@ -119,7 +119,7 @@ void MICROPHONE_::calibracionInicial(unsigned long duracionCalibracion) {
     Serial.println(promedio);
 }
 
-byte MICROPHONE_::get_mic_value_BYTE(){
+byte MICROPHONE_::get_mic_value_BYTE(int sens){
     // Inicializamos raw_min con un valor superior al máximo posible del ADC (4096) 
     // y raw_max en 0. 
     // Si reinicias el sistema (o llamas a una función de reinicio) entre pruebas, 
@@ -146,19 +146,8 @@ byte MICROPHONE_::get_mic_value_BYTE(){
             raw_max = sample;
         }
 
-        // Calcular el promedio entre el mínimo y el máximo
-        int average = (raw_min + raw_max) / 2;
-
-        // Imprimir los valores para conocer la calibración en cada entorno
-        Serial.print("Min: ");
-        Serial.print(raw_min);
-        Serial.print(" | Max: ");
-        Serial.print(raw_max);
-        Serial.print(" | Promedio: ");
-        Serial.println(average);
-
         // Mapear el valor del ADC (de 0 a 4096) a un rango de 0 a 255
-        sample = map(sample, 0, 4096, 0, 255);
+        sample = map(sample, 0, 5000 - sens, 0, 255);
         sample = constrain(sample, 0, 255);  // Asegurarse que esté en el rango 0-255
     }
 

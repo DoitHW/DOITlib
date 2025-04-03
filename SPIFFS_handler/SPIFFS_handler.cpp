@@ -2,6 +2,7 @@
 #include <SPIFFS_handler/SPIFFS_handler.h>
 #include <display_handler/display_handler.h>
 #include "icons_64x64_DMS/icons_64x64_DMS.h"
+#include <Translations_handler/translations.h>
 
 
 
@@ -379,3 +380,34 @@ uint8_t loadBrightnessFromSPIFFS() {
         return 100;
     }
 }
+
+void loadDeletableElements() {
+    deletableElementFiles.clear();
+
+    fs::File root = SPIFFS.open("/");
+    if (!root || !root.isDirectory()) {
+        Serial.println("Error al abrir SPIFFS para eliminar elementos.");
+        return;
+    }
+
+    fs::File file = root.openNextFile();
+    while (file) {
+        String fileName = file.name();
+        if (!fileName.startsWith("/")) {
+            fileName = "/" + fileName;
+        }
+
+        if (fileName.startsWith("/element_") && fileName.endsWith(".bin") && fileName.indexOf("_icon") < 0) {
+            // Extraer nombre sin extensión ni ruta
+            String cleanName = fileName;
+            cleanName.remove(0, 9); // quitar "/element_"
+            cleanName.replace(".bin", "");
+            deletableElementFiles.push_back(cleanName);
+        }
+        
+        file.close();
+        file = root.openNextFile();
+    }
+    deletableElementFiles.push_back(getTranslation("VOLVER"));
+}
+

@@ -33,7 +33,7 @@ class MICROPHONE_{
         MICROPHONE_(){}
         void begin();
 
-        byte get_mic_value_BYTE();
+        byte get_mic_value_BYTE(int sens);
         byte get_mic_value_BYTE_voice();
         bool detect_sound_threshold();
         byte detect_musical_note();

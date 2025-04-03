@@ -12,7 +12,7 @@
 #define SCL_PIN 41
 
 // Definición de pines para el PN532 en modo I2C con IRQ
-#define PN532_IRQ   (42)    // Ajusta este valor según tu conexión
+//#define PN532_IRQ   (42)    // Ajusta este valor según tu conexión
 #define PN532_RESET (-1)    // Normalmente -1 si no se utiliza reset
 
 // Instancia global del PN532 utilizando la librería Adafruit_PN532

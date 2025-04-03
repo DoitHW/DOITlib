@@ -150,7 +150,7 @@ void IRAM_ATTR onUartInterrupt() {
                             if (isTarget) {
                                 Serial.println();
                                 frameReceived = true; // Set flag for loop() to process
-                                
+                                Serial.println("Trama recibida y válida 🟢🟢🟢");
                                     DEBUG__________(" ISR: Frame Received OK, targeted to device");
                                 
                             } else {

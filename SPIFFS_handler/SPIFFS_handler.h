@@ -38,3 +38,4 @@ void updateBankList(byte bank);
 void saveBrightnessToSPIFFS(uint8_t value);
 uint8_t loadBrightnessFromSPIFFS();
 std::vector<byte> readBankList();
+void loadDeletableElements();

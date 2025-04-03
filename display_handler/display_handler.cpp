@@ -990,11 +990,10 @@ void drawModesScreen() {
 
 // Opciones del menú oculto
 const char* menuOptions[] = {
-    "BUSCAR_ELEMENTO",
     "IDIOMA",
     "SONIDO",
     "BRILLO",
-    "FORMATEAR",
+    "CONTROL_SALA_MENU",
     "VOLVER"
 };
 const int numOptions = sizeof(menuOptions) / sizeof(menuOptions[0]);
@@ -1075,10 +1074,11 @@ void scrollTextTickerBounce(int selection)
     const int cardHeight = CARD_HEIGHT;
     const int cardMargin = CARD_MARGIN;
     const int visibleOptions = 3;
-    const unsigned long frameInterval = 200;
+    const unsigned long frameInterval = 10;
     
-    static int charOffsets[6] = {0,0,0,0,0,0}; 
-    static int scrollDirections[6] = {1,1,1,1,1,1};
+    static int charOffsets[5] = {0, 0, 0, 0, 0};
+    static int scrollDirections[5] = {1, 1, 1, 1, 1};
+
     static unsigned long lastFrameTime = 0;
 
     tft.setFreeFont(&FreeSans9pt7b);
@@ -1517,5 +1517,363 @@ void scrollTextTickerBounceSound(int selection)
 
     tickerSprite.pushSprite(textAreaX, textAreaY);
     tft.fillRect(textAreaX + textAreaW +5, textAreaY, 128 - (textAreaX + textAreaW), textAreaH, BACKGROUND_COLOR);
+    tickerSprite.deleteSprite();
+}
+
+void drawFormatSubmenu(int selected) {
+    tft.fillScreen(TFT_BLACK);
+    String opciones[] = {"Eliminar elemento", "Restaurar", getTranslation("VOLVER")};
+    for (int i = 0; i < 3; i++) {
+        tft.setTextColor(i == selected ? TFT_GREEN : TFT_WHITE, TFT_BLACK);
+        tft.setCursor(10, 20 + i * 30);
+        tft.print(opciones[i]);
+    }
+}
+
+void drawFormatMenu(int selection) {
+    const int scrollBarWidth = 5;
+    const int visibleOptions = 4;
+    const int totalOptions = 4;
+
+    const char* options[] = {
+        getTranslation("BUSCAR_ELEMENTO"),
+        getTranslation("DELETE_ELEMENT"),
+        getTranslation("RESTORE"),
+        getTranslation("VOLVER")
+    };
+
+    uiSprite.fillSprite(BACKGROUND_COLOR);
+
+    // Título
+    uiSprite.setFreeFont(&FreeSans12pt7b);
+    uiSprite.setTextColor(TEXT_COLOR);
+    uiSprite.setTextDatum(TC_DATUM);
+    uiSprite.setTextSize(1);
+    uiSprite.drawString(String(getTranslation("CONTROL_SALA_MENU")), 64, 5);
+
+    const int x = 9;
+    const int scrollBarX = 128 - scrollBarWidth - 3;
+    const int textAreaW = scrollBarX - x - 2;
+
+    int startIndex = max(0, min(selection - visibleOptions / 2, totalOptions - visibleOptions));
+    int yOffset = 30;
+
+    for (int i = 0; i < visibleOptions && (startIndex + i) < totalOptions; i++) {
+        int idx = startIndex + i;
+        int y = yOffset + i * (CARD_HEIGHT + CARD_MARGIN);
+        bool isCursor = (idx == selection);
+
+        if (isCursor) {
+            uiSprite.fillRoundRect(x - 3, y - 1, textAreaW + 6, CARD_HEIGHT + 2, 3, CARD_COLOR);
+        }
+
+        uiSprite.setFreeFont(&FreeSans9pt7b);
+        uiSprite.setTextSize(1);
+        uiSprite.setTextDatum(TL_DATUM);
+        uiSprite.setTextColor(isCursor ? TEXT_COLOR : TEXT_COLOR);
+        // Medición y truncado manual
+        String fullText = options[idx];
+        String displayText = fullText;
+
+        int textWidth = uiSprite.textWidth(fullText);
+        if (textWidth > textAreaW) {
+            // Truncar añadiendo "..."
+            displayText = "";
+            for (int c = 0; c < fullText.length(); c++) {
+                String temp = displayText + fullText[c];
+                if (uiSprite.textWidth(temp) > textAreaW) break;
+                displayText += fullText[c];
+            }
+}
+
+uiSprite.drawString(displayText, x, y);
+
+    }
+
+    // Barra de scroll
+    int scrollBarY = yOffset;
+    int scrollBarHeight = visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN;
+    uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_DARKGREY);
+
+    if (totalOptions > visibleOptions) {
+        float thumbRatio = (float)visibleOptions / totalOptions;
+        int thumbHeight = max(20, (int)(scrollBarHeight * thumbRatio));
+        int divisor = (totalOptions - visibleOptions);
+        int thumbY = scrollBarY + (scrollBarHeight - thumbHeight) 
+                   * ((divisor != 0) ? (float)(selection - startIndex) / divisor : 0.0f);
+
+        uiSprite.fillRect(scrollBarX, thumbY, scrollBarWidth, thumbHeight, TFT_LIGHTGREY);
+    } else {
+        uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_LIGHTGREY);
+    }
+
+    uiSprite.pushSprite(0, 0);
+}
+
+bool forceDrawDeleteElementMenu = false;
+
+
+void drawDeleteElementMenu(int selection) {
+    const int visibleOptions = 4;
+    const int scrollBarWidth = 5;
+
+    uiSprite.fillSprite(BACKGROUND_COLOR);
+
+    // Título
+    uiSprite.setFreeFont(&FreeSans12pt7b);
+    uiSprite.setTextColor(TEXT_COLOR);
+    uiSprite.setTextDatum(TC_DATUM);
+    uiSprite.setTextSize(1);
+    uiSprite.drawString(String(getTranslation("DELETE_ELEMENT_MENU")), 64, 5);
+
+    const int x = 9;
+    const int scrollBarX = 128 - scrollBarWidth - 3;
+    const int textAreaW = scrollBarX - x - 2;
+
+    int totalOptions = deletableElementFiles.size();
+    if (totalOptions == 0) {
+        uiSprite.setFreeFont(&FreeSans9pt7b);
+        uiSprite.setTextDatum(TC_DATUM);
+        uiSprite.setTextColor(HIGHLIGHT_COLOR);
+        uiSprite.drawString("No hay elementos", 64, 64);
+        uiSprite.pushSprite(0, 0);
+        return;
+    }
+
+    int startIndex = max(0, min(selection - visibleOptions / 2, totalOptions - visibleOptions));
+    int yOffset = 30;
+
+    for (int i = 0; i < visibleOptions && (startIndex + i) < totalOptions; i++) {
+        int idx = startIndex + i;
+        int y = yOffset + i * (CARD_HEIGHT + CARD_MARGIN);
+        bool isCursor = (idx == selection);
+
+        if (isCursor) {
+            uiSprite.fillRoundRect(x - 3, y - 1, textAreaW + 6, CARD_HEIGHT + 2, 3, CARD_COLOR);
+        }
+
+        uiSprite.setFreeFont(&FreeSans9pt7b);
+        uiSprite.setTextDatum(TL_DATUM);
+        uiSprite.setTextSize(1);
+        uiSprite.setTextColor(isCursor ? TEXT_COLOR : TEXT_COLOR);
+        // Truncar el texto si es demasiado largo para el área visible
+        String fullText = deletableElementFiles[idx];
+        String displayText = fullText;
+
+        int textWidth = uiSprite.textWidth(fullText);
+        if (textWidth > textAreaW) {
+            displayText = "";
+            for (int c = 0; c < fullText.length(); c++) {
+                String temp = displayText + fullText[c];
+                if (uiSprite.textWidth(temp) > textAreaW) break;
+                displayText += fullText[c];
+            }
+        }
+
+        uiSprite.drawString(displayText, x, y);
+
+    }
+
+    // Barra de scroll
+    int scrollBarY = yOffset;
+    int scrollBarHeight = visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN;
+    uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_DARKGREY);
+
+    if (totalOptions > visibleOptions) {
+        float thumbRatio = (float)visibleOptions / totalOptions;
+        int thumbHeight = max(20, (int)(scrollBarHeight * thumbRatio));
+        int thumbY = scrollBarY + (scrollBarHeight - thumbHeight)
+                   * (float)(selection - startIndex) / (totalOptions - visibleOptions);
+        uiSprite.fillRect(scrollBarX, thumbY, scrollBarWidth, thumbHeight, TFT_LIGHTGREY);
+    } else {
+        uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_LIGHTGREY);
+    }
+
+    uiSprite.pushSprite(0, 0);
+}
+
+void drawConfirmDelete(const String& fileName) {
+    uiSprite.fillSprite(BACKGROUND_COLOR);
+
+    // Título
+    uiSprite.setFreeFont(&FreeSans12pt7b);
+    uiSprite.setTextColor(HIGHLIGHT_COLOR);
+    uiSprite.setTextDatum(TC_DATUM);
+    uiSprite.setTextSize(1);
+    uiSprite.drawString(getTranslation("CONFIRM_DELETE"), 64, 5);
+
+    // Nombre del elemento
+    uiSprite.setFreeFont(&FreeSans9pt7b);
+    uiSprite.setTextColor(TEXT_COLOR);
+    uiSprite.setTextDatum(TC_DATUM);
+    uiSprite.drawString(fileName, 64, 35);
+
+    // Opciones
+    const char* opciones[] = {
+        getTranslation("YES_DELETE"),
+        getTranslation("CANCEL")
+    };
+
+    const int x = 20;
+    const int yBase = 64;
+    const int boxW = 88;
+    const int boxH = 22;
+    const int spacing = 28;
+
+    for (int i = 0; i < 2; i++) {
+        int y = yBase + i * spacing;
+        if (i == confirmSelection) {
+            uiSprite.fillRoundRect(x - 4, y - 2, boxW + 8, boxH + 4, 4, CARD_COLOR);
+        }
+        uiSprite.setTextDatum(TL_DATUM);
+        uiSprite.setTextColor(i == confirmSelection ? TEXT_COLOR : TEXT_COLOR);
+        uiSprite.drawString(opciones[i], x, y);
+    }
+
+    uiSprite.pushSprite(0, 0);
+}
+
+void scrollTextTickerBounceFormat(int selection) {
+    if (!formatSubMenuActive) return;
+
+    const int cardWidth = 110;
+    const int cardHeight = CARD_HEIGHT;
+    const int cardMargin = CARD_MARGIN;
+    const int visibleOptions = 4;
+    const unsigned long frameInterval = 10;
+    const int scrollMargin = 10;
+
+    static int pixelOffsets[4] = {0};
+    static int scrollDirections[4] = {1};
+    static unsigned long lastFrameTime = 0;
+
+    const char* options[] = {
+        getTranslation("BUSCAR_ELEMENTO"),
+        getTranslation("DELETE_ELEMENT"),
+        getTranslation("RESTORE"),
+        getTranslation("VOLVER")
+    };
+
+    if (selection < 0 || selection >= 4) return;
+    String text = String(options[selection]);
+
+    TFT_eSprite measureSprite(&tft);
+    measureSprite.setFreeFont(&FreeSans9pt7b);
+    measureSprite.setTextWrap(false);
+    measureSprite.setTextSize(1);
+    measureSprite.setTextDatum(TL_DATUM);
+    int fullTextWidth = measureSprite.textWidth(text.c_str());
+    if (fullTextWidth <= cardWidth) return;
+
+    int startIndex = max(0, min(selection - visibleOptions / 2, 4 - visibleOptions));
+    int cardIndex = selection - startIndex;
+    if (cardIndex < 0 || cardIndex >= visibleOptions) return;
+
+    int cardY = 30 + cardIndex * (cardHeight + cardMargin);
+    int textAreaX = 10;
+    int textAreaY = cardY;
+    int textAreaW = cardWidth;
+    int textAreaH = cardHeight - 2;
+
+    unsigned long now = millis();
+    if (now - lastFrameTime >= frameInterval) {
+        pixelOffsets[selection] += scrollDirections[selection];
+
+        if (pixelOffsets[selection] <= 0) {
+            pixelOffsets[selection] = 0;
+            scrollDirections[selection] = 1;
+        }
+        if (pixelOffsets[selection] >= fullTextWidth - cardWidth + scrollMargin) {
+            pixelOffsets[selection] = fullTextWidth - cardWidth + scrollMargin;
+            scrollDirections[selection] = -1;
+        }
+        lastFrameTime = now;
+    }
+
+    TFT_eSprite tickerSprite(&tft);
+    if (tickerSprite.createSprite(textAreaW, textAreaH) == nullptr) return;
+
+    tickerSprite.setFreeFont(&FreeSans9pt7b);
+    tickerSprite.setTextWrap(false);
+    tickerSprite.setTextSize(1);
+    tickerSprite.setTextDatum(TL_DATUM);
+    tickerSprite.setTextColor(TEXT_COLOR);
+    tickerSprite.fillSprite(CARD_COLOR);
+
+    tickerSprite.drawString(text, -pixelOffsets[selection], 0);
+    tickerSprite.pushSprite(textAreaX, textAreaY);
+
+    // Recorte derecho
+    tft.fillRect(textAreaX + textAreaW +5, textAreaY, 128 - (textAreaX + textAreaW), textAreaH, BACKGROUND_COLOR);
+
+    tickerSprite.deleteSprite();
+}
+
+void scrollTextTickerBounceDelete(int selection) {
+    if (!deleteElementMenuActive) return;
+
+    const int cardWidth = 110;
+    const int cardHeight = CARD_HEIGHT;
+    const int cardMargin = CARD_MARGIN;
+    const int visibleOptions = 4;
+    const unsigned long frameInterval = 10;
+    const int scrollMargin = 10;
+
+    static int pixelOffsets[30] = {0}; // Soporta hasta 30 elementos
+    static int scrollDirections[30] = {1};
+    static unsigned long lastFrameTime = 0;
+
+    if (selection < 0 || selection >= deletableElementFiles.size()) return;
+    String text = deletableElementFiles[selection];
+
+    TFT_eSprite measureSprite(&tft);
+    measureSprite.setFreeFont(&FreeSans9pt7b);
+    measureSprite.setTextWrap(false);
+    measureSprite.setTextSize(1);
+    measureSprite.setTextDatum(TL_DATUM);
+    int fullTextWidth = measureSprite.textWidth(text.c_str());
+    if (fullTextWidth <= cardWidth) return;
+
+    int startIndex = max(0, min(selection - visibleOptions / 2, (int)deletableElementFiles.size() - visibleOptions));
+    int cardIndex = selection - startIndex;
+    if (cardIndex < 0 || cardIndex >= visibleOptions) return;
+
+    int cardY = 30 + cardIndex * (cardHeight + cardMargin);
+    int textAreaX = 10;
+    int textAreaY = cardY;
+    int textAreaW = cardWidth;
+    int textAreaH = cardHeight - 2;
+
+    unsigned long now = millis();
+    if (now - lastFrameTime >= frameInterval) {
+        pixelOffsets[selection] += scrollDirections[selection];
+
+        if (pixelOffsets[selection] <= 0) {
+            pixelOffsets[selection] = 0;
+            scrollDirections[selection] = 1;
+        }
+        if (pixelOffsets[selection] >= fullTextWidth - cardWidth + scrollMargin) {
+            pixelOffsets[selection] = fullTextWidth - cardWidth + scrollMargin;
+            scrollDirections[selection] = -1;
+        }
+        lastFrameTime = now;
+    }
+
+    TFT_eSprite tickerSprite(&tft);
+    if (tickerSprite.createSprite(textAreaW, textAreaH) == nullptr) return;
+
+    tickerSprite.setFreeFont(&FreeSans9pt7b);
+    tickerSprite.setTextWrap(false);
+    tickerSprite.setTextSize(1);
+    tickerSprite.setTextDatum(TL_DATUM);
+    tickerSprite.setTextColor(TEXT_COLOR);
+    tickerSprite.fillSprite(CARD_COLOR);
+
+    tickerSprite.drawString(text, -pixelOffsets[selection], 0);
+    tickerSprite.pushSprite(textAreaX, textAreaY);
+
+    // Recorte derecho
+    tft.fillRect(textAreaX + textAreaW +5, textAreaY, 128 - (textAreaX + textAreaW), textAreaH, BACKGROUND_COLOR);
+
     tickerSprite.deleteSprite();
 }

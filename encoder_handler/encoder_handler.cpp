@@ -52,6 +52,8 @@ byte selectedVoiceGender = 0; // 0 = Mujer, 1 = Hombre
 bool negativeResponse = true;
 byte selectedVolume = 0; // 0 = Normal, 1 = Atenuado
 
+bool formatSubMenuActive = false;
+int formatMenuSelection = 0;
 
 
 void encoder_init_func() {
@@ -76,6 +78,10 @@ void handleEncoder() {
             return;
         }
     }
+
+    if (deleteElementMenuActive) return;
+
+    if (formatSubMenuActive) return;
 
     if (soundMenuActive) return;
 
@@ -343,41 +349,41 @@ void handleEncoder() {
     }
 }
 
-void requestAndSyncElementMode() {
-    String currentFile = elementFiles[currentIndex];
+// void requestAndSyncElementMode() {
+//     String currentFile = elementFiles[currentIndex];
 
-    // Obtener la ID del elemento actual
-    byte elementID = BROADCAST;  // Valor predeterminado
-    if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Apagar") {
-        INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
-        elementID = option->ID;  // ID para elementos fijos
-    } else {
-        // Leer la ID desde SPIFFS
+//     // Obtener la ID del elemento actual
+//     byte elementID = BROADCAST;  // Valor predeterminado
+//     if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Apagar") {
+//         INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+//         elementID = option->ID;  // ID para elementos fijos
+//     } else {
+//         // Leer la ID desde SPIFFS
        
-        fs::File f = SPIFFS.open(currentFile, "r");
-        if (f) {
-            f.seek(OFFSET_ID, SeekSet);
-            f.read(&elementID, 1);
-            f.close();
-        }
-            // Enviar trama de petición de modo
-    //send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA, elementID, SPANISH_LANG, ELEM_CMODE_SECTOR));
+//         fs::File f = SPIFFS.open(currentFile, "r");
+//         if (f) {
+//             f.seek(OFFSET_ID, SeekSet);
+//             f.read(&elementID, 1);
+//             f.close();
+//         }
+//             // Enviar trama de petición de modo
+//     //send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA, elementID, SPANISH_LANG, ELEM_CMODE_SECTOR));
 
-    // Esperar respuesta del sector ELEM_CMODE_SECTOR
-    // if (!element->esperar_respuesta(100)) {
-    //     Serial.printf("No llegó respuesta del sector ELEM_CMODE_SECTOR para el elemento con ID %d\n", elementID);
-    //     return;
-    // }
-    }
+//     // Esperar respuesta del sector ELEM_CMODE_SECTOR
+//     // if (!element->esperar_respuesta(100)) {
+//     //     Serial.printf("No llegó respuesta del sector ELEM_CMODE_SECTOR para el elemento con ID %d\n", elementID);
+//     //     return;
+//     // }
+//     }
 
 
 
-    // Si llega la respuesta, el modo será procesado en RX_main_handler
-                                                                                                    #ifdef DEBUG
-                                                                                                    Serial.printf("Respuesta del sector ELEM_CMODE_SECTOR recibida para el elemento con ID %d\n", elementID);    
-                                                                                                    #endif
+//     // Si llega la respuesta, el modo será procesado en RX_main_handler
+//                                                                                                     #ifdef DEBUG
+//                                                                                                     Serial.printf("Respuesta del sector ELEM_CMODE_SECTOR recibida para el elemento con ID %d\n", elementID);    
+//                                                                                                     #endif
     
-}
+// }
 
 
 bool modeAlternateActive = false;
@@ -746,7 +752,7 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
     // Navegación por el menú con el encoder
     if (newEncoderValue != lastEncoderValue) {
         hiddenMenuSelection += (newEncoderValue > lastEncoderValue) ? 1 : -1;
-        hiddenMenuSelection = constrain(hiddenMenuSelection, 0, 5); // Ahora hay 6 opciones (índices 0-5)
+        hiddenMenuSelection = constrain(hiddenMenuSelection, 0, 4); // Ahora hay 6 opciones (índices 0-5)
         lastEncoderValue = newEncoderValue;
         drawHiddenMenu(hiddenMenuSelection);
     }
@@ -762,12 +768,7 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
     ignoreEncoderClick = true;
     byte respuesta = 0;
     switch (hiddenMenuSelection) {
-        case 0: {// Añadir elemento
-            element->validar_elemento();
-            hiddenMenuActive = false;
-            break;
-        }
-        case 1: // Cambiar idioma
+        case 0: // Cambiar idioma
         // Activar el submenú de idioma
         languageMenuActive = true;
         languageMenuSelection = 0;  // Inicialmente se selecciona la primera opción (ES)
@@ -776,7 +777,7 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
         hiddenMenuActive = false;
             break;
             
-        case 2: // Sonido
+        case 1: // Sonido
         soundMenuActive = true;
         soundMenuSelection = 0;
         drawSoundMenu(soundMenuSelection);
@@ -785,7 +786,7 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
                                                                                             Serial.println("Cambiando Sonido...");
                                                                                             #endif
             break;
-        case 3: // Brillo
+        case 2: // Brillo
                                                                                             #ifdef DEBUG
                                                                                             Serial.println("Ajustando brillo...");
                                                                                             #endif
@@ -804,17 +805,19 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
     
         drawBrightnessMenu(currentBrightness);
             break;
-        case 4: // Formatear SPIFFS
-                                                                                            #ifdef DEBUG
-                                                                                            Serial.println("Formateando SPIFFS...");
-                                                                                            #endif
+        case 3: // Formatear SPIFFS
             // Lógica para formatear SPIFFS
-            formatSPIFFS();
-            loadElementsFromSPIFFS();
-            drawCurrentElement();
+            // formatSPIFFS();
+            // loadElementsFromSPIFFS();
+            // drawCurrentElement();
             hiddenMenuActive = false;
+            formatSubMenuActive = true;
+            formatMenuSelection = 0;
+            buttonPressStart = 0;
+            while (digitalRead(ENC_BUTTON) == LOW); // Espera a que se suelte el botón  
+            drawFormatMenu(formatMenuSelection);
             break;
-        case 5: // Volver
+        case 4: // Volver
                                                                                             #ifdef DEBUG
                                                                                             Serial.println("Volviendo al menú principal");
                                                                                             #endif
@@ -928,5 +931,166 @@ void handleBankSelectionMenu(std::vector<byte>& bankList, std::vector<bool>& sel
             delay(200);
         }
     }
+}
+
+const int numFormatOptions = 4;
+const int formatOptions[numFormatOptions] = {0, 1, 2, 3};
+
+
+void handleFormatMenu() {
+    static int currentIndex = 0;
+    int32_t newEncoderValue = encoder.getCount();
+    static int32_t lastValue = newEncoderValue;
+
+    if (newEncoderValue != lastValue) {
+        int dir = (newEncoderValue > lastValue) ? 1 : -1;
+        lastValue = newEncoderValue;
+        currentIndex = (currentIndex + dir + numFormatOptions) % numFormatOptions;
+        formatMenuSelection = formatOptions[currentIndex];
+        drawFormatMenu(formatMenuSelection);
+    }
+
+    if (digitalRead(ENC_BUTTON) == LOW) {
+        if (buttonPressStart == 0) {
+            buttonPressStart = millis();
+        }
+    } else {
+        if (buttonPressStart > 0 && millis() - buttonPressStart < 1000) {
+            switch (formatMenuSelection) {
+                case 0: {// Añadir elemento
+                    element->validar_elemento();
+                    hiddenMenuActive = false;
+                    break;
+                }
+                case 1:  // Eliminar elemento
+                    loadDeletableElements();
+                    if (deletableElementFiles.size() > 0) {
+                        Serial.println("[📂] Lista de elementos disponibles para eliminar:");
+                        for (size_t i = 0; i < deletableElementFiles.size(); ++i) {
+                            Serial.printf(" - %s\n", deletableElementFiles[i].c_str());
+                        }
+
+                        deleteElementMenuActive = true;
+                        deleteElementSelection = 0;
+                        formatSubMenuActive = false;
+                        drawDeleteElementMenu(deleteElementSelection);
+                        forceDrawDeleteElementMenu = true;
+
+                    } else {
+                        Serial.println("No hay elementos para eliminar.");
+                    }
+                    break;
+
+                case 2:  // Restaurar (formatear SPIFFS)
+                    Serial.println("[⚠️] Formateando SPIFFS...");
+                    formatSPIFFS();
+                    loadElementsFromSPIFFS();
+                    formatSubMenuActive = false;
+                    ESP.restart();
+                    drawCurrentElement();
+                    break;
+
+                case 3:  // Volver
+                    formatSubMenuActive = false;
+                    drawCurrentElement();
+                    break;
+            }
+            drawFormatMenu(formatMenuSelection); // Refrescar visual tras selección
+        }
+        buttonPressStart = 0;
+    }
+}
+
+bool deleteElementMenuActive = false;
+int deleteElementSelection = 0;
+std::vector<String> deletableElementFiles;
+bool confirmDeleteActive = false;
+int confirmSelection = 0;
+String confirmedFileToDelete = "";
+
+
+void handleDeleteElementMenu() {
+    static int currentIndex = 0;
+    int32_t newEncoderValue = encoder.getCount();
+    static int32_t lastValue = newEncoderValue;
+
+    if (newEncoderValue != lastValue) {
+        int dir = (newEncoderValue > lastValue) ? 1 : -1;
+        lastValue = newEncoderValue;
+
+        currentIndex = (currentIndex + dir + deletableElementFiles.size()) % deletableElementFiles.size();
+        deleteElementSelection = currentIndex;
+        drawDeleteElementMenu(deleteElementSelection);
+    }
+
+    if (digitalRead(ENC_BUTTON) == LOW) {
+        if (buttonPressStart == 0) {
+            buttonPressStart = millis();
+        }
+    } else {
+        if (buttonPressStart > 0 && millis() - buttonPressStart < 1000) {
+            String selected = deletableElementFiles[deleteElementSelection];
+        
+            if (selected == getTranslation("VOLVER")) {
+                deleteElementMenuActive = false;
+                formatSubMenuActive = true;
+                drawFormatMenu(formatMenuSelection);
+            } else {
+                Serial.printf("[❓] Confirmar eliminación de: %s\n", selected.c_str());
+                confirmDeleteActive = true;
+                confirmSelection = 0;
+                confirmedFileToDelete = selected;
+        
+                deleteElementMenuActive = false;
+                confirmDeleteMenuActive = true;
+                drawConfirmDelete(selected);
+            }
+        }
+        
+        buttonPressStart = 0;
+    }
+}
+bool confirmDeleteMenuActive = false;
+void handleConfirmDelete() {
+    static int32_t lastValue = encoder.getCount();
+    int32_t newValue = encoder.getCount();
+
+    if (newValue != lastValue) {
+        int dir = (newValue > lastValue) ? 1 : -1;
+        lastValue = newValue;
+
+        confirmSelection = (confirmSelection + dir + 2) % 2;
+        drawConfirmDelete(confirmedFileToDelete);
+    }
+
+    if (digitalRead(ENC_BUTTON) == LOW) {
+        if (buttonPressStart == 0) {
+            buttonPressStart = millis();
+        }
+    } else {
+        if (buttonPressStart > 0 && millis() - buttonPressStart < 1000) {
+            if (confirmSelection == 0) {
+                // ✅ Sí, eliminar
+                String fullPath = "/element_" + confirmedFileToDelete + ".bin";
+                if (SPIFFS.exists(fullPath)) {
+                    SPIFFS.remove(fullPath);
+                    Serial.printf("[🗑] Eliminado: %s\n", fullPath.c_str());
+                }
+                formatSubMenuActive = false;
+                confirmDeleteActive = false;
+
+                // Recargar elementos o reiniciar
+                loadElementsFromSPIFFS();
+                drawCurrentElement();  // Volver al menú principal
+            } else {
+                // ❌ Cancelar
+                confirmDeleteActive = false;
+                deleteElementMenuActive = true;
+                drawDeleteElementMenu(deleteElementSelection);
+            }
+        }
+        buttonPressStart = 0;
+    }
+    confirmDeleteMenuActive = false;
 }
 

@@ -264,24 +264,26 @@ String BOTONERA_::getCurrentFilePath(byte elementID) {
 byte tempID;
 byte BOTONERA_::validar_serial() {
     const int max_reintentos = 5;
-    frameReceived = false;
-
+    
+    iniciarEscaneoElemento("Buscando elementos...");
     for (int intento = 0; intento < max_reintentos; intento++) {
         // Mostrar algo en la interfaz de usuario, p.ej. "Escaneando..."
-        iniciarEscaneoElemento("Buscando elementos...");
-
+        
+        frameReceived = false;
         // Petición de ELEM_SERIAL_SECTOR al DEFAULT_DEVICE
         send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA,
                                               DEFAULT_DEVICE,
                                               SPANISH_LANG,
                                               ELEM_SERIAL_SECTOR));
 
-        frameReceived = false;
-        unsigned long startTime = millis();
+        // unsigned long startTime = millis();
 
-        // Espera hasta 2.5s a que frameReceived se ponga en true
-        while (!frameReceived && (millis() - startTime < 2500)) {
-            delay(10);
+        // // Espera hasta 2.5s a que frameReceived se ponga en true
+        // while (!frameReceived && (millis() - startTime < 2500)) {
+        //     delay(10);
+        // }
+        if (!esperar_respuesta(2500)) {
+            Serial.println("No llegó respuesta de ELEM_SERIAL_SECTOR");
         }
 
         // Si hubo respuesta (frameReceived = true), procesamos
@@ -483,7 +485,7 @@ void BOTONERA_::reasignar_id_elemento(INFO_PACK_T* infoPack) {
 
     // Se envía el frame para fijar la nueva ID
     send_frame(frameMaker_SET_ELEM_ID(DEFAULT_BOTONERA, DEFAULT_DEVICE, newID));
-    delay(10);
+    delay(100);
 
     Serial.println("🆙🆙🆙🆙 ID reasignada");
 }
@@ -520,7 +522,7 @@ void BOTONERA_::validar_elemento() {
             send_frame(frameMaker_SET_ELEM_ID(DEFAULT_BOTONERA,
                                               DEFAULT_DEVICE,
                                               lastAssignedID));
-            delay(500);
+            delay(300);
             // 3) Verificar confirmación de ID (petición de ELEM_ID_SECTOR a la new ID)
             if (confirmarCambioID(lastAssignedID)) {
                 // Éxito: ID confirmada
@@ -546,7 +548,7 @@ void BOTONERA_::validar_elemento() {
             send_frame(frameMaker_SET_ELEM_ID(DEFAULT_BOTONERA,
                                               DEFAULT_DEVICE,
                                               lastAssignedID));
-            delay(500);
+            delay(1000);
             // 3) Podemos verificar si deseamos confirmarlo también:
             if (!confirmarCambioID(lastAssignedID)) {
                 Serial.println("❌ Falló la confirmación de la nueva ID en elemento nuevo.");
@@ -594,6 +596,7 @@ byte BOTONERA_::getIdFromSPIFFS(byte *serial) {
 
             file.close();
             root.close();
+            Serial.println("Existing ID: " + String(existingID, HEX));
             return existingID; // Devuelve la ID encontrada
         }
 
@@ -606,12 +609,15 @@ byte BOTONERA_::getIdFromSPIFFS(byte *serial) {
 
 bool BOTONERA_::confirmarCambioID(byte nuevaID) {
     // Petición de ELEM_ID_SECTOR al "nuevaID"
+    frameReceived = false;
+    Serial.println("Confirmamos cambio de id ####################");
     send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA,
                                           nuevaID,
                                           SPANISH_LANG,
                                           ELEM_ID_SECTOR));
-
-    if (!esperar_respuesta(2000)) {
+    Serial.println(" 🥲🥲🥲 frameReceived: " + String(frameReceived));
+    
+    if (!esperar_respuesta(2500)) {
         Serial.println("No llegó respuesta de ELEM_ID_SECTOR");
         return false;
     }
@@ -631,14 +637,9 @@ bool BOTONERA_::confirmarCambioID(byte nuevaID) {
 
 bool BOTONERA_::esperar_respuesta(unsigned long timeout) {
     unsigned long startTime = millis();
-    frameReceived = false;
-
     while (millis() - startTime < timeout) {
-        if (frameReceived) {
-            return true; // Respuesta recibida
-        }
-        delay(10);
-        // Aquí podrías hacer yield() en ESP8266/ESP32
+        if (frameReceived) return true; // Respuesta recibida
+        delay(100);
     }
     return false; // Timeout
 }
@@ -680,6 +681,7 @@ bool BOTONERA_::procesar_sector(int sector, INFO_PACK_T* infoPack, uint8_t targe
 
     for (int intento = 0; intento < max_reintentos; intento++) {
         // Petición del sector al "targetID"
+        frameReceived = false;
         send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA,
                                               targetID,
                                               SPANISH_LANG,

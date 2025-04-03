@@ -1376,7 +1376,7 @@ void COLORHANDLER_::BouncingBalls(byte baseRed, byte baseGreen, byte baseBlue) {
 
       // Lógica del juego
       if (gameActive) {
-          byte micValue = doitMic.get_mic_value_BYTE();
+          byte micValue = doitMic.get_mic_value_BYTE(MIC_SENS);
           byte newJugada = map(micValue, 0, 255, 0, MAX_STEPS);
           
           if (newJugada > jugada) {
