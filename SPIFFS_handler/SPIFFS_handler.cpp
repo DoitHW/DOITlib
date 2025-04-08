@@ -162,14 +162,14 @@ void loadElementsFromSPIFFS() {
         file = root.openNextFile();
     }
                                                                                     #ifdef DEBUG
-                                                                                    //Serial.println("Elementos encontrados:");
+                                                                                    Serial.println("Elementos encontrados:");
                                                                                     #endif
     
-    // for (size_t i = 0; i < elementFiles.size(); i++) {
-    //     Serial.printf("%d: %s\n", (int)i, elementFiles[i].c_str());
-    // }
+     for (size_t i = 0; i < elementFiles.size(); i++) {
+         Serial.printf("%d: %s\n", (int)i, elementFiles[i].c_str());
+     }
                                                                                     #ifdef DEBUG
-                                                                                    //Serial.printf("Total de elementos: %d\n", (int)elementFiles.size());                                                                                
+                                                                                    Serial.printf("Total de elementos: %d\n", (int)elementFiles.size());                                                                                
                                                                                     #endif
     
 }

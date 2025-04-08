@@ -8,6 +8,8 @@
 #include <encoder_handler/encoder_handler.h>
 #include <display_handler/display_handler.h>
 
+#define MIN_VALID_ELEMENT_SIZE (OFFSET_ID + 1) // Se espera que el archivo tenga al menos OFFSET_ID+1 bytes
+
 
 extern std::vector<uint8_t> printTargetID;
 
@@ -577,34 +579,59 @@ void BOTONERA_::validar_elemento() {
 }
 
 byte BOTONERA_::getIdFromSPIFFS(byte *serial) {
-  
-    fs::File root = SPIFFS.open("/");
-    fs::File file = root.openNextFile();
-
-    while (file) {
-        // Leemos el serial en la posición OFFSET_SERIAL
-        file.seek(OFFSET_SERIAL);
-        byte existingSerial[5];
-        file.read(existingSerial, 5);
-
-        // Comparamos con el serial pasado como parámetro
-        if (memcmp(existingSerial, serial, 5) == 0) {
-            // Leemos la ID
-            file.seek(OFFSET_ID);
-            byte existingID;
-            file.read(&existingID, 1);
-
-            file.close();
-            root.close();
-            Serial.println("Existing ID: " + String(existingID, HEX));
-            return existingID; // Devuelve la ID encontrada
-        }
-
-        file = root.openNextFile();
+    if (!SPIFFS.begin(true)) {
+        return 0xFF;
     }
-
+    
+    fs::File root = SPIFFS.open("/");
+    if (!root || !root.isDirectory()) {
+        return 0xFF;
+    }
+    
+    root.rewindDirectory();
+    
+    while (true) {
+        fs::File file = root.openNextFile();
+        if (!file) {
+            break;
+        }
+        
+        String fileName = String(file.name());
+        
+        // Normalizar el nombre del archivo
+        if (!fileName.startsWith("/")) {
+            fileName = "/" + fileName;
+        }
+        
+        // Solo considerar archivos válidos
+        if (fileName.startsWith("/element_") && fileName.endsWith(".bin")) {
+            // Verificar que el archivo tenga tamaño suficiente para leer el serial
+            if (file.size() >= MIN_VALID_ELEMENT_SIZE) {
+                file.seek(OFFSET_SERIAL);
+                byte existingSerial[5];
+                int bytesRead = file.read(existingSerial, 5);
+                
+                if (bytesRead == 5) {
+                    if (memcmp(existingSerial, serial, 5) == 0) {
+                        file.seek(OFFSET_ID);
+                        byte existingID = 0;
+                        bytesRead = file.read(&existingID, 1);
+                        
+                        if (bytesRead == 1) {
+                            file.close();
+                            root.close();
+                            return existingID;
+                        }
+                    }
+                }
+            }
+        }
+        
+        file.close();
+    }
+    
     root.close();
-    return 0xFF; // Indica que no se encontró
+    return 0xFF; // No se encontró
 }
 
 bool BOTONERA_::confirmarCambioID(byte nuevaID) {
@@ -764,52 +791,87 @@ void BOTONERA_::print_info_pack(const INFO_PACK_T *infoPack) {
 }
 
 bool BOTONERA_::serialExistsInSPIFFS(byte serialNum[5]) {
-    // Validación del sistema de archivos antes de abrir
     if (!SPIFFS.begin(true)) {
-        Serial.println("Error: SPIFFS no pudo montarse correctamente.");
         return false;
     }
   
     fs::File root = SPIFFS.open("/");
-    
-    if (!root || !root.isDirectory()) {
-        Serial.println("Error: No se pudo abrir el directorio raíz de SPIFFS.");
+    if (!root) {
         return false;
     }
-
-    fs::File file = root.openNextFile();
-
-    // Evitar uso excesivo de pila: Crear tempPack en el heap
+    if (!root.isDirectory()) {
+        root.close();
+        return false;
+    }
+    
+    root.rewindDirectory();
+    
+    // Verificar primero cuántos archivos hay en total
+    int totalFiles = 0;
+    while (true) {
+        fs::File tempFile = root.openNextFile();
+        if (!tempFile) break;
+        totalFiles++;
+        tempFile.close();
+    }
+    
+    root.rewindDirectory();
+    
     INFO_PACK_T *tempPack = new (std::nothrow) INFO_PACK_T;
     if (!tempPack) {
-        Serial.println("Error: No se pudo asignar memoria para tempPack.");
+        root.close();
         return false;
     }
-
-    while (file) {
-        // Validar que el archivo tenga suficiente tamaño antes de leer
-        if (file.size() >= OFFSET_SERIAL + 5) {
-            file.seek(OFFSET_SERIAL);
-            file.read(tempPack->serialNum, 5);
-            Serial.printf("Serial leído: %02X%02X%02X%02X%02X\n", tempPack->serialNum[0], tempPack->serialNum[1], tempPack->serialNum[2], tempPack->serialNum[3], tempPack->serialNum[4]);
-
-            if (tempPack->serialNum[0] == serialNum[0] && tempPack->serialNum[1] == serialNum[1] && tempPack->serialNum[2] == serialNum[2] && tempPack->serialNum[3] == serialNum[3] && tempPack->serialNum[4] == serialNum[4]) {
-                Serial.println("Número de serie encontrado.");
-                delete tempPack;
-                file.close();
-                return true;  
-            }
-        } else {
-            Serial.println("Error: El archivo es demasiado pequeño para contener un número de serie.");
+    
+    bool found = false;
+    int filesChecked = 0;
+    
+    while (true) {
+        fs::File file = root.openNextFile();
+        if (!file) {
+            break;
         }
-
-        file.close();  // Cerrar archivo antes de abrir el siguiente
-        file = root.openNextFile();
+        
+        filesChecked++;
+        String fileName = String(file.name());
+        
+        // Normalizar el nombre del archivo (añadir '/' al inicio si no está presente)
+        if (!fileName.startsWith("/")) {
+            fileName = "/" + fileName;
+        }
+        
+        // Solo procesar archivos reales de elementos
+        if (fileName.startsWith("/element_") && fileName.endsWith(".bin")) {
+            if (file.size() >= MIN_VALID_ELEMENT_SIZE) {
+                // Leer el ID primero para verificar
+                file.seek(OFFSET_ID);
+                byte id;
+                int bytesRead = file.read(&id, 1);
+                
+                if (bytesRead == 1) {
+                    // Ahora leer el serial
+                    file.seek(OFFSET_SERIAL);
+                    bytesRead = file.read(tempPack->serialNum, 5);
+                    
+                    if (bytesRead == 5) {
+                        // Comparar con el serial buscado
+                        if (memcmp(tempPack->serialNum, serialNum, 5) == 0) {
+                            found = true;
+                            file.close();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        file.close();
     }
-
-    Serial.println("Número de serie NO encontrado.");
+    
     delete tempPack;
-    return false;
+    root.close();
+    
+    return found;
 }
 
 void BOTONERA_::iniciarEscaneoElemento(const char* mensajeInicial) {
@@ -1041,25 +1103,78 @@ void BOTONERA_::mostrarMensajeTemporal(int respuesta, int dTime) {
 
 byte BOTONERA_::getNextAvailableID() {
     byte nextID = 0x01;
-
-    fs::File root = SPIFFS.open("/");
-    fs::File file = root.openNextFile();
-
-    // Escanea todos los archivos y busca la ID más alta para incrementarla
-    while (file) {
-        byte existingID;
-        file.seek(OFFSET_ID);
-        file.read(&existingID, 1);
-
-        if (existingID >= nextID) {
-            nextID = existingID + 1; 
-        }
-        file = root.openNextFile();
+    
+    if (!SPIFFS.begin(true)) {
+        return 0xDD;
     }
+    
+    fs::File root = SPIFFS.open("/");
+    if (!root) {
+        return 0xDD;
+    }
+    if (!root.isDirectory()) {
+        root.close();
+        return 0xDD;
+    }
+    
+    // Contar total de archivos
+    root.rewindDirectory();
+    int totalFiles = 0;
+    while (true) {
+        fs::File tempFile = root.openNextFile();
+        if (!tempFile) break;
+        
+        totalFiles++;
+        tempFile.close();
+    }
+    
+    // Buscar archivos de elementos
+    root.rewindDirectory();
+    int elementCount = 0;
+    
+    while (true) {
+        fs::File file = root.openNextFile();
+        if (!file) {
+            break;
+        }
+        
+        String fileName = String(file.name());
+        
+        // Normalizar el nombre del archivo (añadir '/' al inicio si no está presente)
+        if (!fileName.startsWith("/")) {
+            fileName = "/" + fileName;
+        }
+        
+        // Verificar si es un archivo de elemento
+        if (fileName.startsWith("/element_") && fileName.endsWith(".bin")) {
+            elementCount++;
+            
+            if (file.size() >= MIN_VALID_ELEMENT_SIZE) {
+                // Leer la ID
+                file.seek(OFFSET_ID);
+                byte existingID = 0;
+                int bytesRead = file.read(&existingID, 1);
+                
+                if (bytesRead == 1) {
+                    // Verificar el número de serie para confirmar que es un elemento válido
+                    file.seek(OFFSET_SERIAL);
+                    byte serial[5];
+                    bytesRead = file.read(serial, 5);
+                    
+                    if (bytesRead == 5) {
+                        // Actualizar nextID si es necesario
+                        if (existingID >= nextID) {
+                            nextID = existingID + 1;
+                        }
+                    }
+                }
+            }
+        }
+        
+        file.close();
+    }
+    
     root.close();
-
-    Serial.printf("✅ Nueva ID disponible: %d\n", nextID);
+    
     return nextID;
 }
-
-
