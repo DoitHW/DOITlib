@@ -80,10 +80,10 @@ void initializeDynamicOptions() {
     strncpy((char*)ambientesOption.name, "AMBIENTES", 24);
     strncpy((char*)ambientesOption.desc, "Configura los ambientes de la sala.", 192);
     ambientesOption.currentMode = 0;
-    strncpy((char*)ambientesOption.mode[0].name, "BASICO", 24);
-    strncpy((char*)ambientesOption.mode[0].desc, "Modo basico para ambientes.", 192);
-    ambientesOption.mode[0].config[0] = 0x80;
-    ambientesOption.mode[0].config[1] = 0x01;
+    //strncpy((char*)ambientesOption.mode[0].name, "BASICO", 24);
+    //strncpy((char*)ambientesOption.mode[0].desc, "Modo basico para ambientes.", 192);
+    ambientesOption.mode[0].config[0] = 0x00;
+    ambientesOption.mode[0].config[1] = 0x09;
     memcpy(ambientesOption.icono, ambientes_64x64, sizeof(ambientesOption.icono));
 
     // ----- Fichas -----
@@ -352,6 +352,56 @@ std::vector<byte> readBankList() {
     std::sort(bankList.begin(), bankList.end());
     return bankList;
 }
+
+void updateBankAndFamilyList(byte bank, const char* familyName) {
+    updateBankList(bank);  // Mantener funcionalidad original
+
+    const char* filePath = "/families_list.txt";
+    String linePrefix = String(bank) + ":";
+    bool exists = false;
+
+    // Leer archivo y comprobar si ya existe el bank
+    File f = SPIFFS.open(filePath, "r");
+    if (f) {
+        while (f.available()) {
+            String line = f.readStringUntil('\n');
+            if (line.startsWith(linePrefix)) {
+                exists = true;
+                break;
+            }
+        }
+        f.close();
+    }
+
+    if (!exists) {
+        File f = SPIFFS.open(filePath, "a");
+        if (f) {
+            f.printf("%d:%s\n", bank, familyName);
+            f.close();
+            Serial.printf("Familia añadida: %d -> %s\n", bank, familyName);
+        }
+    }
+}
+
+String getFamilyNameFromBank(byte bank) {
+    const char* filePath = "/families_list.txt";
+    String linePrefix = String(bank) + ":";
+    
+    File f = SPIFFS.open(filePath, "r");
+    if (!f) return String("Desconocido");
+
+    while (f.available()) {
+        String line = f.readStringUntil('\n');
+        if (line.startsWith(linePrefix)) {
+            f.close();
+            return line.substring(line.indexOf(':') + 1);
+        }
+    }
+    f.close();
+    return String("Desconocido");
+}
+
+
 
 void saveBrightnessToSPIFFS(uint8_t value) {
     File file = SPIFFS.open("/brightness.txt", FILE_WRITE);

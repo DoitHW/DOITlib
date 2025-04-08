@@ -37,6 +37,7 @@ public:
         TOKEN_ADDR addr;
         TOKEN_COLOR color;
         TOKEN_ADDR partner[8];
+        char familyName[25]; 
     };
 
     // Constructor
@@ -70,6 +71,7 @@ public:
 
     // Función auxiliar para convertir dos caracteres ASCII hex a un byte
     byte asciiHexToByte(char high, char low);
+    byte hexToByte(const String &hex);
     // Función auxiliar para parsear la cadena del token y convertirla en TOKEN_DATA
     TOKEN_DATA parseTokenString(const String &tokenStr);
     // Variables públicas para facilitar el control en el loop
@@ -104,5 +106,9 @@ private:
 };
 
 extern DOITSOUNDS_ doitPlayer;
+
+extern std::vector<byte> bankList;
+extern std::vector<bool> selectedBanks;
+
 
 #endif // TOKEN_DMS_H

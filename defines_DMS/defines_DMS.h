@@ -676,6 +676,18 @@ enum SECTOR_LIST{
   ACTIVE_ELEM_LIST //length 33 array[33] omplirlo amb IDS seleccionades 0x00 0x21, enviar un return elem sector amb sector + array, a target DC
 };
 
+enum AMBIENTS{
+
+  RAIN,
+  BEACH,
+  SPACE,
+  CITY,
+  ZEN,
+  OCEAN,
+  AURORA,
+  FOREST,
+  NEUTRAL
+};
 
 
 //

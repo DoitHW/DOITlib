@@ -135,7 +135,6 @@ byte MICROPHONE_::get_mic_value_BYTE(int sens){
 
     if (bytes_read > 0) {
         sample >>= 14;           // Ajusta el valor (según tu hardware)
-        Serial.println(sample);
         sample = abs(sample);      // Se toma el valor absoluto
         
         // Actualizar el mínimo y el máximo "crudos"

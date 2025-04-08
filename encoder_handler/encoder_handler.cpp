@@ -400,7 +400,16 @@ void handleModeSelection(const String& currentFile) {
     if (currentModeIndex == 0) {
         bool wasSelected = selectedStates[currentIndex];
         selectedStates[currentIndex] = !wasSelected;
-        if (currentFile != "Ambientes" && currentFile != "Fichas" && currentFile != "Apagar") {
+        if (currentFile == "Ambientes") {
+            // 🔥 Nuevo comportamiento: enviar START_CMD por broadcast
+            if (selectedStates[currentIndex]) {
+                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{0xFF}, START_CMD));
+            } else {
+                doitPlayer.stop_file();
+                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{0xFF}, BLACKOUT));
+            }
+        }
+        else if (currentFile != "Fichas" && currentFile != "Apagar") {
             fs::File f = SPIFFS.open(currentFile, "r+");
             if (f) {
                 if (selectedStates[currentIndex]) {
@@ -1051,10 +1060,10 @@ void handleDeleteElementMenu() {
     }
 }
 bool confirmDeleteMenuActive = false;
+
 void handleConfirmDelete() {
     static int32_t lastValue = encoder.getCount();
     int32_t newValue = encoder.getCount();
-
     if (newValue != lastValue) {
         int dir = (newValue > lastValue) ? 1 : -1;
         lastValue = newValue;
@@ -1078,19 +1087,20 @@ void handleConfirmDelete() {
                 }
                 formatSubMenuActive = false;
                 confirmDeleteActive = false;
-
+                confirmDeleteMenuActive = false;
                 // Recargar elementos o reiniciar
                 loadElementsFromSPIFFS();
                 drawCurrentElement();  // Volver al menú principal
             } else {
+                Serial.println("CANCELANDO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
                 // ❌ Cancelar
                 confirmDeleteActive = false;
                 deleteElementMenuActive = true;
+                confirmDeleteMenuActive = false;
                 drawDeleteElementMenu(deleteElementSelection);
             }
         }
         buttonPressStart = 0;
     }
-    confirmDeleteMenuActive = false;
 }
 

@@ -971,17 +971,6 @@ void COLORHANDLER_::setPixelHeatColor (int Pixel, byte temperature) {
   }
 }
 
-void COLORHANDLER_::set_botoneraPattern (byte patternin){
-  switch (patternin)
-  {
-  case 0:
-    
-    break;
-  case 1:
-    
-    break;
-  }
-}
 
 #ifdef NOELEM
 void COLORHANDLER_::welcomeEffect() {

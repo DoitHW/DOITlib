@@ -1213,8 +1213,7 @@ void drawLanguageMenu(int selection) {
     uiSprite.pushSprite(0, 0);
 }
 
-extern int bankMenuCurrentSelection;   // 0: Confirmar, 1..n: banks
-extern int bankMenuWindowOffset;       // Índice del primer elemento visible en la ventana
+       // Índice del primer elemento visible en la ventana
 extern int bankMenuVisibleItems;
 
 void drawBankSelectionMenu(const std::vector<byte>& bankList, const std::vector<bool>& selectedBanks, int currentSelection, int windowOffset) {
@@ -1235,12 +1234,25 @@ void drawBankSelectionMenu(const std::vector<byte>& bankList, const std::vector<
     const int textAreaW = 110;
     const int scrollBarX = 120;
     
+    // Definir el color celeste para las opciones seleccionadas
+    const uint32_t SELECTED_OPTION_COLOR = TFT_CYAN; // Color celeste para opciones marcadas
+    
     // Dibujar cada opción visible dentro de la ventana determinada por windowOffset
     for (int i = 0; i < visibleOptions && (windowOffset + i) < totalItems; i++) {
         int menuIndex = windowOffset + i;  // Índice global del item
         int y = 30 + i * (CARD_HEIGHT + CARD_MARGIN); // Usando CARD_HEIGHT=20 y CARD_MARGIN=5, como en drawModesScreen
         bool isSelected = (menuIndex == currentSelection);
-        uint32_t textColor = isSelected ? HIGHLIGHT_COLOR : TEXT_COLOR;
+        bool isOptionChecked = (menuIndex > 0 && selectedBanks.size() > (size_t)(menuIndex - 1) && selectedBanks[menuIndex - 1]);
+        
+        // Determinar el color del texto según la selección actual y si está marcado
+        uint32_t textColor;
+        if (isSelected) {
+            textColor = HIGHLIGHT_COLOR; // Prioridad al resaltado de la selección actual
+        } else if (isOptionChecked) {
+            textColor = SELECTED_OPTION_COLOR; // Color celeste para opciones marcadas pero no seleccionadas
+        } else {
+            textColor = TEXT_COLOR; // Color normal para opciones no marcadas
+        }
         
         uiSprite.setFreeFont(&FreeSans9pt7b);
         uiSprite.setTextSize(1);
@@ -1251,14 +1263,12 @@ void drawBankSelectionMenu(const std::vector<byte>& bankList, const std::vector<
         if (menuIndex == 0) {
             label = "Confirmar";
         } else {
-            // Formatear el bank en hexadecimal
-            char buf[10];
-            sprintf(buf, "%02d", bankList[menuIndex - 1]);
-            label = String(buf);
-            // Agregar marca de selección si está seleccionado
-            if (selectedBanks.size() > (size_t)(menuIndex - 1) && selectedBanks[menuIndex - 1]) {
-                label += " [X]";
-            }
+            // Obtener el nombre de la familia asociado al bank
+            byte bank = bankList[menuIndex - 1];
+            String familyName = getFamilyNameFromBank(bank);
+            label = familyName;
+            
+            // Ya no añadimos [X] porque se usa el color para indicar la selección
         }
         
         // Si la opción seleccionada tiene texto muy largo, aplicar ticker horizontal similar a drawModesScreen.

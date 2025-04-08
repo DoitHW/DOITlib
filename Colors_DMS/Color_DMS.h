@@ -193,7 +193,6 @@ class COLORHANDLER_ {
         byte get_currentBrightness();
 
         void setPatternBotonera(byte mode, DynamicLEDManager& ledManager);
-        void set_botoneraPattern(byte patternin);
 
         void welcomeEffect();
 

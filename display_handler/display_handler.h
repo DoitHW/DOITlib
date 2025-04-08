@@ -44,4 +44,6 @@ extern std::vector<bool> currentAlternateStates;
 extern uint8_t currentBrightness;       // Valor actual en porcentaje
 extern uint8_t tempBrightness; 
 extern bool forceDrawDeleteElementMenu;
+extern int bankMenuCurrentSelection;   // 0: Confirmar, 1..n: banks
+extern int bankMenuWindowOffset;
 

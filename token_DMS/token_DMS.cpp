@@ -201,7 +201,7 @@ bool TOKEN_::leerMensajeNFC(String &mensaje) {
   uint8_t rawBuffer[128] = {0};
   int len = 0;
   // Leer de la página 6 a la 18 (13 páginas * 4 bytes = 52 bytes)
-  for (uint8_t page = 6; page <= 18; page++) {
+  for (uint8_t page = 6; page <= 30; page++) {
     uint8_t pageBuffer[4] = {0};
     if (!nfc.ntag2xx_ReadPage(page, pageBuffer)) {
       Serial.print("⚠️ ERROR: Falló la lectura de la página ");
@@ -239,7 +239,7 @@ bool TOKEN_::leerMensajeNFC(String &mensaje) {
   Serial.println("Token string extraído: " + tokenStr);
   
   // Se espera que el token tenga 46 dígitos hexadecimales (23 bytes)
-  if (tokenStr.length() != 46) {
+  if (tokenStr.length() != 94) {
     Serial.println("⚠️ ERROR: Longitud del token inválida. Se esperaba 46 dígitos hexadecimales, se obtuvo: " + String(tokenStr.length()));
     mensaje = "";
     return false;
@@ -262,7 +262,7 @@ bool TOKEN_::leerMensajeNFC(String &mensaje) {
   token.currentToken.cmd = hexToByte(tokenStr.substring(0, 2));
   token.currentToken.cmd2 = hexToByte(tokenStr.substring(2, 4));
   token.currentToken.addr.bank = hexToByte(tokenStr.substring(4, 6));
-  updateBankList(token.currentToken.addr.bank);
+  //updateBankList(token.currentToken.addr.bank);
   Serial.println("SPIFFS: Bank actualizado: " + String(token.currentToken.addr.bank, HEX));
   token.currentToken.addr.file = hexToByte(tokenStr.substring(6, 8));
   token.currentToken.color.r = hexToByte(tokenStr.substring(8, 10));
@@ -274,7 +274,16 @@ bool TOKEN_::leerMensajeNFC(String &mensaje) {
     token.currentToken.partner[i].bank = hexToByte(tokenStr.substring(startIdx, startIdx + 2));
     token.currentToken.partner[i].file = hexToByte(tokenStr.substring(startIdx + 2, startIdx + 4));
   }
-  
+
+  // Leer 24 bytes para el nombre de la familia (posiciones 46 a 93)
+for (int i = 0; i < 24; i++) {
+  token.currentToken.familyName[i] = hexToByte(tokenStr.substring(46 + i * 2, 48 + i * 2));
+}
+token.currentToken.familyName[24] = '\0'; // Asegurar string nulo-terminado
+
+  updateBankAndFamilyList(token.currentToken.addr.bank, (char*)token.currentToken.familyName);
+  bankList = readBankList();
+  selectedBanks.resize(bankList.size(), false);
   // Imprimir valores para depuración
   Serial.println("Token decodificado:");
   Serial.print("CMD: 0x"); Serial.println(token.currentToken.cmd, HEX);
@@ -290,6 +299,9 @@ bool TOKEN_::leerMensajeNFC(String &mensaje) {
     Serial.print(", File=0x");
     Serial.println(token.currentToken.partner[i].file, HEX);
   }
+  Serial.print("🏷️  Familia: ");
+  Serial.println(token.currentToken.familyName);
+
   
   mensaje = tokenStr;
   // Actualizar el UID procesado para evitar relecturas mientras la misma tarjeta esté presente
@@ -463,6 +475,22 @@ byte TOKEN_::asciiHexToByte(char high, char low) {
   return value;
 }
 
+byte TOKEN_::hexToByte(const String &hex) {
+  if (hex.length() < 2) return 0;
+  char high = hex.charAt(0);
+  char low  = hex.charAt(1);
+
+  auto nibble = [](char c) -> byte {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    return 0;
+  };
+
+  return (nibble(high) << 4) | nibble(low);
+}
+
+
 TOKEN_::TOKEN_DATA TOKEN_::parseTokenString(const String &tokenStr) {
   TOKEN_DATA data = {}; // Inicializa en 0
 
@@ -474,7 +502,7 @@ TOKEN_::TOKEN_DATA TOKEN_::parseTokenString(const String &tokenStr) {
   String content = tokenStr.substring(1, tokenStr.length()-1);
 
   // Ahora se espera que el contenido tenga 46 caracteres (23 bytes)
-  if(content.length() != 46) {
+  if(content.length() != 94) {
     Serial.print("DEBUG: Longitud incorrecta del token: ");
     Serial.println(content.length());
     return data;

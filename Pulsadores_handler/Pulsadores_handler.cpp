@@ -60,18 +60,13 @@ bool PulsadoresHandler::isButtonPressed(byte color) {
     return false; // Ningún botón con ese color está presionado
 }
 
-// Función que recorre la matriz y procesa cada pulsador de forma independiente.
-// Esta función debe llamarse desde el loop principal en cada iteración.
 void PulsadoresHandler::procesarPulsadores() {
-    // --- Construir la lista de destino (target) para botones de color ---
+    // --- Construir el vector de destino (target) ---
     std::vector<byte> target;
     String currentFile = elementFiles[currentIndex];
-    
-    // Verificar si estamos en "Fichas" para manejar de forma especial
     bool isFichas = (currentFile == "Fichas");
-    
+
     if (!isFichas) {
-        // Solo construir target para elementos que no son "Fichas"
         if (currentFile == "Ambientes") {
             bool ambientesSeleccionado = false;
             for (size_t i = 0; i < elementFiles.size(); i++) {
@@ -81,30 +76,29 @@ void PulsadoresHandler::procesarPulsadores() {
                 }
             }
             if (ambientesSeleccionado) {
-                for (size_t i = 0; i < elementFiles.size(); i++) {
-                    if (selectedStates[i] && elementFiles[i].startsWith("/"))  {
-                        byte elementID = 0;
-                        fs::File f = SPIFFS.open(elementFiles[i], "r");
-                        if (f) {
-                            f.seek(OFFSET_ID, SeekSet);
-                            f.read(&elementID, 1);
-                            f.close();
-                        }
-                        if (elementID != 0) {
-                            target.push_back(elementID);
-                        }
-                    }
-                }
+                target.push_back(BROADCAST);
             }
         } else {
-            if (isCurrentElementSelected()) {
-                target.push_back(getCurrentElementID());
+            // Elemento dinámico (ni Fichas, ni Ambientes, ni Apagar)
+            byte elementID = BROADCAST;
+            if (currentFile == "Apagar") {
+                elementID = apagarSala.ID;
+            } else {
+                fs::File f = SPIFFS.open(currentFile, "r");
+                if (f) {
+                    f.seek(OFFSET_ID, SeekSet);
+                    f.read(&elementID, 1);
+                    f.close();
+                } else {
+                    Serial.printf("❌ Error al leer la ID del archivo %s\n", currentFile.c_str());
+                }
             }
+            target.push_back(elementID);
         }
     }
     // --- Fin construcción target ---
 
-    // --- Leer la configuración actual (aplicable a todos los botones) ---
+    // --- Leer configuración del modo actual ---
     byte modeConfig[2] = {0};
     if (!getModeConfig(currentFile, currentModeIndex, modeConfig)) {
         Serial.println("⚠️ No se pudo obtener la configuración del modo actual.");
@@ -115,26 +109,21 @@ void PulsadoresHandler::procesarPulsadores() {
     bool hasRelay    = getModeFlag(modeConfig, HAS_RELAY_1);
     bool hasAdvanced = getModeFlag(modeConfig, HAS_ADVANCED_COLOR);
 
-    // --- Comprobación de estado alternativo ---
-    // Si el modo tiene HAS_ADVANCED_COLOR y HAS_PULSE, forzamos a que, si el modo alternativo NO está activo, se trate como sin pulso.
+    // Si se tiene HAS_ADVANCED_COLOR y HAS_PULSE pero NO el modo alternativo activo, se ignora el PULSE
     if (hasAdvanced && hasPulse && !modeAlternateActive) {
-         hasPulse = false;
+        hasPulse = false;
     }
-    // --- Fin comprobación de estado alternativo ---
 
-    // --- Variables estáticas para el escaneo ---
+    // --- Variables estáticas para el escaneo de pulsadores ---
     static bool lastState[FILAS][COLUMNAS] = { { false } };
     static unsigned long pressTime[FILAS][COLUMNAS] = { { 0 } };
+    static byte currentActiveColor = BLACK; // Color enviado en la última trama
+    static bool blackSent = false;            // Para evitar reenvío redundante de BLACK
+    static bool mixReady = true;              // Nueva variable: true cuando se han soltado botones (count<2)
 
-    // Variables estáticas para el envío en modo PULSE:
-    static byte currentActiveColor = BLACK;  // Color actualmente activo
-    static bool blackSent = false;             // Para evitar reenvío repetido de BLACK
-
-    // --- Estado actual del botón RELAY ---
+    // --- Estados especiales para botones RELAY y BLUE ---
     bool currentRelayState = false;
-    bool blueButtonState = false;  // Agregamos variable para el estado del botón azul
-    
-    // --- Reiniciar estado si hubo cambio de modo ---
+    bool blueButtonState = false;
     static int lastModeIndex = -1;
     if (currentModeIndex != lastModeIndex) {
         for (int i = 0; i < FILAS; i++) {
@@ -144,17 +133,18 @@ void PulsadoresHandler::procesarPulsadores() {
         }
         currentActiveColor = BLACK;
         blackSent = false;
+        mixReady = true; // Reiniciamos la bandera mixReady al cambiar de modo
         lastModeIndex = currentModeIndex;
     }
 
-    // --- Escanear la matriz de pulsadores ---
+    // --- Escaneo de la matriz ---
     for (int i = 0; i < FILAS; i++) {
         digitalWrite(filas[i], LOW);
         delayMicroseconds(10);
         for (int j = 0; j < COLUMNAS; j++) {
             bool currentPressed = (digitalRead(columnas[j]) == LOW);
-            
-            // Actualizar tiempo de pulsación para botones de color (excluyendo RELAY)
+
+            // Actualiza el tiempo de pulsación (para botones que no son RELAY)
             if (pulsadorColor[i][j] != RELAY) {
                 if (!lastState[i][j] && currentPressed) {
                     pressTime[i][j] = millis();
@@ -162,41 +152,33 @@ void PulsadoresHandler::procesarPulsadores() {
                     pressTime[i][j] = 0;
                 }
             }
-            
-            // Actualizar estado del botón RELAY
+
+            // Actualiza estados para botones especiales
             if (pulsadorColor[i][j] == RELAY) {
                 currentRelayState |= currentPressed;
             }
-            
-            // Actualizar estado del botón BLUE
             if (pulsadorColor[i][j] == BLUE) {
                 blueButtonState |= currentPressed;
             }
-            
-            // Detectar eventos: PRESIÓN y LIBERACIÓN.
+
+            // Detecta eventos de pulsación y liberación
             if (!lastState[i][j] && currentPressed) {
                 if (isFichas) {
-                    // En "Fichas" solo actualizamos el estado de los botones sin enviar tramas
-                    if (pulsadorColor[i][j] == RELAY) {
+                    if (pulsadorColor[i][j] == RELAY)
                         relayButtonPressed = true;
-                    } else if (pulsadorColor[i][j] == BLUE) {
+                    else if (pulsadorColor[i][j] == BLUE)
                         blueButtonPressed = true;
-                    }
                 } else {
-                    // Comportamiento normal para otros elementos
                     processButtonEvent(i, j, BUTTON_PRESSED, hasPulse, hasPassive, hasRelay, target);
                 }
             }
             if (lastState[i][j] && !currentPressed) {
                 if (isFichas) {
-                    // En "Fichas" solo actualizamos el estado de los botones sin enviar tramas
-                    if (pulsadorColor[i][j] == RELAY) {
+                    if (pulsadorColor[i][j] == RELAY)
                         relayButtonPressed = false;
-                    } else if (pulsadorColor[i][j] == BLUE) {
+                    else if (pulsadorColor[i][j] == BLUE)
                         blueButtonPressed = false;
-                    }
                 } else {
-                    // Comportamiento normal para otros elementos
                     processButtonEvent(i, j, BUTTON_RELEASED, hasPulse, hasPassive, hasRelay, target);
                 }
             }
@@ -204,15 +186,13 @@ void PulsadoresHandler::procesarPulsadores() {
         }
         digitalWrite(filas[i], HIGH);
     }
-    
-    // Actualizar estado del botón RELAY y BLUE
     relayButtonPressed = currentRelayState;
     blueButtonPressed = blueButtonState;
-    
-    // --- Lógica de envío en modo PULSE ---
-    if (!inModesScreen && hasPulse && !isFichas) {  // No enviar en "Fichas"
+
+    // --- Lógica para enviar trama en modo PULSE ---
+    if (!inModesScreen && hasPulse && !isFichas) {
         if (hasAdvanced) {
-            // Modo ADVANCED + PULSE: máximo 2 botones simultáneos.
+            // Modo ADVANCED + PULSE: se cuentan hasta 2 botones no RELAY pulsados
             int count = 0;
             byte color1 = BLACK, color2 = BLACK;
             for (int i = 0; i < FILAS; i++) {
@@ -228,48 +208,56 @@ void PulsadoresHandler::procesarPulsadores() {
                     }
                 }
             }
-            if (count == 0) {
-                if (!blackSent) {
-                    send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, BLACK));
-#ifdef DEBUG
-                    Serial.println("ADVANCED PULSE: Ningún botón activo, enviando Negro.");
-#endif
-                    currentActiveColor = BLACK;
-                    blackSent = true;
-                }
-            } else if (count == 1) {
-                if (currentActiveColor != color1) {
-                    send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, color1));
-#ifdef DEBUG
-                    Serial.printf("ADVANCED PULSE: Un botón activo, enviando color %d.\n", color1);
-#endif
-                    currentActiveColor = color1;
-                    blackSent = false;
-                }
-            } else if (count == 2) {
-                byte mixColor;
-                if (colorHandler.color_mix_handler(color1, color2, &mixColor) ) {
-                    if (currentActiveColor != mixColor) {
-                        send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, mixColor));
-                        currentActiveColor = mixColor;
-                        blackSent = false;
-                    }
-                } else {
+            if (count < 2) {
+                // Si hay uno o ningún botón pulsado, se reinicia el estado de la mezcla
+                mixReady = true;
+                if (count == 0) {
                     if (!blackSent) {
                         send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, BLACK));
+#ifdef DEBUG
+                        Serial.println("ADVANCED PULSE: Ningún botón activo, enviando Negro.");
+#endif
                         currentActiveColor = BLACK;
                         blackSent = true;
                     }
+                } else if (count == 1) {
+                    if (currentActiveColor != color1) {
+                        send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, color1));
+#ifdef DEBUG
+                        Serial.printf("ADVANCED PULSE: Un botón activo, enviando color %d.\n", color1);
+#endif
+                        currentActiveColor = color1;
+                        blackSent = false;
+                    }
                 }
-            } else { // Más de 2 botones: enviar BLACK.
-                if (!blackSent) {
-                    send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, BLACK));
-                    currentActiveColor = BLACK;
-                    blackSent = true;
+            } else if (count == 2) {
+                // Si hay dos botones pulsados y mixReady está activado (es decir, es la primera vez en esta combinación)
+                if (mixReady) {
+                    byte mixColor;
+                    if (colorHandler.color_mix_handler(color1, color2, &mixColor)) {
+                        send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, mixColor));
+#ifdef DEBUG
+                        Serial.printf("ADVANCED PULSE: Dos botones activos, enviando mezcla %d.\n", mixColor);
+#endif
+                        currentActiveColor = mixColor;
+                        blackSent = false;
+                        mixReady = false;  // Marcar que ya se envió la mezcla para esta combinación
+                    } else {
+                        if (!blackSent) {
+                            send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, BLACK));
+#ifdef DEBUG
+                            Serial.println("ADVANCED PULSE: Combinación no definida, enviando Negro.");
+#endif
+                            currentActiveColor = BLACK;
+                            blackSent = true;
+                            mixReady = false;
+                        }
+                    }
                 }
+                // Si mixReady es false, se evita el reenvío continuo.
             }
         } else {
-            // Modo PULSE normal sin advanced: determinar el botón más reciente.
+            // Lógica para modo PULSE sin advanced (igual que en el código original)
             unsigned long maxTime = 0;
             byte newActiveColor = BLACK;
             bool activeColorValid = false;
@@ -283,29 +271,19 @@ void PulsadoresHandler::procesarPulsadores() {
                     }
                 }
             }
-            if (activeColorValid) {
-                if (currentActiveColor != newActiveColor) {
-                    send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, newActiveColor));
-#ifdef DEBUG
-                    Serial.printf("PULSE: Nuevo color activo (%d) enviado.\n", newActiveColor);
-#endif
-                    currentActiveColor = newActiveColor;
-                    blackSent = false;
-                }
-            } else {
-                if (!blackSent) {
-                    send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, BLACK));
-#ifdef DEBUG
-                    Serial.println("PULSE: Ningún botón activo, enviando Negro.");
-#endif
-                    currentActiveColor = BLACK;
-                    blackSent = true;
-                }
+            if (activeColorValid && currentActiveColor != newActiveColor) {
+                send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, newActiveColor));
+                currentActiveColor = newActiveColor;
+                blackSent = false;
+            } else if (!activeColorValid && !blackSent) {
+                send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, BLACK));
+                currentActiveColor = BLACK;
+                blackSent = true;
             }
         }
     }
-    // En modos sin pulso, el envío se realiza inmediatamente en processButtonEvent.
 }
+
 
 // Función auxiliar para procesar el evento de un botón en la posición (i, j)
 void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
@@ -322,6 +300,26 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
         return;
     }
 
+    if (currentFile == "Ambientes") {
+        if (event == BUTTON_PRESSED){
+            if (isCurrentElementSelected()) {
+                byte buttonColor = pulsadorColor[i][j];
+                if (buttonColor == RELAY) buttonColor = BLACK;
+                
+                // 🎯 Tramas especiales
+                send_frame(frameMaker_SEND_PATTERN_NUM(DEFAULT_BOTONERA, target, buttonColor));
+                delay(100);
+
+                // 🔊 Reproducción de audio
+                if (buttonColor != BLACK) {
+                     if (buttonColor == BEACH || buttonColor == OCEAN) doitPlayer.play_file(98, buttonColor);
+                     else doitPlayer.play_file(99, 8);
+                }else doitPlayer.stop_file();
+
+                return; // ⚠️ Evita seguir procesando la pulsación con lógica normal
+            }
+        }
+    }
 
     // 1. Procesar el botón RELAY (botón especial)
     if (buttonColor == RELAY)
@@ -343,11 +341,13 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
             }
             else
             {
+                if (currentFile != "Ambientes" && currentFile != "Fichas" && currentFile != "Apagar"){
                 relay_state = !relay_state;
                 send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, target, relay_state));
 #ifdef DEBUG
                 Serial.printf("RELAY BÁSICO: PRESIÓN, toggle relay_state a %d\n", relay_state);
 #endif
+                }
             }
         }
         else if (event == BUTTON_RELEASED)
