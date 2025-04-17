@@ -12,7 +12,7 @@ ADXL345Handler::ADXL345Handler()
 // Inicialización del ADXL345
 void ADXL345Handler::init()
 {
-    Wire.begin(SDA_PIN, SCL_PIN);
+    Wire.begin(SDA_ADXL_PIN, SCL_ADXL_PIN);
     Wire.setClock(100000); // Reducir la velocidad I2C para mayor estabilidad
     const int maxAttempts = 3;
     int attempt = 0;

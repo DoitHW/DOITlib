@@ -149,7 +149,7 @@ byte MICROPHONE_::get_mic_value_BYTE(int sens){
         sample = map(sample, 0, 5000 - sens, 0, 255);
         sample = constrain(sample, 0, 255);  // Asegurarse que esté en el rango 0-255
     }
-
+    Serial.println("raw_min: " + String(raw_min) + ", raw_max: " + String(raw_max) + ", sample: " + String(sample));
     return (byte)sample; // Devolver el valor mapeado
 }
 

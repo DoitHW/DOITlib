@@ -1472,7 +1472,28 @@ FRAME_T frameMaker_RETURN_ELEM_SECTOR (byte originin, byte targetin, byte *secto
     return frame;
 }
 
+FRAME_T frameMaker_SEND_RESPONSE (byte originin, std::vector<byte>targetin, byte response){
 
+    FRAME_T frame;
+    memset(&frame, 0, sizeof(FRAME_T));
+    frame.data.resize(L_SEND_RESPONSE);
+    uint16_t  frameLength = 0x07 + targetin.size() + L_SEND_RESPONSE;
+
+    frame.start= NEW_START;
+    frame.frameLengthLsb = frameLength & 0xFF;
+    frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
+    frame.origin= originin;
+    frame.numTargets = targetin.size();
+    frame.target= targetin;
+    frame.function= F_SEND_RESPONSE;
+    frame.dataLengthMsb = (L_SEND_RESPONSE>> 8) & 0xFF; 
+    frame.dataLengthLsb = L_SEND_RESPONSE & 0xFF;
+    frame.data[0]= response;
+    frame.checksum= checksum_calc(frame);
+    frame.end= NEW_END;
+
+    return frame;
+}
 
 
 

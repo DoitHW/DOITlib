@@ -861,13 +861,13 @@ void debugModeConfig(const uint8_t modeConfig[2]) {
             case HAS_BASIC_COLOR:   Serial.print("HAS_BASIC_COLOR"); break;
             case HAS_PULSE:         Serial.print("HAS_PULSE"); break;
             case HAS_ADVANCED_COLOR:Serial.print("HAS_ADVANCED_COLOR"); break;
-            case HAS_RELAY_1:       Serial.print("HAS_RELAY_1"); break;
-            case HAS_RELAY_2:       Serial.print("HAS_RELAY_2"); break;
-            case HAS_RELAY_3:       Serial.print("HAS_RELAY_3"); break;
-            case HAS_RELAY_4:       Serial.print("HAS_RELAY_4"); break;
+            case HAS_RELAY:         Serial.print("HAS_RELAY"); break;
+            case HAS_RELAY_N1:       Serial.print("HAS_RELAY_2"); break;
+            case HAS_RELAY_N2:       Serial.print("HAS_RELAY_3"); break;
+            case NOP_1:              Serial.print("HAS_RELAY_4"); break;
             case HAS_SENS_VAL_1:    Serial.print("HAS_SENS_VAL_1"); break;
             case HAS_SENS_VAL_2:    Serial.print("HAS_SENS_VAL_2"); break;
-            case SITUATED_HIGH:     Serial.print("SITUATED_HIGH"); break;
+            case NOP_2:             Serial.print("SITUATED_HIGH"); break;
             case HAS_PASSIVE:       Serial.print("HAS_PASSIVE"); break;
             case HAS_BINARY_SENSORS:Serial.print("HAS_BINARY_SENSORS"); break;
             case HAS_BANK_FILE:     Serial.print("HAS_BANK_FILE"); break;
@@ -1016,7 +1016,6 @@ std::vector<String> deletableElementFiles;
 bool confirmDeleteActive = false;
 int confirmSelection = 0;
 String confirmedFileToDelete = "";
-
 
 void handleDeleteElementMenu() {
     static int currentIndex = 0;

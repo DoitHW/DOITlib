@@ -106,7 +106,7 @@ void PulsadoresHandler::procesarPulsadores() {
     }
     bool hasPulse    = getModeFlag(modeConfig, HAS_PULSE);
     bool hasPassive  = getModeFlag(modeConfig, HAS_PASSIVE);
-    bool hasRelay    = getModeFlag(modeConfig, HAS_RELAY_1);
+    bool hasRelay    = getModeFlag(modeConfig, HAS_RELAY);
     bool hasAdvanced = getModeFlag(modeConfig, HAS_ADVANCED_COLOR);
 
     // Si se tiene HAS_ADVANCED_COLOR y HAS_PULSE pero NO el modo alternativo activo, se ignora el PULSE
@@ -312,8 +312,9 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
 
                 // 🔊 Reproducción de audio
                 if (buttonColor != BLACK) {
-                     if (buttonColor == BEACH || buttonColor == OCEAN) doitPlayer.play_file(98, buttonColor);
-                     else doitPlayer.play_file(99, 8);
+                    //  if (buttonColor == BEACH || buttonColor == OCEAN) doitPlayer.play_file(98, buttonColor);
+                    //  else doitPlayer.play_file(99, 8);
+                     doitPlayer.play_file(8, buttonColor +1);
                 }else doitPlayer.stop_file();
 
                 return; // ⚠️ Evita seguir procesando la pulsación con lógica normal

@@ -1086,7 +1086,7 @@ void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager)
   }
 
   // --- Bloque modular para el LED 0 (efecto de relé) ---
-  if (getModeFlag(modeConfig, HAS_RELAY_1) || getModeFlag(modeConfig, HAS_RELAY_2)) {
+  if (getModeFlag(modeConfig, HAS_RELAY)) {
       ledManager.addEffect(new FadeEffect(*this, 0, CRGB::Blue, CRGB::Cyan, 50));
   } else {
       leds[0] = CRGB::Black;

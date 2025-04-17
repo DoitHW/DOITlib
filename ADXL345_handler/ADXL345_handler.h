@@ -5,8 +5,8 @@
 #include <Frame_DMS/Frame_DMS.h>
 
 // Definición de pines I2C
-#define SDA_PIN 47
-#define SCL_PIN 48
+#define SDA_ADXL_PIN 47
+#define SCL_ADXL_PIN 48
 
 // Clase para manejar el acelerómetro ADXL345
 class ADXL345Handler {

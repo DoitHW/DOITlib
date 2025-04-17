@@ -22,7 +22,7 @@
                                                 #define SLOW_RF                  // -> FAST_RF= 115200 / SLOW_RF= 9600 (NO TOCAR POR DIOSSSS)
                                                 #define _ERR_THROW_START_        if(element->get_err_dbg())Serial1.println(
                                                 #define _ERR_THROW_END_          );
-                                                #define NOADXL 
+                                                #define ADXL 
 /*                                                                                                 
                                      .-+***+-:....                                                  
                                       .+@@@@@@@@@+:......:::.....                                   
@@ -65,9 +65,9 @@
 #define I2C2_SDA 40
 #define I2C2_SCL 41
 
-#define I2S_WS   16
-#define I2S_SD   47
-#define I2S_SCK  48
+#define I2S_WS   11//orig 16
+#define I2S_SD   12//orig 47
+#define I2S_SCK  13//orig 48
 
 
 #define ELEMENT_ID_FILE_PATH             "/ID_FILE.txt"
@@ -136,6 +136,9 @@
 #define F_SET_ELEM_DEAF       0xB3
 #define L_SET_ELEM_DEAF       0x01
 
+
+#define F_SEND_RESPONSE       0xC0
+#define L_SEND_RESPONSE       0x01
 #define F_SEND_COLOR          0xC1
 #define L_SEND_COLOR          0x01 
 #define F_SEND_RGB            0xC2
@@ -185,6 +188,10 @@
 #define OLD_COLOR_FUNCTION    0xCB
 #define OLD_RELAY_FUNCTION    0xD3
 #define NO_COLOR              0x00
+
+#define WIN             1
+#define FAIL            0
+#define TRY_AGAIN       2
 
 // Definiciones de cosas del manejo de los tramas y esas cosas
 // NO AGREGAR RES sense consultar a los dioses del Olimpo
@@ -545,6 +552,7 @@ enum SECTOR_LIST{
 
   ELEM_NAME_SECTOR= 0, //0
   ELEM_DESC_SECTOR,
+  ELEM_LOCATION_SECTOR,
   ELEM_SERIAL_SECTOR,
   ELEM_ID_SECTOR,
   ELEM_CMODE_SECTOR,

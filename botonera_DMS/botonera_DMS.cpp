@@ -524,7 +524,7 @@ void BOTONERA_::validar_elemento() {
             send_frame(frameMaker_SET_ELEM_ID(DEFAULT_BOTONERA,
                                               DEFAULT_DEVICE,
                                               lastAssignedID));
-            delay(300);
+            delay(2000);
             // 3) Verificar confirmación de ID (petición de ELEM_ID_SECTOR a la new ID)
             if (confirmarCambioID(lastAssignedID)) {
                 // Éxito: ID confirmada
@@ -550,7 +550,7 @@ void BOTONERA_::validar_elemento() {
             send_frame(frameMaker_SET_ELEM_ID(DEFAULT_BOTONERA,
                                               DEFAULT_DEVICE,
                                               lastAssignedID));
-            delay(1000);
+            delay(2000);
             // 3) Podemos verificar si deseamos confirmarlo también:
             if (!confirmarCambioID(lastAssignedID)) {
                 Serial.println("❌ Falló la confirmación de la nueva ID en elemento nuevo.");
@@ -682,9 +682,11 @@ bool BOTONERA_::procesar_y_guardar_elemento_nuevo(byte targetID) {
     // Pedimos todos los sectores
     bool error = false;
     for (int sector = ELEM_NAME_SECTOR; sector <= ELEM_ICON_ROW_63_SECTOR; sector++) {
-        if (!procesar_sector(sector, infoPack, targetID)) {
-            error = true;
-            break;
+        if (sector != ELEM_LOCATION_SECTOR){ // ojo hay que rehacer esta lógica
+            if (!procesar_sector(sector, infoPack, targetID)){
+                error = true;
+                break;
+            }
         }
     }
 

@@ -1546,7 +1546,7 @@ void drawFormatMenu(int selection) {
     const int totalOptions = 4;
 
     const char* options[] = {
-        getTranslation("BUSCAR_ELEMENTO"),
+        getTranslation("UPDATE_SALA"),
         getTranslation("DELETE_ELEMENT"),
         getTranslation("RESTORE"),
         getTranslation("VOLVER")
@@ -1621,7 +1621,6 @@ uiSprite.drawString(displayText, x, y);
 }
 
 bool forceDrawDeleteElementMenu = false;
-
 
 void drawDeleteElementMenu(int selection) {
     const int visibleOptions = 4;
@@ -1758,7 +1757,7 @@ void scrollTextTickerBounceFormat(int selection) {
     static unsigned long lastFrameTime = 0;
 
     const char* options[] = {
-        getTranslation("BUSCAR_ELEMENTO"),
+        getTranslation("UPDATE_SALA"),
         getTranslation("DELETE_ELEMENT"),
         getTranslation("RESTORE"),
         getTranslation("VOLVER")

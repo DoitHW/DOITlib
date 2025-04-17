@@ -8,15 +8,19 @@
 #include <SPIFFS_handler/SPIFFS_handler.h>
 
 // Definición de pines I2C para ESP32 (ajústalos según tu hardware)
-#define SDA_PIN 40
-#define SCL_PIN 41
+#define SDA_NFC_PIN 40
+#define SCL_NFC_PIN 41
 
 // Definición de pines para el PN532 en modo I2C con IRQ
 //#define PN532_IRQ   (42)    // Ajusta este valor según tu conexión
 #define PN532_RESET (-1)    // Normalmente -1 si no se utiliza reset
 
 // Instancia global del PN532 utilizando la librería Adafruit_PN532
-static Adafruit_PN532 nfc(PN532_IRQ, PN532_RESET);
+//static Adafruit_PN532 nfc(PN532_IRQ, PN532_RESET);
+TwoWire PN532_Wire = TwoWire(1);
+Adafruit_PN532 nfc(PN532_IRQ, PN532_RESET, &PN532_Wire);
+
+
 
 // Variables para manejo de IRQ (para uso interno de la lectura)
 extern int irqCurr;
@@ -32,29 +36,31 @@ TOKEN_::TOKEN_() : lastReadAttempt(0), readInterval(200), genre(0), lang(static_
     lastProcessedUID = "";
 }
 
+
 void TOKEN_::begin() {
   const int MAX_RETRIES = 5;
   int retryCount = 0;
 
-  Wire.begin(SDA_PIN, SCL_PIN);
+  PN532_Wire.begin(SDA_NFC_PIN, SCL_NFC_PIN);  // SDA_2 / SCL_2
+  PN532_Wire.setClock(100000);
   delay(100);
 
   while (retryCount < MAX_RETRIES) {
-    nfc.begin();
-    uint32_t versiondata = nfc.getFirmwareVersion();
-    if (versiondata) {
-      nfc.SAMConfig();
+      nfc.begin();
+      uint32_t versiondata = nfc.getFirmwareVersion();
+      if (versiondata) {
+          nfc.SAMConfig();
+          startListeningToNFC();
+          return;
+      }
 
-      startListeningToNFC();
-      return; // Salir si inicialización fue exitosa
-    }
-
-    Serial.printf("ERROR: No se encontró el módulo PN532 (intento %d de %d). Reintentando...\n", retryCount + 1, MAX_RETRIES);
-    retryCount++;
+      Serial.printf("ERROR: No se encontró el módulo PN532 (intento %d de %d). Reintentando...\n", retryCount + 1, MAX_RETRIES);
+      retryCount++;
+      delay(500);
   }
 
   Serial.println("FATAL: No se pudo inicializar el PN532 tras múltiples intentos. Reiniciando dispositivo...");
-  delay(2000); // Pequeña pausa para ver mensaje
+  delay(2000);
   ESP.restart();
 }
 
@@ -63,7 +69,7 @@ bool TOKEN_::isCardPresent() {
   uint8_t uidLength = 0;
   
   // Usamos un timeout muy corto para un sondeo rápido
-  bool result = nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, _uid, &uidLength, 30);
+  bool result = nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, _uid, &uidLength, 100);
   
   return result;
 }
@@ -398,7 +404,7 @@ void TOKEN_::token_handler(TOKEN_DATA token, uint8_t lang_in, bool genre_in, uin
             while (doitPlayer.is_playing()) { delay(10); }
             delay(200);
             int fileNum = match ? random(1, 4) : random(1, 3);
-            send_frame(frameMaker_SEND_COLOR(myid, targets, match ? 7 : 3));  // 7: verde (match), 3: rojo (fail)
+            send_frame(frameMaker_SEND_RESPONSE(myid, targets, match ? WIN : FAIL));
             doitPlayer.play_file((match ? WIN_RESP_BANK : FAIL_RESP_BANK) + genre_in, fileNum + lang);
             delay(50);
             while (doitPlayer.is_playing()) { delay(10); }
@@ -426,7 +432,7 @@ void TOKEN_::token_handler(TOKEN_DATA token, uint8_t lang_in, bool genre_in, uin
           while (doitPlayer.is_playing()) { delay(10); }
           delay(600);
           // Enviar color de respuesta: verde (7) si es correcto, rojo (3) si no
-          send_frame(frameMaker_SEND_COLOR(myid, targets, isCorrect ? 7 : 3));
+          send_frame(frameMaker_SEND_RESPONSE(myid, targets, isCorrect ? WIN : FAIL));
           doitPlayer.play_file((isCorrect ? WIN_RESP_BANK : FAIL_RESP_BANK) + genre_in, random(1, isCorrect ? 4 : 3) + lang);
           while (doitPlayer.is_playing()) { delay(10); }
           delay(600);

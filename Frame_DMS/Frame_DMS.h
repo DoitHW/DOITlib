@@ -123,6 +123,7 @@ FRAME_T frameMaker_SEND_SENSOR_VALUE_2   (byte originin, std::vector<byte>target
 FRAME_T frameMaker_SEND_FLAG_BYTE      (byte originin, std::vector<byte>targetin, byte flagin);
 FRAME_T frameMaker_SEND_PATTERN_NUM    (byte irigin, std::vector<byte>targetin, byte patternin);
 FRAME_T frameMaker_SEND_FILE_NUM       (byte originin, std::vector<byte>targetin, byte bankin, byte filein);
+FRAME_T frameMaker_SEND_RESPONSE       (byte originin, std::vector<byte>targetin, byte response);
 
 FRAME_T frameMaker_RETURN_ELEM_SECTOR  (byte originin, byte targetin, byte *sector_data, byte sectorin);
 FRAME_T frameMaker_REQ_ELEM_SECTOR(byte originin, byte targetin, byte idiomain, byte sectorin);
