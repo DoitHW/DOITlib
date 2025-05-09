@@ -351,7 +351,7 @@
 
 // TESTS
 
-enum COMMANDS_{
+enum COMMANDS_ { 
   BLACKOUT= 0,
   START_CMD,
   TEST_CMD,
@@ -366,7 +366,12 @@ enum COMMANDS_{
   ALTERNATE_MODE_ON,
   ALTERNATE_MODE_OFF,
   OTA_AP_ON,
-  OTA_AP_OFF
+  OTA_AP_OFF,
+  COG_ACT_ON,
+  COG_ACT_OFF,
+  SHOW_ID_CMD,
+  WIN_CMD,
+  FAIL_CMD
 };
 
 enum TOKEN_TYPE_{
@@ -385,7 +390,9 @@ enum TOKEN_CONFIG_{
 #define RELAY_3_FLAG     0x02
 #define RELAY_4_FLAG     0x03
 
-// ETC
+// Histéresis para batería crítica
+const float BATTERY_LOCK_THRESHOLD = 15.0;
+const float BATTERY_UNLOCK_THRESHOLD = 17.0;
 
 #define SET_RELAY        0x01
 #define RESET_RELAY      0x00
@@ -546,6 +553,14 @@ enum PATTERN_LIST{
     RAINBOW_PATT,
     SNOW_PATT,
     CLOUD_PATT
+};
+
+enum POSITION{
+
+  GROUND,
+  WALL_H,
+  WALL_V,
+  CEILING
 };
 
 enum SECTOR_LIST{

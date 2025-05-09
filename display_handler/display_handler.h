@@ -32,6 +32,9 @@ void drawDeleteElementMenu(int selection);
 void drawConfirmDelete(const String& fileName);
 void scrollTextTickerBounceFormat(int selection);
 void scrollTextTickerBounceDelete(int selection);
+void showCriticalBatteryMessage();
+void drawBatteryIconMini(float percentage);
+void drawCognitiveMenu();
 
 extern bool isScrollingText;
 extern TFT_eSPI tft;
@@ -46,4 +49,6 @@ extern uint8_t tempBrightness;
 extern bool forceDrawDeleteElementMenu;
 extern int bankMenuCurrentSelection;   // 0: Confirmar, 1..n: banks
 extern int bankMenuWindowOffset;
+extern bool criticalBatteryLock; // lo usarás en otras partes
+extern float batteryPercentage;
 

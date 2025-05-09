@@ -9,7 +9,7 @@
 #include <Translations_handler/translations.h>
 #include <vector>
 
-#define PN532_IRQ 42 //botonera antiga 42
+#define PN532_IRQ 46 //botonera antiga 42
 // Enumeración de modos de operación del token
 enum TOKEN_MODE_ {
     TOKEN_BASIC_MODE = 0,

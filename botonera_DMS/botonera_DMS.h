@@ -43,6 +43,11 @@ class BOTONERA_ : public ELEMENT_{
         byte getIdFromSPIFFS(byte *serial);
         String getCurrentFilePath(byte elementID);
         void printFrameInfo(LAST_ENTRY_FRAME_T LEF);
+        void activateCognitiveMode();
+        void deactivateCognitiveMode();
+    
+    
+        
 
     private:   
         byte lastAssignedID = DEFAULT_DEVICE;
@@ -53,6 +58,8 @@ class BOTONERA_ : public ELEMENT_{
 
 extern BOTONERA_ *element;
 extern DOITSOUNDS_ doitPlayer;
+extern byte currentCognitiveCommand;
+extern bool inCognitiveMenu;
 
 
 

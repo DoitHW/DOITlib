@@ -78,6 +78,7 @@ struct INFO_PACK_T{
     byte currentMode;
     MODE_T mode[16];
     uint16_t icono[ICON_ROWS][ICON_COLUMNS];
+    byte situacion;
 };
 
 struct ICON_PACK_T{

@@ -6,10 +6,10 @@
 #include <ESP32Encoder.h>
 #include <vector>
 
-// Pines del encoder
-#define ENC_A 26
-#define ENC_B 34
-#define ENC_BUTTON 33
+// Pines del encoder            //BOTONERA FRANC        BOTONERA MARC
+#define ENC_A 26                //26                                            (33 para nuevas botoneras sin placa)
+#define ENC_B 34                //34                                            (34 para nuevas botoneras sin placa)
+#define ENC_BUTTON 33           //33                                            (26 para nuevas botoneras sin placa)
 
 
 // Declaración de funciones relacionadas con el encoder
@@ -85,6 +85,8 @@ extern std::vector<String> deletableElementFiles;
 extern bool confirmDeleteActive;
 extern int confirmSelection;
 extern bool confirmDeleteMenuActive;
+extern bool ignoreNextEncoderClick;
+
 
 
 

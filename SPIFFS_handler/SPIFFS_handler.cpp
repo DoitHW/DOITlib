@@ -70,6 +70,13 @@ bool readElementData(fs::File& f, char* elementName, char* modeName, int& startX
     startX = (tft.width() - 64) / 2;
     startY = (tft.height() - 64) / 2 - 20;
 
+    // Leer situación
+    f.seek(OFFSET_SITUACION, SeekSet);
+    byte situacionByte = 0;
+    f.read(&situacionByte, 1);
+    // Puedes usarlo si quieres mostrarlo o pasarlo por referencia
+
+
     return true;
 }
 
@@ -85,6 +92,7 @@ void initializeDynamicOptions() {
     ambientesOption.mode[0].config[0] = 0x00;
     ambientesOption.mode[0].config[1] = 0x09;
     memcpy(ambientesOption.icono, ambientes_64x64, sizeof(ambientesOption.icono));
+    ambientesOption.situacion = 0;
 
     // ----- Fichas -----
     memset(&fichasOption, 0, sizeof(INFO_PACK_T));
@@ -106,17 +114,21 @@ void initializeDynamicOptions() {
 
     memcpy(fichasOption.icono, fichas_64x64, sizeof(fichasOption.icono));
     //Serial.println("Nombre de fichasOption.name después de crear el icono: " + String((char*)fichasOption.name));
+    fichasOption.situacion = 0;
 
     // ----- ApagarSala -----
     memset(&apagarSala, 0, sizeof(INFO_PACK_T));
     strncpy((char*)apagarSala.name, "APAGAR", 24);
     strncpy((char*)apagarSala.desc, "Apaga la sala por completo.", 192);
+    apagarSala.mode[0].config[0] = 0x00;
+    apagarSala.mode[0].config[1] = 0x00;
     apagarSala.currentMode = 0;
     // Puedes añadir uno o varios modos, aquí un ejemplo con un solo modo "OFF".
     // strncpy((char*)apagarSala.mode[0].name, "OFF", 24);
     // strncpy((char*)apagarSala.mode[0].desc, "Modo para apagar la sala.", 192);
     // apagarSala.mode[0].config[0] = 0x7F; // El valor que tú desees para este modo
     // apagarSala.mode[0].config[1] = 0xFF;
+    apagarSala.situacion = 0;
 
     // Asumiendo que tienes un icono llamado apagar_64x64:
     memcpy(apagarSala.icono, apagar_sala_64x64, sizeof(apagarSala.icono));
@@ -126,17 +138,6 @@ void initializeDynamicOptions() {
 void loadElementsFromSPIFFS() {
     elementFiles.clear();
     selectedStates.clear();
-
-    // Agregar las opciones dinámicas
-    elementFiles.push_back("Ambientes");
-    selectedStates.push_back(false);
-
-    elementFiles.push_back("Fichas");
-    selectedStates.push_back(false);
-
-    elementFiles.push_back("Apagar");
-    selectedStates.push_back(false);
-
 
     // Cargar elementos desde SPIFFS
     fs::File root = SPIFFS.open("/");
@@ -171,7 +172,15 @@ void loadElementsFromSPIFFS() {
                                                                                     #ifdef DEBUG
                                                                                     Serial.printf("Total de elementos: %d\n", (int)elementFiles.size());                                                                                
                                                                                     #endif
-    
+     // Agregar las opciones dinámicas
+     elementFiles.push_back("Ambientes");
+     selectedStates.push_back(false);
+ 
+     elementFiles.push_back("Fichas");
+     selectedStates.push_back(false);
+ 
+     elementFiles.push_back("Apagar");
+     selectedStates.push_back(false);
 }
 
 byte getCurrentElementID() {
@@ -212,35 +221,43 @@ bool checkMostSignificantBit(byte modeConfig[2]) {
 bool getModeConfig(const String& fileName, byte mode, byte modeConfig[2]) {
     memset(modeConfig, 0, 2); // Inicializar en 0
 
-    if (fileName == "Ambientes" || fileName == "Fichas" || fileName == "Apagar") {
-        INFO_PACK_T* option = (fileName == "Ambientes") ? &ambientesOption : &fichasOption;
+    INFO_PACK_T* option = nullptr;
+
+    if (fileName == "Ambientes") {
+        option = &ambientesOption;
+    } else if (fileName == "Fichas") {
+        option = &fichasOption;
+    } else if (fileName == "Apagar") {
+        option = &apagarSala;
+    }
+
+    if (option != nullptr) {
         memcpy(modeConfig, option->mode[mode].config, 2);
         return true;
-    } else {
-       
-        fs::File f = SPIFFS.open(fileName, "r");
-        if (!f) {
-                                                                                    #ifdef DEBUG
-                                                                                    Serial.println("❌ Error abriendo el archivo: " + fileName);                                                                       
-                                                                                    #endif
-            
-            return false;
-        }
-
-        f.seek(OFFSET_MODES + (SIZE_MODE * mode) + 24 + 192, SeekSet);
-        if (f.read(modeConfig, 2) != 2) {
-                                                                                    #ifdef DEBUG
-                                                                                    Serial.println("❌ Error leyendo configuración del modo");                                                                      
-                                                                                    #endif
-            
-            f.close();
-            return false;
-        }
-
-        f.close();
-        return true;
     }
+
+    // Si no es un elemento fijo, buscar en SPIFFS
+    fs::File f = SPIFFS.open(fileName, "r");
+    if (!f) {
+        #ifdef DEBUG
+        Serial.println("❌ Error abriendo el archivo: " + fileName);
+        #endif
+        return false;
+    }
+
+    f.seek(OFFSET_MODES + (SIZE_MODE * mode) + 24 + 192, SeekSet); // OFFSET_CONFIG
+    if (f.read(modeConfig, 2) != 2) {
+        #ifdef DEBUG
+        Serial.println("❌ Error leyendo configuración del modo");
+        #endif
+        f.close();
+        return false;
+    }
+
+    f.close();
+    return true;
 }
+
 
 void setAllElementsToBasicMode() {
 

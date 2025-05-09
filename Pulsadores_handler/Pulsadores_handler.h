@@ -11,7 +11,7 @@ extern int filas[FILAS];
 extern int columnas[COLUMNAS];
 
 extern byte pulsadorColor[FILAS][COLUMNAS];
-extern bool relay_state;
+extern byte relay_state;
 enum ButtonEventType { BUTTON_PRESSED, BUTTON_RELEASED };
 
 class PulsadoresHandler {

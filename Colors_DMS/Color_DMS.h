@@ -246,6 +246,7 @@ class COLORHANDLER_ {
         int numLeds;
         void setCurrentFile(const String& file) { currentFile = file; } 
         bool color_mix_handler(int color1, int color2, byte *resultado);
+        void mapCognitiveLEDs();
     private:
 
     unsigned long lastUpdate = 0;

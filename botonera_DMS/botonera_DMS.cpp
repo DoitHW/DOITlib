@@ -12,10 +12,12 @@
 
 
 extern std::vector<uint8_t> printTargetID;
-
+byte currentCognitiveCommand = COG_ACT_OFF;
 
 BOTONERA_::BOTONERA_() : ELEMENT_() {
             set_type(TYPE_BOTONERA);
+            
+
         }
 
 void BOTONERA_::botonera_begin(){}
@@ -163,6 +165,29 @@ void BOTONERA_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
 
             doitPlayer.play_file(LEF.data[0],LEF.data[1]);
             
+            break;
+        }
+
+        case F_SEND_COMMAND: {
+            byte receivedCommand = LEF.data[0];
+            currentCognitiveCommand = receivedCommand;
+            Serial.println("Comando recibido: " + String(receivedCommand, HEX));
+            
+            if (receivedCommand == COG_ACT_ON) {
+                Serial.println("Activando modo cognitivo...");
+                activateCognitiveMode();
+            } else if (receivedCommand == COG_ACT_OFF) {
+                Serial.println("Desactivando modo cognitivo...");
+                deactivateCognitiveMode();
+            } else if (receivedCommand == WIN_CMD)
+            {
+                byte res= rand() % 4;
+                doitPlayer.play_file(WIN_RESP_BANK, 11 + res);
+            } else if (receivedCommand == FAIL_CMD)
+            {
+                byte res= rand() % 4;
+                doitPlayer.play_file(FAIL_RESP_BANK, 11 + res);
+            }
             break;
         }
 
@@ -329,6 +354,10 @@ void BOTONERA_::procesar_datos_sector(LAST_ENTRY_FRAME_T &LEF, int sector, INFO_
             memcpy(infoPack->desc, &LEF.data[1], 
                    min(sizeof(infoPack->desc), LEF.data.size() - 1));
             break;
+        
+        case ELEM_LOCATION_SECTOR:
+            infoPack->situacion = LEF.data[1];
+            break;
 
         case ELEM_SERIAL_SECTOR:
             memcpy(infoPack->serialNum, &LEF.data[1], 
@@ -430,6 +459,10 @@ bool BOTONERA_::guardar_elemento(INFO_PACK_T* infoPack) {
     for (int y = 0; y < ICON_ROWS && success; ++y) {
         success &= writeBytesChecked(file, (uint8_t*)infoPack->icono[y], ICON_COLUMNS * 2);
     }
+
+    // Después del icono
+    success &= writeBytesChecked(file, &infoPack->situacion, 1);
+
 
     file.close();
 
@@ -681,14 +714,36 @@ bool BOTONERA_::procesar_y_guardar_elemento_nuevo(byte targetID) {
 
     // Pedimos todos los sectores
     bool error = false;
-    for (int sector = ELEM_NAME_SECTOR; sector <= ELEM_ICON_ROW_63_SECTOR; sector++) {
-        if (sector != ELEM_LOCATION_SECTOR){ // ojo hay que rehacer esta lógica
-            if (!procesar_sector(sector, infoPack, targetID)){
-                error = true;
-                break;
-            }
+    // Descargar sectores clave manualmente para evitar exclusión de LOCATION
+    std::vector<int> sectores = {
+        ELEM_NAME_SECTOR,
+        ELEM_DESC_SECTOR,
+        ELEM_LOCATION_SECTOR,
+        ELEM_SERIAL_SECTOR,
+        ELEM_ID_SECTOR,
+        ELEM_CMODE_SECTOR
+    };
+
+    // Modos
+    for (int i = 0; i < 16; i++) {
+        sectores.push_back(ELEM_MODE_0_NAME_SECTOR + i * 3);
+        sectores.push_back(ELEM_MODE_0_DESC_SECTOR + i * 3);
+        sectores.push_back(ELEM_MODE_0_FLAG_SECTOR + i * 3);
+    }
+
+    // Icono
+    for (int i = 0; i < 64; i++) {
+        sectores.push_back(ELEM_ICON_ROW_0_SECTOR + i);
+    }
+
+    // Procesar todos
+    for (int sector : sectores) {
+        if (!procesar_sector(sector, infoPack, targetID)) {
+            error = true;
+            break;
         }
     }
+
 
     // Si falló alguno de los sectores, limpiamos y salimos
     if (error) {
@@ -1180,3 +1235,18 @@ byte BOTONERA_::getNextAvailableID() {
     
     return nextID;
 }
+
+bool inCognitiveMenu = false;
+
+void BOTONERA_::activateCognitiveMode() {
+    inCognitiveMenu = true;
+    drawCognitiveMenu();
+    colorHandler.mapCognitiveLEDs(); // función que veremos abajo
+}
+void BOTONERA_::deactivateCognitiveMode() {
+    inCognitiveMenu = false;
+    drawCurrentElement(); // Volver a la pantalla principal
+}
+
+
+

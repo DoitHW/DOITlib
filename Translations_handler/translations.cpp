@@ -39,7 +39,10 @@ const Translation translations[] = {
   {"CONFIRM_DELETE",     "Confirmar",                 "Confirmar",                "Confirmar",                      "Berretsi",                           "Confirmer",                         "Bestätigen",                  "Confirm",                    "Conferma"},
   {"CANCEL",             "Cancelar",                  "Cancelar",                 "Cancel·lar",                     "Ezeztatu",                           "Annuler",                           "Abbrechen",                   "Cancel",                     "Annulla"},
   {"YES_DELETE",         "Si",                        "Si",                       "Si",                             "Bai",                                "Oui",                               "Ja",                          "Yes",                        "Si"},
-
+  {"ACTIVIDADES",        "Actividades",               "Actividades",              "Activitats",                     "Jarduerak",                          "Activites",                         "Aktivitaten",                 "Activities",                 "Attivita"},
+  {"COGNITIVAS",         "Cognitivas",                "Cognitivas",               "Cognitives",                     "Kognitiboak",                        "Cognitives",                        "Kognitive",                   "Cognitive",                  "Cognitive"},
+  {"SALIR",              "Salir",                     "Salir",                    "Sortir",                         "Irten",                              "Sortir",                            "Verlassen",                   "Exit",                       "Esci"},
+  
   {nullptr,              nullptr,                     nullptr,                    nullptr,                          nullptr,                              nullptr,                             nullptr,                       nullptr,                      nullptr} // Entrada final
 };
 

@@ -15,6 +15,8 @@ const size_t SIZE_MODES = SIZE_MODE * 16; // 3488 bytes
 const size_t OFFSET_MODES = OFFSET_CURRENTMODE + 1;  // 220 +0=220
 // Icono empieza en 220 + 3488 = 3708
 const size_t OFFSET_ICONO = OFFSET_MODES + SIZE_MODES; // 220 +3488=3708
+const size_t OFFSET_SITUACION = OFFSET_ICONO + (ICON_ROWS * ICON_COLUMNS * 2); // 3708 + 8192 = 11900
+
 // icono =64*64*2=8192 bytes total ~11900
 
 static uint16_t lineBuffer[64]; 

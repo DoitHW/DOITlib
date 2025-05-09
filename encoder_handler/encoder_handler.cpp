@@ -79,6 +79,41 @@ void handleEncoder() {
         }
     }
 
+    // Si la pantalla está apagada, SOLO reactivar si hay una acción real (movimiento o pulsación)
+    if (!displayOn) {
+        if ((encoder.getCount() != lastEncoderValue) || (digitalRead(ENC_BUTTON) == LOW)) {
+            
+            display_wakeup();
+            encoderIgnoreUntil = millis() + 500; // Ignorar entradas durante 500 ms
+            lastDisplayInteraction = millis();
+            // **Reiniciamos lastEncoderValue para que el giro realizado mientras la pantalla estaba apagada no se procese**
+            lastEncoderValue = encoder.getCount();
+
+           
+        }
+        return; // No procesamos ningún otro evento.
+    }
+
+    if (inCognitiveMenu) {
+        static bool clicked = false;
+        if (digitalRead(ENC_BUTTON) == LOW) {
+            if (!clicked) {
+                inCognitiveMenu = false;
+                clicked = true;
+            
+                ignoreEncoderClick = true; // ✅ IGNORA el click siguiente
+            
+                std::vector<byte> target = {DEFAULT_BOTONERA};
+                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, target, COG_ACT_OFF));
+                drawCurrentElement();
+            }
+            
+        } else {
+            clicked = false;
+        }
+        return;
+    }
+    
     if (deleteElementMenuActive) return;
 
     if (formatSubMenuActive) return;
@@ -96,17 +131,7 @@ void handleEncoder() {
         return;
     }
     
-    // Si la pantalla está apagada, SOLO reactivar si hay una acción real (movimiento o pulsación)
-    if (!displayOn) {
-        if ((encoder.getCount() != lastEncoderValue) || (digitalRead(ENC_BUTTON) == LOW)) {
-            display_wakeup();
-            encoderIgnoreUntil = millis() + 500; // Ignorar entradas durante 500 ms
-            lastDisplayInteraction = millis();
-            // **Reiniciamos lastEncoderValue para que el giro realizado mientras la pantalla estaba apagada no se procese**
-            lastEncoderValue = encoder.getCount();
-        }
-        return; // No procesamos ningún otro evento.
-    }
+    
     
     // Si estamos en el menú principal (drawCurrentElement) y el sistema está bloqueado,
     // se ignoran rotaciones y clicks simples; solo se permite la pulsación larga para desbloquear.
@@ -222,6 +247,7 @@ void handleEncoder() {
             if (realModeIndex >= 0) {
                 String currentFile = elementFiles[currentIndex];
                 colorHandler.setCurrentFile(currentFile);
+                Serial.println("SetPattern 2");
                 colorHandler.setPatternBotonera(realModeIndex, ledManager);
             }
             drawModesScreen();
@@ -322,6 +348,7 @@ void handleEncoder() {
                     elementID.push_back(0xFF);
                     send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, BLACKOUT));
                     setAllElementsToBasicMode();
+                    doitPlayer.stop_file();
                     showMessageWithLoading(getTranslation("APAGANDO_SALA"), 5000);
                     currentIndex = 0;
                     drawCurrentElement();
@@ -518,6 +545,7 @@ void handleModeSelection(const String& currentFile) {
         memcpy(modeConfigTemp, modeConfig, 2);  // Usar la configuración que ya tenemos
         
         if (getModeFlag(modeConfigTemp, HAS_ALTERNATIVE_MODE)) {
+            
             if (currentAlternateStates.size() > (size_t)adjustedVisibleIndex && currentAlternateStates[adjustedVisibleIndex]) {
                 modeAlternateActive = true;
                 send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{getCurrentElementID()}, ALTERNATE_MODE_ON));

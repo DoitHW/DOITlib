@@ -1027,45 +1027,131 @@ void COLORHANDLER_::welcomeEffect() {
 }
 #endif
 
+// void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager) {
+//   ledManager.clearEffects(); // Limpiar efectos dinámicos previos
+
+//   if (mode >= 16) {
+//       #ifdef DEBUG
+//           Serial.printf("⚠️ Modo inválido: %d\n", mode);
+//       #endif
+//       return;
+//   }
+
+//   byte modeConfig[2] = {0};
+//   if (!getModeConfig(currentFile, mode, modeConfig)) {
+//       #ifdef DEBUG
+//           Serial.println("⚠️ No se pudo obtener la configuración del modo.");
+//       #endif
+//       return;
+//   }
+
+//   #ifdef DEBUG
+//   Serial.printf("Mode %d - Byte Config: 0x%02X%02X\n", mode, modeConfig[0], modeConfig[1]);
+//   #endif
+
+//   // --- Verificar si el elemento actual es "Fichas" ---
+//   if (currentFile == "Fichas") {
+//       fill_solid(leds, NUM_LEDS, CRGB::Black); // Apagar todos los LEDs
+
+//       if (mode == 0) { // Modo Básico: solo el LED 0 con efecto
+//           ledManager.addEffect(new FadeEffect(*this, 0, CRGB::Blue, CRGB::Cyan, 50));
+//       } 
+//       else if (mode == 1 || mode == 2) { // Modo Parejas o Adivina
+//           ledManager.addEffect(new FadeEffect(*this, 0, CRGB::Blue, CRGB::Cyan, 50)); // LED 0 con efecto dinámico
+//           leds[8] = CRGB::White; // LED 9 en blanco
+//       }
+
+//       FastLED.show();
+//       return; // Salir para evitar aplicar la lógica general
+//   }
+
+//   // --- Bloque modular para asignar colores a la botonera ---
+//   if (getModeFlag(modeConfig, HAS_PATTERNS)) {
+//       fill_solid(leds + 1, NUM_LEDS - 1, CRGB::White);
+//   } else if (getModeFlag(modeConfig, HAS_PASSIVE)) {
+//       fill_solid(leds + 1, NUM_LEDS - 1, CRGB::Black);
+//       leds[8] = CRGB::White;
+//   } else if (getModeFlag(modeConfig, HAS_BASIC_COLOR) || getModeFlag(modeConfig, HAS_ADVANCED_COLOR)) {
+//       CRGB colorMap[] = {
+//           CRGB::Black, CRGB::White, CRGB::Red, CRGB::Cyan,
+//           CRGB::Yellow, CRGB(0xFF, 0x59, 0x00), CRGB::Green,
+//           CRGB(0xFF, 0x00, 0xD2), CRGB::Blue
+//       };
+
+//       for (int i = 1; i < NUM_LEDS; i++) {
+//           leds[i] = colorMap[i];
+//       }
+//   } else {
+//       fill_solid(leds + 1, NUM_LEDS - 1, CRGB::Black);
+//   }
+
+//   // --- Bloque modular para el LED 0 (efecto de relé) ---
+//   if (getModeFlag(modeConfig, HAS_RELAY)) {
+//       ledManager.addEffect(new FadeEffect(*this, 0, CRGB::Blue, CRGB::Cyan, 50));
+//   } else {
+//       leds[0] = CRGB::Black;
+//   }
+
+//   FastLED.show();
+// }
 void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager) {
   ledManager.clearEffects(); // Limpiar efectos dinámicos previos
 
   if (mode >= 16) {
-      #ifdef DEBUG
-          Serial.printf("⚠️ Modo inválido: %d\n", mode);
-      #endif
+#ifdef DEBUG
+      Serial.printf("⚠️ Modo inválido: %d\n", mode);
+#endif
       return;
   }
 
   byte modeConfig[2] = {0};
   if (!getModeConfig(currentFile, mode, modeConfig)) {
-      #ifdef DEBUG
-          Serial.println("⚠️ No se pudo obtener la configuración del modo.");
-      #endif
+#ifdef DEBUG
+      Serial.println("⚠️ No se pudo obtener la configuración del modo.");
+#endif
       return;
   }
 
-  #ifdef DEBUG
+#ifdef DEBUG
   Serial.printf("Mode %d - Byte Config: 0x%02X%02X\n", mode, modeConfig[0], modeConfig[1]);
-  #endif
+#endif
 
-  // --- Verificar si el elemento actual es "Fichas" ---
+  // --- FICHAS ---
   if (currentFile == "Fichas") {
-      fill_solid(leds, NUM_LEDS, CRGB::Black); // Apagar todos los LEDs
+      fill_solid(leds, NUM_LEDS, CRGB::Black);
 
-      if (mode == 0) { // Modo Básico: solo el LED 0 con efecto
+      if (mode == 0) {
           ledManager.addEffect(new FadeEffect(*this, 0, CRGB::Blue, CRGB::Cyan, 50));
-      } 
-      else if (mode == 1 || mode == 2) { // Modo Parejas o Adivina
-          ledManager.addEffect(new FadeEffect(*this, 0, CRGB::Blue, CRGB::Cyan, 50)); // LED 0 con efecto dinámico
-          leds[8] = CRGB::White; // LED 9 en blanco
+      } else if (mode == 1 || mode == 2) {
+          ledManager.addEffect(new FadeEffect(*this, 0, CRGB::Blue, CRGB::Cyan, 50));
+          leds[8] = CRGB::White;
       }
 
       FastLED.show();
-      return; // Salir para evitar aplicar la lógica general
+      return;
   }
 
-  // --- Bloque modular para asignar colores a la botonera ---
+  // --- FLAGS DE RELÉ ---
+  bool hasRelay    = getModeFlag(modeConfig, HAS_RELAY);
+  bool hasRelayN1  = getModeFlag(modeConfig, HAS_RELAY_N1);
+  bool hasRelayN2  = getModeFlag(modeConfig, HAS_RELAY_N2);
+
+  int relayCount = 0;
+
+  if (!hasRelay && hasRelayN1 && hasRelayN2) {
+      relayCount = 4; // caso aromaterapia
+  } else if (hasRelay) {
+      if (!hasRelayN1 && !hasRelayN2) relayCount = 1;
+      else if (!hasRelayN1 && hasRelayN2) relayCount = 2;
+      else if (hasRelayN1 && !hasRelayN2) relayCount = 3;
+      else if (hasRelayN1 && hasRelayN2)  relayCount = 4;
+  }
+
+
+  bool isMultiRelay = relayCount > 1;
+  bool isAromaterapia = (!hasRelay && hasRelayN1 && hasRelayN2);
+
+  // --- COLORES DE LOS BOTONES (excepto LED 0) ---
   if (getModeFlag(modeConfig, HAS_PATTERNS)) {
       fill_solid(leds + 1, NUM_LEDS - 1, CRGB::White);
   } else if (getModeFlag(modeConfig, HAS_PASSIVE)) {
@@ -1077,17 +1163,25 @@ void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager)
           CRGB::Yellow, CRGB(0xFF, 0x59, 0x00), CRGB::Green,
           CRGB(0xFF, 0x00, 0xD2), CRGB::Blue
       };
-
       for (int i = 1; i < NUM_LEDS; i++) {
           leds[i] = colorMap[i];
       }
   } else {
       fill_solid(leds + 1, NUM_LEDS - 1, CRGB::Black);
   }
-
-  // --- Bloque modular para el LED 0 (efecto de relé) ---
-  if (getModeFlag(modeConfig, HAS_RELAY)) {
+  Serial.println("relayCount: " + String(relayCount));
+  // --- VISUALIZACIÓN DE RELÉS ---
+  if (relayCount == 1 && hasRelay) {
+      // Caso: solo un relé → usar LED 0 con efecto
       ledManager.addEffect(new FadeEffect(*this, 0, CRGB::Blue, CRGB::Cyan, 50));
+  } else if (isMultiRelay || isAromaterapia) {
+      // Caso: 2 o más relés → usar LEDs 9, 7, 5, 3 en blanco
+      fill_solid(leds, NUM_LEDS, CRGB::Black);
+      if (relayCount >= 1) leds[8] = CRGB::Blue;
+      if (relayCount >= 2) leds[6] = CRGB::Green;
+      if (relayCount >= 3) leds[4] = CRGB::Yellow;
+      if (relayCount >= 4) leds[2] = CRGB::Red;
+
   } else {
       leds[0] = CRGB::Black;
   }
@@ -1152,7 +1246,18 @@ void COLORHANDLER_::sequencer_game(byte& colorin) {
     }
 }
 
-
+void COLORHANDLER_::mapCognitiveLEDs() {
+  Serial.println("Mapeo de LEDs cognitivos: ");
+  colorHandler.setPatternBotonera(0, ledManager); // Desactiva todos
+  for (int i = 0; i < NUM_LEDS; i++) {
+      leds[i] = CRGB::Black;
+  }
+  leds[2] = CRGB::Red;
+  leds[4] = CRGB::Yellow;
+  leds[6] = CRGB::Green;
+  leds[8] = CRGB::Blue;
+  FastLED.show();
+}
 
 
 

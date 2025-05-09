@@ -55,7 +55,7 @@ void ADXL345Handler::readInclination(char axis)
     accel.getEvent(&event);
     float currentInclination;
     if (!accel.getEvent(&event)) {
-        Serial.println("🥲🥲🥲🥲🥲🥲🥲🥲🥲Error reading ADXL345 event!");
+        Serial.println("Error reading ADXL345 event!");
         return; // Exit if reading fails
         }
 
@@ -65,7 +65,7 @@ void ADXL345Handler::readInclination(char axis)
         currentInclination = event.acceleration.x;
         break;
     case 'y':
-        currentInclination = event.acceleration.y;
+        currentInclination = -event.acceleration.y;
         break;
     default:
         return;

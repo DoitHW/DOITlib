@@ -6,6 +6,7 @@
 #include "rom/rtc.h"    // Opcional, si quieres info de reset
 #include <icons_64x64_DMS/icons_64x64_DMS.h>
 #include <Translations_handler/translations.h>
+#include <botonera_DMS/botonera_DMS.h>
 
 // Definir dimensiones
 #define CARD_WIDTH 110
@@ -619,11 +620,12 @@ void drawCurrentElement() {
               drawModeName(modeDisplay.c_str());
          }
          f.close();
-         drawSelectionCircle(selectedStates[currentIndex], startX, startY);
+         //drawSelectionCircle(selectedStates[currentIndex], startX, startY);
          currentMode = realModeIndex;
     }
     currentModeIndex = currentMode;
     colorHandler.setCurrentFile(currentFile);
+    Serial.println("setPatternBotonera 1");
     colorHandler.setPatternBotonera(currentModeIndex, ledManager);
     drawNavigationArrows();
     
@@ -632,7 +634,9 @@ void drawCurrentElement() {
     if (!inModesScreen && systemLocked) {
          uiSprite.pushImage(0, 0, 16, 16, device_lock);
     }
-    
+
+    drawBatteryIconMini(batteryPercentage);
+
     uiSprite.pushSprite(0, 0);
     lastDisplayInteraction = millis();
     displayOn = true;
@@ -647,7 +651,9 @@ void display_sleep() {
 void display_wakeup() {
     displayOn = true;
     // Vuelve a dibujar el menú principal para “despertar” la interfaz
-    drawCurrentElement();
+    if (inCognitiveMenu) {
+        drawCognitiveMenu();
+    }else drawCurrentElement();
     lastDisplayInteraction = millis();
     Serial.println("Pantalla reactivada por interacción.");
   }
@@ -1886,3 +1892,64 @@ void scrollTextTickerBounceDelete(int selection) {
 
     tickerSprite.deleteSprite();
 }
+
+void showCriticalBatteryMessage() {
+    uiSprite.fillSprite(TFT_BLACK);
+    uiSprite.setTextDatum(MC_DATUM);
+    uiSprite.setTextColor(TFT_RED, TFT_BLACK);
+    uiSprite.setFreeFont(&FreeSansBold9pt7b);
+    uiSprite.drawString("Cargar bateria", 64, 10);
+    uiSprite.pushImage(48, 40, 32, 61, vbat32x61_0_);
+    uiSprite.pushSprite(0, 0);
+    
+}
+
+const int vbatallArray_LEN = 5;
+const uint16_t* vbatallArray[5] = {
+	vbat30x15_horizontal_10_25_1,
+	vbat30x15_horizontal_10_25_2,
+	vbat30x15_horizontal_25_66,
+	vbat30x15_horizontal_66_100,
+	vbat32x61_0_
+};
+unsigned long lastBatteryToggleTime = 0;
+bool batteryToggleState = false;
+
+void drawBatteryIconMini(float percentage) {
+    const int x = 128 - 30; // esquina superior derecha, adaptado al tamaño 30x15
+    const int y = 2;
+
+    const uint16_t* icon = nullptr;
+
+    if (percentage < 25.0) {
+        // Toggle entre 1 y 0 barra
+        if (millis() - lastBatteryToggleTime > 500) {
+            batteryToggleState = !batteryToggleState;
+            lastBatteryToggleTime = millis();
+        }
+        icon = batteryToggleState ? vbatallArray[1] : vbatallArray[0];
+    }
+    else if (percentage < 66.0) {
+        icon = vbatallArray[2];  // 2 barras
+    }
+    else {
+        icon = vbatallArray[3];  // 3 barras
+    }
+
+    // Mostrar icono
+    uiSprite.pushImage(x, y, 30, 15, icon);
+}
+
+void drawCognitiveMenu() {
+    uiSprite.fillSprite(BACKGROUND_COLOR);
+    uiSprite.setTextDatum(MC_DATUM);
+    uiSprite.setFreeFont(&FreeSansBold9pt7b);
+    uiSprite.setTextColor(TFT_WHITE, BACKGROUND_COLOR);
+    uiSprite.drawString(getTranslation("ACTIVIDADES"), 64, 20); //
+    uiSprite.drawString(getTranslation("COGNITIVAS"), 64, 40);
+    uiSprite.setFreeFont(&FreeSans9pt7b);
+    uiSprite.drawString(getTranslation("SALIR"), 64, 80);
+    uiSprite.drawRoundRect(34, 70, 60, 20, 4, TFT_LIGHTGREY); // marco
+    uiSprite.pushSprite(0, 0);
+}
+
