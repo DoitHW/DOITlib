@@ -23,8 +23,9 @@ class BOTONERA_ : public ELEMENT_{
         void sectorIn_handler(std::vector<byte> data, byte tragetin);
         void print_info_pack(const INFO_PACK_T *infoPack);
         bool serialExistsInSPIFFS(byte serialNum[5]);
-        void iniciarEscaneoElemento(const char* mensajeInicial);
-        void actualizarBarraProgreso(float progreso);
+        //void iniciarEscaneoElemento(const char* mensajeInicial);
+        //void actualizarBarraProgreso(float progreso);
+        //void actualizarBarraProgreso(float progreso, const char* detalleTexto = nullptr);
         void finalizarEscaneoElemento();
         void dibujarMarco(uint16_t color);
         void mostrarMensajeTemporal(int respuesta, int dTime);
@@ -45,7 +46,18 @@ class BOTONERA_ : public ELEMENT_{
         void printFrameInfo(LAST_ENTRY_FRAME_T LEF);
         void activateCognitiveMode();
         void deactivateCognitiveMode();
-    
+
+        ////////////////////////////////
+
+        void escanearSala();
+        bool procesar_y_guardar_elemento_nuevo(byte targetID, const byte serialNumDelElemento[5]);
+        byte buscarPrimerIDLibre(const bool ocupadas[32]);
+        void actualizarIDenSPIFFS(const byte serial[5], byte nuevaID);
+        bool escanearID(byte targetID, byte serial[5], unsigned long timeoutPerAttempt, int retries);
+        bool elementoAsignadoA_ID_enSPIFFS(byte idToFind);
+        void iniciarEscaneoElemento(const char* mensajeInicial);
+        void actualizarBarraProgreso(int pasoActual,int pasosTotales,const char* etiqueta = nullptr);
+
     
         
 

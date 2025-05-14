@@ -35,6 +35,8 @@ void scrollTextTickerBounceDelete(int selection);
 void showCriticalBatteryMessage();
 void drawBatteryIconMini(float percentage);
 void drawCognitiveMenu();
+void drawConfirmRestoreMenu(int selection);
+//void actualizarBarraProgreso(float progreso, const char* detalleTexto = nullptr);
 
 extern bool isScrollingText;
 extern TFT_eSPI tft;

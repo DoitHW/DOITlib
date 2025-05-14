@@ -42,6 +42,7 @@ const Translation translations[] = {
   {"ACTIVIDADES",        "Actividades",               "Actividades",              "Activitats",                     "Jarduerak",                          "Activites",                         "Aktivitaten",                 "Activities",                 "Attivita"},
   {"COGNITIVAS",         "Cognitivas",                "Cognitivas",               "Cognitives",                     "Kognitiboak",                        "Cognitives",                        "Kognitive",                   "Cognitive",                  "Cognitive"},
   {"SALIR",              "Salir",                     "Salir",                    "Sortir",                         "Irten",                              "Sortir",                            "Verlassen",                   "Exit",                       "Esci"},
+  {"SHOW_ID",            "Mostrar ID",                "Mostrar ID",               "Mostrar ID",                     "ID erakutsi",                        "Afficher l'ID",                     "ID anzeigen",                 "Show ID",                    "Mostra ID"},
   
   {nullptr,              nullptr,                     nullptr,                    nullptr,                          nullptr,                              nullptr,                             nullptr,                       nullptr,                      nullptr} // Entrada final
 };

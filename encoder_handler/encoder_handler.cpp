@@ -113,6 +113,8 @@ void handleEncoder() {
         }
         return;
     }
+
+    if (confirmRestoreMenuActive) return;
     
     if (deleteElementMenuActive) return;
 
@@ -434,6 +436,11 @@ void handleModeSelection(const String& currentFile) {
             } else {
                 doitPlayer.stop_file();
                 send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{0xFF}, BLACKOUT));
+                for (size_t i = 0; i < selectedStates.size(); i++) {
+                        selectedStates[i] = false;
+                    }
+                setAllElementsToBasicMode();
+                doitPlayer.stop_file();
             }
         }
         else if (currentFile != "Fichas" && currentFile != "Apagar") {
@@ -970,8 +977,10 @@ void handleBankSelectionMenu(std::vector<byte>& bankList, std::vector<bool>& sel
     }
 }
 
-const int numFormatOptions = 4;
-const int formatOptions[numFormatOptions] = {0, 1, 2, 3};
+const int numFormatOptions = 5;
+const int formatOptions[numFormatOptions] = {0, 1, 2, 3, 4};
+bool confirmRestoreMenuActive = false;
+int confirmRestoreSelection = 0;  // 0 = Sí, 1 = No
 
 
 void handleFormatMenu() {
@@ -995,7 +1004,7 @@ void handleFormatMenu() {
         if (buttonPressStart > 0 && millis() - buttonPressStart < 1000) {
             switch (formatMenuSelection) {
                 case 0: {// Añadir elemento
-                    element->validar_elemento();
+                    element->escanearSala();
                     hiddenMenuActive = false;
                     break;
                 }
@@ -1018,25 +1027,82 @@ void handleFormatMenu() {
                     }
                     break;
 
-                case 2:  // Restaurar (formatear SPIFFS)
-                    Serial.println("[⚠️] Formateando SPIFFS...");
-                    formatSPIFFS();
-                    loadElementsFromSPIFFS();
+                // case 2:  // Restaurar (formatear SPIFFS)
+                //     Serial.println("[⚠️] Formateando SPIFFS...");
+                //     formatSPIFFS();
+                //     loadElementsFromSPIFFS();
+                //     formatSubMenuActive = false;
+                //     ESP.restart();
+                //     drawCurrentElement();
+                //     break;
+
+                case 2:  // Restaurar
+                    confirmRestoreMenuActive = true;
+                    confirmRestoreSelection = 0;
                     formatSubMenuActive = false;
-                    ESP.restart();
-                    drawCurrentElement();
+                    drawConfirmRestoreMenu(confirmRestoreSelection);
+                    break;
+                case 3:  // Mostrar ID
+                    Serial.println("[🆔] Mostrando ID");
+                    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, {BROADCAST}, SHOW_ID_CMD));
+                    formatSubMenuActive = true;
+                    // drawCurrentElement(); // volver al menú principal
                     break;
 
-                case 3:  // Volver
+                case 4:  // Volver
                     formatSubMenuActive = false;
                     drawCurrentElement();
                     break;
+                
             }
-            drawFormatMenu(formatMenuSelection); // Refrescar visual tras selección
+            if (!confirmRestoreMenuActive && !deleteElementMenuActive) {
+    drawFormatMenu(formatMenuSelection); // Solo refresca si no se ha salido al submenú
+}
+
         }
         buttonPressStart = 0;
     }
 }
+
+void handleConfirmRestoreMenu() {
+    static int lastSelection = 0;
+    int32_t newValue = encoder.getCount();
+
+    if (newValue != lastSelection) {
+        int dir = (newValue > lastSelection) ? 1 : -1;
+        lastSelection = newValue;
+        confirmRestoreSelection = (confirmRestoreSelection + dir + 2) % 2;
+        drawConfirmRestoreMenu(confirmRestoreSelection);
+    }
+
+    if (digitalRead(ENC_BUTTON) == LOW) {
+        if (buttonPressStart == 0) buttonPressStart = millis();
+    } else {
+        if (buttonPressStart > 0 && millis() - buttonPressStart < 1000) {
+            if (confirmRestoreSelection == 0) {
+                // Opción "Sí"
+                Serial.println("[⚠️] Restaurando sala...");
+                send_frame(frameMaker_SET_ELEM_ID(DEFAULT_BOTONERA, {BROADCAST}, DEFAULT_DEVICE));
+                delay(600);
+                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, {BROADCAST}, SHOW_ID_CMD));
+                delay(3000);
+                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, {BROADCAST}, BLACKOUT));
+                delay(500);
+                formatSPIFFS();
+                loadElementsFromSPIFFS();
+                confirmRestoreMenuActive = false;
+                formatSubMenuActive = false;
+                ESP.restart();  // Reinicia el sistema tras formatear
+            } else {
+                // Opción "No"
+                confirmRestoreMenuActive = false;
+                drawFormatMenu(formatMenuSelection);
+            }
+        }
+        buttonPressStart = 0;
+    }
+}
+
 
 bool deleteElementMenuActive = false;
 int deleteElementSelection = 0;

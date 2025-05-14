@@ -7,9 +7,9 @@
 #include <vector>
 
 // Pines del encoder            //BOTONERA FRANC        BOTONERA MARC
-#define ENC_A 26                //26                                            (33 para nuevas botoneras sin placa)
-#define ENC_B 34                //34                                            (34 para nuevas botoneras sin placa)
-#define ENC_BUTTON 33           //33                                            (26 para nuevas botoneras sin placa)
+#define ENC_A 26                //26                    33                      (33 para nuevas botoneras sin placa)
+#define ENC_B 34                //34                    34                      (34 para nuevas botoneras sin placa)
+#define ENC_BUTTON 33           //33                    26                      (26 para nuevas botoneras sin placa)
 
 
 // Declaración de funciones relacionadas con el encoder
@@ -42,6 +42,8 @@ void handleFormatMenu();
 void handleDeleteElementMenu();
 
 void handleConfirmDelete();
+
+void handleConfirmRestoreMenu();
 
 // Variables externas requeridas
 extern std::vector<String> elementFiles;
@@ -86,6 +88,10 @@ extern bool confirmDeleteActive;
 extern int confirmSelection;
 extern bool confirmDeleteMenuActive;
 extern bool ignoreNextEncoderClick;
+
+extern bool confirmRestoreMenuActive;
+extern int confirmRestoreSelection;
+ 
 
 
 

@@ -1546,15 +1546,97 @@ void drawFormatSubmenu(int selected) {
     }
 }
 
+// void drawFormatMenu(int selection) {
+//     const int scrollBarWidth = 5;
+//     const int visibleOptions = 4;
+//     const int totalOptions = 5;
+
+//     const char* options[] = {
+//         getTranslation("UPDATE_SALA"),
+//         getTranslation("DELETE_ELEMENT"),
+//         getTranslation("RESTORE"),
+//         getTranslation("SHOW_ID"),
+//         getTranslation("VOLVER")
+//     };
+
+//     uiSprite.fillSprite(BACKGROUND_COLOR);
+
+//     // Título
+//     uiSprite.setFreeFont(&FreeSans12pt7b);
+//     uiSprite.setTextColor(TEXT_COLOR);
+//     uiSprite.setTextDatum(TC_DATUM);
+//     uiSprite.setTextSize(1);
+//     uiSprite.drawString(String(getTranslation("CONTROL_SALA_MENU")), 64, 5);
+
+//     const int x = 9;
+//     const int scrollBarX = 128 - scrollBarWidth - 3;
+//     const int textAreaW = scrollBarX - x - 2;
+
+//     int startIndex = max(0, min(selection - visibleOptions / 2, totalOptions - visibleOptions));
+//     int yOffset = 30;
+
+//     for (int i = 0; i < visibleOptions && (startIndex + i) < totalOptions; i++) {
+//         int idx = startIndex + i;
+//         int y = yOffset + i * (CARD_HEIGHT + CARD_MARGIN);
+//         bool isCursor = (idx == selection);
+
+//         if (isCursor) {
+//             uiSprite.fillRoundRect(x - 3, y - 1, textAreaW + 6, CARD_HEIGHT + 2, 3, CARD_COLOR);
+//         }
+
+//         uiSprite.setFreeFont(&FreeSans9pt7b);
+//         uiSprite.setTextSize(1);
+//         uiSprite.setTextDatum(TL_DATUM);
+//         uiSprite.setTextColor(isCursor ? TEXT_COLOR : TEXT_COLOR);
+//         // Medición y truncado manual
+//         String fullText = options[idx];
+//         String displayText = fullText;
+
+//         int textWidth = uiSprite.textWidth(fullText);
+//         if (textWidth > textAreaW) {
+//             // Truncar añadiendo "..."
+//             displayText = "";
+//             for (int c = 0; c < fullText.length(); c++) {
+//                 String temp = displayText + fullText[c];
+//                 if (uiSprite.textWidth(temp) > textAreaW) break;
+//                 displayText += fullText[c];
+//             }
+// }
+
+// uiSprite.drawString(displayText, x, y);
+
+//     }
+
+//     // Barra de scroll
+//     int scrollBarY = yOffset;
+//     int scrollBarHeight = visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN;
+//     uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_DARKGREY);
+
+//     if (totalOptions > visibleOptions) {
+//         float thumbRatio = (float)visibleOptions / totalOptions;
+//         int thumbHeight = max(20, (int)(scrollBarHeight * thumbRatio));
+//         int divisor = (totalOptions - visibleOptions);
+//         int thumbY = scrollBarY + (scrollBarHeight - thumbHeight) 
+//                    * ((divisor != 0) ? (float)(selection - startIndex) / divisor : 0.0f);
+
+//         uiSprite.fillRect(scrollBarX, thumbY, scrollBarWidth, thumbHeight, TFT_LIGHTGREY);
+//     } else {
+//         uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_LIGHTGREY);
+//     }
+
+//     uiSprite.pushSprite(0, 0);
+// }
+
 void drawFormatMenu(int selection) {
     const int scrollBarWidth = 5;
     const int visibleOptions = 4;
-    const int totalOptions = 4;
+    const int totalOptions = 5;
 
     const char* options[] = {
         getTranslation("UPDATE_SALA"),
         getTranslation("DELETE_ELEMENT"),
         getTranslation("RESTORE"),
+        getTranslation("SHOW_ID"),
         getTranslation("VOLVER")
     };
 
@@ -1570,9 +1652,10 @@ void drawFormatMenu(int selection) {
     const int x = 9;
     const int scrollBarX = 128 - scrollBarWidth - 3;
     const int textAreaW = scrollBarX - x - 2;
-
-    int startIndex = max(0, min(selection - visibleOptions / 2, totalOptions - visibleOptions));
     int yOffset = 30;
+
+    // Cálculo del índice de inicio para scroll vertical
+    int startIndex = max(0, min(selection - visibleOptions / 2, totalOptions - visibleOptions));
 
     for (int i = 0; i < visibleOptions && (startIndex + i) < totalOptions; i++) {
         int idx = startIndex + i;
@@ -1586,27 +1669,25 @@ void drawFormatMenu(int selection) {
         uiSprite.setFreeFont(&FreeSans9pt7b);
         uiSprite.setTextSize(1);
         uiSprite.setTextDatum(TL_DATUM);
-        uiSprite.setTextColor(isCursor ? TEXT_COLOR : TEXT_COLOR);
-        // Medición y truncado manual
+        uiSprite.setTextColor(TEXT_COLOR);
+
         String fullText = options[idx];
         String displayText = fullText;
 
         int textWidth = uiSprite.textWidth(fullText);
         if (textWidth > textAreaW) {
-            // Truncar añadiendo "..."
             displayText = "";
             for (int c = 0; c < fullText.length(); c++) {
                 String temp = displayText + fullText[c];
                 if (uiSprite.textWidth(temp) > textAreaW) break;
                 displayText += fullText[c];
             }
-}
+        }
 
-uiSprite.drawString(displayText, x, y);
-
+        uiSprite.drawString(displayText, x, y);
     }
 
-    // Barra de scroll
+    // Dibujar barra de scroll
     int scrollBarY = yOffset;
     int scrollBarHeight = visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN;
     uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_DARKGREY);
@@ -1614,10 +1695,8 @@ uiSprite.drawString(displayText, x, y);
     if (totalOptions > visibleOptions) {
         float thumbRatio = (float)visibleOptions / totalOptions;
         int thumbHeight = max(20, (int)(scrollBarHeight * thumbRatio));
-        int divisor = (totalOptions - visibleOptions);
-        int thumbY = scrollBarY + (scrollBarHeight - thumbHeight) 
-                   * ((divisor != 0) ? (float)(selection - startIndex) / divisor : 0.0f);
-
+        int divisor = totalOptions - visibleOptions;
+        int thumbY = scrollBarY + (scrollBarHeight - thumbHeight) * ((divisor != 0) ? (float)(selection - startIndex) / divisor : 0.0f);
         uiSprite.fillRect(scrollBarX, thumbY, scrollBarWidth, thumbHeight, TFT_LIGHTGREY);
     } else {
         uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_LIGHTGREY);
@@ -1952,4 +2031,27 @@ void drawCognitiveMenu() {
     uiSprite.drawRoundRect(34, 70, 60, 20, 4, TFT_LIGHTGREY); // marco
     uiSprite.pushSprite(0, 0);
 }
+
+void drawConfirmRestoreMenu(int selection) {
+    uiSprite.fillSprite(BACKGROUND_COLOR);
+    uiSprite.setFreeFont(&FreeSans9pt7b);
+    uiSprite.setTextDatum(TC_DATUM);
+    uiSprite.setTextSize(1);
+    uiSprite.setTextColor(TEXT_COLOR);
+
+    uiSprite.drawString("Restaurar sala?", 64, 10);
+
+    const char* options[] = {"Si", "No"};
+    for (int i = 0; i < 2; i++) {
+        int y = 40 + i * 40;
+        if (i == selection) {
+            uiSprite.fillRoundRect(20, y - 5, 88, 30, 5, CARD_COLOR);
+        }
+        uiSprite.setTextDatum(TC_DATUM);
+        uiSprite.drawString(options[i], 64, y);
+    }
+
+    uiSprite.pushSprite(0, 0);
+}
+
 
