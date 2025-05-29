@@ -784,10 +784,10 @@ uint16_t get_info_num(int count, ...) {
 
                                                         #ifdef DEBUG
                                                                 Serial.print("Se devuelve un 16bit config -> " );
-                                                                Serial.println(config, BIN);
+                                                                DEBUG__________ln(config, BIN);
                                                                 Serial.print(" para el modo ");
                                                                 Serial.print(modein);
-                                                                Serial.println(" para el elemento Wallwasher");     
+                                                                DEBUG__________ln(" para el elemento Wallwasher");     
                                                         #endif
                 return config;
                 }

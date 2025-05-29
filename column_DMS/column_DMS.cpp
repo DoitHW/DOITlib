@@ -39,13 +39,13 @@ void COLUMN_::relay_handler(bool actionin){
 void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
     if (!element) {
                                                             #ifdef DEBUG
-                                                                Serial.println("Error: 'element' no está inicializado.");
+                                                                DEBUG__________ln("Error: 'element' no está inicializado.");
                                                             #endif
         return;
     }
     UBaseType_t stackSize = uxTaskGetStackHighWaterMark(NULL);
                                                             #ifdef DEBUG
-                                                               Serial.println("Stack restante: " + String(stackSize));
+                                                               DEBUG__________ln("Stack restante: " + String(stackSize));
                                                             #endif
     byte currentMode_ = element->get_currentMode();
 
@@ -90,7 +90,7 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             } 
             else if(command == TEST_CMD){
                 #ifdef DEBUG
-                    Serial.println("Recibido NOP_");
+                    DEBUG__________ln("Recibido NOP_");
                 #endif
                 for(int i= 0; i < 10; i++){
                     colorHandler.setAll(0, 0, 0);
@@ -101,7 +101,7 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             }
             else if(command == SEND_REG_RF_CMD){
                 #ifdef DEBUG
-                    Serial.println("Recibido REG");
+                    DEBUG__________ln("Recibido REG");
                 #endif
                 delay(400);
                 colorHandler.setAll(30, 30, 5);
@@ -111,7 +111,7 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             }
             else if(command == SEND_STATS_RF_CMD){
                 #ifdef DEBUG
-                    Serial.println("Recibido STATS");
+                    DEBUG__________ln("Recibido STATS");
                 #endif
                 delay(400);
                 colorHandler.setAll(5, 10, 30);
@@ -121,7 +121,7 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             }
             else if(command == ERR_DBG_ON){
                 #ifdef DEBUG
-                    Serial.println("Recibido ERR ON");
+                    DEBUG__________ln("Recibido ERR ON");
                 #endif
                 delay(100);
                 element->set_err_dbg(true);
@@ -129,14 +129,14 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             }
             else if(command == ERR_DBG_OFF){
                 #ifdef DEBUG
-                    Serial.println("Recibido ERR OFF");
+                    DEBUG__________ln("Recibido ERR OFF");
                 #endif
                 delay(100);
                 element->set_err_dbg(false);
             }
             else if(command == SET_ELEM_DEAF){
                 #ifdef DEBUG
-                    Serial.println("Recibido DEAF SHORT");
+                    DEBUG__________ln("Recibido DEAF SHORT");
                 #endif
                 Serial1.end();
                 delay(MIN_DEAF_TIME);
@@ -147,7 +147,7 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             }
             else if(command == SET_ELEM_LONG_DEAF){
                 #ifdef DEBUG
-                    Serial.println("Recibido DEAF LONG");
+                    DEBUG__________ln("Recibido DEAF LONG");
                 #endif
                 Serial1.end();
                 delay(MAX_DEAF_TIME);
@@ -159,7 +159,7 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             else if(command == MAGIC_TEST_CMD){
                 _ERR_THROW_START_ "PUDDI PUDDI" _ERR_THROW_END_
                 #ifdef DEBUG
-                    Serial.println("Recibido PUDDI PUDDI");
+                    DEBUG__________ln("Recibido PUDDI PUDDI");
                 #endif
                 static bool magik= true;
                 #ifdef PLAYER
@@ -179,7 +179,7 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             else if(command == MAGIC_TEST_2_CMD){
                 _ERR_THROW_START_ "MISION IMPOSIBOL" _ERR_THROW_END_
                 #ifdef DEBUG
-                    Serial.println("Recibido MISION IMPOSIBLE");
+                    DEBUG__________ln("Recibido MISION IMPOSIBLE");
                 #endif
                 static bool magik= true;
                 #ifdef PLAYER
@@ -204,21 +204,21 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             byte sector= LEF.data[1];
             //element->event_register_update(EV_SECTOR_REQ, sector);
                                                                             #ifdef DEBUG
-                                                                            Serial.println("lenguaje pedido: " + String(lang));   
-                                                                            Serial.println("sector pedido: " + String(sector));   
+                                                                            DEBUG__________ln("lenguaje pedido: " + String(lang));   
+                                                                            DEBUG__________ln("sector pedido: " + String(sector));   
                                                                             #endif
             byte sector_data[192];
             get_sector_data(sector_data, lang, sector);
                                                                             #ifdef DEBUG
-                                                                            Serial.println("Sector data: " + String(sector_data[0], HEX));
+                                                                            DEBUG__________ln("Sector data: " + String(sector_data[0], HEX));
                                                                             #endif
             FRAME_T frame= frameMaker_RETURN_ELEM_SECTOR(globalID, LEF.origin, sector_data, sector);
             send_frame(frame);
             
                                                             #ifdef DEBUG
-                                                             Serial.println("Info devuelta en un Return");
-                                                             Serial.println("Recibido F_REQ_ELEM_INFO, lang= " +String(lang));
-                                                             Serial.println("Recibido F_REQ_ELEM_INFO, sector= " +String(sector));
+                                                             DEBUG__________ln("Info devuelta en un Return");
+                                                             DEBUG__________ln("Recibido F_REQ_ELEM_INFO, lang= " +String(lang));
+                                                             DEBUG__________ln("Recibido F_REQ_ELEM_INFO, sector= " +String(sector));
                                                             #endif
             break;
         }
@@ -231,7 +231,7 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
         }
         default: 
                                                                 #ifdef DEBUG
-                                                                    Serial.println("Trama recibida pero no se ha iniciado sesion.");
+                                                                    DEBUG__________ln("Trama recibida pero no se ha iniciado sesion.");
                                                                 #endif
             break;
     }
@@ -245,7 +245,7 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
                 byte mode= LEF.data[0];
                 byte static prevMode= 1;
                                                                             #ifdef DEBUG
-                                                                            Serial.println("OJUU, LEF.data[0]= " +String(mode));
+                                                                            DEBUG__________ln("OJUU, LEF.data[0]= " +String(mode));
                                                                             #endif
                 if(mode != COLUMN_PATTERN_MODE) colorHandler.set_activePattern(NO_PATTERN);
                 element->set_mode(mode);
@@ -285,11 +285,11 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
                 event_register(EV_COLOR_CHANGE, color);
                 CRGB colorin= colorHandler.get_CRGB_from_colorList(color);
                                                                 #ifdef DEBUG
-                                                                    Serial.println("Color recibido: " + String(color));
+                                                                    DEBUG__________ln("Color recibido: " + String(color));
                                                                 #endif
                 if (currentMode_ == COLUMN_BASIC_MODE) {
                                                                 #ifdef DEBUG
-                                                                    Serial.println("Manejando en modo BASIC_MODE.");
+                                                                    DEBUG__________ln("Manejando en modo BASIC_MODE.");
                                                                 #endif
 
                     colorHandler.set_targetColor(colorin);
@@ -301,7 +301,7 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
                 }
                 else if(currentMode_ == COLUMN_SLOW_MODE){
                                                                 #ifdef DEBUG
-                                                                    Serial.println("Manejando en modo COLUMN_FAST_MODE. o mix");
+                                                                    DEBUG__________ln("Manejando en modo COLUMN_FAST_MODE. o mix");
                                                                 #endif
                     colorHandler.set_targetColor(colorin);
                     colorHandler.set_targetFade(SLOWEST_FADE);
@@ -313,7 +313,7 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
 
                 else if(currentMode_ == COLUMN_MOTION_LIGHT_MODE){
                                                                 #ifdef DEBUG
-                                                                    Serial.println("Manejando en modo COLUMN_MOTION_MODE.");
+                                                                    DEBUG__________ln("Manejando en modo COLUMN_MOTION_MODE.");
                                                                 #endif
                     colorHandler.set_targetColor(colorin);
                     colorHandler.set_targetFade(NORMAL_FADE);
@@ -329,7 +329,7 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
 
                 else if(currentMode_ == COLUMN_MIX_MODE){
                                         #ifdef DEBUG
-                                            Serial.println("Manejando en modo MIX MODE");
+                                            DEBUG__________ln("Manejando en modo MIX MODE");
                                         #endif
                     colorHandler.set_targetColor(colorin);
                     colorHandler.set_targetFade(NORMAL_FADE);
@@ -341,7 +341,7 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
 
                 else if(currentMode_ == COLUMN_PULSE_MODE){
                                     #ifdef DEBUG
-                                        Serial.println("Manejando en modo MIX MODE");
+                                        DEBUG__________ln("Manejando en modo MIX MODE");
                                     #endif
                     colorHandler.set_targetColor(colorin);
                     colorHandler.set_targetFade(FASTEST_FADE);
@@ -356,7 +356,7 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
                     if(colorHandler.get_is_paused()) colorHandler.set_is_paused(false);
                     else                             colorHandler.set_is_paused(true);
                                                                 #ifdef DEBUG
-                                                                    Serial.println("Manejando en modo COLUMN_PASSIVE_MODE.");
+                                                                    DEBUG__________ln("Manejando en modo COLUMN_PASSIVE_MODE.");
                                                                 #endif
                     break;
                 }
@@ -366,14 +366,14 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
                     if(colorHandler.get_is_paused()) colorHandler.set_is_paused(false);
                     else                             colorHandler.set_is_paused(true);
                                                                 #ifdef DEBUG
-                                                                    Serial.println("Manejando en modo COLUMN_PASSIVE_MODE.");
+                                                                    DEBUG__________ln("Manejando en modo COLUMN_PASSIVE_MODE.");
                                                                 #endif
                     break;
                 }
 
                 else if(currentMode_ == COLUMN_VOICE_LIGHT_MODE){
                                                             #ifdef DEBUG
-                                                                Serial.println("Manejando en modo MIX MODE");
+                                                                DEBUG__________ln("Manejando en modo MIX MODE");
                                                             #endif
                     colorHandler.set_targetColor(colorin);
                     colorHandler.set_targetFade(NORMAL_FADE);
@@ -385,7 +385,7 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
 
                 else if(currentMode_ == COLUMN_VOICE_REVERSE_LIGHT_MODE){
                                                             #ifdef DEBUG
-                                                                Serial.println("Manejando en modo MIX MODE");
+                                                                DEBUG__________ln("Manejando en modo MIX MODE");
                                                             #endif
                     colorHandler.set_targetColor(colorin);
                     colorHandler.set_targetFade(NORMAL_FADE);
@@ -411,7 +411,7 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
         
             case F_SEND_SENSOR_VALUE_1:{
                                                                 #ifdef DEBUG
-                                                                Serial.println("Se ha recibido un sensor value");
+                                                                DEBUG__________ln("Se ha recibido un sensor value");
                                                                 #endif
                 if(currentMode_ == COLUMN_MOTION_LIGHT_MODE){
                     byte value= get_brightness_from_sensorValue(LEF);
@@ -461,8 +461,8 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             case F_SEND_FLAG_BYTE:{
                 bool bubbles= LEF.data[0] & 0x01;
                                                                     #ifdef DEBUG
-                                                                        Serial.println(" he recibido un flag byte: " );
-                                                                        Serial.println(bubbles);
+                                                                        DEBUG__________ln(" he recibido un flag byte: " );
+                                                                        DEBUG__________ln(bubbles);
                                                                     #endif
                 if( currentMode_ == COLUMN_BASIC_MODE ||
                     currentMode_ == COLUMN_SLOW_MODE ||
@@ -506,7 +506,7 @@ void COLUMN_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
 
     stackSize = uxTaskGetStackHighWaterMark(NULL);  // ojo que esto no se que hace, pero si lo quitas se mueren 3 gatitos y 1 peruano.
                                                                 #ifdef DEBUG
-                                                                   Serial.println("Stack restante al final: " + String(stackSize));
+                                                                   DEBUG__________ln("Stack restante al final: " + String(stackSize));
                                                                 #endif
 }
 

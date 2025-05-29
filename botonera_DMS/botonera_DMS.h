@@ -57,7 +57,7 @@ class BOTONERA_ : public ELEMENT_{
         bool elementoAsignadoA_ID_enSPIFFS(byte idToFind);
         void iniciarEscaneoElemento(const char* mensajeInicial);
         void actualizarBarraProgreso(int pasoActual,int pasosTotales,const char* etiqueta = nullptr);
-
+        
     
         
 

@@ -30,11 +30,11 @@ void ELEMENT_::begin() {
     delay(100);
     if(!SPIFFS.begin()){
         #ifdef DEBUG
-            Serial.println("Error al montar SPIFFS");
+            DEBUG__________ln("Error al montar SPIFFS");
         #endif
     } else {
         #ifdef DEBUG
-            //Serial.println("SPIFFS montado correctamente");
+            //DEBUG__________ln("SPIFFS montado correctamente");
         #endif
     }
     delay(100);    
@@ -79,12 +79,12 @@ int ELEMENT_::find_max_duration_value(const std::map<int, unsigned long>& durati
 
 bool ELEMENT_::save_statistics(const Statistics& stats) {
     #ifdef DEBUG
-        Serial.println("Guardando estadísticas en SPIFFS...");
+        DEBUG__________ln("Guardando estadísticas en SPIFFS...");
     #endif
     File file = SPIFFS.open(ELEMENT_STATISTICS_FILE_PATH, FILE_WRITE);
     if (!file) {
         #ifdef DEBUG
-            Serial.println("- Error al abrir el archivo de estadísticas para guardar");
+            DEBUG__________ln("- Error al abrir el archivo de estadísticas para guardar");
         #endif
         return false;
     }
@@ -97,7 +97,7 @@ bool ELEMENT_::save_statistics(const Statistics& stats) {
 
     file.close();
 #ifdef DEBUG
-    Serial.println("- Estadísticas guardadas en SPIFFS");
+    DEBUG__________ln("- Estadísticas guardadas en SPIFFS");
 #endif
     return true;
 }
@@ -131,7 +131,7 @@ ELEMENT_::Statistics ELEMENT_::load_statistics() {
     File file = SPIFFS.open(ELEMENT_STATISTICS_FILE_PATH, FILE_READ);
     if (!file || !file.available()) {
 #ifdef DEBUG
-        Serial.println("- Archivo de estadísticas no encontrado o vacío, usando valores por defecto.");
+        DEBUG__________ln("- Archivo de estadísticas no encontrado o vacío, usando valores por defecto.");
 #endif
         return stats;
     }
@@ -163,7 +163,7 @@ ELEMENT_::Statistics ELEMENT_::load_statistics() {
     stats.accumulatedModeDurations = std::map<int, unsigned long>();
 
 #ifdef DEBUG
-    Serial.println("- Estadísticas cargadas desde SPIFFS");
+    DEBUG__________ln("- Estadísticas cargadas desde SPIFFS");
 #endif
     return stats;
 }
@@ -191,7 +191,7 @@ String ELEMENT_::get_statistic(String statisticName) {
 
 bool ELEMENT_::save_register() {
     #ifdef DEBUG
-        Serial.println("Guardando registro de eventos en SPIFFS (circular overwrite)...");
+        DEBUG__________ln("Guardando registro de eventos en SPIFFS (circular overwrite)...");
     #endif
 
     String newSessionData = "";
@@ -203,7 +203,7 @@ bool ELEMENT_::save_register() {
         newSessionData += "-----SESSION_END-----\n";
     } else {
         #ifdef DEBUG
-            Serial.println("- No hay eventos para guardar.");
+            DEBUG__________ln("- No hay eventos para guardar.");
         #endif
         return true; // No error, just nothing to save
     }
@@ -230,8 +230,8 @@ bool ELEMENT_::save_register() {
             String contentToKeep = existingContent.substring(existingContent.length() - availableSpace);
             fileContentToWrite += contentToKeep; // Append the most recent part of the old content, using fileContentToWrite
              #ifdef DEBUG
-                Serial.print("- Límite de tamaño alcanzado. Sobreescribiendo datos antiguos. Bytes mantenidos: ");
-                Serial.println(contentToKeep.length());
+                DEBUG__________("- Límite de tamaño alcanzado. Sobreescribiendo datos antiguos. Bytes mantenidos: ");
+                DEBUG__________ln(contentToKeep.length());
             #endif
         } else {
              fileContentToWrite += existingContent; // Append all existing content if it fits
@@ -245,7 +245,7 @@ bool ELEMENT_::save_register() {
 
 
     #ifdef DEBUG
-        Serial.println("- Registro de eventos guardado en SPIFFS (circular overwrite)");
+        DEBUG__________ln("- Registro de eventos guardado en SPIFFS (circular overwrite)");
     #endif
     eventLog.clear();
     return true;
@@ -347,19 +347,19 @@ void ELEMENT_::print_event_register_file_RF() {
 
 void ELEMENT_::print_event_register_file() {
     #ifdef DEBUG
-        Serial.println("--- Contenido del archivo de registro de eventos en SPIFFS ---");
+        DEBUG__________ln("--- Contenido del archivo de registro de eventos en SPIFFS ---");
     #endif
     File file = SPIFFS.open(ELEMENT_EVENT_REGISTER_FILE_PATH, FILE_READ);
     if(!file){
         #ifdef DEBUG
-            Serial.println("- Error al abrir el archivo de registro de eventos para lectura.");
+            DEBUG__________ln("- Error al abrir el archivo de registro de eventos para lectura.");
         #endif
         return;
     }
 
     if(!file.available()){
         #ifdef DEBUG
-            Serial.println("- El archivo de registro de eventos está vacío.");
+            DEBUG__________ln("- El archivo de registro de eventos está vacío.");
         #endif
     } else {
         while(file.available()){
@@ -367,7 +367,7 @@ void ELEMENT_::print_event_register_file() {
             line.trim();
             if (line.startsWith("-----SESSION_START-----") || line.startsWith("-----SESSION_END-----")) {
                 #ifdef DEBUG
-                    Serial.println(line); // Imprimir delimitadores de sesión sin formato
+                    DEBUG__________ln(line); // Imprimir delimitadores de sesión sin formato
                 #endif
             } else {
                 // Procesar líneas de eventos
@@ -388,17 +388,17 @@ void ELEMENT_::print_event_register_file() {
 
                     #ifdef DEBUG
 
-                        Serial.print(padStringRight(get_event_type_name(eventType), 25));
-                        Serial.print(padStringRight(String(value), 10));
-                        Serial.print(padStringRight(format_millis_time(timestamp), 12)); // Imprimir timestamp formateado
+                        DEBUG__________(padStringRight(get_event_type_name(eventType), 25));
+                        DEBUG__________(padStringRight(String(value), 10));
+                        DEBUG__________(padStringRight(format_millis_time(timestamp), 12)); // Imprimir timestamp formateado
                         if (duration != -1) {
-                            Serial.println(format_millis_time(duration)); // Imprimir duración formateada
+                            DEBUG__________ln(format_millis_time(duration)); // Imprimir duración formateada
                         }
-                        Serial.println("");
+                        DEBUG__________ln("");
                     #endif
                 } else {
                     #ifdef DEBUG
-                        Serial.println("Línea de evento con formato incorrecto: " + line); // Debug para líneas inesperadas
+                        DEBUG__________ln("Línea de evento con formato incorrecto: " + line); // Debug para líneas inesperadas
                     #endif
                 }
             }
@@ -406,36 +406,36 @@ void ELEMENT_::print_event_register_file() {
     }
     file.close();
     #ifdef DEBUG
-        Serial.println("--- Fin del contenido del archivo de registro de eventos ---");
+        DEBUG__________ln("--- Fin del contenido del archivo de registro de eventos ---");
     #endif
 }
 
 void ELEMENT_::print_statistics_file() {
     #ifdef DEBUG
-        Serial.println("--- Contenido del archivo de estadísticas en SPIFFS ---");
+        DEBUG__________ln("--- Contenido del archivo de estadísticas en SPIFFS ---");
     #endif
     File file = SPIFFS.open(ELEMENT_STATISTICS_FILE_PATH, FILE_READ);
     if(!file){
         #ifdef DEBUG
-            Serial.println("- Error al abrir el archivo de estadísticas para lectura.");
+            DEBUG__________ln("- Error al abrir el archivo de estadísticas para lectura.");
         #endif
         return;
     }
     if(!file.available()){
         #ifdef DEBUG
-            Serial.println("- El archivo de estadísticas está vacío.");
+            DEBUG__________ln("- El archivo de estadísticas está vacío.");
         #endif
     } else {
         while(file.available()){
             String line = file.readStringUntil('\n');
             #ifdef DEBUG
-                Serial.println(line);
+                DEBUG__________ln(line);
             #endif
         }
     }
     file.close();
     #ifdef DEBUG
-        Serial.println("--- Fin del contenido del archivo de estadísticas ---");
+        DEBUG__________ln("--- Fin del contenido del archivo de estadísticas ---");
     #endif
 }
 
@@ -448,11 +448,11 @@ void ELEMENT_::event_register(EVENT_TYPE event, int value){
                 sessionStartTime = currentTimestamp;
                 log_event(event, value, currentTimestamp, 0); // Duration 0 para EV_START
                 #ifdef DEBUG
-                    Serial.println("Sesión iniciada");
+                    DEBUG__________ln("Sesión iniciada");
                 #endif
             } else {
                 #ifdef DEBUG
-                    Serial.println("Advertencia: EV_START recibido cuando la sesión ya estaba activa.");
+                    DEBUG__________ln("Advertencia: EV_START recibido cuando la sesión ya estaba activa.");
                 #endif
             }
         } else if (event == EV_END) {
@@ -461,9 +461,9 @@ void ELEMENT_::event_register(EVENT_TYPE event, int value){
                 unsigned long sessionDuration = currentTimestamp - sessionStartTime;
                 log_event(event, value, currentTimestamp, sessionDuration);
                 #ifdef DEBUG
-                    Serial.print("Sesión finalizada. Duración: ");
-                    Serial.print(sessionDuration / 1000.0); // en segundos
-                    Serial.println(" segundos");
+                    DEBUG__________("Sesión finalizada. Duración: ");
+                    DEBUG__________(sessionDuration / 1000.0); // en segundos
+                    DEBUG__________ln(" segundos");
                 #endif
                 event_register(EV_MODE_CHANGE, DEFAULT_BASIC_MODE);
                 event_register(EV_PATTERN_CHANGE, 1);  // ADDED: default pattern to pattern 1 on session end
@@ -471,7 +471,7 @@ void ELEMENT_::event_register(EVENT_TYPE event, int value){
                 calculate_and_save_statistics();
             } else {
                 #ifdef DEBUG
-                    Serial.println("Advertencia: EV_END recibido sin sesión activa.");
+                    DEBUG__________ln("Advertencia: EV_END recibido sin sesión activa.");
                 #endif
             }
         } else if (event == EV_MODE_CHANGE || event == EV_COLOR_CHANGE || event == EV_PATTERN_CHANGE) {
@@ -479,10 +479,10 @@ void ELEMENT_::event_register(EVENT_TYPE event, int value){
         } else if (event == EV_FLAG_CHANGE || event == EV_ID_CHANGE) {
             log_event(event, value, currentTimestamp, -1); // Duration -1 para eventos sin tiempo
             #ifdef DEBUG
-                Serial.print("Evento registrado: ");
-                Serial.print(get_event_type_name(event));
-                Serial.print(", Valor: ");
-                Serial.println(value);
+                DEBUG__________("Evento registrado: ");
+                DEBUG__________(get_event_type_name(event));
+                DEBUG__________(", Valor: ");
+                DEBUG__________ln(value);
             #endif
         }
 }
@@ -539,20 +539,20 @@ void ELEMENT_::handle_timed_event(EVENT_TYPE event, int value, unsigned long cur
             lastTimedEventValue = value;
             lastTimedEventType = event;
             #ifdef DEBUG
-                Serial.print("Cambio de ");
-                Serial.print(get_event_type_name(event));
-                Serial.print(", Valor: ");
-                Serial.println(value);
+                DEBUG__________("Cambio de ");
+                DEBUG__________(get_event_type_name(event));
+                DEBUG__________(", Valor: ");
+                DEBUG__________ln(value);
             #endif
 
         } else {
              // Mismo valor, no hacemos nada o podríamos registrar que se mantiene el mismo valor (opcional)
              // Para este ejemplo, no registramos eventos con el mismo valor consecutivo.
              #ifdef DEBUG
-                 Serial.print("Mismo valor para ");
-                 Serial.print(get_event_type_name(event));
-                 Serial.print(", Valor: ");
-                 Serial.println(value);
+                 DEBUG__________("Mismo valor para ");
+                 DEBUG__________(get_event_type_name(event));
+                 DEBUG__________(", Valor: ");
+                 DEBUG__________ln(value);
              #endif
         }
     } else {
@@ -566,10 +566,10 @@ void ELEMENT_::handle_timed_event(EVENT_TYPE event, int value, unsigned long cur
         lastTimedEventValue = value;
         lastTimedEventType = event;
         #ifdef DEBUG
-            Serial.print("Inicio de ");
-            Serial.print(get_event_type_name(event));
-            Serial.print(", Valor: ");
-            Serial.println(value);
+            DEBUG__________("Inicio de ");
+            DEBUG__________(get_event_type_name(event));
+            DEBUG__________(", Valor: ");
+            DEBUG__________ln(value);
         #endif
     }
 }
@@ -580,13 +580,13 @@ void ELEMENT_::update_last_timed_event_duration(unsigned long duration) {
             if (eventLog[i].eventType == lastTimedEventType && eventLog[i].duration == 0) { // Encuentra el último evento sin duración
                 eventLog[i].duration = duration;
                 #ifdef DEBUG
-                    Serial.print("Duración de ");
-                    Serial.print(get_event_type_name(lastTimedEventType));
-                    Serial.print(" (valor ");
-                    Serial.print(lastTimedEventValue);
-                    Serial.print("): ");
-                    Serial.print(duration / 1000.0); // en segundos
-                    Serial.println(" segundos");
+                    DEBUG__________("Duración de ");
+                    DEBUG__________(get_event_type_name(lastTimedEventType));
+                    DEBUG__________(" (valor ");
+                    DEBUG__________(lastTimedEventValue);
+                    DEBUG__________("): ");
+                    DEBUG__________(duration / 1000.0); // en segundos
+                    DEBUG__________ln(" segundos");
                 #endif
                 break; // Asumimos que solo hay un evento sin duración pendiente para el tipo
             }
@@ -606,22 +606,22 @@ void ELEMENT_::log_event(EVENT_TYPE event, int value, unsigned long timestamp, u
 
 void ELEMENT_::print_event_log() {
     #ifdef DEBUG
-    Serial.println("--- Registro de Eventos ---");
+    DEBUG__________ln("--- Registro de Eventos ---");
     for (const auto& entry : eventLog) {
-        Serial.print("Evento: ");
-        Serial.print(get_event_type_name(entry.eventType));
-        Serial.print(", Valor: ");
-        Serial.print(entry.value);
-        Serial.print(", Timestamp: ");
-        Serial.print(entry.timestamp);
+        DEBUG__________("Evento: ");
+        DEBUG__________(get_event_type_name(entry.eventType));
+        DEBUG__________(", Valor: ");
+        DEBUG__________(entry.value);
+        DEBUG__________(", Timestamp: ");
+        DEBUG__________(entry.timestamp);
         if (entry.duration != -1) {
-            Serial.print(", Duración: ");
-            Serial.print(entry.duration / 1000.0); // en segundos
-            Serial.print(" segundos");
+            DEBUG__________(", Duración: ");
+            DEBUG__________(entry.duration / 1000.0); // en segundos
+            DEBUG__________(" segundos");
         }
-        Serial.println("");
+        DEBUG__________ln("");
     }
-    Serial.println("--- Fin del Registro ---");
+    DEBUG__________ln("--- Fin del Registro ---");
     #endif
 }
 
@@ -654,7 +654,7 @@ String ELEMENT_::get_serial_from_file(){
     File file = SPIFFS.open(ELEMENT_SERIALNUM_FILE_PATH, "r");
     if (!file) {
                                                                                         #ifdef DEBUG
-                                                                                        Serial.println("Error al abrir el archivo");
+                                                                                        DEBUG__________ln("Error al abrir el archivo");
                                                                                         #endif
         return serial;
     }
@@ -671,7 +671,7 @@ byte ELEMENT_::get_ID_from_file(){
     File file = SPIFFS.open(ELEMENT_ID_FILE_PATH, "r");
     if (!file) {
                                                                                     #ifdef DEBUG
-                                                                                        Serial.println("Error al abrir el archivo");
+                                                                                        DEBUG__________ln("Error al abrir el archivo");
                                                                                     #endif
         return -1;
     }
@@ -685,13 +685,13 @@ void ELEMENT_::set_ID_to_file(byte IDin){
     File file = SPIFFS.open(ELEMENT_ID_FILE_PATH, "w");
     if (!file) {
                                                                                 #ifdef DEBUG
-                                                                                    Serial.println("Error al abrir el archivo");
+                                                                                    DEBUG__________ln("Error al abrir el archivo");
                                                                                 #endif
         return;
     }
     file.println(IDin);
                                                                                 #ifdef DEBUG
-                                                                                Serial.println("ID guardado en FILE ID: " + String(IDin));
+                                                                                DEBUG__________ln("ID guardado en FILE ID: " + String(IDin));
                                                                                 #endif
     file.close();
 }
@@ -722,7 +722,7 @@ void ELEMENT_::set_manager(byte managerin){
 
     exclusiveIDmanager= managerin;
                                                                 #ifdef DEBUG
-                                                                  Serial.println("configurado manager exclusivo: " +String(exclusiveIDmanager));
+                                                                  DEBUG__________ln("configurado manager exclusivo: " +String(exclusiveIDmanager));
                                                                 #endif
 }
 
@@ -734,8 +734,8 @@ byte ELEMENT_::get_manager(){
 void ELEMENT_::set_mode(uint8_t mode) {
     currentMode = mode;
                                                                             #ifdef DEBUG
-                                                                        Serial.println("current: " +String(currentMode));
-                                                                        Serial.println("mode " +String(mode));
+                                                                        DEBUG__________ln("current: " +String(currentMode));
+                                                                        DEBUG__________ln("mode " +String(mode));
                                                                         #endif
 }
 
@@ -777,7 +777,7 @@ void ELEMENT_::configurar_RF(int baudRate) {
     bool resetConfirmado = false;
     if (Serial1.available()) {
         #ifdef DEBUG
-        Serial.println("Respuesta a 115200 detectada");
+        DEBUG__________ln("Respuesta a 115200 detectada");
         #endif
         resetConfirmado = true;
     } else {
@@ -788,7 +788,7 @@ void ELEMENT_::configurar_RF(int baudRate) {
         delay(200);
         if (Serial1.available()) {
             #ifdef DEBUG
-                //Serial.println("Respuesta a 9600 detectada");
+                //DEBUG__________ln("Respuesta a 9600 detectada");
             #endif
             resetConfirmado = true;
         }
@@ -796,7 +796,7 @@ void ELEMENT_::configurar_RF(int baudRate) {
 
     if (!resetConfirmado) {
                                                                                                 #ifdef DEBUG
-                                                                                                Serial.println("Error: No se detectó respuesta del módulo RF");
+                                                                                                DEBUG__________ln("Error: No se detectó respuesta del módulo RF");
                                                                                                 #endif
         digitalWrite(RF_CONFIG_PIN, HIGH);
         return;
@@ -808,7 +808,7 @@ void ELEMENT_::configurar_RF(int baudRate) {
 
     if (baudRate == 115200) {
                                                                                                 #ifdef DEBUG
-                                                                                                //Serial.println("Config UART y Wireless a 115200");
+                                                                                                //DEBUG__________ln("Config UART y Wireless a 115200");
                                                                                                 #endif
         comandoUART[0] = 0xAA; comandoUART[1] = 0xFA; comandoUART[2] = 0x1E;
         comandoUART[3] = 0x00; comandoUART[4] = 0x01; comandoUART[5] = 0xC2; comandoUART[6] = 0x00;
@@ -817,7 +817,7 @@ void ELEMENT_::configurar_RF(int baudRate) {
         comandoWirelessDataRate[3] = 0x00; comandoWirelessDataRate[4] = 0x01; comandoWirelessDataRate[5] = 0xC2; comandoWirelessDataRate[6] = 0x00;
     } else {
                                                                                                 #ifdef DEBUG
-                                                                                                //Serial.println("Config UART y Wireless a 9600");
+                                                                                                //DEBUG__________ln("Config UART y Wireless a 9600");
                                                                                                 #endif
         comandoUART[0] = 0xAA; comandoUART[1] = 0xFA; comandoUART[2] = 0x1E;
         comandoUART[3] = 0x00; comandoUART[4] = 0x00; comandoUART[5] = 0x25; comandoUART[6] = 0x80;
@@ -837,7 +837,7 @@ void ELEMENT_::configurar_RF(int baudRate) {
     Serial1.write(comandoLeerConfiguracion, sizeof(comandoLeerConfiguracion));
     delay(200);
                                                                                                         #ifdef DEBUG
-                                                                                                        //Serial.println(" =[Desglosando configuración recibida]=");
+                                                                                                        //DEBUG__________ln(" =[Desglosando configuración recibida]=");
                                                                                                         #endif
 
     // Filtrar valores no relevantes
@@ -871,30 +871,30 @@ void ELEMENT_::configurar_RF(int baudRate) {
         uint32_t baudrate = (velocidad[0] << 24) | (velocidad[1] << 16) | (velocidad[2] << 8) | velocidad[3];
         uint16_t bw = (anchoBanda[0] << 8) | anchoBanda[1];
         #ifdef DEBUG
-        // Serial.print("📡 Frecuencia: ");
-        // Serial.print(freq);
-        // Serial.println(" Hz");
+        // DEBUG__________("📡 Frecuencia: ");
+        // DEBUG__________(freq);
+        // DEBUG__________ln(" Hz");
 
-        // Serial.print("⚡ Velocidad inalámbrica: ");
-        // Serial.print(baudrate);
-        // Serial.println(" bps");
+        // DEBUG__________("⚡ Velocidad inalámbrica: ");
+        // DEBUG__________(baudrate);
+        // DEBUG__________ln(" bps");
 
-        // Serial.print("📶 Ancho de banda: ");
-        // Serial.print(bw);
-        // Serial.println(" kHz");
+        // DEBUG__________("📶 Ancho de banda: ");
+        // DEBUG__________(bw);
+        // DEBUG__________ln(" kHz");
 
-        // Serial.print("🎛️  Desviación de frecuencia: ");
-        // Serial.print(desviacionFrecuencia);
-        // Serial.println(" kHz");
+        // DEBUG__________("🎛️  Desviación de frecuencia: ");
+        // DEBUG__________(desviacionFrecuencia);
+        // DEBUG__________ln(" kHz");
 
-        // Serial.print("🔋 Potencia de transmisión: ");
-        // Serial.print(potencia);
-        // Serial.println(" dBm");
-        // Serial.println();
+        // DEBUG__________("🔋 Potencia de transmisión: ");
+        // DEBUG__________(potencia);
+        // DEBUG__________ln(" dBm");
+        // DEBUG__________ln();
         #endif
     } else {
         #ifdef DEBUG
-           // Serial.println("Error: Datos insuficientes para interpretar la configuración.");
+           // DEBUG__________ln("Error: Datos insuficientes para interpretar la configuración.");
         #endif
     }
 
@@ -906,17 +906,17 @@ void ELEMENT_::configurar_RF(int baudRate) {
     Serial1.end();
     if (baudRate == 115200) {
         #ifdef DEBUG
-            //Serial.println("Config velocidad UART en ESP32 a 115200");
+            //DEBUG__________ln("Config velocidad UART en ESP32 a 115200");
         #endif
         Serial1.begin(115200, SERIAL_8N1, RF_RX_PIN, RF_TX_PIN);
     } else {
         #ifdef DEBUG
-            //Serial.println("Config velocidad UART en ESP32 a 9600");
+            //DEBUG__________ln("Config velocidad UART en ESP32 a 9600");
         #endif
         Serial1.begin(9600, SERIAL_8N1, RF_RX_PIN, RF_TX_PIN);
     }
         #ifdef DEBUG
-        //Serial.println("Configuración completa y módulo reiniciado correctamente.");
+        //DEBUG__________ln("Configuración completa y módulo reiniciado correctamente.");
         #endif
     delay(10);
 }

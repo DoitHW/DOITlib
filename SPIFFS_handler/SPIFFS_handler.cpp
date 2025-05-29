@@ -10,7 +10,7 @@ bool writeBytesChecked(fs::File &f, const uint8_t* data, size_t length) {
     size_t written = f.write(data, length);
     if(written != length) {
         #ifdef DEBUG
-          Serial.printf("Error: se esperaban escribir %u bytes, se escribieron %u\n",(unsigned)length,(unsigned)written);                                                                        
+          DEBUG__________printf("Error: se esperaban escribir %u bytes, se escribieron %u\n",(unsigned)length,(unsigned)written);                                                                        
         #endif
         return false;
     }
@@ -20,19 +20,19 @@ bool writeBytesChecked(fs::File &f, const uint8_t* data, size_t length) {
 
 void formatSPIFFS() {
     #ifdef DEBUG
-      Serial.print("Formateando SPIFFS...");                                                                            
+      DEBUG__________("Formateando SPIFFS...");                                                                            
     #endif
     
     SPIFFS.end();
     if (!SPIFFS.format()) {
         #ifdef DEBUG
-          Serial.println("Error al formatear SPIFFS.");                                                                        
+          DEBUG__________ln("Error al formatear SPIFFS.");                                                                        
         #endif
         
     }
     if (!SPIFFS.begin(true)) {
         #ifdef DEBUG
-          Serial.println("Error al montar SPIFFS después del formateo.");                                                                        
+          DEBUG__________ln("Error al montar SPIFFS después del formateo.");                                                                        
         #endif
         
     }
@@ -113,7 +113,7 @@ void initializeDynamicOptions() {
     fichasOption.mode[2].config[1] = 0x08;
 
     memcpy(fichasOption.icono, fichas_64x64, sizeof(fichasOption.icono));
-    //Serial.println("Nombre de fichasOption.name después de crear el icono: " + String((char*)fichasOption.name));
+    //DEBUG__________ln("Nombre de fichasOption.name después de crear el icono: " + String((char*)fichasOption.name));
     fichasOption.situacion = 0;
 
     // ----- ApagarSala -----
@@ -143,7 +143,7 @@ void loadElementsFromSPIFFS() {
     fs::File root = SPIFFS.open("/");
     if (!root || !root.isDirectory()) {
                                                                                                                 #ifdef DEBUG
-                                                                                                                Serial.println("Error: No se pudo abrir el directorio raíz de SPIFFS.");                                                                           
+                                                                                                                DEBUG__________ln("Error: No se pudo abrir el directorio raíz de SPIFFS.");                                                                           
                                                                                                                 #endif
         
         return;
@@ -163,14 +163,14 @@ void loadElementsFromSPIFFS() {
         file = root.openNextFile();
     }
                                                                                     #ifdef DEBUG
-                                                                                    Serial.println("Elementos encontrados:");
+                                                                                    DEBUG__________ln("Elementos encontrados:");
                                                                                     #endif
     
      for (size_t i = 0; i < elementFiles.size(); i++) {
-         Serial.printf("%d: %s\n", (int)i, elementFiles[i].c_str());
+         DEBUG__________printf("%d: %s\n", (int)i, elementFiles[i].c_str());
      }
                                                                                     #ifdef DEBUG
-                                                                                    Serial.printf("Total de elementos: %d\n", (int)elementFiles.size());                                                                                
+                                                                                    DEBUG__________printf("Total de elementos: %d\n", (int)elementFiles.size());                                                                                
                                                                                     #endif
      // Agregar las opciones dinámicas
      elementFiles.push_back("Ambientes");
@@ -201,7 +201,7 @@ byte getCurrentElementID() {
         f.close();
     } else {
                                                                                     #ifdef DEBUG
-                                                                                    Serial.println("Error al leer la ID del archivo.");                                                                           
+                                                                                    DEBUG__________ln("Error al leer la ID del archivo.");                                                                           
                                                                                     #endif
         
     }
@@ -214,7 +214,7 @@ bool isCurrentElementSelected() {
 
 bool checkMostSignificantBit(byte modeConfig[2]) {
     // Devuelve true si el bit más significativo del primer byte es 1, de lo contrario false
-    //Serial.println("Devolviendo el bit más significativo del modo. ");
+    //DEBUG__________ln("Devolviendo el bit más significativo del modo. ");
     return (modeConfig[0] & 0x80) != 0;
 }
 
@@ -240,7 +240,7 @@ bool getModeConfig(const String& fileName, byte mode, byte modeConfig[2]) {
     fs::File f = SPIFFS.open(fileName, "r");
     if (!f) {
         #ifdef DEBUG
-        Serial.println("❌ Error abriendo el archivo: " + fileName);
+        DEBUG__________ln("❌ Error abriendo el archivo: " + fileName);
         #endif
         return false;
     }
@@ -248,7 +248,7 @@ bool getModeConfig(const String& fileName, byte mode, byte modeConfig[2]) {
     f.seek(OFFSET_MODES + (SIZE_MODE * mode) + 24 + 192, SeekSet); // OFFSET_CONFIG
     if (f.read(modeConfig, 2) != 2) {
         #ifdef DEBUG
-        Serial.println("❌ Error leyendo configuración del modo");
+        DEBUG__________ln("❌ Error leyendo configuración del modo");
         #endif
         f.close();
         return false;
@@ -280,7 +280,7 @@ void setAllElementsToBasicMode() {
         fs::File f = SPIFFS.open(fileName, "r+");
         if (!f) {
                                                                                     #ifdef DEBUG
-                                                                                    Serial.println("❌ Error abriendo " + fileName + " para escritura.");                                                                       
+                                                                                    DEBUG__________ln("❌ Error abriendo " + fileName + " para escritura.");                                                                       
                                                                                     #endif
             continue;
         }
@@ -290,7 +290,7 @@ void setAllElementsToBasicMode() {
         f.flush();
         f.close();
                                                                                     #ifdef DEBUG
-                                                                                    //Serial.println("✅ Modo básico actualizado en " + fileName);                                                                    
+                                                                                    //DEBUG__________ln("✅ Modo básico actualizado en " + fileName);                                                                    
                                                                                     #endif
         
     }   
@@ -309,7 +309,7 @@ void updateBankList(byte bank) {
             }
             f.close();
         } else {
-            Serial.println("Error al abrir el archivo de banks para lectura.");
+            DEBUG__________ln("Error al abrir el archivo de banks para lectura.");
         }
     }
 
@@ -334,18 +334,18 @@ void updateBankList(byte bank) {
             }
             f.close();
 
-            Serial.print("Bank list updated: ");
+            DEBUG__________("Bank list updated: ");
             for (byte b : bankList) {
-                Serial.print("0x");
-                Serial.print(b, HEX);
-                Serial.print(" ");
+                DEBUG__________("0x");
+                DEBUG__________(b, HEX);
+                DEBUG__________(" ");
             }
-            Serial.println();
+            DEBUG__________ln();
         } else {
-            Serial.println("Error al abrir el archivo de banks para escritura.");
+            DEBUG__________ln("Error al abrir el archivo de banks para escritura.");
         }
     } else {
-        Serial.println("El bank ya existe en la lista.");
+        DEBUG__________ln("El bank ya existe en la lista.");
     }
 }
 
@@ -361,7 +361,7 @@ std::vector<byte> readBankList() {
             }
             f.close();
         } else {
-            Serial.println("Error al abrir el archivo de banks para lectura.");
+            DEBUG__________ln("Error al abrir el archivo de banks para lectura.");
         }
     }
     
@@ -395,7 +395,7 @@ void updateBankAndFamilyList(byte bank, const char* familyName) {
         if (f) {
             f.printf("%d:%s\n", bank, familyName);
             f.close();
-            Serial.printf("Familia añadida: %d -> %s\n", bank, familyName);
+            DEBUG__________printf("Familia añadida: %d -> %s\n", bank, familyName);
         }
     }
 }
@@ -425,9 +425,9 @@ void saveBrightnessToSPIFFS(uint8_t value) {
     if (file) {
         file.printf("%d", value);  // Guardamos como texto
         file.close();
-        Serial.println("💾 Brillo guardado en SPIFFS: " + String(value));
+        DEBUG__________ln("💾 Brillo guardado en SPIFFS: " + String(value));
     } else {
-        Serial.println("❌ Error al guardar brillo en SPIFFS");
+        DEBUG__________ln("❌ Error al guardar brillo en SPIFFS");
     }
 }
 
@@ -440,10 +440,10 @@ uint8_t loadBrightnessFromSPIFFS() {
         file.close();
         int value = content.toInt();
         value = constrain(value, 0, 100);
-        Serial.println("🔆 Brillo cargado desde SPIFFS: " + String(value));
+        DEBUG__________ln("🔆 Brillo cargado desde SPIFFS: " + String(value));
         return value;
     } else {
-        Serial.println("❌ Error al leer brillo desde SPIFFS");
+        DEBUG__________ln("❌ Error al leer brillo desde SPIFFS");
         return 100;
     }
 }
@@ -453,7 +453,7 @@ void loadDeletableElements() {
 
     fs::File root = SPIFFS.open("/");
     if (!root || !root.isDirectory()) {
-        Serial.println("Error al abrir SPIFFS para eliminar elementos.");
+        DEBUG__________ln("Error al abrir SPIFFS para eliminar elementos.");
         return;
     }
 

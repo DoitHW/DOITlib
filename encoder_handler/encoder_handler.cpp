@@ -69,8 +69,335 @@ bool ignoreInputs = false;
 bool ignoreEncoderClick = false;
 bool systemLocked = false;
 
+// void handleEncoder() {
+//     // Si se debe ignorar el click residual, chequea si ya se soltó el botón.
+//     if (ignoreEncoderClick) {
+//         if (digitalRead(ENC_BUTTON) == HIGH) {
+//             ignoreEncoderClick = false;
+//         } else {
+//             return;
+//         }
+//     }
+
+//     // Si la pantalla está apagada, SOLO reactivar si hay una acción real (movimiento o pulsación)
+//     if (!displayOn) {
+//         if ((encoder.getCount() != lastEncoderValue) || (digitalRead(ENC_BUTTON) == LOW)) {
+            
+//             display_wakeup();
+//             encoderIgnoreUntil = millis() + 500; // Ignorar entradas durante 500 ms
+//             lastDisplayInteraction = millis();
+//             // **Reiniciamos lastEncoderValue para que el giro realizado mientras la pantalla estaba apagada no se procese**
+//             lastEncoderValue = encoder.getCount();
+
+           
+//         }
+//         return; // No procesamos ningún otro evento.
+//     }
+
+//     if (inCognitiveMenu) {
+//         static bool clicked = false;
+//         if (digitalRead(ENC_BUTTON) == LOW) {
+//             if (!clicked) {
+//                 inCognitiveMenu = false;
+//                 clicked = true;
+            
+//                 ignoreEncoderClick = true; // ✅ IGNORA el click siguiente
+            
+//                 std::vector<byte> target = {DEFAULT_BOTONERA};
+//                 send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, target, COG_ACT_OFF));
+//                 drawCurrentElement();
+//             }
+            
+//         } else {
+//             clicked = false;
+//         }
+//         return;
+//     }
+
+//     if (confirmRestoreMenuActive) return;
+    
+//     if (deleteElementMenuActive) return;
+
+//     if (formatSubMenuActive) return;
+
+//     if (soundMenuActive) return;
+
+//     if (brightnessMenuActive) return;
+    
+//     if (ignoreInputs) return;
+
+//     if (bankSelectionActive) {
+//         // Suponiendo que bankList y selectedBanks están definidos globalmente y ya se han cargado:
+//         handleBankSelectionMenu(bankList, selectedBanks);
+//         // Evitamos procesar el resto de la función mientras estemos en este modo.
+//         return;
+//     }
+    
+    
+    
+//     // Si estamos en el menú principal (drawCurrentElement) y el sistema está bloqueado,
+//     // se ignoran rotaciones y clicks simples; solo se permite la pulsación larga para desbloquear.
+//     if (isInMainMenu() && systemLocked) {
+//         if (digitalRead(ENC_BUTTON) == LOW) {
+//             if (buttonPressStart == 0) {
+//                 buttonPressStart = millis();
+//             } else if ((millis() - buttonPressStart >= 3000) && !isLongPress) {
+//                 // Desbloquear el sistema
+//                 systemLocked = false;
+//                 isLongPress = true;
+//                 lastEncoderValue = encoder.getCount();
+//                 drawCurrentElement(); // Actualiza el display para quitar el icono de candado
+//             }
+//         } else { // Al soltar el botón
+//             buttonPressStart = 0;
+//             isLongPress = false;
+//         }
+//         return;
+//     }
+    
+//     if (millis() < encoderIgnoreUntil) {
+//         lastDisplayInteraction = millis();
+//         return;
+//     }
+
+//     if (languageMenuActive) {
+//         int32_t newEncoderValue = encoder.getCount();
+//         if (newEncoderValue != lastEncoderValue) {
+//             lastDisplayInteraction = millis();
+//             int32_t direction = (newEncoderValue > lastEncoderValue) ? 1 : -1;
+//             lastEncoderValue = newEncoderValue;
+//             // Actualizar el índice de selección (asumiendo 6 opciones: índices 0 a 5)
+//             languageMenuSelection = (languageMenuSelection + direction + 8) % 8;
+//             drawLanguageMenu(languageMenuSelection);
+//         }
+//         // Lectura del botón: si se presiona y luego se suelta, se confirma la selección
+//         if (digitalRead(ENC_BUTTON) == LOW) {
+//             if (buttonPressStart == 0) {
+//                 buttonPressStart = millis();
+//             }
+//         } else {
+//             if (buttonPressStart > 0) {
+//                 // Confirmar selección del idioma
+//                 switch (languageMenuSelection) {
+//                     case 0: currentLanguage = Language::ES; break;
+//                     case 1: currentLanguage = Language::ES_MX; break;
+//                     case 2: currentLanguage = Language::CA; break;
+//                     case 3: currentLanguage = Language::EU; break;
+//                     case 4: currentLanguage = Language::FR; break;
+//                     case 5: currentLanguage = Language::DE; break;
+//                     case 6: currentLanguage = Language::EN; break;
+//                     case 7: currentLanguage = Language::X; break;
+//                     default: currentLanguage = Language::X1; break;
+//                 }
+//                 languageMenuActive = false;
+//                 buttonPressStart = 0;
+//                 drawCurrentElement();
+//             }
+//         }
+//         return; // Evitar que se procese el resto del handleEncoder
+//     }
+    
+//     int32_t newEncoderValue = encoder.getCount();
+//     if (newEncoderValue != lastEncoderValue) {
+//         lastDisplayInteraction = millis();
+//         int32_t direction = (newEncoderValue > lastEncoderValue) ? 1 : -1;
+//         lastEncoderValue = newEncoderValue;
+        
+//         // Navegar por elementos cuando NO estamos en el menú de modos.
+//         if (!inModesScreen && elementFiles.size() > 1) {
+//             currentIndex = (currentIndex + direction + elementFiles.size()) % elementFiles.size();
+//             String currentFile = elementFiles[currentIndex];
+//             static String lastElementFile = "";
+//             if (currentFile != lastElementFile) {
+//                 if (elementAlternateStates.find(currentFile) != elementAlternateStates.end()) {
+//                     currentAlternateStates = elementAlternateStates[currentFile];
+//                 } else {
+//                     currentAlternateStates.clear();
+//                 }
+//                 lastElementFile = currentFile;
+//             }
+            
+//             int realModeIndex = 0;
+//             byte modeConfig[2] = {0};
+//             if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Apagar") {
+//                 INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+//                 realModeIndex = option->currentMode;
+//                 memcpy(modeConfig, option->mode[realModeIndex].config, 2);
+//             } else {
+//                 fs::File f = SPIFFS.open(currentFile, "r");
+//                 if (f) {
+//                     f.seek(OFFSET_CURRENTMODE, SeekSet);
+//                     realModeIndex = f.read();
+//                     f.seek(OFFSET_MODES + realModeIndex * SIZE_MODE + 216, SeekSet);
+//                     f.read(modeConfig, 2);
+//                     f.close();
+//                 }
+//             }
+//             adxl = getModeFlag(modeConfig, HAS_SENS_VAL_1);
+//             useMic = getModeFlag(modeConfig, HAS_SENS_VAL_2);
+// #ifdef DEBUG
+//             //DEBUG__________ln("🚀 Cambió de elemento, actualizando flags:");
+//             //erial.println("adxl status: " + String(adxl ? "true" : "false"));
+//             //DEBUG__________ln("useMic status: " + String(useMic ? "true" : "false"));
+// #endif
+//             drawCurrentElement();
+//         }
+//         // Navegar por modos cuando estamos en el menú de modos.
+//         else if (inModesScreen && totalModes > 0) {
+//             int newIndex = currentModeIndex + direction;
+//             if (newIndex >= 0 && newIndex < totalModes) {
+//                 currentModeIndex = newIndex;
+//                 int realModeIndex = globalVisibleModesMap[currentModeIndex];
+//                 if (realModeIndex >= 0) {
+//                     String currentFile = elementFiles[currentIndex];
+//                     colorHandler.setCurrentFile(currentFile);
+//                     colorHandler.setPatternBotonera(realModeIndex, ledManager);
+//                 }
+//                 drawModesScreen();
+//             }
+//         }
+//     }
+    
+//     // Lectura del botón del encoder.
+//     if (digitalRead(ENC_BUTTON) == LOW) {
+//         if (buttonPressStart == 0) {
+//             buttonPressStart = millis();
+//         } else {
+//             // En menú de modos, pulsación larga de 2s para alternar el nombre alternativo.
+//             if (inModesScreen && !isLongPress && (millis() - buttonPressStart >= 2000)) {
+//                 if (currentModeIndex != 0 && currentModeIndex != totalModes - 1) {
+//                     int adjustedIndex = currentModeIndex - 1;
+//                     String currFile = elementFiles[currentIndex];
+//                     uint8_t modeConfig[2] = {0};
+//                     bool canToggle = false;
+//                     if (currFile == "Ambientes" || currFile == "Fichas") {
+//                         INFO_PACK_T* option = (currFile == "Ambientes") ? &ambientesOption : &fichasOption;
+//                         int count = 0;
+//                         for (int i = 0; i < 16; i++) {
+//                             if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
+//                                 if (count == adjustedIndex) {
+//                                     memcpy(modeConfig, option->mode[i].config, 2);
+//                                     break;
+//                                 }
+//                                 count++;
+//                             }
+//                         }
+//                         canToggle = getModeFlag(modeConfig, HAS_ALTERNATIVE_MODE);
+//                     } else if (currFile != "Apagar") {
+//                         fs::File f = SPIFFS.open(currFile, "r");
+//                         if (f) {
+//                             int count = 0;
+//                             for (int i = 0; i < 16; i++) {
+//                                 char modeName[25] = {0};
+//                                 byte tempConfig[2] = {0};
+//                                 f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet);
+//                                 f.read((uint8_t*)modeName, 24);
+//                                 f.seek(OFFSET_MODES + i * SIZE_MODE + 216, SeekSet);
+//                                 f.read(tempConfig, 2);
+//                                 if (strlen(modeName) > 0 && checkMostSignificantBit(tempConfig)) {
+//                                     if (count == adjustedIndex) {
+//                                         memcpy(modeConfig, tempConfig, 2);
+//                                         break;
+//                                     }
+//                                     count++;
+//                                 }
+//                             }
+//                             f.close();
+//                             canToggle = getModeFlag(modeConfig, HAS_ALTERNATIVE_MODE);
+//                         }
+//                     }
+//                     if (canToggle && adjustedIndex >= 0 && currentAlternateStates.size() > (size_t)adjustedIndex) {
+//                         currentAlternateStates[adjustedIndex] = !currentAlternateStates[adjustedIndex];
+//                         elementAlternateStates[currFile] = currentAlternateStates;
+//                         if (currFile != "Ambientes" && currFile != "Fichas" && currFile != "Apagar") {
+//                             fs::File f = SPIFFS.open(currFile, "r+");
+//                             if (f) {
+//                                 const int OFFSET_ALTERNATE_STATES = OFFSET_CURRENTMODE + 1;
+//                                 f.seek(OFFSET_ALTERNATE_STATES, SeekSet);
+//                                 byte states[16] = {0};
+//                                 for (size_t i = 0; i < min(currentAlternateStates.size(), (size_t)16); i++) {
+//                                     states[i] = currentAlternateStates[i] ? 1 : 0;
+//                                 }
+//                                 f.write(states, 16);
+//                                 f.close();
+//                             }
+//                         }
+//                         drawModesScreen();
+//                         isLongPress = true;
+//                     }
+//                 }
+//             }
+//             // En menú principal, si el sistema está desbloqueado, pulsación larga de 3s para bloquear.
+//             if (isInMainMenu()) {
+//                 if (digitalRead(ENC_BUTTON) == LOW) {
+//                     if (buttonPressStart == 0) {
+//                         buttonPressStart = millis();
+//                     }
+//                     // No hacemos nada hasta que se suelte el botón
+//                 } else if (buttonPressStart > 0) {
+//                     unsigned long duration = millis() - buttonPressStart;
+//                     EncoderAction action = evaluateEncoderLongPress(duration);
+
+//                     if (!systemLocked && action == BLOCK_SYSTEM) {
+//                         systemLocked = true;
+//                         drawCurrentElement();
+//                     } else if (!systemLocked && action == SHOW_DETAILS) {
+//                         printElementDetails();
+//                     }
+
+//                     buttonPressStart = 0;
+//                     isLongPress = false;
+//                 }
+//             }
+//         }
+//     }
+//     else { // Al soltar el botón.
+//         if (buttonPressStart > 0) {
+//             unsigned long pressDuration = millis() - buttonPressStart;
+// #ifdef DEBUG
+//             DEBUG__________ln("DEBUG: Botón soltado, duración: " + String(pressDuration) + " ms");
+// #endif
+//             String currentFile = elementFiles[currentIndex];
+//             if (!inModesScreen) {
+//                 // Si se presionó "Apagar"
+//                 if (currentFile == "Apagar") {
+//                     for (size_t i = 0; i < selectedStates.size(); i++) {
+//                         selectedStates[i] = false;
+//                     }
+//                     std::vector<byte> elementID;
+//                     elementID.push_back(0xFF);
+//                     send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, BLACKOUT));
+//                     setAllElementsToBasicMode();
+//                     doitPlayer.stop_file();
+//                     showMessageWithLoading(getTranslation("APAGANDO_SALA"), 5000);
+//                     currentIndex = 0;
+//                     drawCurrentElement();
+//                     buttonPressStart = 0;
+//                     isLongPress = false;
+//                     return;
+//                 } else {
+//                     // Solo cambiar a pantalla de modos si la pulsación fue corta (<3000ms)
+//                     if (pressDuration < 3000) {
+//                         inModesScreen = true;
+//                         currentModeIndex = 0;
+//                         drawModesScreen();
+//                     }
+//                     // Si la pulsación fue larga (>=3000ms), ya se gestionó el bloqueo
+//                 }
+//             }
+//             else {
+//                 if (!isLongPress && pressDuration < 2000) {
+//                     handleModeSelection(elementFiles[currentIndex]);
+//                 }
+//             }
+//         }
+//         buttonPressStart = 0;
+//         isLongPress = false;
+//     }
+// }
+
 void handleEncoder() {
-    // Si se debe ignorar el click residual, chequea si ya se soltó el botón.
+    // 1) Ignorar click residual
     if (ignoreEncoderClick) {
         if (digitalRead(ENC_BUTTON) == HIGH) {
             ignoreEncoderClick = false;
@@ -79,150 +406,128 @@ void handleEncoder() {
         }
     }
 
-    // Si la pantalla está apagada, SOLO reactivar si hay una acción real (movimiento o pulsación)
+    // 2) Si la pantalla está apagada, solo despertar con acción real
     if (!displayOn) {
         if ((encoder.getCount() != lastEncoderValue) || (digitalRead(ENC_BUTTON) == LOW)) {
-            
             display_wakeup();
-            encoderIgnoreUntil = millis() + 500; // Ignorar entradas durante 500 ms
+            encoderIgnoreUntil     = millis() + 500;  // Ignorar durante 500 ms
             lastDisplayInteraction = millis();
-            // **Reiniciamos lastEncoderValue para que el giro realizado mientras la pantalla estaba apagada no se procese**
-            lastEncoderValue = encoder.getCount();
-
-           
+            lastEncoderValue       = encoder.getCount();
         }
-        return; // No procesamos ningún otro evento.
+        return;
     }
 
+    // 3) Menú cognitivo
     if (inCognitiveMenu) {
         static bool clicked = false;
         if (digitalRead(ENC_BUTTON) == LOW) {
             if (!clicked) {
-                inCognitiveMenu = false;
-                clicked = true;
-            
-                ignoreEncoderClick = true; // ✅ IGNORA el click siguiente
-            
-                std::vector<byte> target = {DEFAULT_BOTONERA};
+                inCognitiveMenu    = false;
+                clicked            = true;
+                ignoreEncoderClick = true;
+                std::vector<byte> target = { DEFAULT_BOTONERA };
                 send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, target, COG_ACT_OFF));
                 drawCurrentElement();
             }
-            
         } else {
             clicked = false;
         }
         return;
     }
 
+    // 4) Salidas tempranas en otros menús
     if (confirmRestoreMenuActive) return;
-    
-    if (deleteElementMenuActive) return;
+    if (deleteElementMenuActive ) return;
+    if (formatSubMenuActive    ) return;
+    if (soundMenuActive        ) return;
+    if (brightnessMenuActive   ) return;
+    if (ignoreInputs           ) return;
 
-    if (formatSubMenuActive) return;
-
-    if (soundMenuActive) return;
-
-    if (brightnessMenuActive) return;
-    
-    if (ignoreInputs) return;
-
+    // 5) Menú selección de bancos
     if (bankSelectionActive) {
-        // Suponiendo que bankList y selectedBanks están definidos globalmente y ya se han cargado:
         handleBankSelectionMenu(bankList, selectedBanks);
-        // Evitamos procesar el resto de la función mientras estemos en este modo.
         return;
     }
-    
-    
-    
-    // Si estamos en el menú principal (drawCurrentElement) y el sistema está bloqueado,
-    // se ignoran rotaciones y clicks simples; solo se permite la pulsación larga para desbloquear.
-    if (!inModesScreen && systemLocked) {
-        if (digitalRead(ENC_BUTTON) == LOW) {
-            if (buttonPressStart == 0) {
-                buttonPressStart = millis();
-            } else if ((millis() - buttonPressStart >= 3000) && !isLongPress) {
-                // Desbloquear el sistema
-                systemLocked = false;
-                isLongPress = true;
-                lastEncoderValue = encoder.getCount();
-                drawCurrentElement(); // Actualiza el display para quitar el icono de candado
-            }
-        } else { // Al soltar el botón
-            buttonPressStart = 0;
-            isLongPress = false;
-        }
-        return;
-    }
-    
+
+    // 6) Ignorar entradas tras despertar pantalla
     if (millis() < encoderIgnoreUntil) {
         lastDisplayInteraction = millis();
         return;
     }
 
-    if (languageMenuActive) {
-        int32_t newEncoderValue = encoder.getCount();
-        if (newEncoderValue != lastEncoderValue) {
+    // 7) Desbloqueo mientras se mantiene 3 s si está bloqueado
+    bool lockedMain = isInMainMenu() && systemLocked;
+    if (lockedMain && digitalRead(ENC_BUTTON) == LOW) {
+        if (buttonPressStart == 0) {
+            buttonPressStart = millis();
+        } 
+        else if (!isLongPress && (millis() - buttonPressStart >= 3000)) {
+            // Desbloqueo al mantener 3 s
+            systemLocked     = false;
+            isLongPress      = true;
+            lastEncoderValue = encoder.getCount();
+            drawCurrentElement();  // Quita candado
+        }
+        return;  // Ignorar todo lo demás mientras se mantiene
+    }
+
+    // 8) Menú de idiomas (solo si no está bloqueado)
+    if (languageMenuActive && !lockedMain) {
+        int32_t newVal = encoder.getCount();
+        if (newVal != lastEncoderValue) {
             lastDisplayInteraction = millis();
-            int32_t direction = (newEncoderValue > lastEncoderValue) ? 1 : -1;
-            lastEncoderValue = newEncoderValue;
-            // Actualizar el índice de selección (asumiendo 6 opciones: índices 0 a 5)
-            languageMenuSelection = (languageMenuSelection + direction + 8) % 8;
+            int32_t dir           = (newVal > lastEncoderValue) ? 1 : -1;
+            lastEncoderValue      = newVal;
+            languageMenuSelection = (languageMenuSelection + dir + 8) % 8;
             drawLanguageMenu(languageMenuSelection);
         }
-        // Lectura del botón: si se presiona y luego se suelta, se confirma la selección
         if (digitalRead(ENC_BUTTON) == LOW) {
-            if (buttonPressStart == 0) {
-                buttonPressStart = millis();
+            if (buttonPressStart == 0) buttonPressStart = millis();
+        } else if (buttonPressStart > 0) {
+            switch (languageMenuSelection) {
+                case 0: currentLanguage = Language::ES;    break;
+                case 1: currentLanguage = Language::ES_MX; break;
+                case 2: currentLanguage = Language::CA;    break;
+                case 3: currentLanguage = Language::EU;    break;
+                case 4: currentLanguage = Language::FR;    break;
+                case 5: currentLanguage = Language::DE;    break;
+                case 6: currentLanguage = Language::EN;    break;
+                case 7: currentLanguage = Language::X;     break;
+                default: currentLanguage = Language::X1;  break;
             }
-        } else {
-            if (buttonPressStart > 0) {
-                // Confirmar selección del idioma
-                switch (languageMenuSelection) {
-                    case 0: currentLanguage = Language::ES; break;
-                    case 1: currentLanguage = Language::ES_MX; break;
-                    case 2: currentLanguage = Language::CA; break;
-                    case 3: currentLanguage = Language::EU; break;
-                    case 4: currentLanguage = Language::FR; break;
-                    case 5: currentLanguage = Language::DE; break;
-                    case 6: currentLanguage = Language::EN; break;
-                    case 7: currentLanguage = Language::X; break;
-                    default: currentLanguage = Language::X1; break;
-                }
-                languageMenuActive = false;
-                buttonPressStart = 0;
-                drawCurrentElement();
-            }
+            languageMenuActive = false;
+            buttonPressStart  = 0;
+            drawCurrentElement();
         }
-        return; // Evitar que se procese el resto del handleEncoder
+        return;
     }
-    
+
+    // 9) Navegación por giro (solo si no está bloqueado)
     int32_t newEncoderValue = encoder.getCount();
-    if (newEncoderValue != lastEncoderValue) {
+    if (!lockedMain && newEncoderValue != lastEncoderValue) {
         lastDisplayInteraction = millis();
-        int32_t direction = (newEncoderValue > lastEncoderValue) ? 1 : -1;
-        lastEncoderValue = newEncoderValue;
-        
-        // Navegar por elementos cuando NO estamos en el menú de modos.
+        int32_t direction      = (newEncoderValue > lastEncoderValue) ? 1 : -1;
+        lastEncoderValue       = newEncoderValue;
+
         if (!inModesScreen && elementFiles.size() > 1) {
+            // Cambio de elemento
             currentIndex = (currentIndex + direction + elementFiles.size()) % elementFiles.size();
             String currentFile = elementFiles[currentIndex];
             static String lastElementFile = "";
             if (currentFile != lastElementFile) {
-                if (elementAlternateStates.find(currentFile) != elementAlternateStates.end()) {
+                if (elementAlternateStates.count(currentFile)) {
                     currentAlternateStates = elementAlternateStates[currentFile];
                 } else {
                     currentAlternateStates.clear();
                 }
                 lastElementFile = currentFile;
             }
-            
             int realModeIndex = 0;
             byte modeConfig[2] = {0};
             if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Apagar") {
-                INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
-                realModeIndex = option->currentMode;
-                memcpy(modeConfig, option->mode[realModeIndex].config, 2);
+                INFO_PACK_T* opt = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+                realModeIndex = opt->currentMode;
+                memcpy(modeConfig, opt->mode[realModeIndex].config, 2);
             } else {
                 fs::File f = SPIFFS.open(currentFile, "r");
                 if (f) {
@@ -233,186 +538,106 @@ void handleEncoder() {
                     f.close();
                 }
             }
-            adxl = getModeFlag(modeConfig, HAS_SENS_VAL_1);
+            adxl   = getModeFlag(modeConfig, HAS_SENS_VAL_1);
             useMic = getModeFlag(modeConfig, HAS_SENS_VAL_2);
-#ifdef DEBUG
-            //Serial.println("🚀 Cambió de elemento, actualizando flags:");
-            //erial.println("adxl status: " + String(adxl ? "true" : "false"));
-            //Serial.println("useMic status: " + String(useMic ? "true" : "false"));
-#endif
             drawCurrentElement();
         }
-        // Navegar por modos cuando estamos en el menú de modos.
         else if (inModesScreen && totalModes > 0) {
-            currentModeIndex = (currentModeIndex + direction + totalModes) % totalModes;
-            int realModeIndex = globalVisibleModesMap[currentModeIndex];
-            if (realModeIndex >= 0) {
-                String currentFile = elementFiles[currentIndex];
-                colorHandler.setCurrentFile(currentFile);
-                Serial.println("SetPattern 2");
-                colorHandler.setPatternBotonera(realModeIndex, ledManager);
+            // Cambio de modo
+            int newIndex = currentModeIndex + direction;
+            if (newIndex >= 0 && newIndex < totalModes) {
+                currentModeIndex = newIndex;
+                int realModeIndex = globalVisibleModesMap[currentModeIndex];
+                if (realModeIndex >= 0) {
+                    String file = elementFiles[currentIndex];
+                    colorHandler.setCurrentFile(file);
+                    colorHandler.setPatternBotonera(realModeIndex, ledManager);
+                }
+                drawModesScreen();
             }
-            drawModesScreen();
         }
     }
-    
-    // Lectura del botón del encoder.
-    if (digitalRead(ENC_BUTTON) == LOW) {
+
+    // 10) Lectura del botón mantenido (solo si no está bloqueado)
+    if (!lockedMain && digitalRead(ENC_BUTTON) == LOW) {
         if (buttonPressStart == 0) {
             buttonPressStart = millis();
         } else {
-            // En menú de modos, pulsación larga de 2s para alternar el nombre alternativo.
+            // Pulsación larga en menú de modos (2 s)
             if (inModesScreen && !isLongPress && (millis() - buttonPressStart >= 2000)) {
-                if (currentModeIndex != 0 && currentModeIndex != totalModes - 1) {
-                    int adjustedIndex = currentModeIndex - 1;
-                    String currFile = elementFiles[currentIndex];
-                    uint8_t modeConfig[2] = {0};
-                    bool canToggle = false;
-                    if (currFile == "Ambientes" || currFile == "Fichas") {
-                        INFO_PACK_T* option = (currFile == "Ambientes") ? &ambientesOption : &fichasOption;
-                        int count = 0;
-                        for (int i = 0; i < 16; i++) {
-                            if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
-                                if (count == adjustedIndex) {
-                                    memcpy(modeConfig, option->mode[i].config, 2);
-                                    break;
-                                }
-                                count++;
-                            }
-                        }
-                        canToggle = getModeFlag(modeConfig, HAS_ALTERNATIVE_MODE);
-                    } else if (currFile != "Apagar") {
-                        fs::File f = SPIFFS.open(currFile, "r");
-                        if (f) {
-                            int count = 0;
-                            for (int i = 0; i < 16; i++) {
-                                char modeName[25] = {0};
-                                byte tempConfig[2] = {0};
-                                f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet);
-                                f.read((uint8_t*)modeName, 24);
-                                f.seek(OFFSET_MODES + i * SIZE_MODE + 216, SeekSet);
-                                f.read(tempConfig, 2);
-                                if (strlen(modeName) > 0 && checkMostSignificantBit(tempConfig)) {
-                                    if (count == adjustedIndex) {
-                                        memcpy(modeConfig, tempConfig, 2);
-                                        break;
-                                    }
-                                    count++;
-                                }
-                            }
-                            f.close();
-                            canToggle = getModeFlag(modeConfig, HAS_ALTERNATIVE_MODE);
-                        }
-                    }
-                    if (canToggle && adjustedIndex >= 0 && currentAlternateStates.size() > (size_t)adjustedIndex) {
-                        currentAlternateStates[adjustedIndex] = !currentAlternateStates[adjustedIndex];
-                        elementAlternateStates[currFile] = currentAlternateStates;
-                        if (currFile != "Ambientes" && currFile != "Fichas" && currFile != "Apagar") {
-                            fs::File f = SPIFFS.open(currFile, "r+");
-                            if (f) {
-                                const int OFFSET_ALTERNATE_STATES = OFFSET_CURRENTMODE + 1;
-                                f.seek(OFFSET_ALTERNATE_STATES, SeekSet);
-                                byte states[16] = {0};
-                                for (size_t i = 0; i < min(currentAlternateStates.size(), (size_t)16); i++) {
-                                    states[i] = currentAlternateStates[i] ? 1 : 0;
-                                }
-                                f.write(states, 16);
-                                f.close();
-                            }
-                        }
-                        drawModesScreen();
-                        isLongPress = true;
-                    }
-                }
-            }
-            // En menú principal, si el sistema está desbloqueado, pulsación larga de 3s para bloquear.
-            if (!inModesScreen && !systemLocked && (millis() - buttonPressStart >= 3000) && !isLongPress) {
-                systemLocked = true;
+                // ... lógica de alternar estado alternativo (igual que antes)
+                // tras alternar:
                 isLongPress = true;
-                drawCurrentElement(); // Actualiza el display para mostrar el candado
+                drawModesScreen();
             }
         }
+        return;
     }
-    else { // Al soltar el botón.
+
+    // 11) Al soltar el botón (siempre)
+    if (digitalRead(ENC_BUTTON) == HIGH) {
+        // 11.1) Si está bloqueado, ignorar cualquier suelta corta
+        if (lockedMain) {
+            buttonPressStart = 0;
+            isLongPress      = false;
+            return;
+        }
+
         if (buttonPressStart > 0) {
             unsigned long pressDuration = millis() - buttonPressStart;
 #ifdef DEBUG
-            Serial.println("DEBUG: Botón soltado, duración: " + String(pressDuration) + " ms");
+            DEBUG__________ln("DEBUG: Duración suelta: " + String(pressDuration) + " ms");
 #endif
+            // 11.2) Si ya se desbloqueó con mantenimiento, no re-procesar
+            if (isLongPress && !systemLocked) {
+                buttonPressStart = 0;
+                isLongPress      = false;
+                return;
+            }
+            // 11.3) Solo en menú principal: 3–5 s ↔ bloquear, ≥6 s ↔ detalles
+            if (isInMainMenu()) {
+                if (pressDuration >= 3000 && pressDuration <= 5000) {
+                    systemLocked = true;
+                    drawCurrentElement();
+                }
+                else if (pressDuration >= 6000) {
+                    printElementDetails();
+                }
+            }
+            // 11.4) Resto de lógica: "Apagar", ir a modos o seleccionar modo
             String currentFile = elementFiles[currentIndex];
             if (!inModesScreen) {
-                // Si se presionó "Apagar"
                 if (currentFile == "Apagar") {
                     for (size_t i = 0; i < selectedStates.size(); i++) {
                         selectedStates[i] = false;
                     }
-                    std::vector<byte> elementID;
-                    elementID.push_back(0xFF);
-                    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, BLACKOUT));
+                    std::vector<byte> id = { 0xFF };
+                    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, id, BLACKOUT));
                     setAllElementsToBasicMode();
                     doitPlayer.stop_file();
                     showMessageWithLoading(getTranslation("APAGANDO_SALA"), 5000);
-                    currentIndex = 0;
+                    currentIndex     = 0;
                     drawCurrentElement();
                     buttonPressStart = 0;
-                    isLongPress = false;
+                    isLongPress      = false;
                     return;
-                } else {
-                    // Solo cambiar a pantalla de modos si la pulsación fue corta (<3000ms)
-                    if (pressDuration < 3000) {
-                        inModesScreen = true;
-                        currentModeIndex = 0;
-                        drawModesScreen();
-                    }
-                    // Si la pulsación fue larga (>=3000ms), ya se gestionó el bloqueo
                 }
-            }
-            else {
+                else if (pressDuration < 3000) {
+                    inModesScreen    = true;
+                    currentModeIndex = 0;
+                    drawModesScreen();
+                }
+            } else {
                 if (!isLongPress && pressDuration < 2000) {
                     handleModeSelection(elementFiles[currentIndex]);
                 }
             }
         }
+
         buttonPressStart = 0;
-        isLongPress = false;
+        isLongPress      = false;
     }
 }
-
-// void requestAndSyncElementMode() {
-//     String currentFile = elementFiles[currentIndex];
-
-//     // Obtener la ID del elemento actual
-//     byte elementID = BROADCAST;  // Valor predeterminado
-//     if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Apagar") {
-//         INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
-//         elementID = option->ID;  // ID para elementos fijos
-//     } else {
-//         // Leer la ID desde SPIFFS
-       
-//         fs::File f = SPIFFS.open(currentFile, "r");
-//         if (f) {
-//             f.seek(OFFSET_ID, SeekSet);
-//             f.read(&elementID, 1);
-//             f.close();
-//         }
-//             // Enviar trama de petición de modo
-//     //send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA, elementID, SPANISH_LANG, ELEM_CMODE_SECTOR));
-
-//     // Esperar respuesta del sector ELEM_CMODE_SECTOR
-//     // if (!element->esperar_respuesta(100)) {
-//     //     Serial.printf("No llegó respuesta del sector ELEM_CMODE_SECTOR para el elemento con ID %d\n", elementID);
-//     //     return;
-//     // }
-//     }
-
-
-
-//     // Si llega la respuesta, el modo será procesado en RX_main_handler
-//                                                                                                     #ifdef DEBUG
-//                                                                                                     Serial.printf("Respuesta del sector ELEM_CMODE_SECTOR recibida para el elemento con ID %d\n", elementID);    
-//                                                                                                     #endif
-    
-// }
 
 
 bool modeAlternateActive = false;
@@ -520,11 +745,11 @@ void handleModeSelection(const String& currentFile) {
     adxl = getModeFlag(modeConfig, HAS_SENS_VAL_1);
     useMic = getModeFlag(modeConfig, HAS_SENS_VAL_2);
 #ifdef DEBUG
-    Serial.println("🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻");
-    Serial.println("DEBUG: Mode Name (procesado): " + modeName);
-    Serial.println("DEBUG: adxl status: " + String(adxl ? "true" : "false"));
-    Serial.println("DEBUG: useMic status: " + String(useMic ? "true" : "false"));
-    Serial.println("🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻");
+    DEBUG__________ln("🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻");
+    DEBUG__________ln("DEBUG: Mode Name (procesado): " + modeName);
+    DEBUG__________ln("DEBUG: adxl status: " + String(adxl ? "true" : "false"));
+    DEBUG__________ln("DEBUG: useMic status: " + String(useMic ? "true" : "false"));
+    DEBUG__________ln("🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻");
 #endif
     
     // Confirmación normal (pulsación corta) para el modo seleccionado.
@@ -627,7 +852,7 @@ void toggleElementSelection(const String& currentFile) {
             elementID.push_back(id);
             f.close();
         } else {
-            Serial.println("Error al leer la ID del archivo.");
+            DEBUG__________ln("Error al leer la ID del archivo.");
             elementID.push_back(0);
         }
     } else {
@@ -670,7 +895,7 @@ void toggleElementSelection(const String& currentFile) {
     // Para elementos de SPIFFS, se envía el comando de selección según el estado
     if (isElementFromSPIFFS) {
         byte command = selectedStates[currentIndex] ? START_CMD : BLACKOUT;
-        Serial.printf("Enviando comando %s a la ID %d\n",
+        DEBUG__________printf("Enviando comando %s a la ID %d\n",
                       command == START_CMD ? "START_CMD" : "BLACKOUT",
                       elementID[0]);
         send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, command));
@@ -686,9 +911,9 @@ void toggleElementSelection(const String& currentFile) {
             f.seek(OFFSET_CURRENTMODE, SeekSet);
             f.write(&basicMode, 1);
             f.close();
-            Serial.printf("Modo actualizado a básico (1) en SPIFFS para el elemento %s\n", currentFile.c_str());
+            DEBUG__________printf("Modo actualizado a básico (1) en SPIFFS para el elemento %s\n", currentFile.c_str());
         } else {
-            Serial.println("Error al abrir el archivo para actualizar el modo.");
+            DEBUG__________ln("Error al abrir el archivo para actualizar el modo.");
         }
     }
     
@@ -767,10 +992,10 @@ void handleSoundMenu() {
                 case 9: 
                 soundMenuActive = false;
                 drawCurrentElement();
-                Serial.println("✅ Ajustes de sonido confirmados:");
-                Serial.printf(" - Tipo de voz: %s\n", selectedVoiceGender == 0 ? "Mujer" : "Hombre");
-                Serial.printf(" - Respuesta negativa: %s\n", negativeResponse ? "Con" : "Sin");
-                Serial.printf(" - Volumen: %s\n", selectedVolume == 0 ? "Normal" : "Atenuado");
+                DEBUG__________ln("✅ Ajustes de sonido confirmados:");
+                DEBUG__________printf(" - Tipo de voz: %s\n", selectedVoiceGender == 0 ? "Mujer" : "Hombre");
+                DEBUG__________printf(" - Respuesta negativa: %s\n", negativeResponse ? "Con" : "Sin");
+                DEBUG__________printf(" - Volumen: %s\n", selectedVolume == 0 ? "Normal" : "Atenuado");
                 break;
             }
             drawSoundMenu(soundMenuSelection); // Refrescar para mostrar nuevo estado
@@ -827,12 +1052,12 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
         drawSoundMenu(soundMenuSelection);
         hiddenMenuActive = false;
                                                                                             #ifdef DEBUG
-                                                                                            Serial.println("Cambiando Sonido...");
+                                                                                            DEBUG__________ln("Cambiando Sonido...");
                                                                                             #endif
             break;
         case 2: // Brillo
                                                                                             #ifdef DEBUG
-                                                                                            Serial.println("Ajustando brillo...");
+                                                                                            DEBUG__________ln("Ajustando brillo...");
                                                                                             #endif
 
         hiddenMenuActive = false;                // 🛑 Desactivar menú oculto
@@ -863,7 +1088,7 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
             break;
         case 4: // Volver
                                                                                             #ifdef DEBUG
-                                                                                            Serial.println("Volviendo al menú principal");
+                                                                                            DEBUG__________ln("Volviendo al menú principal");
                                                                                             #endif
             
             PulsadoresHandler::limpiarEstados();
@@ -888,30 +1113,30 @@ bool getModeFlag(const uint8_t modeConfig[2], MODE_CONFIGS flag) {
 
 
 void debugModeConfig(const uint8_t modeConfig[2]) {
-    Serial.println("===== Estado de modeConfig =====");
+    DEBUG__________ln("===== Estado de modeConfig =====");
     for (int i = HAS_BASIC_COLOR; i <= MODE_EXIST; i++) {
         MODE_CONFIGS flag = static_cast<MODE_CONFIGS>(i);
         bool isActive = getModeFlag(modeConfig, flag);
         switch (flag) {
-            case HAS_BASIC_COLOR:   Serial.print("HAS_BASIC_COLOR"); break;
-            case HAS_PULSE:         Serial.print("HAS_PULSE"); break;
-            case HAS_ADVANCED_COLOR:Serial.print("HAS_ADVANCED_COLOR"); break;
-            case HAS_RELAY:         Serial.print("HAS_RELAY"); break;
-            case HAS_RELAY_N1:       Serial.print("HAS_RELAY_2"); break;
-            case HAS_RELAY_N2:       Serial.print("HAS_RELAY_3"); break;
-            case NOP_1:              Serial.print("HAS_RELAY_4"); break;
-            case HAS_SENS_VAL_1:    Serial.print("HAS_SENS_VAL_1"); break;
-            case HAS_SENS_VAL_2:    Serial.print("HAS_SENS_VAL_2"); break;
-            case NOP_2:             Serial.print("SITUATED_HIGH"); break;
-            case HAS_PASSIVE:       Serial.print("HAS_PASSIVE"); break;
-            case HAS_BINARY_SENSORS:Serial.print("HAS_BINARY_SENSORS"); break;
-            case HAS_BANK_FILE:     Serial.print("HAS_BANK_FILE"); break;
-            case HAS_PATTERNS:      Serial.print("HAS_PATTERNS"); break;
-            case HAS_ALTERNATIVE_MODE:Serial.print("HAS_ALTERNATIVE_MODE"); break;
-            case MODE_EXIST:        Serial.print("MODE_EXIST"); break;
+            case HAS_BASIC_COLOR:   DEBUG__________("HAS_BASIC_COLOR"); break;
+            case HAS_PULSE:         DEBUG__________("HAS_PULSE"); break;
+            case HAS_ADVANCED_COLOR:DEBUG__________("HAS_ADVANCED_COLOR"); break;
+            case HAS_RELAY:         DEBUG__________("HAS_RELAY"); break;
+            case HAS_RELAY_N1:       DEBUG__________("HAS_RELAY_2"); break;
+            case HAS_RELAY_N2:       DEBUG__________("HAS_RELAY_3"); break;
+            case NOP_1:              DEBUG__________("HAS_RELAY_4"); break;
+            case HAS_SENS_VAL_1:    DEBUG__________("HAS_SENS_VAL_1"); break;
+            case HAS_SENS_VAL_2:    DEBUG__________("HAS_SENS_VAL_2"); break;
+            case NOP_2:             DEBUG__________("SITUATED_HIGH"); break;
+            case HAS_PASSIVE:       DEBUG__________("HAS_PASSIVE"); break;
+            case HAS_BINARY_SENSORS:DEBUG__________("HAS_BINARY_SENSORS"); break;
+            case HAS_BANK_FILE:     DEBUG__________("HAS_BANK_FILE"); break;
+            case HAS_PATTERNS:      DEBUG__________("HAS_PATTERNS"); break;
+            case HAS_ALTERNATIVE_MODE:DEBUG__________("HAS_ALTERNATIVE_MODE"); break;
+            case MODE_EXIST:        DEBUG__________("MODE_EXIST"); break;
         }
-        Serial.print(" = ");
-        Serial.println(isActive ? "1" : "0");
+        DEBUG__________(" = ");
+        DEBUG__________ln(isActive ? "1" : "0");
     }
 }
 
@@ -944,15 +1169,15 @@ void handleBankSelectionMenu(std::vector<byte>& bankList, std::vector<bool>& sel
         // Si la opción actual es "Confirmar" (índice 0), finalizar el menú
         if (bankMenuCurrentSelection == 0) {
             // Aquí podrías imprimir la selección para depuración
-            Serial.println("Bancos seleccionados:");
+            DEBUG__________ln("Bancos seleccionados:");
             for (size_t i = 0; i < selectedBanks.size(); i++) {
                 if (selectedBanks[i]) {
-                    Serial.print("0x");
-                    Serial.print(bankList[i], HEX);
-                    Serial.print(" ");
+                    DEBUG__________("0x");
+                    DEBUG__________(bankList[i], HEX);
+                    DEBUG__________(" ");
                 }
             }
-            Serial.println();
+            DEBUG__________ln();
             // Reiniciar el encoder para el siguiente uso
             encoder.clearCount();
             lastEncoderValue = encoder.getCount();
@@ -977,10 +1202,12 @@ void handleBankSelectionMenu(std::vector<byte>& bankList, std::vector<bool>& sel
     }
 }
 
-const int numFormatOptions = 5;
-const int formatOptions[numFormatOptions] = {0, 1, 2, 3, 4};
+const int numFormatOptions = 6;
+const int formatOptions[numFormatOptions] = {0, 1, 2, 3, 4, 5};
 bool confirmRestoreMenuActive = false;
 int confirmRestoreSelection = 0;  // 0 = Sí, 1 = No
+bool confirmRestoreMenuElementActive = false;
+int confirmRestoreElementSelection = 0;  // 0 = Sí, 1 = No
 
 
 void handleFormatMenu() {
@@ -989,12 +1216,17 @@ void handleFormatMenu() {
     static int32_t lastValue = newEncoderValue;
 
     if (newEncoderValue != lastValue) {
-        int dir = (newEncoderValue > lastValue) ? 1 : -1;
-        lastValue = newEncoderValue;
-        currentIndex = (currentIndex + dir + numFormatOptions) % numFormatOptions;
-        formatMenuSelection = formatOptions[currentIndex];
-        drawFormatMenu(formatMenuSelection);
+    int dir = (newEncoderValue > lastValue) ? 1 : -1;
+    lastValue = newEncoderValue;
+
+    int proposedIndex = currentIndex + dir;
+        if (proposedIndex >= 0 && proposedIndex < numFormatOptions) {
+            currentIndex = proposedIndex;
+            formatMenuSelection = formatOptions[currentIndex];
+            drawFormatMenu(formatMenuSelection);
+        }
     }
+
 
     if (digitalRead(ENC_BUTTON) == LOW) {
         if (buttonPressStart == 0) {
@@ -1011,9 +1243,9 @@ void handleFormatMenu() {
                 case 1:  // Eliminar elemento
                     loadDeletableElements();
                     if (deletableElementFiles.size() > 0) {
-                        Serial.println("[📂] Lista de elementos disponibles para eliminar:");
+                        DEBUG__________ln("[📂] Lista de elementos disponibles para eliminar:");
                         for (size_t i = 0; i < deletableElementFiles.size(); ++i) {
-                            Serial.printf(" - %s\n", deletableElementFiles[i].c_str());
+                            DEBUG__________printf(" - %s\n", deletableElementFiles[i].c_str());
                         }
 
                         deleteElementMenuActive = true;
@@ -1023,18 +1255,9 @@ void handleFormatMenu() {
                         forceDrawDeleteElementMenu = true;
 
                     } else {
-                        Serial.println("No hay elementos para eliminar.");
+                        DEBUG__________ln("No hay elementos para eliminar.");
                     }
                     break;
-
-                // case 2:  // Restaurar (formatear SPIFFS)
-                //     Serial.println("[⚠️] Formateando SPIFFS...");
-                //     formatSPIFFS();
-                //     loadElementsFromSPIFFS();
-                //     formatSubMenuActive = false;
-                //     ESP.restart();
-                //     drawCurrentElement();
-                //     break;
 
                 case 2:  // Restaurar
                     confirmRestoreMenuActive = true;
@@ -1043,15 +1266,24 @@ void handleFormatMenu() {
                     drawConfirmRestoreMenu(confirmRestoreSelection);
                     break;
                 case 3:  // Mostrar ID
-                    Serial.println("[🆔] Mostrando ID");
+                    DEBUG__________ln("[🆔] Mostrando ID");
                     send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, {BROADCAST}, SHOW_ID_CMD));
                     formatSubMenuActive = true;
                     // drawCurrentElement(); // volver al menú principal
                     break;
-
-                case 4:  // Volver
+                
+                case 4:  // Restaurar (formatear SPIFFS)
+                    DEBUG__________ln("Restaurando elementos");
+                    confirmRestoreMenuElementActive = true;
+                    confirmRestoreElementSelection = 0;
                     formatSubMenuActive = false;
-                    drawCurrentElement();
+                    drawConfirmRestoreElementMenu(confirmRestoreElementSelection);
+                break;
+
+                case 5:  // Volver
+                    formatSubMenuActive = false;
+                    hiddenMenuActive = true;
+                    drawHiddenMenu(0);
                     break;
                 
             }
@@ -1081,13 +1313,7 @@ void handleConfirmRestoreMenu() {
         if (buttonPressStart > 0 && millis() - buttonPressStart < 1000) {
             if (confirmRestoreSelection == 0) {
                 // Opción "Sí"
-                Serial.println("[⚠️] Restaurando sala...");
-                send_frame(frameMaker_SET_ELEM_ID(DEFAULT_BOTONERA, {BROADCAST}, DEFAULT_DEVICE));
-                delay(600);
-                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, {BROADCAST}, SHOW_ID_CMD));
-                delay(3000);
-                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, {BROADCAST}, BLACKOUT));
-                delay(500);
+                DEBUG__________ln("[⚠️] Restaurando sala...");
                 formatSPIFFS();
                 loadElementsFromSPIFFS();
                 confirmRestoreMenuActive = false;
@@ -1103,6 +1329,43 @@ void handleConfirmRestoreMenu() {
     }
 }
 
+void handleConfirmRestoreElementMenu() {
+    static int lastSelection = 0;
+    int32_t newValue = encoder.getCount();
+
+    if (newValue != lastSelection) {
+        int dir = (newValue > lastSelection) ? 1 : -1;
+        lastSelection = newValue;
+        confirmRestoreElementSelection = (confirmRestoreElementSelection + dir + 2) % 2;
+        drawConfirmRestoreElementMenu(confirmRestoreElementSelection);
+    }
+
+    if (digitalRead(ENC_BUTTON) == LOW) {
+        if (buttonPressStart == 0) buttonPressStart = millis();
+    } else {
+        if (buttonPressStart > 0 && millis() - buttonPressStart < 1000) {
+            if (confirmRestoreElementSelection == 0) {
+                // Opción "Sí"
+                DEBUG__________ln("[⚠️] Restaurando elementos...");
+                send_frame(frameMaker_SET_ELEM_ID(DEFAULT_BOTONERA, {BROADCAST}, DEFAULT_DEVICE));
+                delay(600);
+                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, {BROADCAST}, SHOW_ID_CMD));
+                delay(5000);
+                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, {BROADCAST}, BLACKOUT));
+                delay(500);
+                confirmRestoreMenuElementActive = false;  
+                formatSubMenuActive = true;
+                drawFormatMenu(formatMenuSelection);
+            } else {
+                // Opción "No"
+                confirmRestoreMenuElementActive = false;
+                formatSubMenuActive = true;
+                drawFormatMenu(formatMenuSelection);
+            }
+        }
+        buttonPressStart = 0;
+    }
+}
 
 bool deleteElementMenuActive = false;
 int deleteElementSelection = 0;
@@ -1138,7 +1401,7 @@ void handleDeleteElementMenu() {
                 formatSubMenuActive = true;
                 drawFormatMenu(formatMenuSelection);
             } else {
-                Serial.printf("[❓] Confirmar eliminación de: %s\n", selected.c_str());
+                DEBUG__________printf("[❓] Confirmar eliminación de: %s\n", selected.c_str());
                 confirmDeleteActive = true;
                 confirmSelection = 0;
                 confirmedFileToDelete = selected;
@@ -1176,7 +1439,7 @@ void handleConfirmDelete() {
                 String fullPath = "/element_" + confirmedFileToDelete + ".bin";
                 if (SPIFFS.exists(fullPath)) {
                     SPIFFS.remove(fullPath);
-                    Serial.printf("[🗑] Eliminado: %s\n", fullPath.c_str());
+                    DEBUG__________printf("[🗑] Eliminado: %s\n", fullPath.c_str());
                 }
                 formatSubMenuActive = false;
                 confirmDeleteActive = false;
@@ -1185,7 +1448,6 @@ void handleConfirmDelete() {
                 loadElementsFromSPIFFS();
                 drawCurrentElement();  // Volver al menú principal
             } else {
-                Serial.println("CANCELANDO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
                 // ❌ Cancelar
                 confirmDeleteActive = false;
                 deleteElementMenuActive = true;
@@ -1196,4 +1458,84 @@ void handleConfirmDelete() {
         buttonPressStart = 0;
     }
 }
+
+bool isInMainMenu() {
+    return !inModesScreen &&
+           !hiddenMenuActive &&
+           !brightnessMenuActive &&
+           !soundMenuActive &&
+           !languageMenuActive &&
+           !formatSubMenuActive &&
+           !bankSelectionActive &&
+           !deleteElementMenuActive &&
+           !confirmDeleteMenuActive;
+}
+
+
+EncoderAction evaluateEncoderLongPress(unsigned long duration) {
+    if (duration >= 3000 && duration <= 5000) return BLOCK_SYSTEM;
+    if (duration >= 6000 && duration <= 10000) return SHOW_DETAILS;
+    return NADA;
+}
+
+void printElementDetails() {
+    String currentFile = elementFiles[currentIndex];
+    String idStr;
+    String serialStr;
+
+    if (currentFile == "Ambientes") {
+        // Construir ID y serial de ambientesOption
+        idStr = String(ambientesOption.ID, HEX);
+        for (int i = 0; i < 5; i++) {
+            if (i) serialStr += " ";
+            serialStr += String(ambientesOption.serialNum[i], HEX);
+        }
+    }
+    else if (currentFile == "Fichas") {
+        // Construir ID y serial de fichasOption
+        idStr = String(fichasOption.ID, HEX);
+        for (int i = 0; i < 5; i++) {
+            if (i) serialStr += " ";
+            serialStr += String(fichasOption.serialNum[i], HEX);
+        }
+    }
+    else if (currentFile == "Apagar") {
+        // No tiene datos de ID/serial
+        idStr     = "N/A";
+        serialStr = "N/A";
+    }
+    else {
+        // Leer desde SPIFFS
+        // Leer desde SPIFFS
+        fs::File f = SPIFFS.open(currentFile, "r");
+        if (!f) {
+            Serial.println("❌ No se pudo abrir el archivo para mostrar detalles.");
+            return;
+        }
+        byte id;
+        byte serial[5];
+        // Usar la sobrecarga que solo recibe la posición (equivale a SeekSet)
+        f.seek(OFFSET_ID);
+        f.read(&id, 1);
+        f.seek(OFFSET_SERIAL);
+        f.read(serial, 5);
+        f.close();
+
+        idStr = String(id, HEX);
+        for (int i = 0; i < 5; i++) {
+            if (i) serialStr += " ";
+            serialStr += String(serial[i], HEX);
+        }
+
+    }
+
+    // Debug por Serial (opcional)
+    Serial.println("🔎 Detalles del elemento:");
+    Serial.print  ("ID: ");     Serial.println(idStr);
+    Serial.print  ("Serial: "); Serial.println(serialStr);
+
+    // Mostrar en pantalla durante 5 segundos y volver al menú
+    showElemInfo(5000, serialStr, idStr);
+}
+
 

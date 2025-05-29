@@ -390,7 +390,7 @@ CRGB COLORHANDLER_::get_CRGB_from_pasiveColorList(int index) {
     if (index < 0 || index >= sizeof(listaColoresPasivos) / sizeof(listaColoresPasivos[0])) {
     _ERR_THROW_START_ "Al intentar crear un CRGB a partir del numero de color, el numero de color se sale de los margenes..." _ERR_THROW_END_
                                                                 #ifdef DEBUG
-                                                                  Serial.println("Al intentar crear un CRGB a partir del numero de color, el numero de color se sale de los margenes...");
+                                                                  DEBUG__________ln("Al intentar crear un CRGB a partir del numero de color, el numero de color se sale de los margenes...");
                                                                 #endif
         return CRGB::Black;   
     }
@@ -401,7 +401,7 @@ CRGB COLORHANDLER_::get_CRGB_from_pasiveColorList(int index) {
 CRGB COLORHANDLER_::get_CRGB_from_colorList(int index) {
     if (index < 0 || index >= sizeof(listaColores) / sizeof(listaColores[0])) {
                                                                 #ifdef DEBUG
-                                                                  Serial.println("Al intentar crear un CRGB a partir del numero de color, el numero de color se sale de los margenes...");
+                                                                  DEBUG__________ln("Al intentar crear un CRGB a partir del numero de color, el numero de color se sale de los margenes...");
                                                                 #endif
         return CRGB::Black;   
     }
@@ -851,7 +851,7 @@ void COLORHANDLER_::set_targetFade(uint16_t fade){
     if (fade > 0 && fade <= UINT16_MAX) fadeTime = fade;
     else {
                                                                                                 #ifdef DEBUG
-                                                                                                  Serial.println("Algo pasa al hacer set_targetFade");
+                                                                                                  DEBUG__________ln("Algo pasa al hacer set_targetFade");
                                                                                                 #endif  
     }
 }
@@ -863,7 +863,7 @@ void COLORHANDLER_::set_targetBrightness(byte brightin){
     if (brightin <= 255) targetBrightness = brightin;
         else {
                                                                                               #ifdef DEBUG
-                                                                                                Serial.println("Algo pasa al hacer set_braitness");
+                                                                                                DEBUG__________ln("Algo pasa al hacer set_braitness");
                                                                                               #endif  
     }
 }
@@ -884,7 +884,7 @@ void COLORHANDLER_::set_currentBrightness(byte brightin){
     if (brightin <= 255) currentBrightness = brightin;
         else {
                                                                                               #ifdef DEBUG
-                                                                                                Serial.println("Algo pasa al hacer set_braitness");
+                                                                                                DEBUG__________ln("Algo pasa al hacer set_braitness");
                                                                                               #endif  
     }
 }
@@ -1027,79 +1027,12 @@ void COLORHANDLER_::welcomeEffect() {
 }
 #endif
 
-// void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager) {
-//   ledManager.clearEffects(); // Limpiar efectos dinámicos previos
-
-//   if (mode >= 16) {
-//       #ifdef DEBUG
-//           Serial.printf("⚠️ Modo inválido: %d\n", mode);
-//       #endif
-//       return;
-//   }
-
-//   byte modeConfig[2] = {0};
-//   if (!getModeConfig(currentFile, mode, modeConfig)) {
-//       #ifdef DEBUG
-//           Serial.println("⚠️ No se pudo obtener la configuración del modo.");
-//       #endif
-//       return;
-//   }
-
-//   #ifdef DEBUG
-//   Serial.printf("Mode %d - Byte Config: 0x%02X%02X\n", mode, modeConfig[0], modeConfig[1]);
-//   #endif
-
-//   // --- Verificar si el elemento actual es "Fichas" ---
-//   if (currentFile == "Fichas") {
-//       fill_solid(leds, NUM_LEDS, CRGB::Black); // Apagar todos los LEDs
-
-//       if (mode == 0) { // Modo Básico: solo el LED 0 con efecto
-//           ledManager.addEffect(new FadeEffect(*this, 0, CRGB::Blue, CRGB::Cyan, 50));
-//       } 
-//       else if (mode == 1 || mode == 2) { // Modo Parejas o Adivina
-//           ledManager.addEffect(new FadeEffect(*this, 0, CRGB::Blue, CRGB::Cyan, 50)); // LED 0 con efecto dinámico
-//           leds[8] = CRGB::White; // LED 9 en blanco
-//       }
-
-//       FastLED.show();
-//       return; // Salir para evitar aplicar la lógica general
-//   }
-
-//   // --- Bloque modular para asignar colores a la botonera ---
-//   if (getModeFlag(modeConfig, HAS_PATTERNS)) {
-//       fill_solid(leds + 1, NUM_LEDS - 1, CRGB::White);
-//   } else if (getModeFlag(modeConfig, HAS_PASSIVE)) {
-//       fill_solid(leds + 1, NUM_LEDS - 1, CRGB::Black);
-//       leds[8] = CRGB::White;
-//   } else if (getModeFlag(modeConfig, HAS_BASIC_COLOR) || getModeFlag(modeConfig, HAS_ADVANCED_COLOR)) {
-//       CRGB colorMap[] = {
-//           CRGB::Black, CRGB::White, CRGB::Red, CRGB::Cyan,
-//           CRGB::Yellow, CRGB(0xFF, 0x59, 0x00), CRGB::Green,
-//           CRGB(0xFF, 0x00, 0xD2), CRGB::Blue
-//       };
-
-//       for (int i = 1; i < NUM_LEDS; i++) {
-//           leds[i] = colorMap[i];
-//       }
-//   } else {
-//       fill_solid(leds + 1, NUM_LEDS - 1, CRGB::Black);
-//   }
-
-//   // --- Bloque modular para el LED 0 (efecto de relé) ---
-//   if (getModeFlag(modeConfig, HAS_RELAY)) {
-//       ledManager.addEffect(new FadeEffect(*this, 0, CRGB::Blue, CRGB::Cyan, 50));
-//   } else {
-//       leds[0] = CRGB::Black;
-//   }
-
-//   FastLED.show();
-// }
 void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager) {
   ledManager.clearEffects(); // Limpiar efectos dinámicos previos
 
   if (mode >= 16) {
 #ifdef DEBUG
-      Serial.printf("⚠️ Modo inválido: %d\n", mode);
+      DEBUG__________printf("⚠️ Modo inválido: %d\n", mode);
 #endif
       return;
   }
@@ -1107,13 +1040,13 @@ void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager)
   byte modeConfig[2] = {0};
   if (!getModeConfig(currentFile, mode, modeConfig)) {
 #ifdef DEBUG
-      Serial.println("⚠️ No se pudo obtener la configuración del modo.");
+      DEBUG__________ln("⚠️ No se pudo obtener la configuración del modo.");
 #endif
       return;
   }
 
 #ifdef DEBUG
-  Serial.printf("Mode %d - Byte Config: 0x%02X%02X\n", mode, modeConfig[0], modeConfig[1]);
+  DEBUG__________printf("Mode %d - Byte Config: 0x%02X%02X\n", mode, modeConfig[0], modeConfig[1]);
 #endif
 
   // --- FICHAS ---
@@ -1141,7 +1074,7 @@ void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager)
   if (!hasRelay && hasRelayN1 && hasRelayN2) {
       relayCount = 4; // caso aromaterapia
   } else if (hasRelay) {
-      if (!hasRelayN1 && !hasRelayN2) relayCount = 1;
+      if (!hasRelayN1 && !hasRelayN2)     relayCount = 1;
       else if (!hasRelayN1 && hasRelayN2) relayCount = 2;
       else if (hasRelayN1 && !hasRelayN2) relayCount = 3;
       else if (hasRelayN1 && hasRelayN2)  relayCount = 4;
@@ -1169,7 +1102,7 @@ void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager)
   } else {
       fill_solid(leds + 1, NUM_LEDS - 1, CRGB::Black);
   }
-  Serial.println("relayCount: " + String(relayCount));
+  DEBUG__________ln("relayCount: " + String(relayCount));
   // --- VISUALIZACIÓN DE RELÉS ---
   if (relayCount == 1 && hasRelay) {
       // Caso: solo un relé → usar LED 0 con efecto
@@ -1247,7 +1180,7 @@ void COLORHANDLER_::sequencer_game(byte& colorin) {
 }
 
 void COLORHANDLER_::mapCognitiveLEDs() {
-  Serial.println("Mapeo de LEDs cognitivos: ");
+  DEBUG__________ln("Mapeo de LEDs cognitivos: ");
   colorHandler.setPatternBotonera(0, ledManager); // Desactiva todos
   for (int i = 0; i < NUM_LEDS; i++) {
       leds[i] = CRGB::Black;
@@ -1391,7 +1324,7 @@ void COLORHANDLER_::BouncingBalls(byte baseRed, byte baseGreen, byte baseBlue) {
       const char* noteNames[] = {"DO", "RE", "MI", "FA", "SOL", "LA", "SI"};
       
       byte detectedNote = doitMic.detect_musical_note();
-      Serial.println("Nota escuchada: " + String(detectedNote));
+      DEBUG__________ln("Nota escuchada: " + String(detectedNote));
 
       // Procesar solo si se detecta una nota válida (entre 1 y 7)
       if (detectedNote > 0 && detectedNote <= 7) {
@@ -1404,7 +1337,7 @@ void COLORHANDLER_::BouncingBalls(byte baseRed, byte baseGreen, byte baseBlue) {
                       colorHandler.leds[i] = noteColor;
                   }
                   FastLED.show();
-                  Serial.println("Nota estable detectada: " + String(noteNames[mappedNote]));
+                  DEBUG__________ln("Nota estable detectada: " + String(noteNames[mappedNote]));
                   lastStableNote = detectedNote;
                   #ifdef PLAYER
                                   // doitPlayer.play_file(14, detectedNote + 11);
@@ -1663,12 +1596,12 @@ void COLORHANDLER_::block_silence_SA() {
 void COLORHANDLER_::block_silence(CRGB colorin) {
 
     static unsigned long lastUpdateTime = 0;
-    static int currentStep = 0;  // Comienza desde el paso más bajo
+    static int currentStep = 0;         // Comienza desde el paso más bajo
     static int targetStep = 0;
     static float currentPosition = 0;
-    const float RISE_SPEED = 0.4;  // Velocidad de subida (ajusta según necesites)
-    const float FALL_SPEED = 0.2;  // Velocidad de caída (ajusta según necesites)
-    const int UPDATE_INTERVAL = 10;  // Intervalo de actualización en ms
+    const float RISE_SPEED = 0.4;       // Velocidad de subida (ajusta según necesites)
+    const float FALL_SPEED = 0.2;       // Velocidad de caída (ajusta según necesites)
+    const int UPDATE_INTERVAL = 10;     // Intervalo de actualización en ms
 
     unsigned long currentTime = millis();
     if (currentTime - lastUpdateTime < UPDATE_INTERVAL) return;  // Aún no es tiempo de actualizar
@@ -1706,11 +1639,6 @@ void COLORHANDLER_::block_silence(CRGB colorin) {
         currentStep = newStep;
     }
 }
-
-
-
-
-
 
 void COLORHANDLER_::matrix_draw_circle(int centerX, int centerY, int radius, CRGB color) {
     auto getLedIndex = [](int x, int y) -> int {

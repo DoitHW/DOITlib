@@ -45,6 +45,18 @@ void handleConfirmDelete();
 
 void handleConfirmRestoreMenu();
 
+void handleConfirmRestoreElementMenu();
+
+bool isInMainMenu() ;
+
+enum EncoderAction {
+    NADA,
+    BLOCK_SYSTEM,
+    SHOW_DETAILS
+};
+
+EncoderAction evaluateEncoderLongPress(unsigned long duration);
+void printElementDetails();
 // Variables externas requeridas
 extern std::vector<String> elementFiles;
 extern std::vector<bool> selectedStates;
@@ -91,6 +103,8 @@ extern bool ignoreNextEncoderClick;
 
 extern bool confirmRestoreMenuActive;
 extern int confirmRestoreSelection;
+extern bool confirmRestoreMenuElementActive;
+extern int confirmRestoreElementSelection;
  
 
 

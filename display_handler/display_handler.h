@@ -36,8 +36,16 @@ void showCriticalBatteryMessage();
 void drawBatteryIconMini(float percentage);
 void drawCognitiveMenu();
 void drawConfirmRestoreMenu(int selection);
+void drawConfirmRestoreElementMenu(int selection);
 //void actualizarBarraProgreso(float progreso, const char* detalleTexto = nullptr);
+void showElemInfo(unsigned long delayTime, const String& serialNumber, const String& elementID);
+void mostrarTextoAjustado(TFT_eSPI& tft,
+                                 const char* texto,
+                                 uint16_t xCentro,
+                                 uint16_t yInicio,
+                                 uint16_t maxWidth);
 
+                                 
 extern bool isScrollingText;
 extern TFT_eSPI tft;
 extern TFT_eSprite uiSprite;

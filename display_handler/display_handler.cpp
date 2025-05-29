@@ -83,14 +83,14 @@ void drawSunIcon(int16_t x, int16_t y, uint16_t color) {
 }
 
 void display_init() {
-    //Serial.println("Inicializando display...");
+    //DEBUG__________ln("Inicializando display...");
     tft.init();
     tft.setRotation(0);
     tft.fillScreen(BACKGROUND_COLOR);
     tft.setSwapBytes(true);
     uiSprite.createSprite(tft.width(), tft.height());
     uiSprite.setSwapBytes(true);
-    //Serial.println("Display inicializado.");
+    //DEBUG__________ln("Display inicializado.");
     
 }
 
@@ -163,7 +163,7 @@ void showMessageWithLoading(const char* message, unsigned long delayTime) {
   }
 
 void drawErrorMessage(const char* message) {
-    Serial.println(message);
+    DEBUG__________ln(message);
     uiSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
     uiSprite.setTextDatum(MC_DATUM);
     uiSprite.setTextSize(2);
@@ -538,7 +538,7 @@ void drawCurrentElement() {
          uiSprite.setTextSize(1);
          String displayName = getDisplayName(currentFile);
          int elementTextWidth = uiSprite.textWidth(displayName);
-         //Serial.println("DEBUG: Tamaño de elemento '" + displayName + "' = " + String(elementTextWidth));
+         //DEBUG__________ln("DEBUG: Tamaño de elemento '" + displayName + "' = " + String(elementTextWidth));
          if (elementTextWidth > DISPLAY_WIDTH) {
               nameScrollActive = true;
               currentDisplayName = displayName;
@@ -580,7 +580,7 @@ void drawCurrentElement() {
              }
              currentAlternateStates = tempAlternate;
              elementAlternateStates[currentFile] = currentAlternateStates;
-             Serial.println("DEBUG: [SPIFFS] currentAlternateStates.size() = " + String(currentAlternateStates.size()));
+             DEBUG__________ln("DEBUG: [SPIFFS] currentAlternateStates.size() = " + String(currentAlternateStates.size()));
          } else {
              currentAlternateStates = elementAlternateStates[currentFile];
          }
@@ -625,13 +625,16 @@ void drawCurrentElement() {
     }
     currentModeIndex = currentMode;
     colorHandler.setCurrentFile(currentFile);
-    Serial.println("setPatternBotonera 1");
     colorHandler.setPatternBotonera(currentModeIndex, ledManager);
     drawNavigationArrows();
     
     // Si el sistema está bloqueado, dibujar el icono de candado en la esquina superior izquierda.
     // Se asume que 'device_lock' es la imagen almacenada en RAM y sus dimensiones son 16x16 (ajustar si es necesario).
-    if (!inModesScreen && systemLocked) {
+    // if (!inModesScreen && systemLocked) {
+    //      uiSprite.pushImage(0, 0, 16, 16, device_lock);
+    // }
+
+    if (isInMainMenu() && systemLocked) {
          uiSprite.pushImage(0, 0, 16, 16, device_lock);
     }
 
@@ -645,7 +648,7 @@ void drawCurrentElement() {
 void display_sleep() {
     tft.fillScreen(TFT_BLACK);
     displayOn = false;
-    Serial.println("Pantalla apagada por inactividad.");
+    DEBUG__________ln("Pantalla apagada por inactividad.");
   }
   
 void display_wakeup() {
@@ -655,84 +658,8 @@ void display_wakeup() {
         drawCognitiveMenu();
     }else drawCurrentElement();
     lastDisplayInteraction = millis();
-    Serial.println("Pantalla reactivada por interacción.");
+    DEBUG__________ln("Pantalla reactivada por interacción.");
   }
-
-
-//  void display_sleep() {
-//     // Asumimos que la pantalla ya muestra el fondo actual (por drawCurrentElement())
-//     int cx = tft.width() / 2;
-//     int cy = tft.height() / 2;
-//     int maxRadius = sqrt(cx * cx + cy * cy);
-//     // Animación iris-out: el "hueco" (la zona visible) se reduce hasta desaparecer.
-//     for (int r = maxRadius; r >= 0; r -= 5) {
-//         // Para cada fila, se dibuja negro en las zonas que quedan fuera del círculo de radio r
-//         for (int y = 0; y < tft.height(); y++) {
-//             int dy = abs(y - cy);
-//             if (dy > r) {
-//                 // Toda la fila queda fuera del círculo: se pinta toda de negro.
-//                 tft.drawFastHLine(0, y, tft.width(), TFT_BLACK);
-//             } else {
-//                 // Dentro de la fila, calcular la distancia horizontal máxima para quedar dentro del círculo.
-//                 int dx = sqrt((float)r * r - (float)dy * dy);
-//                 int left = cx - dx;
-//                 int right = cx + dx;
-//                 // Pinta a la izquierda y a la derecha de la zona visible.
-//                 if (left > 0) tft.drawFastHLine(0, y, left, TFT_BLACK);
-//                 if (right < tft.width()) tft.drawFastHLine(right, y, tft.width() - right, TFT_BLACK);
-//             }
-//         }
-//         delay(10); // Retardo para suavizar la animación.
-//     }
-//     displayOn = false;
-//     Serial.println("Pantalla apagada por inactividad.");
-// }
-
-// void display_wakeup() {
-//     displayOn = true;
-    
-//     int cx = tft.width() / 2;
-//     int cy = tft.height() / 2;
-//     int maxRadius = sqrt(cx * cx + cy * cy);
-    
-//     // Dibujar primero el fondo completo
-//     drawCurrentElement();
-//     lastDisplayInteraction = millis();
-    
-//     // Comenzamos con la pantalla negra
-//     tft.fillScreen(TFT_BLACK);
-    
-//     // Animación iris-in: se "abre" el iris mostrando el fondo en el centro que crece hasta revelar toda la imagen
-//     for (int r = 0; r <= maxRadius; r += 5) {
-//         // Redraw the background to prevent flickering
-//         drawCurrentElement();
-        
-//         // Pintar de negro todo lo que esté fuera del círculo
-//         for (int y = 0; y < tft.height(); y++) {
-//             int dy = abs(y - cy);
-//             if (dy > r) {
-//                 // Línea completa negra si está fuera del radio
-//                 tft.drawFastHLine(0, y, tft.width(), TFT_BLACK);
-//             } else {
-//                 // Calcular ancho del círculo en este punto
-//                 int dx = sqrt((float)r * r - (float)dy * dy);
-//                 int left = cx - dx;
-//                 int right = cx + dx;
-                
-//                 // Pintar de negro las zonas fuera del círculo
-//                 if (left > 0) 
-//                     tft.drawFastHLine(0, y, left, TFT_BLACK);
-//                 if (right < tft.width()) 
-//                     tft.drawFastHLine(right, y, tft.width() - right, TFT_BLACK);
-//             }
-//         }
-        
-//         delay(10);
-//     }
-    
-//     lastDisplayInteraction = millis();
-//     Serial.println("Pantalla reactivada por interacción.");
-// }
 
 void animateTransition(int direction) {
     if (elementFiles.size() <= 1) return;
@@ -749,6 +676,192 @@ void animateTransition(int direction) {
 std::map<String, std::vector<bool>> elementAlternateStates;
 std::vector<bool> currentAlternateStates;
 
+
+// void drawModesScreen() {
+//     // Variables para scroll vertical suave.
+//     static int scrollOffset = 0;
+//     static int targetScrollOffset = 0;
+//     const int visibleOptions = 4; // Número máximo de opciones visibles.
+
+//     // Variables para scroll horizontal del texto de la opción seleccionada.
+//     static int modeTickerOffset = 0;
+//     static int modeTickerDirection = 1;
+//     static unsigned long modeLastFrameTime = 0;
+//     static int lastSelectedMode = -1;
+
+//     uiSprite.fillSprite(BACKGROUND_COLOR);
+
+//     uiSprite.setFreeFont(&FreeSans12pt7b);
+//     uiSprite.setTextColor(TEXT_COLOR);
+//     uiSprite.setTextDatum(TC_DATUM);
+//     uiSprite.setTextSize(1);
+//     uiSprite.drawString(getTranslation("MODOS"), 64, 5);
+
+//     String currentFile = elementFiles[currentIndex];
+
+//     int visibleModesMap[18];
+//     visibleModesMap[0] = -3;
+//     int count = 1;
+
+//     if (currentFile == "Ambientes" || currentFile == "Fichas") {
+//         INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+//         for (int i = 0; i < 16; i++) {
+//             if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
+//                 visibleModesMap[count] = i;
+//                 count++;
+//             }
+//         }
+//     } else if (currentFile != "Apagar") {
+//         fs::File f = SPIFFS.open(currentFile, "r");
+//         if (f) {
+//             for (int i = 0; i < 16; i++) {
+//                 char modeName[25] = {0};
+//                 byte modeConfig[2] = {0};
+//                 f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet);
+//                 f.read((uint8_t*)modeName, 24);
+//                 f.seek(OFFSET_MODES + i * SIZE_MODE + 216, SeekSet);
+//                 f.read(modeConfig, 2);
+//                 if (strlen(modeName) > 0 && checkMostSignificantBit(modeConfig)) {
+//                     visibleModesMap[count] = i;
+//                     count++;
+//                 }
+//             }
+//             f.close();
+//         }
+//     }
+
+//     visibleModesMap[count] = -2;
+//     count++;
+//     totalModes = count;
+
+//     if (currentModeIndex < 0 || currentModeIndex >= totalModes) {
+//         currentModeIndex = 0;
+//     }
+
+//     memcpy(globalVisibleModesMap, visibleModesMap, sizeof(int) * totalModes);
+
+//     int startIndex = max(0, min(currentModeIndex - visibleOptions / 2, totalModes - visibleOptions));
+
+//     const int x = 10;
+//     const int textAreaW = 110;
+//     const int scrollBarX = 120;
+
+//     for (int i = 0; i < visibleOptions && (startIndex + i) < totalModes; i++) {
+//         int currentVisibleIndex = startIndex + i;
+//         int y = 30 + i * (CARD_HEIGHT + CARD_MARGIN);
+//         bool isSelected = (currentVisibleIndex == currentModeIndex);
+//         uint32_t textColor = TEXT_COLOR;
+
+//         // Dibujar fondo si está seleccionado
+//         if (isSelected) {
+//             uiSprite.fillRoundRect(x - 3, y - 1, textAreaW + 6, CARD_HEIGHT + 2, 3, CARD_COLOR);
+//             textColor = TEXT_COLOR;
+//         }
+
+//         uiSprite.setFreeFont(&FreeSans9pt7b);
+//         uiSprite.setTextColor(textColor);
+//         uiSprite.setTextSize(1);
+//         uiSprite.setTextDatum(TL_DATUM);
+
+//         int modeVal = visibleModesMap[currentVisibleIndex];
+//         String label;
+
+//         if (modeVal == -2) {
+//             label = getTranslation("VOLVER");
+//         } else if (modeVal == -3) {
+//             label = selectedStates[currentIndex] ? getTranslation("APAGAR") : getTranslation("ENCENDER");
+//         } else {
+//             char modeName[25] = {0};
+//             if (currentFile == "Ambientes" || currentFile == "Fichas") {
+//                 INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+//                 strncpy(modeName, (char*)option->mode[modeVal].name, 24);
+//             } else {
+//                 fs::File f = SPIFFS.open(currentFile, "r");
+//                 if (f) {
+//                     f.seek(OFFSET_MODES + modeVal * SIZE_MODE, SeekSet);
+//                     f.read((uint8_t*)modeName, 24);
+//                     f.close();
+//                 }
+//             }
+//             label = String(modeName);
+//             if (currentFile == "Ambientes" || currentFile == "Fichas") {
+//                 label = getTranslation(label.c_str());
+//             }
+
+//             bool modeAlternateState = false;
+//             if (currentAlternateStates.size() > (size_t)(currentVisibleIndex - 1) && visibleModesMap[currentVisibleIndex] != -2) {
+//                 modeAlternateState = currentAlternateStates[currentVisibleIndex - 1];
+//             }
+//             label = getModeDisplayName(label, modeAlternateState);
+//         }
+
+//         if (isSelected) {
+//             if (currentModeIndex != lastSelectedMode) {
+//                 modeTickerOffset = 0;
+//                 modeTickerDirection = 1;
+//                 lastSelectedMode = currentModeIndex;
+//             }
+
+//             int fullTextWidth = uiSprite.textWidth(label);
+//             if (fullTextWidth > textAreaW) {
+//                 const unsigned long frameInterval = 50;
+//                 unsigned long now = millis();
+//                 if (now - modeLastFrameTime >= frameInterval) {
+//                     modeTickerOffset += modeTickerDirection;
+//                     if (modeTickerOffset < 0) {
+//                         modeTickerOffset = 0;
+//                         modeTickerDirection = 1;
+//                     }
+//                     if (modeTickerOffset > (fullTextWidth - textAreaW)) {
+//                         modeTickerOffset = fullTextWidth - textAreaW;
+//                         modeTickerDirection = -1;
+//                     }
+//                     modeLastFrameTime = now;
+//                 }
+//                 TFT_eSprite modeSprite = TFT_eSprite(&tft);
+//                 modeSprite.createSprite(textAreaW, CARD_HEIGHT);
+//                 modeSprite.fillSprite(CARD_COLOR);
+//                 modeSprite.setFreeFont(&FreeSans9pt7b);
+//                 modeSprite.setTextSize(1);
+//                 modeSprite.setTextDatum(TL_DATUM);
+//                 modeSprite.setTextColor(TEXT_COLOR, CARD_COLOR);
+//                 modeSprite.drawString(label, -modeTickerOffset, 0);
+//                 modeSprite.pushToSprite(&uiSprite, x, y);
+//                 modeSprite.deleteSprite();
+//             } else {
+//                 uiSprite.drawString(label, x, y);
+//             }
+//         } else {
+//             uiSprite.drawString(label, x, y);
+//         }
+//     }
+
+//     const int scrollBarWidth = 5;
+//     int scrollBarY = 30;
+//     uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN, TFT_DARKGREY);
+//     if (totalModes > visibleOptions) {
+//         float thumbRatio = (float)visibleOptions / (float)totalModes;
+//         int thumbHeight = max(20, (int)((visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN) * thumbRatio));
+//         int thumbY = scrollBarY + (visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN - thumbHeight)
+//                      * (float)(currentModeIndex - startIndex) / (float)(totalModes - visibleOptions);
+//         uiSprite.fillRect(scrollBarX, thumbY, scrollBarWidth, thumbHeight, TFT_LIGHTGREY);
+//     } else {
+//         uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN, TFT_LIGHTGREY);
+//     }
+
+//     uiSprite.pushSprite(0, 0);
+
+//     int visibleCurrentModeIndex = currentModeIndex;
+//     if (visibleCurrentModeIndex >= 0) {
+//         targetScrollOffset = visibleCurrentModeIndex * (CARD_HEIGHT + CARD_MARGIN);
+//         if (targetScrollOffset > totalModes * (CARD_HEIGHT + CARD_MARGIN) - 100) {
+//             targetScrollOffset = totalModes * (CARD_HEIGHT + CARD_MARGIN) - 100;
+//         }
+//         if (targetScrollOffset < 0) targetScrollOffset = 0;
+//     }
+//     scrollOffset += (targetScrollOffset - scrollOffset) / 4;
+// }
+
 void drawModesScreen() {
     // Variables para scroll vertical suave.
     static int scrollOffset = 0;
@@ -761,10 +874,8 @@ void drawModesScreen() {
     static unsigned long modeLastFrameTime = 0;
     static int lastSelectedMode = -1;
 
-    // Limpiar el sprite completo.
     uiSprite.fillSprite(BACKGROUND_COLOR);
 
-    // Título.
     uiSprite.setFreeFont(&FreeSans12pt7b);
     uiSprite.setTextColor(TEXT_COLOR);
     uiSprite.setTextDatum(TC_DATUM);
@@ -772,25 +883,19 @@ void drawModesScreen() {
     uiSprite.drawString(getTranslation("MODOS"), 64, 5);
 
     String currentFile = elementFiles[currentIndex];
-    
-    // Construir el mapa auxiliar de modos visibles.
-    // La primera opción siempre será "Encender/Apagar" (valor especial -3).
-    int visibleModesMap[18]; // Espacio para: "Encender/Apagar" + hasta 16 modos + "Regresar".
-    visibleModesMap[0] = -3; // -3 indica "Encender/Apagar".
+
+    int visibleModesMap[18];
+    visibleModesMap[0] = -3;
     int count = 1;
-    
-    // Para elementos fijos ("Ambientes" o "Fichas").
+
     if (currentFile == "Ambientes" || currentFile == "Fichas") {
         INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
         for (int i = 0; i < 16; i++) {
             if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
-                visibleModesMap[count] = i;
-                count++;
+                visibleModesMap[count++] = i;
             }
         }
-    }
-    // Para elementos almacenados en SPIFFS (excepto "Apagar").
-    else if (currentFile != "Apagar") {
+    } else if (currentFile != "Apagar") {
         fs::File f = SPIFFS.open(currentFile, "r");
         if (f) {
             for (int i = 0; i < 16; i++) {
@@ -801,106 +906,68 @@ void drawModesScreen() {
                 f.seek(OFFSET_MODES + i * SIZE_MODE + 216, SeekSet);
                 f.read(modeConfig, 2);
                 if (strlen(modeName) > 0 && checkMostSignificantBit(modeConfig)) {
-                    visibleModesMap[count] = i;
-                    count++;
+                    visibleModesMap[count++] = i;
                 }
             }
             f.close();
         }
     }
-    // Agregar la opción "Regresar" al final.
-    visibleModesMap[count] = -2; // -2 indica "Regresar".
-    count++;
+
+    visibleModesMap[count++] = -2;
     totalModes = count;
 
-    // Validar currentModeIndex.
     if (currentModeIndex < 0 || currentModeIndex >= totalModes) {
         currentModeIndex = 0;
     }
-    
-    // Copiar el mapa visible a la variable global.
-    memcpy(globalVisibleModesMap, visibleModesMap, sizeof(int) * totalModes);
-    
-    // Calcular el índice de inicio para centrar la opción seleccionada.
-    int startIndex = max(0, min(currentModeIndex - visibleOptions / 2, totalModes - visibleOptions));
 
-    // Parámetros de layout.
+    memcpy(globalVisibleModesMap, visibleModesMap, sizeof(int) * totalModes);
+
+    // Ventana rodante: desplaza startIndex uno en vez de centrar
+    static int startIndex = 0;
+    if ((currentModeIndex - startIndex) > (visibleOptions - 2)
+        && startIndex < (totalModes - visibleOptions)) {
+        startIndex++;
+    }
+    else if ((currentModeIndex - startIndex) < 1
+             && startIndex > 0) {
+        startIndex--;
+    }
+
     const int x = 10;
     const int textAreaW = 110;
     const int scrollBarX = 120;
 
-    // Dibujar cada opción visible.
+    // Dibujar cada opción visible
     for (int i = 0; i < visibleOptions && (startIndex + i) < totalModes; i++) {
         int currentVisibleIndex = startIndex + i;
         int y = 30 + i * (CARD_HEIGHT + CARD_MARGIN);
         bool isSelected = (currentVisibleIndex == currentModeIndex);
-        uint32_t textColor = isSelected ? HIGHLIGHT_COLOR : TEXT_COLOR;
+
+        // Fondo del recuadro si está seleccionado
+        if (isSelected) {
+            uiSprite.fillRoundRect(x - 3, y - 1, textAreaW + 6, CARD_HEIGHT + 2, 3, CARD_COLOR);
+        }
 
         uiSprite.setFreeFont(&FreeSans9pt7b);
-        uiSprite.setTextColor(textColor);
         uiSprite.setTextSize(1);
         uiSprite.setTextDatum(TL_DATUM);
+        uiSprite.setTextColor(TEXT_COLOR);
 
         int modeVal = visibleModesMap[currentVisibleIndex];
+        String label;
+
         if (modeVal == -2) {
-            // Dibujar la opción "Regresar" como un icono de flecha izquierda.
-            int arrowWidth = 12;
-            int arrowHeight = 12;
-            int arrowX = x + (textAreaW - arrowWidth) / 2;
-            int arrowY = y + (CARD_HEIGHT - arrowHeight) / 2;
-            uiSprite.fillTriangle(arrowX + arrowWidth, arrowY, arrowX, arrowY + arrowHeight / 2, arrowX + arrowWidth, arrowY + arrowHeight, textColor);
-        }
-        else if (modeVal == -3) {
-            // Dibujar la opción "Encender/Apagar".
-            String label = selectedStates[currentIndex] ? getTranslation("APAGAR") : getTranslation("ENCENDER");
-            if (isSelected) {
-                if (currentModeIndex != lastSelectedMode) {
-                    modeTickerOffset = 0;
-                    modeTickerDirection = 1;
-                    lastSelectedMode = currentModeIndex;
-                }
-                uiSprite.setFreeFont(&FreeSans9pt7b);
-                uiSprite.setTextSize(1);
-                int fullTextWidth = uiSprite.textWidth(label);
-                if (fullTextWidth > textAreaW) {
-                    const unsigned long frameInterval = 50;
-                    unsigned long now = millis();
-                    if (now - modeLastFrameTime >= frameInterval) {
-                        modeTickerOffset += modeTickerDirection;
-                        if (modeTickerOffset < 0) {
-                            modeTickerOffset = 0;
-                            modeTickerDirection = 1;
-                        }
-                        if (modeTickerOffset > (fullTextWidth - textAreaW)) {
-                            modeTickerOffset = fullTextWidth - textAreaW;
-                            modeTickerDirection = -1;
-                        }
-                        modeLastFrameTime = now;
-                    }
-                    TFT_eSprite modeSprite = TFT_eSprite(&tft);
-                    modeSprite.createSprite(textAreaW, CARD_HEIGHT);
-                    modeSprite.fillSprite(BACKGROUND_COLOR);
-                    modeSprite.setFreeFont(&FreeSans9pt7b);
-                    modeSprite.setTextSize(1);
-                    modeSprite.setTextDatum(TL_DATUM);
-                    modeSprite.setTextColor(textColor, BACKGROUND_COLOR);
-                    modeSprite.drawString(label, -modeTickerOffset, 0);
-                    modeSprite.pushToSprite(&uiSprite, x, y);
-                    modeSprite.deleteSprite();
-                } else {
-                    uiSprite.drawString(label, x, y);
-                }
-            } else {
-                uiSprite.drawString(label, x, y);
-                uiSprite.fillRect(0, y, x, CARD_HEIGHT, BACKGROUND_COLOR);
-                uiSprite.fillRect(120, y, 128 - 120, CARD_HEIGHT, BACKGROUND_COLOR);
-            }
-        }
-        else {
-            // Dibujar una opción normal de modo.
+            label = getTranslation("VOLVER");
+        } else if (modeVal == -3) {
+            label = selectedStates[currentIndex]
+                    ? getTranslation("APAGAR")
+                    : getTranslation("ENCENDER");
+        } else {
             char modeName[25] = {0};
             if (currentFile == "Ambientes" || currentFile == "Fichas") {
-                INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+                INFO_PACK_T* option = (currentFile == "Ambientes")
+                                      ? &ambientesOption
+                                      : &fichasOption;
                 strncpy(modeName, (char*)option->mode[modeVal].name, 24);
             } else {
                 fs::File f = SPIFFS.open(currentFile, "r");
@@ -910,78 +977,63 @@ void drawModesScreen() {
                     f.close();
                 }
             }
-            String modeStr = String(modeName);
+            label = String(modeName);
             if (currentFile == "Ambientes" || currentFile == "Fichas") {
-                modeStr = String(getTranslation(modeStr.c_str()));
+                label = getTranslation(label.c_str());
             }
-            // Para opciones normales, se accede al estado alternativo usando (índice visible - 1).
+
             bool modeAlternateState = false;
-            if (currentAlternateStates.size() > (size_t)(currentVisibleIndex - 1) && visibleModesMap[currentVisibleIndex] != -2) {
+            if (currentAlternateStates.size() > (size_t)(currentVisibleIndex - 1)
+                && visibleModesMap[currentVisibleIndex] != -2) {
                 modeAlternateState = currentAlternateStates[currentVisibleIndex - 1];
             }
-            modeStr = getModeDisplayName(modeStr, modeAlternateState);
-            if (isSelected) {
-                if (currentModeIndex != lastSelectedMode) {
-                    modeTickerOffset = 0;
-                    modeTickerDirection = 1;
-                    lastSelectedMode = currentModeIndex;
-                }
-                uiSprite.setFreeFont(&FreeSans9pt7b);
-                uiSprite.setTextSize(1);
-                int fullTextWidth = uiSprite.textWidth(modeStr);
-                if (fullTextWidth > textAreaW) {
-                    const unsigned long frameInterval = 50;
-                    unsigned long now = millis();
-                    if (now - modeLastFrameTime >= frameInterval) {
-                        modeTickerOffset += modeTickerDirection;
-                        if (modeTickerOffset < 0) {
-                            modeTickerOffset = 0;
-                            modeTickerDirection = 1;
-                        }
-                        if (modeTickerOffset > (fullTextWidth - textAreaW)) {
-                            modeTickerOffset = fullTextWidth - textAreaW;
-                            modeTickerDirection = -1;
-                        }
-                        modeLastFrameTime = now;
-                    }
-                    TFT_eSprite modeSprite = TFT_eSprite(&tft);
-                    modeSprite.createSprite(textAreaW, CARD_HEIGHT);
-                    modeSprite.fillSprite(BACKGROUND_COLOR);
-                    modeSprite.setFreeFont(&FreeSans9pt7b);
-                    modeSprite.setTextSize(1);
-                    modeSprite.setTextDatum(TL_DATUM);
-                    modeSprite.setTextColor(textColor, BACKGROUND_COLOR);
-                    modeSprite.drawString(modeStr, -modeTickerOffset, 0);
-                    modeSprite.pushToSprite(&uiSprite, x, y);
-                    modeSprite.deleteSprite();
-                } else {
-                    uiSprite.drawString(modeStr, x, y);
-                }
-            } else {
-                uiSprite.drawString(modeStr, x, y);
-                uiSprite.fillRect(0, y, x, CARD_HEIGHT, BACKGROUND_COLOR);
-                uiSprite.fillRect(120, y, 128 - 120, CARD_HEIGHT, BACKGROUND_COLOR);
+            label = getModeDisplayName(label, modeAlternateState);
+        }
+
+        if (isSelected) {
+            if (currentModeIndex != lastSelectedMode) {
+                modeTickerOffset = 0;
+                modeTickerDirection = 1;
+                lastSelectedMode = currentModeIndex;
             }
+
+            int fullTextWidth = uiSprite.textWidth(label);
+            if (fullTextWidth > textAreaW) {
+                const unsigned long frameInterval = 50;
+                unsigned long now = millis();
+                if (now - modeLastFrameTime >= frameInterval) {
+                    modeTickerOffset += modeTickerDirection;
+                    if (modeTickerOffset < 0) {
+                        modeTickerOffset = 0;
+                        modeTickerDirection = 1;
+                    }
+                    if (modeTickerOffset > (fullTextWidth - textAreaW)) {
+                        modeTickerOffset = fullTextWidth - textAreaW;
+                        modeTickerDirection = -1;
+                    }
+                    modeLastFrameTime = now;
+                }
+                TFT_eSprite modeSprite(&tft);
+                modeSprite.createSprite(textAreaW, CARD_HEIGHT);
+                modeSprite.fillSprite(CARD_COLOR);
+                modeSprite.setFreeFont(&FreeSans9pt7b);
+                modeSprite.setTextSize(1);
+                modeSprite.setTextDatum(TL_DATUM);
+                modeSprite.setTextColor(TEXT_COLOR, CARD_COLOR);
+                modeSprite.drawString(label, -modeTickerOffset, 0);
+                modeSprite.pushToSprite(&uiSprite, x, y);
+                modeSprite.deleteSprite();
+            } else {
+                uiSprite.drawString(label, x, y);
+            }
+        } else {
+            uiSprite.drawString(label, x, y);
         }
     }
-    
-    // Dibujar la barra de desplazamiento vertical.
-    const int scrollBarWidth = 5;
-    int scrollBarY = 30;
-    uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN, TFT_DARKGREY);
-    if (totalModes > visibleOptions) {
-        float thumbRatio = (float)visibleOptions / (float)totalModes;
-        int thumbHeight = max(20, (int)((visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN) * thumbRatio));
-        int thumbY = scrollBarY + (visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN - thumbHeight)
-                     * (float)(currentModeIndex - startIndex) / (float)(totalModes - visibleOptions);
-        uiSprite.fillRect(scrollBarX, thumbY, scrollBarWidth, thumbHeight, TFT_LIGHTGREY);
-    } else {
-        uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN, TFT_LIGHTGREY);
-    }
-    
+
     uiSprite.pushSprite(0, 0);
-    
-    // Actualizar scroll vertical suave.
+
+    // Actualizar scroll vertical suave
     int visibleCurrentModeIndex = currentModeIndex;
     if (visibleCurrentModeIndex >= 0) {
         targetScrollOffset = visibleCurrentModeIndex * (CARD_HEIGHT + CARD_MARGIN);
@@ -992,6 +1044,7 @@ void drawModesScreen() {
     }
     scrollOffset += (targetScrollOffset - scrollOffset) / 4;
 }
+
 
 
 // Opciones del menú oculto
@@ -1007,11 +1060,79 @@ const int numOptions = sizeof(menuOptions) / sizeof(menuOptions[0]);
 // Número máximo de opciones visibles
 const int visibleOptions = 4;
 
+// void drawHiddenMenu(int selection)
+// {
+//     const int cardWidth = 110;
+//     const int cardHeight = CARD_HEIGHT;
+//     const int cardMargin = CARD_MARGIN;
+
+//     uiSprite.fillSprite(BACKGROUND_COLOR);
+
+//     // Dibujar el título (ya traducido)
+//     uiSprite.setFreeFont(&FreeSans12pt7b);
+//     uiSprite.setTextColor(TEXT_COLOR);
+//     uiSprite.setTextDatum(TC_DATUM);
+//     uiSprite.setTextSize(1);
+//     uiSprite.drawString(getTranslation("MENU_AJUSTES"), 64, 5);
+
+//     int startIndex = max(0, min(selection - visibleOptions / 2, numOptions - visibleOptions));
+
+//     // Posición X de inicio del texto
+//     int x = 9;
+//     const int scrollBarMargin = 3;
+//     const int scrollBarWidth = 5;
+//     int scrollBarX = 128 - scrollBarWidth - scrollBarMargin;
+//     int textAreaW = scrollBarX - x - 2;
+
+//     for (int i = 0; i < visibleOptions && (startIndex + i) < numOptions; i++)
+//     {
+//         int currentIndex = startIndex + i;
+//         int y = 30 + i * (cardHeight + cardMargin);
+//         bool isSelected = (currentIndex == selection);
+
+//         // Dibujar recuadro de fondo si está seleccionado
+//         if (isSelected) {
+//             uiSprite.fillRoundRect(x - 3, y - 1, textAreaW + 6, cardHeight + 2, 3, CARD_COLOR);
+//         }
+
+//         uiSprite.setFreeFont(&FreeSans9pt7b);
+//         uiSprite.setTextColor(TEXT_COLOR);
+//         uiSprite.setTextSize(1);
+//         uiSprite.setTextDatum(TL_DATUM);
+
+//         // Obtener y truncar el texto si excede el ancho disponible
+//         String tempStr = String(getTranslation(menuOptions[currentIndex]));
+//         while (uiSprite.textWidth(tempStr) > textAreaW && tempStr.length() > 0) {
+//             tempStr.remove(tempStr.length() - 1);
+//         }
+
+//         uiSprite.drawString(tempStr, x, y);
+//     }
+
+//     // Dibujar barra de scroll vertical
+//     const int scrollBarHeight = visibleOptions * (cardHeight + cardMargin) - cardMargin;
+//     const int scrollBarY = 30;
+//     uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_DARKGREY);
+
+//     if (numOptions > visibleOptions) {
+//         float thumbRatio = (float)visibleOptions / (float)numOptions;
+//         int thumbHeight = max(20, (int)(scrollBarHeight * thumbRatio));
+//         int thumbY = scrollBarY + (scrollBarHeight - thumbHeight)
+//                      * (float)(selection - startIndex) / (float)(numOptions - visibleOptions);
+//         uiSprite.fillRect(scrollBarX, thumbY, scrollBarWidth, thumbHeight, TFT_LIGHTGREY);
+//     }
+//     else {
+//         uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_LIGHTGREY);
+//     }
+
+//     uiSprite.pushSprite(0, 0);
+// }
+
 void drawHiddenMenu(int selection)
 {
-    const int cardWidth = 110;
-    const int cardHeight = CARD_HEIGHT;
-    const int cardMargin = CARD_MARGIN;
+    const int cardWidth    = 110;
+    const int cardHeight   = CARD_HEIGHT;
+    const int cardMargin   = CARD_MARGIN;
 
     uiSprite.fillSprite(BACKGROUND_COLOR);
 
@@ -1022,55 +1143,77 @@ void drawHiddenMenu(int selection)
     uiSprite.setTextSize(1);
     uiSprite.drawString(getTranslation("MENU_AJUSTES"), 64, 5);
 
-    int startIndex = max(0, min(selection - visibleOptions / 2, numOptions - visibleOptions));
+    // Ventana rodante: desplaza startIndex de uno en uno
+    static int startIndex = 0;
+    // Si avanzamos más allá de la penúltima fila visible, desplazamos hacia abajo
+    if ((selection - startIndex) > (visibleOptions - 2) 
+        && startIndex < (numOptions - visibleOptions)) {
+        startIndex++;
+    }
+    // Si retrocedemos más allá de la primera fila visible, desplazamos hacia arriba
+    else if ((selection - startIndex) < 1 
+             && startIndex > 0) {
+        startIndex--;
+    }
 
-    // Posición X de inicio del texto
-    int x = 9;  // margen izquierdo
-    // Calcular el límite derecho a partir de la posición de la barra vertical
+    // Posición X y cálculo del área de texto
+    int x = 9;
     const int scrollBarMargin = 3;
-    const int scrollBarWidth = 5;
+    const int scrollBarWidth  = 5;
     int scrollBarX = 128 - scrollBarWidth - scrollBarMargin;
-    // El ancho de la zona de texto es el espacio entre x y la barra vertical (dejando un pequeño margen)
-    int textAreaW = scrollBarX - x - 2; // 2 píxeles de margen extra
+    int textAreaW  = scrollBarX - x - 2;
 
+    // Dibujar cada opción
     for (int i = 0; i < visibleOptions && (startIndex + i) < numOptions; i++)
     {
         int currentIndex = startIndex + i;
         int y = 30 + i * (cardHeight + cardMargin);
-
         bool isSelected = (currentIndex == selection);
-        uint32_t textColor = isSelected ? HIGHLIGHT_COLOR : TEXT_COLOR;
+
+        // Resaltar opción seleccionada
+        if (isSelected) {
+            uiSprite.fillRoundRect(
+                x - 3, y - 1,
+                textAreaW + 6, cardHeight + 2,
+                3,
+                CARD_COLOR
+            );
+        }
 
         uiSprite.setFreeFont(&FreeSans9pt7b);
-        uiSprite.setTextColor(textColor);
+        uiSprite.setTextColor(TEXT_COLOR);
         uiSprite.setTextSize(1);
         uiSprite.setTextDatum(TL_DATUM);
 
-        // Se obtiene la cadena traducida a partir de la clave
+        // Obtener y truncar texto si excede el área
         String tempStr = String(getTranslation(menuOptions[currentIndex]));
         while (uiSprite.textWidth(tempStr) > textAreaW && tempStr.length() > 0) {
             tempStr.remove(tempStr.length() - 1);
         }
+
         uiSprite.drawString(tempStr, x, y);
     }
 
-    // Dibujar la barra vertical de scroll
-    const int scrollBarHeight = visibleOptions * (cardHeight + cardMargin) - cardMargin;
-    const int scrollBarY = 30;
-    uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_DARKGREY);
+    // // Dibujar la barra de scroll vertical
+    // const int scrollBarHeight = visibleOptions * (cardHeight + cardMargin) - cardMargin;
+    // const int scrollBarY      = 30;
+    // uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_DARKGREY);
 
-    if (numOptions > visibleOptions) {
-        float thumbRatio = (float)visibleOptions / (float)numOptions;
-        int thumbHeight = max(20, (int)(scrollBarHeight * thumbRatio));
-        int thumbY = scrollBarY + (scrollBarHeight - thumbHeight)
-                     * (float)(selection - startIndex) / (float)(numOptions - visibleOptions);
-        uiSprite.fillRect(scrollBarX, thumbY, scrollBarWidth, thumbHeight, TFT_LIGHTGREY);
-    }
-    else {
-        uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_LIGHTGREY);
-    }
+    // if (numOptions > visibleOptions) {
+    //     float thumbRatio = (float)visibleOptions / (float)numOptions;
+    //     int thumbHeight  = max(20, (int)(scrollBarHeight * thumbRatio));
+    //     int thumbY       = scrollBarY
+    //                      + (scrollBarHeight - thumbHeight)
+    //                      * (float)(selection - startIndex) 
+    //                        / (float)(numOptions - visibleOptions);
+    //     uiSprite.fillRect(scrollBarX, thumbY, scrollBarWidth, thumbHeight, TFT_LIGHTGREY);
+    // } else {
+    //     uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_LIGHTGREY);
+    // }
+
     uiSprite.pushSprite(0, 0);
 }
+
 
 void scrollTextTickerBounce(int selection)
 {
@@ -1177,49 +1320,49 @@ void drawLanguageMenu(int selection) {
     // Opciones de idioma: se definen 8 opciones
     const char* languageOptions[] = {"ES", "ES(MX)", "CA", "EU", "FR", "DE", "EN"};
     const int numLanguages = 7;
-    const int visibleOptions = 4; // Mostrar 4 opciones a la vez
+    const int visibleOptions = 4;
 
-    // Calcular el índice de inicio de las opciones visibles.
-    // Si la selección es menor que el número de opciones visibles, comenzamos en 0;
-    // de lo contrario, desplazamos para que la opción seleccionada esté al final de la lista visible.
     int startIndex = 0;
     if (selection >= visibleOptions) {
         startIndex = selection - visibleOptions + 1;
     }
 
-    // Limpiar el sprite
     uiSprite.fillSprite(BACKGROUND_COLOR);
 
-    // Título del submenú (puedes traducir "Idioma" si lo prefieres)
     uiSprite.setFreeFont(&FreeSans12pt7b);
     uiSprite.setTextColor(TEXT_COLOR);
     uiSprite.setTextDatum(TC_DATUM);
     uiSprite.setTextSize(1);
     uiSprite.drawString(getTranslation("IDIOMA"), 64, 5);
 
-    // Parámetros para la lista de opciones
-    const int startY = 30; 
-    const int cardHeight = CARD_HEIGHT;  
+    const int startY = 30;
+    const int cardHeight = CARD_HEIGHT;
     const int cardMargin = CARD_MARGIN;
+    const int x = 10;
+    const int textAreaW = 110;
 
-    // Dibujar solo las opciones visibles (desde startIndex hasta startIndex + visibleOptions)
     for (int i = 0; i < visibleOptions; i++) {
         int optionIndex = startIndex + i;
         if (optionIndex >= numLanguages) break;
+
         int y = startY + i * (cardHeight + cardMargin);
         bool isSelected = (optionIndex == selection);
-        uint32_t textColor = isSelected ? HIGHLIGHT_COLOR : TEXT_COLOR;
+
+        if (isSelected) {
+            uiSprite.fillRoundRect(x - 3, y - 1, textAreaW + 6, cardHeight + 2, 3, CARD_COLOR);
+        }
 
         uiSprite.setFreeFont(&FreeSans9pt7b);
-        uiSprite.setTextColor(textColor);
+        uiSprite.setTextColor(TEXT_COLOR);
         uiSprite.setTextSize(1);
         uiSprite.setTextDatum(TL_DATUM);
-        uiSprite.drawString(languageOptions[optionIndex], 10, y);
+        uiSprite.drawString(languageOptions[optionIndex], x, y);
     }
+
     uiSprite.pushSprite(0, 0);
 }
 
-       // Índice del primer elemento visible en la ventana
+// Índice del primer elemento visible en la ventana
 extern int bankMenuVisibleItems;
 
 void drawBankSelectionMenu(const std::vector<byte>& bankList, const std::vector<bool>& selectedBanks, int currentSelection, int windowOffset) {
@@ -1311,20 +1454,7 @@ void drawBankSelectionMenu(const std::vector<byte>& bankList, const std::vector<
             uiSprite.drawString(label, x, y);
         }
     }
-    
-    // Dibujar la barra de desplazamiento vertical, similar a drawModesScreen.
-    const int scrollBarWidth = 5;
-    int scrollBarY = 30;
-    uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN, TFT_DARKGREY);
-    if (totalItems > visibleOptions) {
-        float thumbRatio = (float)visibleOptions / (float)totalItems;
-        int thumbHeight = max(20, (int)((visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN) * thumbRatio));
-        int thumbY = scrollBarY + ((visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN - thumbHeight) *
-                        (float)(currentSelection - windowOffset) / (float)(totalItems - visibleOptions));
-        uiSprite.fillRect(scrollBarX, thumbY, scrollBarWidth, thumbHeight, TFT_LIGHTGREY);
-    } else {
-        uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN, TFT_LIGHTGREY);
-    }
+
     
     uiSprite.pushSprite(0, 0);
 }
@@ -1547,15 +1677,16 @@ void drawFormatSubmenu(int selected) {
 }
 
 // void drawFormatMenu(int selection) {
-//     const int scrollBarWidth = 5;
+//     const int scrollBarWidth = 6;
 //     const int visibleOptions = 4;
-//     const int totalOptions = 5;
+//     const int totalOptions = 6;
 
 //     const char* options[] = {
 //         getTranslation("UPDATE_SALA"),
 //         getTranslation("DELETE_ELEMENT"),
-//         getTranslation("RESTORE"),
+//         getTranslation("FORMATEAR"),
 //         getTranslation("SHOW_ID"),
+//         getTranslation("RESTORE_ELEM"),
 //         getTranslation("VOLVER")
 //     };
 
@@ -1571,9 +1702,10 @@ void drawFormatSubmenu(int selected) {
 //     const int x = 9;
 //     const int scrollBarX = 128 - scrollBarWidth - 3;
 //     const int textAreaW = scrollBarX - x - 2;
-
-//     int startIndex = max(0, min(selection - visibleOptions / 2, totalOptions - visibleOptions));
 //     int yOffset = 30;
+
+//     // Cálculo del índice de inicio para scroll vertical
+//     int startIndex = max(0, min(selection - visibleOptions / 2, totalOptions - visibleOptions));
 
 //     for (int i = 0; i < visibleOptions && (startIndex + i) < totalOptions; i++) {
 //         int idx = startIndex + i;
@@ -1587,27 +1719,25 @@ void drawFormatSubmenu(int selected) {
 //         uiSprite.setFreeFont(&FreeSans9pt7b);
 //         uiSprite.setTextSize(1);
 //         uiSprite.setTextDatum(TL_DATUM);
-//         uiSprite.setTextColor(isCursor ? TEXT_COLOR : TEXT_COLOR);
-//         // Medición y truncado manual
+//         uiSprite.setTextColor(TEXT_COLOR);
+
 //         String fullText = options[idx];
 //         String displayText = fullText;
 
 //         int textWidth = uiSprite.textWidth(fullText);
 //         if (textWidth > textAreaW) {
-//             // Truncar añadiendo "..."
 //             displayText = "";
 //             for (int c = 0; c < fullText.length(); c++) {
 //                 String temp = displayText + fullText[c];
 //                 if (uiSprite.textWidth(temp) > textAreaW) break;
 //                 displayText += fullText[c];
 //             }
-// }
+//         }
 
-// uiSprite.drawString(displayText, x, y);
-
+//         uiSprite.drawString(displayText, x, y);
 //     }
 
-//     // Barra de scroll
+//     // Dibujar barra de scroll
 //     int scrollBarY = yOffset;
 //     int scrollBarHeight = visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN;
 //     uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_DARKGREY);
@@ -1615,10 +1745,8 @@ void drawFormatSubmenu(int selected) {
 //     if (totalOptions > visibleOptions) {
 //         float thumbRatio = (float)visibleOptions / totalOptions;
 //         int thumbHeight = max(20, (int)(scrollBarHeight * thumbRatio));
-//         int divisor = (totalOptions - visibleOptions);
-//         int thumbY = scrollBarY + (scrollBarHeight - thumbHeight) 
-//                    * ((divisor != 0) ? (float)(selection - startIndex) / divisor : 0.0f);
-
+//         int divisor = totalOptions - visibleOptions;
+//         int thumbY = scrollBarY + (scrollBarHeight - thumbHeight) * ((divisor != 0) ? (float)(selection - startIndex) / divisor : 0.0f);
 //         uiSprite.fillRect(scrollBarX, thumbY, scrollBarWidth, thumbHeight, TFT_LIGHTGREY);
 //     } else {
 //         uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_LIGHTGREY);
@@ -1628,15 +1756,16 @@ void drawFormatSubmenu(int selected) {
 // }
 
 void drawFormatMenu(int selection) {
-    const int scrollBarWidth = 5;
-    const int visibleOptions = 4;
-    const int totalOptions = 5;
+    const int scrollBarWidth  = 6;
+    const int visibleOptions  = 4;
+    const int totalOptions    = 6;
 
     const char* options[] = {
         getTranslation("UPDATE_SALA"),
         getTranslation("DELETE_ELEMENT"),
-        getTranslation("RESTORE"),
+        getTranslation("FORMATEAR"),
         getTranslation("SHOW_ID"),
+        getTranslation("RESTORE_ELEM"),
         getTranslation("VOLVER")
     };
 
@@ -1649,21 +1778,41 @@ void drawFormatMenu(int selection) {
     uiSprite.setTextSize(1);
     uiSprite.drawString(String(getTranslation("CONTROL_SALA_MENU")), 64, 5);
 
-    const int x = 9;
+    const int x          = 9;
     const int scrollBarX = 128 - scrollBarWidth - 3;
-    const int textAreaW = scrollBarX - x - 2;
-    int yOffset = 30;
+    const int textAreaW  = scrollBarX - x - 2;
+    const int yOffset    = 30;
 
-    // Cálculo del índice de inicio para scroll vertical
-    int startIndex = max(0, min(selection - visibleOptions / 2, totalOptions - visibleOptions));
+    // Ventana rodante: desplaza startIndex uno en vez de centrar
+    static int startIndex = 0;
+    // Bajar: si el cursor llega a la última fila visible (índice visibleOptions-1)
+    // y aún hay más opciones por debajo
+    if ((selection - startIndex) > (visibleOptions - 2)
+        && startIndex < (totalOptions - visibleOptions)) {
+        startIndex++;
+    }
+    // Subir: si el cursor llega a la primera fila visible (índice 0)
+    // y aún hay más opciones por encima
+    else if ((selection - startIndex) < 1
+             && startIndex > 0) {
+        startIndex--;
+    }
 
+    // Dibujar cada opción
     for (int i = 0; i < visibleOptions && (startIndex + i) < totalOptions; i++) {
         int idx = startIndex + i;
-        int y = yOffset + i * (CARD_HEIGHT + CARD_MARGIN);
+        int y   = yOffset + i * (CARD_HEIGHT + CARD_MARGIN);
         bool isCursor = (idx == selection);
 
         if (isCursor) {
-            uiSprite.fillRoundRect(x - 3, y - 1, textAreaW + 6, CARD_HEIGHT + 2, 3, CARD_COLOR);
+            uiSprite.fillRoundRect(
+                x - 3,
+                y - 1,
+                textAreaW + 6,
+                CARD_HEIGHT + 2,
+                3,
+                CARD_COLOR
+            );
         }
 
         uiSprite.setFreeFont(&FreeSans9pt7b);
@@ -1671,39 +1820,43 @@ void drawFormatMenu(int selection) {
         uiSprite.setTextDatum(TL_DATUM);
         uiSprite.setTextColor(TEXT_COLOR);
 
-        String fullText = options[idx];
+        // Truncar si el texto es demasiado largo
+        String fullText    = options[idx];
         String displayText = fullText;
-
-        int textWidth = uiSprite.textWidth(fullText);
-        if (textWidth > textAreaW) {
+        if (uiSprite.textWidth(fullText) > textAreaW) {
             displayText = "";
             for (int c = 0; c < fullText.length(); c++) {
-                String temp = displayText + fullText[c];
-                if (uiSprite.textWidth(temp) > textAreaW) break;
-                displayText += fullText[c];
+                String tmp = displayText + fullText[c];
+                if (uiSprite.textWidth(tmp) > textAreaW) break;
+                displayText = tmp;
             }
         }
 
         uiSprite.drawString(displayText, x, y);
     }
 
-    // Dibujar barra de scroll
-    int scrollBarY = yOffset;
-    int scrollBarHeight = visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN;
-    uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_DARKGREY);
+    // // Barra de scroll vertical
+    // int scrollBarY      = yOffset;
+    // int scrollBarHeight = visibleOptions * (CARD_HEIGHT + CARD_MARGIN) - CARD_MARGIN;
+    // uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_DARKGREY);
 
-    if (totalOptions > visibleOptions) {
-        float thumbRatio = (float)visibleOptions / totalOptions;
-        int thumbHeight = max(20, (int)(scrollBarHeight * thumbRatio));
-        int divisor = totalOptions - visibleOptions;
-        int thumbY = scrollBarY + (scrollBarHeight - thumbHeight) * ((divisor != 0) ? (float)(selection - startIndex) / divisor : 0.0f);
-        uiSprite.fillRect(scrollBarX, thumbY, scrollBarWidth, thumbHeight, TFT_LIGHTGREY);
-    } else {
-        uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_LIGHTGREY);
-    }
+    // if (totalOptions > visibleOptions) {
+    //     float thumbRatio = (float)visibleOptions / totalOptions;
+    //     int thumbHeight = max(20, (int)(scrollBarHeight * thumbRatio));
+    //     int divisor     = totalOptions - visibleOptions;
+    //     int thumbY      = scrollBarY
+    //                       + (scrollBarHeight - thumbHeight)
+    //                       * ((divisor != 0)
+    //                          ? (float)(selection - startIndex) / divisor
+    //                          : 0.0f);
+    //     uiSprite.fillRect(scrollBarX, thumbY, scrollBarWidth, thumbHeight, TFT_LIGHTGREY);
+    // } else {
+    //     uiSprite.fillRect(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight, TFT_LIGHTGREY);
+    // }
 
     uiSprite.pushSprite(0, 0);
 }
+
 
 bool forceDrawDeleteElementMenu = false;
 
@@ -1836,19 +1989,23 @@ void scrollTextTickerBounceFormat(int selection) {
     const int visibleOptions = 4;
     const unsigned long frameInterval = 10;
     const int scrollMargin = 10;
+    const int totalOptions = 6;
 
-    static int pixelOffsets[4] = {0};
-    static int scrollDirections[4] = {1};
+
+    static int pixelOffsets[6] = {0};
+    static int scrollDirections[6] = {1};
     static unsigned long lastFrameTime = 0;
 
     const char* options[] = {
         getTranslation("UPDATE_SALA"),
         getTranslation("DELETE_ELEMENT"),
-        getTranslation("RESTORE"),
+        getTranslation("FORMATEAR"),
+        getTranslation("SHOW_ID"),
+        getTranslation("RESTORE_ELEM"),
         getTranslation("VOLVER")
     };
 
-    if (selection < 0 || selection >= 4) return;
+    if (selection < 0 || selection >= 5) return;
     String text = String(options[selection]);
 
     TFT_eSprite measureSprite(&tft);
@@ -1857,9 +2014,10 @@ void scrollTextTickerBounceFormat(int selection) {
     measureSprite.setTextSize(1);
     measureSprite.setTextDatum(TL_DATUM);
     int fullTextWidth = measureSprite.textWidth(text.c_str());
+
     if (fullTextWidth <= cardWidth) return;
 
-    int startIndex = max(0, min(selection - visibleOptions / 2, 4 - visibleOptions));
+    int startIndex = max(0, min(selection - visibleOptions / 2, totalOptions - visibleOptions));
     int cardIndex = selection - startIndex;
     if (cardIndex < 0 || cardIndex >= visibleOptions) return;
 
@@ -2052,6 +2210,125 @@ void drawConfirmRestoreMenu(int selection) {
     }
 
     uiSprite.pushSprite(0, 0);
+}
+
+void drawConfirmRestoreElementMenu(int selection) {
+    uiSprite.fillSprite(BACKGROUND_COLOR);
+    uiSprite.setFreeFont(&FreeSans9pt7b);
+    uiSprite.setTextDatum(TC_DATUM);
+    uiSprite.setTextSize(1);
+    uiSprite.setTextColor(TEXT_COLOR);
+
+    uiSprite.drawString("Restaurar elementos?", 64, 10);
+
+    const char* options[] = {"Si", "No"};
+    for (int i = 0; i < 2; i++) {
+        int y = 40 + i * 40;
+        if (i == selection) {
+            uiSprite.fillRoundRect(20, y - 5, 88, 30, 5, CARD_COLOR);
+        }
+        uiSprite.setTextDatum(TC_DATUM);
+        uiSprite.drawString(options[i], 64, y);
+    }
+
+    uiSprite.pushSprite(0, 0);
+}
+
+// Muestra por pantalla el número de serie y el ID de un elemento durante un tiempo
+// y luego vuelve al menú principal.
+// Debes tener disponible la función mostrarTextoAjustado tal como la definiste antes.
+
+void mostrarTextoAjustado(TFT_eSPI& tft,
+                                 const char* texto,
+                                 uint16_t xCentro,
+                                 uint16_t yInicio,
+                                 uint16_t maxWidth)
+{
+    uint8_t prevFont = tft.textfont;
+    uint8_t prevDatum = tft.getTextDatum();
+
+    tft.setTextColor(TFT_WHITE);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextFont(2);
+
+    const uint16_t lineHeight   = tft.fontHeight();
+    const uint16_t screenHeight = 128;
+    const uint16_t maxTextHeight = 55;
+
+    tft.fillRect(5, yInicio - lineHeight/2, 118, maxTextHeight, TFT_BLACK);
+
+
+    const char* ptr = texto;
+    uint16_t y = yInicio;
+    while (*ptr && y + lineHeight <= yInicio + maxTextHeight) {
+        const char* scan = ptr;
+        size_t lastSpace = 0, charsCount = 0;
+        uint16_t w = 0;
+        while (*scan) {
+            ++charsCount;
+            if (charsCount >= 128) break;
+            char buf[128];
+            memcpy(buf, ptr, charsCount);
+            buf[charsCount] = '\0';
+            w = tft.textWidth(buf);
+            if (w > maxWidth) { --charsCount; break; }
+            if (*scan == ' ') lastSpace = charsCount;
+            ++scan;
+        }
+        size_t lineLen = (*scan == '\0') ? charsCount
+                          : (lastSpace > 0 ? lastSpace : charsCount);
+        char lineBuf[128];
+        memcpy(lineBuf, ptr, lineLen);
+        lineBuf[lineLen] = '\0';
+        tft.drawString(lineBuf, xCentro, y);
+        ptr += lineLen;
+        while (*ptr == ' ') ++ptr;
+        y += lineHeight;
+    }
+
+    tft.setTextFont(prevFont);
+    tft.setTextDatum(prevDatum);
+}
+
+
+void showElemInfo(unsigned long delayTime,
+                  const String& serialNumber,
+                  const String& elementID) {
+    // 1) Limpiar toda la pantalla
+    tft.fillScreen(TFT_BLACK);
+
+    // 2) Preparar cadenas a mostrar
+    String idLine     = "ID: " + elementID;
+    String serialLine = "Serial: " + serialNumber;
+
+    // 3) Parámetros para centrar y ajustar el texto
+    const uint16_t xCentro   = tft.width() / 2;  // centro horizontal
+    const uint16_t maxWidth  = tft.width()  - 10; // margen de 5px a cada lado
+
+    // 4) Mostrar ID (empezando en y = 30)
+    mostrarTextoAjustado(tft,
+                         idLine.c_str(),
+                         xCentro,
+                         30,         // yInicio para la primera línea
+                         maxWidth);
+
+    // 5) Mostrar Serial (empezando en y = 30 + altura de bloque)
+    //    Como en mostrarTextoAjustado el bloque máximo de texto es 55px,
+    //    desplazamos 30 + 55 + 10 de separación = 95px
+    mostrarTextoAjustado(tft,
+                         serialLine.c_str(),
+                         xCentro,
+                         60,         // yInicio para la segunda línea
+                         maxWidth);
+
+    // 6) Mantener la pantalla durante delayTime ms
+    unsigned long start = millis();
+    while (millis() - start < delayTime) {
+        // Aquí podrías refrescar watchdog u otras tareas si fuera necesario
+    }
+
+    // 7) Volver al menú principal
+    drawCurrentElement();
 }
 
 

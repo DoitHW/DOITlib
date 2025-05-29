@@ -49,16 +49,16 @@ void IRAM_ATTR onUartInterrupt() {
     while (Serial1.available()) {
         byte receivedByte = Serial1.read();
         bytesProcessed++; // Increment bytes processed count
-        Serial.print((" 0x"+String(receivedByte, HEX)).c_str());
-            DEBUG__________(("\n\n0x" +String(receivedByte, HEX)).c_str())
-            DEBUG__________(("expectedFrameLength str = " +String(expectedFrameLength)).c_str())
-            DEBUG__________(("Recieve state: " +String(receiveState)).c_str())
-            DEBUG__________(("UartBuffer.size()" +String(uartBuffer.size())).c_str())
+        DEBUG__________((" 0x"+String(receivedByte, HEX)).c_str());
+            //DEBUG__________(("\n\n0x" +String(receivedByte, HEX)).c_str())
+            //DEBUG__________ln(("expectedFrameLength str = " +String(expectedFrameLength)).c_str())
+            //DEBUG__________ln(("Recieve state: " +String(receiveState)).c_str())
+            //DEBUG__________ln(("UartBuffer.size()" +String(uartBuffer.size())).c_str())
     
         lastReceivedTime = millis();
         if (receiveState == WAITING_START && receivedByte != NEW_START){
             
-                DEBUG__________("if (receiveState == WAITING_START && receivedByte != NEW_START)")
+                //DEBUG__________ln("if (receiveState == WAITING_START && receivedByte != NEW_START)")
             
             continue;}
     
@@ -67,16 +67,16 @@ void IRAM_ATTR onUartInterrupt() {
             receiveState = WAITING_START;
             uartBuffer.clear();
             expectedFrameLength= 0;
-            DEBUG__________( " ISR Error: UART buffer MAX SIZE reached - Resetting\n\n\n\n\n\n\n\n\n");
-            DEBUG__________( " ISR Error: UART buffer MAX SIZE reached - Resetting\n\n\n\n\n\n\n\n\n");
-            DEBUG__________( " ISR Error: UART buffer MAX SIZE reached - Resetting\n\n\n\n\n\n\n\n\n");
+            //DEBUG__________ln( " ISR Error: UART buffer MAX SIZE reached - Resetting\n\n\n\n\n\n\n\n\n");
+            //DEBUG__________ln( " ISR Error: UART buffer MAX SIZE reached - Resetting\n\n\n\n\n\n\n\n\n");
+            //DEBUG__________ln( " ISR Error: UART buffer MAX SIZE reached - Resetting\n\n\n\n\n\n\n\n\n");
             return; // Exit ISR to prevent buffer overflow
         }
         // --- END OF ADDED BUFFER SIZE CHECK ---
     
         switch (receiveState) {
             case WAITING_START:
-                DEBUG__________("fase waiting")
+                //DEBUG__________ln("fase waiting")
                 if (receivedByte == NEW_START) {
                     uartBuffer.reserve(MAX_FRAME_LENGTH);
                     uartBuffer.clear();
@@ -91,7 +91,7 @@ void IRAM_ATTR onUartInterrupt() {
                 break;
     
             case RECEIVING_LENGTH_MSB:
-                DEBUG__________("rec_L_MSB")
+                //DEBUG__________ln("rec_L_MSB")
                 uartBuffer.push_back(receivedByte);
                 calculatedChecksum += receivedByte;
                 while (calculatedChecksum > 0xFF) calculatedChecksum = (calculatedChecksum & 0xFF) + (calculatedChecksum >> 8);
@@ -100,20 +100,20 @@ void IRAM_ATTR onUartInterrupt() {
                 break;
     
             case RECEIVING_LENGTH_LSB:
-            DEBUG__________("rec_L_LSB")
+            //DEBUG__________ln("rec_L_LSB")
             uartBuffer.push_back(receivedByte);
             calculatedChecksum += receivedByte;
             while (calculatedChecksum > 0xFF) calculatedChecksum = (calculatedChecksum & 0xFF) + (calculatedChecksum >> 8);
             expectedFrameLength |= receivedByte;
             // Move the debug print HERE, after LSB processing:
-            DEBUG__________("expectedFrameLength = " +String(expectedFrameLength))
+            //DEBUG__________ln("expectedFrameLength = " +String(expectedFrameLength))
             totalFrameLength = expectedFrameLength + 3;
     
                 if (totalFrameLength > MAX_FRAME_LENGTH || totalFrameLength < MIN_FRAME_LENGTH) {
                     receiveState = WAITING_START;
                     uartBuffer.clear();
                    
-                        DEBUG__________("❌ Error: Longitud de trama inv\xE1lida - Resetting");
+                        DEBUG__________ln("❌ Error: Longitud de trama inv\xE1lida - Resetting");
                   
                     return;
                 }
@@ -123,7 +123,7 @@ void IRAM_ATTR onUartInterrupt() {
                 break;
     
             case RECEIVING_FRAME:
-                DEBUG__________("rec_FRAME")
+                //DEBUG__________("rec_FRAME");
                 uartBuffer.push_back(receivedByte);
                 receivedBytes++;
                 if (receivedBytes != totalFrameLength - 1) calculatedChecksum += receivedByte;
@@ -148,24 +148,24 @@ void IRAM_ATTR onUartInterrupt() {
                             }
                             isTarget = true; //eliminar esta línea
                             if (isTarget) {
-                                Serial.println();
+                                //DEBUG__________ln();
                                 frameReceived = true; // Set flag for loop() to process
-                                Serial.println("Trama recibida y válida 🟢🟢🟢");
-                                    DEBUG__________(" ISR: Frame Received OK, targeted to device");
+                                DEBUG__________ln("\nTrama recibida y válida 🟢🟢🟢");
+                                //DEBUG__________ln(" ISR: Frame Received OK, targeted to device");
                                 
                             } else {
                                 
-                                    DEBUG__________(" ISR: Frame Received OK, not targeted to device");
+                                    DEBUG__________ln(" ISR: Frame Received OK, not targeted to device");
                                
                             }
                         } else {
                             
-                                DEBUG__________(" ISR Error: Checksum invalid - Frame discarded");
+                                DEBUG__________ln(" ISR Error: Checksum invalid - Frame discarded");
                            
                         }
                     } else {
                       
-                            DEBUG__________(" ISR Error: Invalid END byte - Frame discarded");
+                            DEBUG__________ln(" ISR Error: Invalid END byte - Frame discarded");
                        
                     }
                     receiveState = WAITING_START; // Reset state for next frame
@@ -174,7 +174,7 @@ void IRAM_ATTR onUartInterrupt() {
     
                 if (uartBuffer.size() >= MAX_BUFFER_SIZE) {
     
-                    DEBUG__________("Superado tamaño uartbuffer")
+                    DEBUG__________ln("Superado tamaño uartbuffer")
                     receiveState = WAITING_START; // Reset state on buffer overflow
                     uartBuffer.clear();
                     return; // Exit ISR on buffer overflow
@@ -187,7 +187,7 @@ void IRAM_ATTR onUartInterrupt() {
     if (Serial1.available() && bytesProcessed >= MAX_BYTES_PER_INTERRUPT) {
         partialFrameReceived = true; // Set flag for partial frame (not used in current loop() logic)
        
-            DEBUG__________(" ISR: Partial frame received (more bytes available)");
+            DEBUG__________ln(" ISR: Partial frame received (more bytes available)");
         
     }
 }
@@ -213,7 +213,7 @@ byte checksum_calc(const FRAME_T &framein) {
 }
 
 void printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
-    Serial.println("\n==== 📨 Trama Recibida 📨 ====");
+    DEBUG__________ln("\n==== 📨 Trama Recibida 📨 ====");
 
     // Determinar origen
     String origenStr;
@@ -222,7 +222,7 @@ void printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
     else if (LEF.origin == 0xFF) origenStr = "BROADCAST";
     else origenStr = "DESCONOCIDO";
 
-    Serial.printf("📌 Origen: %s (0x%02X)\n", origenStr.c_str(), LEF.origin);
+    DEBUG__________printf("📌 Origen: %s (0x%02X)\n", origenStr.c_str(), LEF.origin);
 
     // Determinar función
     String functionStr;
@@ -251,19 +251,19 @@ void printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
         default: functionStr = "FUNCIÓN DESCONOCIDA";
     }
 
-    Serial.printf("🛠️  Función: %s (0x%02X)\n", functionStr.c_str(), LEF.function);
+    DEBUG__________printf("🛠️  Función: %s (0x%02X)\n", functionStr.c_str(), LEF.function);
 
     // Interpretación de datos
-    Serial.print("📦 Data: ");
+    DEBUG__________("📦 Data: ");
     if (LEF.data.empty()) {
-        Serial.println("No hay datos para esta función.");
+        DEBUG__________ln("No hay datos para esta función.");
     } else {
         if (LEF.function == 0xCA || LEF.function == 0xCB) { // Sensores
             int minVal = (LEF.data[0] << 8) | LEF.data[1];
             int maxVal = (LEF.data[2] << 8) | LEF.data[3];
             int sensedVal = (LEF.data[4] << 8) | LEF.data[5];
 
-            Serial.printf("MIN = %d, MAX= %d, VAL= %d\n", minVal, maxVal, sensedVal);
+            DEBUG__________printf("MIN = %d, MAX= %d, VAL= %d\n", minVal, maxVal, sensedVal);
         } 
         else if (LEF.function == 0xC1) { // Color recibido
             String colorName;
@@ -279,7 +279,7 @@ void printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
                 case 8: colorName = "NEGRO"; break;
                 default: colorName = "COLOR DESCONOCIDO";
             }
-            Serial.printf("%s (0x%02X)\n", colorName.c_str(), LEF.data[0]);
+            DEBUG__________printf("%s (0x%02X)\n", colorName.c_str(), LEF.data[0]);
         } 
         else if (LEF.function == F_SEND_COMMAND) { // Color recibido
             String cmdName;
@@ -290,28 +290,28 @@ void printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
                 case SEND_REG_RF_CMD: cmdName = "ENVIAR REG POR RF"; break;
                 default: cmdName = "A SABER...";
             }
-            Serial.printf("%s (0x%02X)\n", cmdName.c_str(), LEF.data[0]);
+            DEBUG__________printf("%s (0x%02X)\n", cmdName.c_str(), LEF.data[0]);
         } 
         else if (LEF.function == 0xCE) { // Cambio en el relé
-            Serial.println("Cambio de estado en el relé.");
+            DEBUG__________ln("Cambio de estado en el relé.");
         } 
         else if (LEF.function == 0xA0) { // Petición de sector
             String idioma = (LEF.data[0] == 1) ? "ES" : "OTRO";
-            Serial.printf("Idioma: %s, Sector: %d\n", idioma.c_str(), LEF.data[1]);
+            DEBUG__________printf("Idioma: %s, Sector: %d\n", idioma.c_str(), LEF.data[1]);
         } 
         else if (LEF.function == 0xCC) { // Petición de archivo
-            Serial.printf("Carpeta (Bank): %d, Archivo (File): %d\n", LEF.data[0], LEF.data[1]);
+            DEBUG__________printf("Carpeta (Bank): %d, Archivo (File): %d\n", LEF.data[0], LEF.data[1]);
         } 
         else {
             // Imprimir todos los datos si no hay interpretación específica
             for (size_t i = 0; i < LEF.data.size(); i++) {
-                Serial.printf("0x%02X ", LEF.data[i]);
+                DEBUG__________printf("0x%02X ", LEF.data[i]);
             }
-            Serial.println();
+            DEBUG__________ln();
         }
     }
 
-    Serial.println("=============================");
+    DEBUG__________ln("=============================");
 }
 
 LAST_ENTRY_FRAME_T extract_info_from_frameIn(const std::vector<uint8_t> &frame)
@@ -347,74 +347,74 @@ void send_frame(const FRAME_T &framein) {
     int i = 0;
     byte dTime = 5;
                                                                                                 #ifdef DEBUG
-                                                                                                Serial.println(" #### Trama enviada ####");
+                                                                                                DEBUG__________ln(" #### Trama enviada ####");
                                                                                                 #endif
     Serial1.write(framein.start);
     delay(dTime);
                                                                                                 #ifdef DEBUG
-                                                                                                Serial.println("[" + String(++i) + "] START = " + String(framein.start, HEX));
+                                                                                                DEBUG__________ln("[" + String(++i) + "] START = " + String(framein.start, HEX));
                                                                                                 #endif
     Serial1.write(framein.frameLengthMsb);
     delay(dTime);
                                                                                                 #ifdef DEBUG  
-                                                                                                Serial.println("[" + String(++i) + "] Frame Length Msb = " + String(framein.frameLengthMsb, HEX)); 
+                                                                                                DEBUG__________ln("[" + String(++i) + "] Frame Length Msb = " + String(framein.frameLengthMsb, HEX)); 
                                                                                                 #endif
     Serial1.write(framein.frameLengthLsb); 
     delay(dTime);
                                                                                                 #ifdef DEBUG
-                                                                                                Serial.println("[" + String(++i) + "] Frame Length Lsb = " + String(framein.frameLengthLsb, HEX)); 
+                                                                                                DEBUG__________ln("[" + String(++i) + "] Frame Length Lsb = " + String(framein.frameLengthLsb, HEX)); 
                                                                                                 #endif
     Serial1.write(framein.origin);          
     delay(dTime);
                                                                                                 #ifdef DEBUG
-                                                                                                Serial.println("[" + String(++i) + "] Origen = " + String(framein.origin, HEX)); 
+                                                                                                DEBUG__________ln("[" + String(++i) + "] Origen = " + String(framein.origin, HEX)); 
                                                                                                 #endif
     Serial1.write(framein.numTargets);      
     delay(dTime);
                                                                                                 #ifdef DEBUG
-                                                                                                Serial.println("[" + String(++i) + "] numTargets = " + String(framein.numTargets, HEX)); 
+                                                                                                DEBUG__________ln("[" + String(++i) + "] numTargets = " + String(framein.numTargets, HEX)); 
                                                                                                 #endif
     int dataIndex = 0;
     for (byte target : framein.target) {
         Serial1.write(target); 
         delay(dTime);
                                                                                                 #ifdef DEBUG
-                                                                                                Serial.println("[" + String(++i) + "] Target[" + String(dataIndex++) + "] = " + String(target, HEX)); 
+                                                                                                DEBUG__________ln("[" + String(++i) + "] Target[" + String(dataIndex++) + "] = " + String(target, HEX)); 
                                                                                                 #endif
     }
     Serial1.write(framein.function);        
     delay(dTime);
                                                                                                 #ifdef DEBUG
-                                                                                                Serial.println("[" + String(++i) + "] Function = " + String(framein.function, HEX)); 
+                                                                                                DEBUG__________ln("[" + String(++i) + "] Function = " + String(framein.function, HEX)); 
                                                                                                 #endif
     Serial1.write(framein.dataLengthMsb);   
     delay(dTime);
                                                                                                 #ifdef DEBUG
-                                                                                                Serial.println("[" + String(++i) + "] Data Length Msb = " + String(framein.dataLengthMsb, HEX)); 
+                                                                                                DEBUG__________ln("[" + String(++i) + "] Data Length Msb = " + String(framein.dataLengthMsb, HEX)); 
                                                                                                 #endif
     Serial1.write(framein.dataLengthLsb);   
     delay(dTime);
                                                                                                 #ifdef DEBUG
-                                                                                                Serial.println("[" + String(++i) + "] Data Length Lsb = " + String(framein.dataLengthLsb, HEX)); 
+                                                                                                DEBUG__________ln("[" + String(++i) + "] Data Length Lsb = " + String(framein.dataLengthLsb, HEX)); 
                                                                                                 #endif
     dataIndex = 0;
     for (byte dato : framein.data) {
         Serial1.write(dato); 
         delay(dTime);
                                                                                                 #ifdef DEBUG
-                                                                                                Serial.println("[" + String(++i) + "] Data[" + String(dataIndex++) + "] = " + String(dato, HEX)); 
+                                                                                                DEBUG__________ln("[" + String(++i) + "] Data[" + String(dataIndex++) + "] = " + String(dato, HEX)); 
                                                                                                 #endif
     }
     Serial1.write(framein.checksum);        
     delay(dTime);
                                                                                                 #ifdef DEBUG
-                                                                                                Serial.println("[" + String(++i) + "] Checksum = " + String(framein.checksum, HEX)); 
+                                                                                                DEBUG__________ln("[" + String(++i) + "] Checksum = " + String(framein.checksum, HEX)); 
                                                                                                 #endif
     Serial1.write(framein.end);             
     delay(dTime);
                                                                                                 #ifdef DEBUG
-                                                                                                Serial.println("[" + String(++i) + "] End = " + String(framein.end, HEX)); 
-                                                                                                Serial.println("======================================");
+                                                                                                DEBUG__________ln("[" + String(++i) + "] End = " + String(framein.end, HEX)); 
+                                                                                                DEBUG__________ln("======================================");
                                                                                                 #endif
 }
 
@@ -543,9 +543,9 @@ uint16_t unidimensional_table[SIZE * SIZE];
 
 void  get_sector_data(byte *sector_data, byte lang, byte sector){
                                                                                             #ifdef DEBUG
-                                                                                            Serial.println("Aqui hem entrat a get_sector_data.");
-                                                                                            Serial.println(("GSD_Lang: " + String(lang)));
-                                                                                            Serial.println(("GSD_Sector: " + String(sector)));
+                                                                                            DEBUG__________ln("Aqui hem entrat a get_sector_data.");
+                                                                                            DEBUG__________ln(("GSD_Lang: " + String(lang)));
+                                                                                            DEBUG__________ln(("GSD_Sector: " + String(sector)));
                                                                                             #endif
     memset(sector_data, 0, 192);
 
@@ -568,7 +568,7 @@ void  get_sector_data(byte *sector_data, byte lang, byte sector){
         case ELEM_DESC_SECTOR:
             data = get_string_from_info_DB(ELEM_DESC, lang);
                                                                                                     #ifdef DEBUG
-                                                                                                    Serial.println("Data: " + String(data));
+                                                                                                    DEBUG__________ln("Data: " + String(data));
                                                                                                     #endif
             data.toCharArray((char*)sector_data, 192);
             break;
@@ -1245,7 +1245,7 @@ FRAME_T frameMaker_RETURN_ELEM_SECTOR (byte originin, byte targetin, byte *secto
     frame.data.resize(0);
     frame.function= F_RETURN_ELEM_SECTOR;
                                                                                         #ifdef DEBUG
-                                                                                            Serial.println("Sector a enviar: " + String(sectorin, HEX));
+                                                                                            DEBUG__________ln("Sector a enviar: " + String(sectorin, HEX));
                                                                                         #endif
     frame.data.push_back(sectorin);
     switch (sectorin) {
@@ -1283,7 +1283,7 @@ FRAME_T frameMaker_RETURN_ELEM_SECTOR (byte originin, byte targetin, byte *secto
 // serial falta
             case ELEM_DESC_SECTOR:
                                                                                         #ifdef DEBUG
-                                                                                        Serial.println("Se ha pedido una descripción del elemento. ");
+                                                                                        DEBUG__________ln("Se ha pedido una descripción del elemento. ");
                                                                                         #endif
                 frameLength = 0x08 + L_RETURN_ELEM_SECTOR_192 + 1;
                 frame.frameLengthLsb = frameLength & 0xFF;     
@@ -1463,7 +1463,7 @@ FRAME_T frameMaker_RETURN_ELEM_SECTOR (byte originin, byte targetin, byte *secto
 
         default:
         #ifdef DEBUG
-         Serial.println("Sector no valido");
+         DEBUG__________ln("Sector no valido");
          #endif
                 break;
     }

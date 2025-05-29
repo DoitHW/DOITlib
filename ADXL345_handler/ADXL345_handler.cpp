@@ -26,7 +26,7 @@ void ADXL345Handler::init()
         }
         else
         {
-            Serial.println("ADXL345 no detectado, reintentando...");
+            DEBUG__________ln("ADXL345 no detectado, reintentando...");
             delay(500); // Espera antes del siguiente intento
         }
         attempt++;
@@ -34,14 +34,14 @@ void ADXL345Handler::init()
 
     if (!detected)
     {
-        Serial.println("ADXL345 no detectado");
+        DEBUG__________ln("ADXL345 no detectado");
         initialized = false;
         return;
     }
 
     accel.setRange(ADXL345_RANGE_16_G);
     initialized = true;
-    Serial.println("ADXL345 inicializado correctamente");
+    DEBUG__________ln("ADXL345 inicializado correctamente");
 }
 
 // Leer la inclinación del ADXL345
@@ -55,7 +55,7 @@ void ADXL345Handler::readInclination(char axis)
     accel.getEvent(&event);
     float currentInclination;
     if (!accel.getEvent(&event)) {
-        Serial.println("Error reading ADXL345 event!");
+        DEBUG__________ln("Error reading ADXL345 event!");
         return; // Exit if reading fails
         }
 
@@ -74,13 +74,13 @@ void ADXL345Handler::readInclination(char axis)
     if (abs(currentInclination - lastInclination) >= threshold)
     {
 #ifdef DEBUG
-        Serial.print("Inclinación detectada (");
-        Serial.print(axis);
-        Serial.print("): ");
+        DEBUG__________("Inclinación detectada (");
+        DEBUG__________(axis);
+        DEBUG__________("): ");
 #endif
 
         currentInclination = constrain(currentInclination, -10, 10);
-        Serial.println(currentInclination);
+        DEBUG__________ln(currentInclination);
 
         long finalValue = convertInclinationToValue(currentInclination);
         SENSOR_VALUE_T sensorValue = createSensorValue(finalValue);
@@ -116,7 +116,7 @@ void ADXL345Handler::sendSensorValue(const SENSOR_VALUE_T &sensorValue) {
     
     if (currentElementID == 0xFF) {
                                                                                         #ifdef DEBUG
-                                                                                            Serial.println("⚠️ Advertencia: No se pudo obtener la ID del elemento actual. No se enviará la trama.");                                                                            
+                                                                                            DEBUG__________ln("⚠️ Advertencia: No se pudo obtener la ID del elemento actual. No se enviará la trama.");                                                                            
                                                                                         #endif
         return;
     }
@@ -145,7 +145,7 @@ void ADXL345Handler::end()
     if (!initialized)
     {
                                                                     #ifdef DEBUG
-                                                                    Serial.println("ADXL345Handler::end() llamado, pero ya estaba desactivado.");
+                                                                    DEBUG__________ln("ADXL345Handler::end() llamado, pero ya estaba desactivado.");
                                                                     #endif 
         return;
     }
@@ -153,6 +153,6 @@ void ADXL345Handler::end()
     Wire.end();
     initialized = false;
                                                                     #ifdef DEBUG 
-                                                                    Serial.println("I2C desactivado (acelerómetro end).");
+                                                                    DEBUG__________ln("I2C desactivado (acelerómetro end).");
                                                                     #endif
 }

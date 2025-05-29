@@ -54,12 +54,12 @@ void TOKEN_::begin() {
           return;
       }
 
-      Serial.printf("ERROR: No se encontró el módulo PN532 (intento %d de %d). Reintentando...\n", retryCount + 1, MAX_RETRIES);
+      DEBUG__________printf("ERROR: No se encontró el módulo PN532 (intento %d de %d). Reintentando...\n", retryCount + 1, MAX_RETRIES);
       retryCount++;
       delay(500);
   }
 
-  Serial.println("FATAL: No se pudo inicializar el PN532 tras múltiples intentos. Reiniciando dispositivo...");
+  DEBUG__________ln("FATAL: No se pudo inicializar el PN532 tras múltiples intentos. Reiniciando dispositivo...");
   delay(2000);
   ESP.restart();
 }
@@ -75,7 +75,7 @@ bool TOKEN_::isCardPresent() {
 }
 
 void TOKEN_::resetReader() {
-  Serial.println("⚠️ Forzando reinicio completo del lector NFC...");
+  DEBUG__________ln("⚠️ Forzando reinicio completo del lector NFC...");
   
   // Cancelar cualquier operación pendiente
   nfc.inListPassiveTarget();
@@ -112,13 +112,13 @@ void TOKEN_::startListeningToNFC() {
  
     success = nfc.startPassiveTargetIDDetection(PN532_MIFARE_ISO14443A);
     if (success) {
-      Serial.println("Detección iniciada correctamente.");
+      DEBUG__________ln("Detección iniciada correctamente.");
     }
       
   if (!success) {
-    Serial.println("No card found. Waiting...");
+    DEBUG__________ln("No card found. Waiting...");
   } else {
-    Serial.println("Card already present.");
+    DEBUG__________ln("Card already present.");
     handleCardDetected();
   }
 }
@@ -135,7 +135,7 @@ void TOKEN_::handleCardDetected() {
       delay(10);
   }
   
-  Serial.println(success ? "Read successful" : "Read failed (not a card?)");
+  DEBUG__________ln(success ? "Read successful" : "Read failed (not a card?)");
   
   if (success) {
     String newUID = "";
@@ -149,8 +149,8 @@ void TOKEN_::handleCardDetected() {
     mensajeLeido = false;
     uidDetectionTime = millis();
 
-    Serial.print("Found an ISO14443A card, UID: ");
-    Serial.println(currentUID);
+    DEBUG__________("Found an ISO14443A card, UID: ");
+    DEBUG__________ln(currentUID);
   } else {
     // Si falló la lectura, reiniciar la detección
     startListeningToNFC();
@@ -181,8 +181,8 @@ bool TOKEN_::readCard(String &uid) {
   uid = newUID;
   currentUID = newUID;
 
-  Serial.print("✅ Tarjeta detectada con UID: ");
-  Serial.println(currentUID);
+  DEBUG__________("✅ Tarjeta detectada con UID: ");
+  DEBUG__________ln(currentUID);
   return true;
 }
 
@@ -202,7 +202,7 @@ String TOKEN_::decodeNdefText(const byte* payload, int payloadLength) {
 
 // Función modificada para leer el mensaje NDEF (token) desde las páginas 6 a 18
 bool TOKEN_::leerMensajeNFC(String &mensaje) {
-  Serial.println("DEBUG: Procesando mensaje NDEF para la tarjeta con UID: " + currentUID);
+  DEBUG__________ln("DEBUG: Procesando mensaje NDEF para la tarjeta con UID: " + currentUID);
 
   uint8_t rawBuffer[128] = {0};
   int len = 0;
@@ -210,8 +210,8 @@ bool TOKEN_::leerMensajeNFC(String &mensaje) {
   for (uint8_t page = 6; page <= 30; page++) {
     uint8_t pageBuffer[4] = {0};
     if (!nfc.ntag2xx_ReadPage(page, pageBuffer)) {
-      Serial.print("⚠️ ERROR: Falló la lectura de la página ");
-      Serial.println(page);
+      DEBUG__________("⚠️ ERROR: Falló la lectura de la página ");
+      DEBUG__________ln(page);
       mensaje = "";
       return false;
     }
@@ -224,29 +224,29 @@ bool TOKEN_::leerMensajeNFC(String &mensaje) {
   for (int i = 0; i < len; i++) {
     fullData += (char)rawBuffer[i];
   }
-  Serial.println("Dump completo (páginas 6 a 18): " + fullData);
+  DEBUG__________ln("Dump completo (páginas 6 a 18): " + fullData);
   
   // Buscar los delimitadores '#' en la cadena
   int firstHash = fullData.indexOf('#');
   if (firstHash < 0) {
-    Serial.println("⚠️ ERROR: No se encontró el delimitador de inicio '#'.");
+    DEBUG__________ln("⚠️ ERROR: No se encontró el delimitador de inicio '#'.");
     mensaje = "";
     return false;
   }
   int secondHash = fullData.indexOf('#', firstHash + 1);
   if (secondHash < 0) {
-    Serial.println("⚠️ ERROR: No se encontró el delimitador de fin '#'.");
+    DEBUG__________ln("⚠️ ERROR: No se encontró el delimitador de fin '#'.");
     mensaje = "";
     return false;
   }
   
   // Extraer la cadena entre los dos delimitadores
   String tokenStr = fullData.substring(firstHash + 1, secondHash);
-  Serial.println("Token string extraído: " + tokenStr);
+  DEBUG__________ln("Token string extraído: " + tokenStr);
   
   // Se espera que el token tenga 46 dígitos hexadecimales (23 bytes)
   if (tokenStr.length() != 94) {
-    Serial.println("⚠️ ERROR: Longitud del token inválida. Se esperaba 46 dígitos hexadecimales, se obtuvo: " + String(tokenStr.length()));
+    DEBUG__________ln("⚠️ ERROR: Longitud del token inválida. Se esperaba 46 dígitos hexadecimales, se obtuvo: " + String(tokenStr.length()));
     mensaje = "";
     return false;
   }
@@ -269,7 +269,7 @@ bool TOKEN_::leerMensajeNFC(String &mensaje) {
   token.currentToken.cmd2 = hexToByte(tokenStr.substring(2, 4));
   token.currentToken.addr.bank = hexToByte(tokenStr.substring(4, 6));
   //updateBankList(token.currentToken.addr.bank);
-  Serial.println("SPIFFS: Bank actualizado: " + String(token.currentToken.addr.bank, HEX));
+  DEBUG__________ln("SPIFFS: Bank actualizado: " + String(token.currentToken.addr.bank, HEX));
   token.currentToken.addr.file = hexToByte(tokenStr.substring(6, 8));
   token.currentToken.color.r = hexToByte(tokenStr.substring(8, 10));
   token.currentToken.color.g = hexToByte(tokenStr.substring(10, 12));
@@ -291,22 +291,22 @@ token.currentToken.familyName[24] = '\0'; // Asegurar string nulo-terminado
   bankList = readBankList();
   selectedBanks.resize(bankList.size(), false);
   // Imprimir valores para depuración
-  Serial.println("Token decodificado:");
-  Serial.print("CMD: 0x"); Serial.println(token.currentToken.cmd, HEX);
-  Serial.print("CMD2: 0x"); Serial.println(token.currentToken.cmd2, HEX);
-  Serial.print("Bank: 0x"); Serial.println(token.currentToken.addr.bank, HEX);
-  Serial.print("File: 0x"); Serial.println(token.currentToken.addr.file, HEX);
-  Serial.print("Color R: 0x"); Serial.println(token.currentToken.color.r, HEX);
-  Serial.print("Color G: 0x"); Serial.println(token.currentToken.color.g, HEX);
-  Serial.print("Color B: 0x"); Serial.println(token.currentToken.color.b, HEX);
+  DEBUG__________ln("Token decodificado:");
+  DEBUG__________("CMD: 0x"); DEBUG__________ln(token.currentToken.cmd, HEX);
+  DEBUG__________("CMD2: 0x"); DEBUG__________ln(token.currentToken.cmd2, HEX);
+  DEBUG__________("Bank: 0x"); DEBUG__________ln(token.currentToken.addr.bank, HEX);
+  DEBUG__________("File: 0x"); DEBUG__________ln(token.currentToken.addr.file, HEX);
+  DEBUG__________("Color R: 0x"); DEBUG__________ln(token.currentToken.color.r, HEX);
+  DEBUG__________("Color G: 0x"); DEBUG__________ln(token.currentToken.color.g, HEX);
+  DEBUG__________("Color B: 0x"); DEBUG__________ln(token.currentToken.color.b, HEX);
   for (int i = 0; i < 8; i++) {
-    Serial.print("Partner "); Serial.print(i); Serial.print(": Bank=0x");
-    Serial.print(token.currentToken.partner[i].bank, HEX);
-    Serial.print(", File=0x");
-    Serial.println(token.currentToken.partner[i].file, HEX);
+    DEBUG__________("Partner "); DEBUG__________(i); DEBUG__________(": Bank=0x");
+    DEBUG__________(token.currentToken.partner[i].bank, HEX);
+    DEBUG__________(", File=0x");
+    DEBUG__________ln(token.currentToken.partner[i].file, HEX);
   }
-  Serial.print("🏷️  Familia: ");
-  Serial.println(token.currentToken.familyName);
+  DEBUG__________("🏷️  Familia: ");
+  DEBUG__________ln(token.currentToken.familyName);
 
   
   mensaje = tokenStr;
@@ -332,133 +332,141 @@ void TOKEN_::proponer_token(byte guessbank) {
 }
 
 void TOKEN_::token_handler(TOKEN_DATA token, uint8_t lang_in, bool genre_in, uint8_t myid, std::vector<uint8_t> targets) {
-  // Calcular offset de lenguaje si corresponde
-  byte lang = 0;
-  if (token.addr.bank > 0x09 && token.addr.bank < 0x63) {
-      lang = lang_in * 10;
-  }
-  
-  // Procesamos si la ficha es de efecto (TOKEN_FX) o sin efecto (TOKEN_NOFX)
-  if (token.cmd == TOKEN_FX || token.cmd == TOKEN_NOFX) {
-      // Enviar el color de la ficha
-      COLOR_T colorout;
-      colorout.red   = token.color.r;
-      colorout.green = token.color.g;
-      colorout.blue  = token.color.b;
-      send_frame(frameMaker_SEND_RGB(myid, targets, colorout));
+    // Calcular offset de lenguaje si corresponde
+    byte lang = 0;
+    if (token.addr.bank > 0x09 && token.addr.bank < 0x63) {
+        lang = lang_in * 10;
+    }
 
-      delay(200); // Pausa para asegurar que se aplique el color
+    // Procesamos si la ficha es de efecto (TOKEN_FX) o sin efecto (TOKEN_NOFX)
+    if (token.cmd == TOKEN_FX || token.cmd == TOKEN_NOFX) {
+        // Enviar el color de la ficha
+        COLOR_T colorout;
+        colorout.red   = token.color.r;
+        colorout.green = token.color.g;
+        colorout.blue  = token.color.b;
 
-      // Iniciar reproducción de audio (usa bank + genre y file + lang)
-      doitPlayer.play_file(token.addr.bank + genre_in, token.addr.file + lang);
-      delay(50);
-      while (doitPlayer.is_playing()) { delay(10); }
-      delay(500);
-      // Procesar según el modo actual
-      if (tokenCurrentMode == TOKEN_BASIC_MODE) {
-          // En BASIC: al terminar el audio, si el color es temporal se apaga (se envía negro)
-          if (token.cmd2 == TEMP_COLOR_CONF) {
-              send_frame(frameMaker_SEND_COLOR(myid, targets, 8)); // negro
-          }
-          // Si es PERM_COLOR_CONF, no se realiza ningún cambio (se mantiene el color)
-      }
-      else if (tokenCurrentMode == TOKEN_PARTNER_MODE) {
-        // Declaración estática para retener los datos de la primera ficha
-        static bool firstTokenStored = false;
-        static byte firstTokenBank = 0;
-        static byte firstTokenFile = 0;
-        
-        if (!waitingForPartner) {
-            // Primera ficha: guardar bank y file permanentemente
-            firstTokenBank = token.addr.bank;
-            firstTokenFile = token.addr.file;
-            firstTokenStored = true;
-            Serial.printf("Primer token registrado: Bank = 0x%02X, File = 0x%02X\n", firstTokenBank, firstTokenFile);
-            
-            waitingForPartner = true;
-            
-            // Al finalizar la reproducción de la primera ficha, si es temporal se apaga el color
-            if (token.cmd2 == TEMP_COLOR_CONF) {
-                delay(50);
-                send_frame(frameMaker_SEND_COLOR(myid, targets, 8)); // Enviar negro
-                Serial.println("Primer token: Color temporal, apagando después del audio.");
-            }
-        } else {
-            // Segunda ficha: verificar si alguno de sus partners coincide con el primer token
-            if (!firstTokenStored) {
-                Serial.println("Error: No se encontró el primer token almacenado.");
-                return;
-            }
-            bool match = false;
-            Serial.printf("Comparando primer token (Bank = 0x%02X, File = 0x%02X) con los partners de la segunda ficha:\n", firstTokenBank, firstTokenFile);
-            for (int i = 0; i < 8; i++) {
-                Serial.printf("Partner %d: Bank = 0x%02X, File = 0x%02X\n", i, token.partner[i].bank, token.partner[i].file);
-                if (token.partner[i].bank == firstTokenBank && token.partner[i].file == firstTokenFile) {
-                    match = true;
-                    Serial.printf("Match encontrado en partner %d\n", i);
-                    break;
-                }
-            }
-            
-            delay(50);
-            while (doitPlayer.is_playing()) { delay(10); }
+        if (token.cmd2 != NO_COLOR_CONF) {
+            send_frame(frameMaker_SEND_RGB(myid, targets, colorout));
             delay(200);
-            int fileNum = match ? random(1, 4) : random(1, 3);
-            send_frame(frameMaker_SEND_RESPONSE(myid, targets, match ? WIN : FAIL));
-            doitPlayer.play_file((match ? WIN_RESP_BANK : FAIL_RESP_BANK) + genre_in, fileNum + lang);
-            delay(50);
+        }
+
+        delay(200); // Extra delay por estabilidad visual
+
+        DEBUG__________ln("Bank: " + String(token.addr.bank + genre_in, HEX) + ", File: " + String(token.addr.file + lang, HEX));
+        doitPlayer.play_file(token.addr.bank + genre_in, token.addr.file + lang);
+        delay(50);
+        while (doitPlayer.is_playing()) { delay(10); }
+        delay(500);
+
+        if (tokenCurrentMode == TOKEN_BASIC_MODE) {
+            if (token.cmd2 == TEMP_COLOR_CONF) {
+                send_frame(frameMaker_SEND_COLOR(myid, targets, 8)); // negro
+            }
+        }
+        else if (tokenCurrentMode == TOKEN_PARTNER_MODE) {
+            static bool firstTokenStored = false;
+            static byte firstTokenBank = 0;
+            static byte firstTokenFile = 0;
+
+            if (!waitingForPartner) {
+                firstTokenBank = token.addr.bank;
+                firstTokenFile = token.addr.file;
+                firstTokenStored = true;
+                waitingForPartner = true;
+
+                DEBUG__________printf("Primer token registrado: Bank = 0x%02X, File = 0x%02X\n", firstTokenBank, firstTokenFile);
+
+                if (token.cmd2 == TEMP_COLOR_CONF) {
+                    delay(50);
+                    send_frame(frameMaker_SEND_COLOR(myid, targets, 8));
+                    DEBUG__________ln("Primer token: Color temporal, apagando después del audio.");
+                }
+            } else {
+                if (!firstTokenStored) {
+                    DEBUG__________ln("Error: No se encontró el primer token almacenado.");
+                    return;
+                }
+
+                bool match = false;
+                DEBUG__________printf("Comparando primer token (Bank = 0x%02X, File = 0x%02X) con los partners de la segunda ficha:\n", firstTokenBank, firstTokenFile);
+                for (int i = 0; i < 8; i++) {
+                    DEBUG__________printf("Partner %d: Bank = 0x%02X, File = 0x%02X\n", i, token.partner[i].bank, token.partner[i].file);
+
+                    // Caso 1: Match exacto
+                    if (token.partner[i].bank == firstTokenBank && token.partner[i].file == firstTokenFile) {
+                        match = true;
+                        DEBUG__________printf("✔️ Match exacto encontrado en partner %d\n", i);
+                        break;
+                    }
+
+                    // Caso 2: Match por banco de familia (file = 0xFF)
+                    if (token.partner[i].file == 0xFF && token.partner[i].bank == firstTokenBank) {
+                        match = true;
+                        DEBUG__________printf("🏷️ Match de familia encontrado en partner %d (bank = 0x%02X)\n", i, token.partner[i].bank);
+                        break;
+                    }
+                }
+
+                delay(50);
+                while (doitPlayer.is_playing()) { delay(10); }
+                delay(200);
+
+                int fileNum = match ? random(1, 4) : random(1, 3);
+                send_frame(frameMaker_SEND_RESPONSE(myid, targets, match ? WIN : FAIL));
+                doitPlayer.play_file((match ? WIN_RESP_BANK : FAIL_RESP_BANK) + genre_in, fileNum + lang);
+
+                delay(50);
+                while (doitPlayer.is_playing()) { delay(10); }
+                delay(600);
+
+                if (token.cmd2 == TEMP_COLOR_CONF) {
+                    send_frame(frameMaker_SEND_COLOR(myid, targets, 8));
+                    DEBUG__________ln("Segundo token: TEMP_COLOR_CONF, apagando color.");
+                } else if (token.cmd2 == PERM_COLOR_CONF) {
+                    send_frame(frameMaker_SEND_RGB(myid, targets, colorout));
+                    DEBUG__________ln("Segundo token: PERM_COLOR_CONF, manteniendo color.");
+                }
+
+                waitingForPartner = false;
+                firstTokenStored = false;
+            }
+        }
+        else if (tokenCurrentMode == TOKEN_GUESS_MODE) {
+            bool isCorrect = (token.addr.bank == propossedToken.addr.bank && token.addr.file == propossedToken.addr.file);
             while (doitPlayer.is_playing()) { delay(10); }
             delay(600);
-            
-            // Según el tipo de configuración de color
+
+            send_frame(frameMaker_SEND_RESPONSE(myid, targets, isCorrect ? WIN : FAIL));
+            doitPlayer.play_file((isCorrect ? WIN_RESP_BANK : FAIL_RESP_BANK) + genre_in, random(1, isCorrect ? 4 : 3) + lang);
+
+            while (doitPlayer.is_playing()) { delay(10); }
+            delay(600);
+
             if (token.cmd2 == TEMP_COLOR_CONF) {
-                send_frame(frameMaker_SEND_COLOR(myid, targets, 8)); // Apagar color (negro)
-                Serial.println("Segundo token: TEMP_COLOR_CONF, apagando color.");
+                send_frame(frameMaker_SEND_COLOR(myid, targets, 8));
             } else if (token.cmd2 == PERM_COLOR_CONF) {
-                COLOR_T colorout;
-                colorout.red   = token.color.r;
-                colorout.green = token.color.g;
-                colorout.blue  = token.color.b;
-                send_frame(frameMaker_SEND_RGB(myid, targets, colorout)); // Mantener el color
-                Serial.println("Segundo token: PERM_COLOR_CONF, manteniendo color.");
+                send_frame(frameMaker_SEND_RGB(myid, targets, colorout));
             }
-            
-            waitingForPartner = false;
-            firstTokenStored = false; // Reiniciamos para la próxima pareja
         }
-    }    
-      else if (tokenCurrentMode == TOKEN_GUESS_MODE) {
-          bool isCorrect = (token.addr.bank == propossedToken.addr.bank && token.addr.file == propossedToken.addr.file);
-          while (doitPlayer.is_playing()) { delay(10); }
-          delay(600);
-          // Enviar color de respuesta: verde (7) si es correcto, rojo (3) si no
-          send_frame(frameMaker_SEND_RESPONSE(myid, targets, isCorrect ? WIN : FAIL));
-          doitPlayer.play_file((isCorrect ? WIN_RESP_BANK : FAIL_RESP_BANK) + genre_in, random(1, isCorrect ? 4 : 3) + lang);
-          while (doitPlayer.is_playing()) { delay(10); }
-          delay(600);
-          if (token.cmd2 == TEMP_COLOR_CONF) {
-              send_frame(frameMaker_SEND_COLOR(myid, targets, 8)); // color temporal: apagar
-          } else if (token.cmd2 == PERM_COLOR_CONF) {
-              send_frame(frameMaker_SEND_RGB(myid, targets, colorout)); // color permanente: reenvía el color de la ficha
-          }
-      }
-  }
-  // (No se incluye aquí la lógica de reproducción al presionar el botón del relé, que se gestionará en el loop)
+    }
 }
 
+
+
 void TOKEN_::printFicha(const TOKEN_DATA &f) {
-  Serial.print("CMD: 0x"); Serial.println(f.cmd, HEX);
-  Serial.print("CMD2: 0x"); Serial.println(f.cmd2, HEX);
-  Serial.print("Bank: 0x"); Serial.println(f.addr.bank, HEX);
-  Serial.print("File: 0x"); Serial.println(f.addr.file, HEX);
-  Serial.print("R: 0x"); Serial.println(f.color.r, HEX);
-  Serial.print("G: 0x"); Serial.println(f.color.g, HEX);
-  Serial.print("B: 0x"); Serial.println(f.color.b, HEX);
+  DEBUG__________("CMD: 0x"); DEBUG__________ln(f.cmd, HEX);
+  DEBUG__________("CMD2: 0x"); DEBUG__________ln(f.cmd2, HEX);
+  DEBUG__________("Bank: 0x"); DEBUG__________ln(f.addr.bank, HEX);
+  DEBUG__________("File: 0x"); DEBUG__________ln(f.addr.file, HEX);
+  DEBUG__________("R: 0x"); DEBUG__________ln(f.color.r, HEX);
+  DEBUG__________("G: 0x"); DEBUG__________ln(f.color.g, HEX);
+  DEBUG__________("B: 0x"); DEBUG__________ln(f.color.b, HEX);
   for (int i = 0; i < 8; i++) {
-    Serial.print("P"); Serial.print(i);
-    Serial.print(".Bank: 0x"); Serial.print(f.partner[i].bank, HEX);
-    Serial.print("  P"); Serial.print(i);
-    Serial.print(".File: 0x"); Serial.println(f.partner[i].file, HEX);
+    DEBUG__________("P"); DEBUG__________(i);
+    DEBUG__________(".Bank: 0x"); DEBUG__________(f.partner[i].bank, HEX);
+    DEBUG__________("  P"); DEBUG__________(i);
+    DEBUG__________(".File: 0x"); DEBUG__________ln(f.partner[i].file, HEX);
   }
 }
 
@@ -502,15 +510,15 @@ TOKEN_::TOKEN_DATA TOKEN_::parseTokenString(const String &tokenStr) {
 
   // Se remueven los delimitadores '#' del inicio y fin
   if(tokenStr.charAt(0) != '#' || tokenStr.charAt(tokenStr.length()-1) != '#') {
-    Serial.println("DEBUG: Token sin delimitadores válidos");
+    DEBUG__________ln("DEBUG: Token sin delimitadores válidos");
     return data;
   }
   String content = tokenStr.substring(1, tokenStr.length()-1);
 
   // Ahora se espera que el contenido tenga 46 caracteres (23 bytes)
   if(content.length() != 94) {
-    Serial.print("DEBUG: Longitud incorrecta del token: ");
-    Serial.println(content.length());
+    DEBUG__________("DEBUG: Longitud incorrecta del token: ");
+    DEBUG__________ln(content.length());
     return data;
   }
   
