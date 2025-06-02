@@ -396,6 +396,321 @@ bool systemLocked = false;
 //     }
 // }
 
+// void handleEncoder() {
+//     // 1) Ignorar click residual
+//     if (ignoreEncoderClick) {
+//         if (digitalRead(ENC_BUTTON) == HIGH) {
+//             ignoreEncoderClick = false;
+//         } else {
+//             return;
+//         }
+//     }
+
+//     // 2) Si la pantalla está apagada, solo despertar con acción real
+//     if (!displayOn) {
+//         if ((encoder.getCount() != lastEncoderValue) || (digitalRead(ENC_BUTTON) == LOW)) {
+//             display_wakeup();
+//             encoderIgnoreUntil     = millis() + 500;  // Ignorar durante 500 ms
+//             lastDisplayInteraction = millis();
+//             lastEncoderValue       = encoder.getCount();
+//         }
+//         return;
+//     }
+
+//     // 3) Menú cognitivo
+//     if (inCognitiveMenu) {
+//         static bool clicked = false;
+//         if (digitalRead(ENC_BUTTON) == LOW) {
+//             if (!clicked) {
+//                 inCognitiveMenu    = false;
+//                 clicked            = true;
+//                 ignoreEncoderClick = true;
+//                 std::vector<byte> target = { DEFAULT_BOTONERA };
+//                 send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, target, COG_ACT_OFF));
+//                 drawCurrentElement();
+//             }
+//         } else {
+//             clicked = false;
+//         }
+//         return;
+//     }
+
+//     // 4) Salidas tempranas en otros menús
+//     if (confirmRestoreMenuActive) return;
+//     if (deleteElementMenuActive ) return;
+//     if (formatSubMenuActive    ) return;
+//     if (soundMenuActive        ) return;
+//     if (brightnessMenuActive   ) return;
+//     if (ignoreInputs           ) return;
+
+//     // 5) Menú selección de bancos
+//     if (bankSelectionActive) {
+//         handleBankSelectionMenu(bankList, selectedBanks);
+//         return;
+//     }
+
+//     // 6) Ignorar entradas tras despertar pantalla
+//     if (millis() < encoderIgnoreUntil) {
+//         lastDisplayInteraction = millis();
+//         return;
+//     }
+
+//     // 7) Desbloqueo mientras se mantiene 3 s si está bloqueado
+//     bool lockedMain = isInMainMenu() && systemLocked;
+//     if (lockedMain && digitalRead(ENC_BUTTON) == LOW) {
+//         if (buttonPressStart == 0) {
+//             buttonPressStart = millis();
+//         } 
+//         else if (!isLongPress && (millis() - buttonPressStart >= 500)) {
+//             // Desbloqueo al mantener 3 s
+//             systemLocked     = false;
+//             isLongPress      = true;
+//             lastEncoderValue = encoder.getCount();
+//             drawCurrentElement();
+//         }
+//         return;
+//     }
+
+//     // 8) Menú de idiomas (solo si no está bloqueado)
+//     if (languageMenuActive && !lockedMain) {
+//         int32_t newVal = encoder.getCount();
+//         if (newVal != lastEncoderValue) {
+//             lastDisplayInteraction = millis();
+//             int32_t dir           = (newVal > lastEncoderValue) ? 1 : -1;
+//             lastEncoderValue      = newVal;
+//             languageMenuSelection = (languageMenuSelection + dir + 8) % 8;
+//             drawLanguageMenu(languageMenuSelection);
+//         }
+//         if (digitalRead(ENC_BUTTON) == LOW) {
+//             if (buttonPressStart == 0) buttonPressStart = millis();
+//         } else if (buttonPressStart > 0) {
+//             switch (languageMenuSelection) {
+//                 case 0: currentLanguage = Language::ES;    break;
+//                 case 1: currentLanguage = Language::ES_MX; break;
+//                 case 2: currentLanguage = Language::CA;    break;
+//                 case 3: currentLanguage = Language::EU;    break;
+//                 case 4: currentLanguage = Language::FR;    break;
+//                 case 5: currentLanguage = Language::DE;    break;
+//                 case 6: currentLanguage = Language::EN;    break;
+//                 case 7: currentLanguage = Language::X;     break;
+//                 default: currentLanguage = Language::X1;  break;
+//             }
+//             languageMenuActive = false;
+//             buttonPressStart  = 0;
+//             drawCurrentElement();
+//         }
+//         return;
+//     }
+
+//     // 9) Navegación por giro (solo si no está bloqueado)
+//     int32_t newEncoderValue = encoder.getCount();
+//     if (!lockedMain && newEncoderValue != lastEncoderValue) {
+//         lastDisplayInteraction = millis();
+//         int32_t direction      = (newEncoderValue > lastEncoderValue) ? 1 : -1;
+//         lastEncoderValue       = newEncoderValue;
+
+//         if (!inModesScreen && elementFiles.size() > 1) {
+//             // Cambio de elemento
+//             currentIndex = (currentIndex + direction + elementFiles.size()) % elementFiles.size();
+//             String currentFile = elementFiles[currentIndex];
+//             static String lastElementFile = "";
+//             if (currentFile != lastElementFile) {
+//                 if (elementAlternateStates.count(currentFile)) {
+//                     currentAlternateStates = elementAlternateStates[currentFile];
+//                 } else {
+//                     currentAlternateStates.clear();
+//                 }
+//                 lastElementFile = currentFile;
+//             }
+//             int realModeIndex = 0;
+//             byte modeConfig[2] = {0};
+//             if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Apagar") {
+//                 INFO_PACK_T* opt = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+//                 realModeIndex = opt->currentMode;
+//                 memcpy(modeConfig, opt->mode[realModeIndex].config, 2);
+//             } else {
+//                 fs::File f = SPIFFS.open(currentFile, "r");
+//                 if (f) {
+//                     f.seek(OFFSET_CURRENTMODE, SeekSet);
+//                     realModeIndex = f.read();
+//                     f.seek(OFFSET_MODES + realModeIndex * SIZE_MODE + 216, SeekSet);
+//                     f.read(modeConfig, 2);
+//                     f.close();
+//                 }
+//             }
+//             adxl   = getModeFlag(modeConfig, HAS_SENS_VAL_1);
+//             useMic = getModeFlag(modeConfig, HAS_SENS_VAL_2);
+//             drawCurrentElement();
+//         }
+//         else if (inModesScreen && totalModes > 0) {
+//             // Cambio de modo
+//             int newIndex = currentModeIndex + direction;
+//             if (newIndex >= 0 && newIndex < totalModes) {
+//                 currentModeIndex = newIndex;
+//                 int realModeIndex = globalVisibleModesMap[currentModeIndex];
+//                 if (realModeIndex >= 0) {
+//                     String file = elementFiles[currentIndex];
+//                     colorHandler.setCurrentFile(file);
+//                     colorHandler.setPatternBotonera(realModeIndex, ledManager);
+//                 }
+//                 drawModesScreen();
+//             }
+//         }
+//     }
+
+//     // 10) Lectura del botón mantenido (solo si no está bloqueado)
+//     if (!lockedMain && digitalRead(ENC_BUTTON) == LOW) {
+//         if (buttonPressStart == 0) {
+//             buttonPressStart = millis();
+//         } else {
+//             // Pulsación larga en menú de modos (2 s) para alternar modo alternativo
+
+//             if (isInMainMenu() && !isLongPress && (millis() - buttonPressStart >= 6000)) {
+//                 printElementDetails();
+//                 isLongPress = true;         // Para que no vuelva a reentrar
+//                 return;                     // Salimos inmediatamente, sin esperar a la soltar
+//             }
+
+//             if (inModesScreen && !isLongPress && (millis() - buttonPressStart >= 2000)) {
+//                 if (currentModeIndex > 0 && currentModeIndex < totalModes - 1) {
+//                     int adjustedIndex = currentModeIndex - 1;
+//                     String currFile = elementFiles[currentIndex];
+//                     uint8_t modeConfig[2] = {0};
+//                     bool canToggle = false;
+
+//                     // Obtener configuración del modo
+//                     if (currFile == "Ambientes" || currFile == "Fichas") {
+//                         INFO_PACK_T* option = (currFile == "Ambientes") ? &ambientesOption : &fichasOption;
+//                         int count = 0;
+//                         for (int i = 0; i < 16; i++) {
+//                             if (strlen((char*)option->mode[i].name) > 0 &&
+//                                 checkMostSignificantBit(option->mode[i].config)) {
+//                                 if (count == adjustedIndex) {
+//                                     memcpy(modeConfig, option->mode[i].config, 2);
+//                                     break;
+//                                 }
+//                                 count++;
+//                             }
+//                         }
+//                         canToggle = getModeFlag(modeConfig, HAS_ALTERNATIVE_MODE);
+//                     }
+//                     else if (currFile != "Apagar") {
+//                         fs::File f = SPIFFS.open(currFile, "r");
+//                         if (f) {
+//                             int count = 0;
+//                             for (int i = 0; i < 16; i++) {
+//                                 char modeName[25] = {0};
+//                                 byte tempConfig[2] = {0};
+//                                 f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet);
+//                                 f.read((uint8_t*)modeName, 24);
+//                                 f.seek(OFFSET_MODES + i * SIZE_MODE + 216, SeekSet);
+//                                 f.read(tempConfig, 2);
+//                                 if (strlen(modeName) > 0 &&
+//                                     checkMostSignificantBit(tempConfig)) {
+//                                     if (count == adjustedIndex) {
+//                                         memcpy(modeConfig, tempConfig, 2);
+//                                         break;
+//                                     }
+//                                     count++;
+//                                 }
+//                             }
+//                             f.close();
+//                             canToggle = getModeFlag(modeConfig, HAS_ALTERNATIVE_MODE);
+//                         }
+//                     }
+
+//                     // Alternar estado alternativo y persistir si corresponde
+//                     if (canToggle &&
+//                         adjustedIndex >= 0 &&
+//                         currentAlternateStates.size() > (size_t)adjustedIndex) {
+//                         currentAlternateStates[adjustedIndex] = !currentAlternateStates[adjustedIndex];
+//                         elementAlternateStates[currFile] = currentAlternateStates;
+//                         if (currFile != "Ambientes" &&
+//                             currFile != "Fichas" &&
+//                             currFile != "Apagar") {
+//                             fs::File f = SPIFFS.open(currFile, "r+");
+//                             if (f) {
+//                                 const int OFFSET_ALTERNATE_STATES = OFFSET_CURRENTMODE + 1;
+//                                 f.seek(OFFSET_ALTERNATE_STATES, SeekSet);
+//                                 byte states[16] = {0};
+//                                 for (size_t i = 0; i < min(currentAlternateStates.size(), (size_t)16); i++) {
+//                                     states[i] = currentAlternateStates[i] ? 1 : 0;
+//                                 }
+//                                 f.write(states, 16);
+//                                 f.close();
+//                             }
+//                         }
+//                         drawModesScreen();
+//                         isLongPress = true;
+//                     }
+//                 }
+//             }
+//         }
+//         return;
+//     }
+
+//     // 11) Al soltar el botón (siempre)
+//     if (digitalRead(ENC_BUTTON) == HIGH) {
+//         // 11.1) Si está bloqueado, ignorar cualquier suelta corta
+//         if (lockedMain) {
+//             buttonPressStart = 0;
+//             isLongPress      = false;
+//             return;
+//         }
+
+//         if (buttonPressStart > 0) {
+//             unsigned long pressDuration = millis() - buttonPressStart;
+// #ifdef DEBUG
+//             DEBUG__________ln("DEBUG: Duración suelta: " + String(pressDuration) + " ms");
+// #endif
+//             // 11.2) Si ya se desbloqueó con mantenimiento, no re-procesar
+//             if (isLongPress && !systemLocked) {
+//                 buttonPressStart = 0;
+//                 isLongPress      = false;
+//                 return;
+//             }
+//             // 11.3) Solo en menú principal: 3–5 s ↔ bloquear, ≥6 s ↔ detalles
+//             if (isInMainMenu()) {
+//                 if (pressDuration >= 500 && pressDuration <= 5000) {
+//                     systemLocked = true;
+//                     drawCurrentElement();
+//                 }
+//             }
+//             // 11.4) Resto de lógica: "Apagar", ir a modos o seleccionar modo
+//             String currentFile = elementFiles[currentIndex];
+//             if (!inModesScreen) {
+//                 if (currentFile == "Apagar") {
+//                     for (size_t i = 0; i < selectedStates.size(); i++) {
+//                         selectedStates[i] = false;
+//                     }
+//                     std::vector<byte> id = { 0xFF };
+//                     send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, id, BLACKOUT));
+//                     setAllElementsToBasicMode();
+//                     doitPlayer.stop_file();
+//                     showMessageWithLoading(getTranslation("APAGANDO_SALA"), 5000);
+//                     currentIndex     = 0;
+//                     drawCurrentElement();
+//                     buttonPressStart = 0;
+//                     isLongPress      = false;
+//                     return;
+//                 }
+//                 else if (pressDuration < 500) {
+//                     inModesScreen    = true;
+//                     currentModeIndex = 0;
+//                     drawModesScreen();
+//                 }
+//             } else {
+//                 if (!isLongPress && pressDuration < 500) {
+//                     handleModeSelection(elementFiles[currentIndex]);
+//                 }
+//             }
+//         }
+
+//         buttonPressStart = 0;
+//         isLongPress      = false;
+//     }
+// }
+
 void handleEncoder() {
     // 1) Ignorar click residual
     if (ignoreEncoderClick) {
@@ -455,20 +770,13 @@ void handleEncoder() {
         return;
     }
 
-    // 7) Desbloqueo mientras se mantiene 3 s si está bloqueado
+    // 7) Mientras esté bloqueado, solo marcamos tiempo para desbloquear al soltar
     bool lockedMain = isInMainMenu() && systemLocked;
     if (lockedMain && digitalRead(ENC_BUTTON) == LOW) {
         if (buttonPressStart == 0) {
             buttonPressStart = millis();
-        } 
-        else if (!isLongPress && (millis() - buttonPressStart >= 3000)) {
-            // Desbloqueo al mantener 3 s
-            systemLocked     = false;
-            isLongPress      = true;
-            lastEncoderValue = encoder.getCount();
-            drawCurrentElement();  // Quita candado
         }
-        return;  // Ignorar todo lo demás mientras se mantiene
+        return;
     }
 
     // 8) Menú de idiomas (solo si no está bloqueado)
@@ -563,12 +871,87 @@ void handleEncoder() {
         if (buttonPressStart == 0) {
             buttonPressStart = millis();
         } else {
-            // Pulsación larga en menú de modos (2 s)
+            // Pulsación larga: imprimir detalles al pasar 6000 ms
+            if (isInMainMenu() && !isLongPress && (millis() - buttonPressStart >= 6000)) {
+                printElementDetails();
+                isLongPress = true;  // Para que no vuelva a reentrar
+                return;              // Salimos inmediatamente, sin esperar a soltar
+            }
+
+            // Pulsación larga en menú de modos (2 s): alternar modo alternativo
             if (inModesScreen && !isLongPress && (millis() - buttonPressStart >= 2000)) {
-                // ... lógica de alternar estado alternativo (igual que antes)
-                // tras alternar:
-                isLongPress = true;
-                drawModesScreen();
+                if (currentModeIndex > 0 && currentModeIndex < totalModes - 1) {
+                    int adjustedIndex = currentModeIndex - 1;
+                    String currFile = elementFiles[currentIndex];
+                    uint8_t modeConfig[2] = {0};
+                    bool canToggle = false;
+
+                    // Obtener configuración del modo
+                    if (currFile == "Ambientes" || currFile == "Fichas") {
+                        INFO_PACK_T* option = (currFile == "Ambientes") ? &ambientesOption : &fichasOption;
+                        int count = 0;
+                        for (int i = 0; i < 16; i++) {
+                            if (strlen((char*)option->mode[i].name) > 0 &&
+                                checkMostSignificantBit(option->mode[i].config)) {
+                                if (count == adjustedIndex) {
+                                    memcpy(modeConfig, option->mode[i].config, 2);
+                                    break;
+                                }
+                                count++;
+                            }
+                        }
+                        canToggle = getModeFlag(modeConfig, HAS_ALTERNATIVE_MODE);
+                    }
+                    else if (currFile != "Apagar") {
+                        fs::File f = SPIFFS.open(currFile, "r");
+                        if (f) {
+                            int count = 0;
+                            for (int i = 0; i < 16; i++) {
+                                char modeName[25] = {0};
+                                byte tempConfig[2] = {0};
+                                f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet);
+                                f.read((uint8_t*)modeName, 24);
+                                f.seek(OFFSET_MODES + i * SIZE_MODE + 216, SeekSet);
+                                f.read(tempConfig, 2);
+                                if (strlen(modeName) > 0 &&
+                                    checkMostSignificantBit(tempConfig)) {
+                                    if (count == adjustedIndex) {
+                                        memcpy(modeConfig, tempConfig, 2);
+                                        break;
+                                    }
+                                    count++;
+                                }
+                            }
+                            f.close();
+                            canToggle = getModeFlag(modeConfig, HAS_ALTERNATIVE_MODE);
+                        }
+                    }
+
+                    // Alternar estado alternativo y persistir
+                    if (canToggle &&
+                        adjustedIndex >= 0 &&
+                        currentAlternateStates.size() > (size_t)adjustedIndex) {
+                        currentAlternateStates[adjustedIndex] = !currentAlternateStates[adjustedIndex];
+                        elementAlternateStates[currFile] = currentAlternateStates;
+                        if (currFile != "Ambientes" &&
+                            currFile != "Fichas" &&
+                            currFile != "Apagar") {
+                            fs::File f = SPIFFS.open(currFile, "r+");
+                            if (f) {
+                                const int OFFSET_ALTERNATE_STATES = OFFSET_CURRENTMODE + 1;
+                                f.seek(OFFSET_ALTERNATE_STATES, SeekSet);
+                                byte states[16] = {0};
+                                for (size_t i = 0; i < min(currentAlternateStates.size(), (size_t)16); i++) {
+                                    states[i] = currentAlternateStates[i] ? 1 : 0;
+                                }
+                                f.write(states, 16);
+                                f.close();
+                            }
+                        }
+                        drawModesScreen();
+                        isLongPress = true;
+                    }
+                }
             }
         }
         return;
@@ -576,7 +959,19 @@ void handleEncoder() {
 
     // 11) Al soltar el botón (siempre)
     if (digitalRead(ENC_BUTTON) == HIGH) {
-        // 11.1) Si está bloqueado, ignorar cualquier suelta corta
+        // 11.0) Si estaba bloqueado y soltaste entre 1000 ms y 5000 ms → desbloquear
+        if (lockedMain && buttonPressStart > 0) {
+            unsigned long pressDuration = millis() - buttonPressStart;
+            if (pressDuration >= 500 && pressDuration <= 5000) {
+                systemLocked    = false;
+                drawCurrentElement();
+                buttonPressStart = 0;
+                isLongPress      = false;
+                return;
+            }
+        }
+
+        // 11.1) Si sigue bloqueado (no entró en 11.0), ignorar suelta corta
         if (lockedMain) {
             buttonPressStart = 0;
             isLongPress      = false;
@@ -588,26 +983,70 @@ void handleEncoder() {
 #ifdef DEBUG
             DEBUG__________ln("DEBUG: Duración suelta: " + String(pressDuration) + " ms");
 #endif
-            // 11.2) Si ya se desbloqueó con mantenimiento, no re-procesar
+            // 11.2) Si ya procesamos un long-press (por detalles o alternar modo), no re-procesar
             if (isLongPress && !systemLocked) {
                 buttonPressStart = 0;
                 isLongPress      = false;
                 return;
             }
-            // 11.3) Solo en menú principal: 3–5 s ↔ bloquear, ≥6 s ↔ detalles
+
+            // 11.3) Solo en menú principal y desbloqueado:
+            //       1000–5000 ms → BLOQUEAR
+            //       <500 ms → acción corta (Apagar o abrir modos)
+            //       ≥6000 ms → detalles (por si no se llamó en sección 10)
             if (isInMainMenu()) {
-                if (pressDuration >= 3000 && pressDuration <= 5000) {
+                if (pressDuration >= 500 && pressDuration <= 5000) {
+                    // — BLOQUEAR —
                     systemLocked = true;
                     drawCurrentElement();
+                    buttonPressStart = 0;
+                    isLongPress      = false;
+                    return;
+                }
+                else if (pressDuration < 500) {
+                    // — “Short press” (<500 ms) — distinguir si es “Apagar” o “Abrir modos” —
+                    String currentFile = elementFiles[currentIndex];
+                    if (currentFile == "Apagar") {
+                        // Apagar la sala (rutinario), idéntico a antes
+                        for (size_t i = 0; i < selectedStates.size(); i++) {
+                            selectedStates[i] = false;
+                        }
+                        std::vector<byte> id = { 0xFF };
+                        send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, id, BLACKOUT));
+                        setAllElementsToBasicMode();
+                        doitPlayer.stop_file();
+                        showMessageWithLoading(getTranslation("APAGANDO_SALA"), 5000);
+                        currentIndex     = 0;
+                        drawCurrentElement();
+                        buttonPressStart = 0;
+                        isLongPress      = false;
+                        return;
+                    } else {
+                        // No es “Apagar”, abrimos el submenú de modos
+                        inModesScreen    = true;
+                        currentModeIndex = 0;
+                        drawModesScreen();
+                        buttonPressStart = 0;
+                        isLongPress      = false;
+                        return;
+                    }
                 }
                 else if (pressDuration >= 6000) {
+                    // — Detalles (por si no se disparó en sección 10) —
                     printElementDetails();
+                    buttonPressStart = 0;
+                    isLongPress      = false;
+                    return;
                 }
             }
-            // 11.4) Resto de lógica: "Apagar", ir a modos o seleccionar modo
+
+            // 11.4) Resto de lógica: si no entramos en ninguna de las ramas anteriores,
+            //       procesamos “Apagar” o “Seleccionar modo” en menú de modos.
             String currentFile = elementFiles[currentIndex];
             if (!inModesScreen) {
                 if (currentFile == "Apagar") {
+                    // Aquí realmente no llegaríamos, porque se habría procesado en la rama <500 ms
+                    // (se garantizó un return). Pero por completitud:
                     for (size_t i = 0; i < selectedStates.size(); i++) {
                         selectedStates[i] = false;
                     }
@@ -622,13 +1061,15 @@ void handleEncoder() {
                     isLongPress      = false;
                     return;
                 }
-                else if (pressDuration < 3000) {
+                else if (pressDuration < 500) {
+                    // Si no es “Apagar” y nos pilló aquí (corte de lógica), entramos a modos
                     inModesScreen    = true;
                     currentModeIndex = 0;
                     drawModesScreen();
                 }
             } else {
-                if (!isLongPress && pressDuration < 2000) {
+                // Si ya estábamos en menú de modos y fue press corto <500 ms
+                if (!isLongPress && pressDuration < 500) {
                     handleModeSelection(elementFiles[currentIndex]);
                 }
             }
@@ -1535,7 +1976,7 @@ void printElementDetails() {
     Serial.print  ("Serial: "); Serial.println(serialStr);
 
     // Mostrar en pantalla durante 5 segundos y volver al menú
-    showElemInfo(5000, serialStr, idStr);
+    showElemInfo(10000, serialStr, idStr);
 }
 
 
