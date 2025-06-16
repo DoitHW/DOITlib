@@ -20,10 +20,15 @@ public:
     bool isInitialized() const;       // Verificar si está inicializado
     void setThreshold(float newThreshold);  // Configurar un nuevo umbral
     void end();
+    void readInclinations();
+    SENSOR_DOUBLE_T createSensorDoubleValue(long finalValueX, long finalValueY);
+    void sendSensorValueDouble(const SENSOR_DOUBLE_T &sensorValue);
 
 private:
     Adafruit_ADXL345_Unified accel;
     float lastInclination;  // Última inclinación leída
+    float lastInclinationX;
+    float lastInclinationY;
     float threshold;        // Umbral de cambio significativo
     bool initialized;       // Estado de inicialización
     int errorCount;

@@ -6,6 +6,7 @@
 #include <encoder_handler/encoder_handler.h>
 #include <Colors_DMS/Color_DMS.h>
 #include <display_handler/display_handler.h>
+#include <RelayManager_DMS/RelayStateManager.h>
 
 // Inicialización de pines y matriz de colores
 int filas[FILAS] = {4, 5, 6, 7};
@@ -396,49 +397,108 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
         }
         return;
     }
-
     // ---------------------------- RELÉ ÚNICO (botón RELAY) ----------------------------
-    if (buttonColor == RELAY)
-    {
-        if (!hasRelay || isMultiRelay || isAromaterapia)
-            return;
-        if (digitalRead(ENC_BUTTON) == LOW)
-            return;
-
-        if (event == BUTTON_PRESSED)
-        {
-            relayButtonPressed = true;
-            if (hasPulse)
-            {
-                relay_state = 1;
-                send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, target, relay_state));
-#ifdef DEBUG
-                DEBUG__________ln("RELAY PULSE: PRESIÓN, enviando relay_state = TRUE");
-#endif
-            }
-            else
-            {
-                if (currentFile != "Ambientes" && currentFile != "Fichas" && currentFile != "Apagar")
-                {
-                    relay_state = !relay_state;
-                    send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, target, relay_state));
-#ifdef DEBUG
-                    DEBUG__________printf("RELAY BÁSICO: PRESIÓN, toggle relay_state a %d\n", relay_state);
-#endif
-                }
-            }
-        }
-        else if (event == BUTTON_RELEASED && hasPulse)
-        {
-            relayButtonPressed = false;
-            relay_state = 0;
-            send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, target, relay_state));
-#ifdef DEBUG
-            DEBUG__________ln("RELAY PULSE: LIBERACIÓN, enviando relay_state = FALSE");
-#endif
-        }
+if (buttonColor == RELAY) {
+    // Sólo relé simple, no multirrelé ni aromaterapia
+    if (!hasRelay || isMultiRelay || isAromaterapia) 
         return;
+    // Evita interferir con el encoder
+    if (digitalRead(ENC_BUTTON) == LOW) 
+        return;
+
+    uint8_t id = target.empty() ? BROADCAST : target[0];
+
+    if (event == BUTTON_PRESSED) {
+        if (hasPulse) {
+            // MODO PULSE: al presionar → encender (1)
+            send_frame(frameMaker_SEND_FLAG_BYTE(
+                DEFAULT_BOTONERA,
+                { id },
+                0x01
+            ));
+            // Actualizamos el gestor a ON
+            RelayStateManager::set(id, true);
+        } else {
+            // MODO BÁSICO: toggle contra el estado guardado
+            bool cur  = RelayStateManager::get(id);
+            bool next = !cur;
+            send_frame(frameMaker_SEND_FLAG_BYTE(
+                DEFAULT_BOTONERA,
+                { id },
+                next ? 0x01 : 0x00
+            ));
+            RelayStateManager::set(id, next);
+        }
+
+    #ifdef DEBUG
+        DEBUG__________printf("RELAY %s: PRESIÓN → Elemento %d, estado %d→%d\n",
+            hasPulse ? "PULSE" : "BÁSICO",
+            id, hasPulse ? 0 : RelayStateManager::get(id),
+            hasPulse ? 1 : RelayStateManager::get(id)
+        );
+    #endif
+
     }
+    else if (event == BUTTON_RELEASED && hasPulse) {
+        // MODO PULSE: al soltar → apagar (0)
+        send_frame(frameMaker_SEND_FLAG_BYTE(
+            DEFAULT_BOTONERA,
+            { id },
+            0x00
+        ));
+        // Actualizamos el gestor a OFF
+        RelayStateManager::set(id, false);
+
+    #ifdef DEBUG
+        DEBUG__________printf("RELAY PULSE: LIBERACIÓN → Elemento %d, estado 1→0\n", id);
+    #endif
+    }
+    return;
+}
+
+
+//     // ---------------------------- RELÉ ÚNICO (botón RELAY) ----------------------------
+//     if (buttonColor == RELAY)
+//     {
+//         if (!hasRelay || isMultiRelay || isAromaterapia)
+//             return;
+//         if (digitalRead(ENC_BUTTON) == LOW)
+//             return;
+
+//         if (event == BUTTON_PRESSED)
+//         {
+//             relayButtonPressed = true;
+//             if (hasPulse)
+//             {
+//                 relay_state = 1;
+//                 send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, target, relay_state));
+// #ifdef DEBUG
+//                 DEBUG__________ln("RELAY PULSE: PRESIÓN, enviando relay_state = TRUE");
+// #endif
+//             }
+//             else
+//             {
+//                 if (currentFile != "Ambientes" && currentFile != "Fichas" && currentFile != "Apagar")
+//                 {
+//                     relay_state = !relay_state;
+//                     send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, target, relay_state));
+// #ifdef DEBUG
+//                     DEBUG__________printf("RELAY BÁSICO: PRESIÓN, toggle relay_state a %d\n", relay_state);
+// #endif
+//                 }
+//             }
+//         }
+//         else if (event == BUTTON_RELEASED && hasPulse)
+//         {
+//             relayButtonPressed = false;
+//             relay_state = 0;
+//             send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, target, relay_state));
+// #ifdef DEBUG
+//             DEBUG__________ln("RELAY PULSE: LIBERACIÓN, enviando relay_state = FALSE");
+// #endif
+//         }
+//         return;
+//     }
 
     // ---------------------------- MODO PASIVO: SOLO AZUL ----------------------------
     if (hasPassive && (buttonColor != BLUE))

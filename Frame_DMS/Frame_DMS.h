@@ -56,6 +56,21 @@ struct SENSOR_VALUE_T{
     byte lsb_val;
 };
 
+struct SENSOR_DOUBLE_T{
+    byte msb_min;
+    byte lsb_min;
+    byte msb_max;
+    byte lsb_max;
+    byte msb_val;
+    byte lsb_val;
+    byte msb_min2;
+    byte lsb_min2;
+    byte msb_max2;
+    byte lsb_max2;
+    byte msb_val2;
+    byte lsb_val2;
+};
+
 struct COLOR_T{
     byte red;
     byte green;
@@ -119,8 +134,8 @@ FRAME_T frameMaker_SET_ELEM_DEAF       (byte originin, std::vector<byte>targetin
 FRAME_T frameMaker_SEND_COLOR          (byte originin, std::vector<byte>targetin, byte colorin);
 FRAME_T frameMaker_SEND_RGB             (byte originin, std::vector<byte>targetin, COLOR_T colorin);
 FRAME_T frameMaker_SEND_COMMAND           (byte originin, std::vector<byte>targetin, byte commandin);
-FRAME_T frameMaker_SEND_SENSOR_VALUE   (byte originin, std::vector<byte>targetin, SENSOR_VALUE_T sensorin);
-FRAME_T frameMaker_SEND_SENSOR_VALUE_2   (byte originin, std::vector<byte>targetin, SENSOR_VALUE_T sensorin);
+FRAME_T frameMaker_SEND_SENSOR_VALUE   (byte originin, std::vector<byte>targetin, SENSOR_DOUBLE_T sensorin);
+FRAME_T frameMaker_SEND_SENSOR_VALUE_2  (byte originin, std::vector<byte>targetin, SENSOR_VALUE_T sensorin);
 FRAME_T frameMaker_SEND_FLAG_BYTE      (byte originin, std::vector<byte>targetin, byte flagin);
 FRAME_T frameMaker_SEND_PATTERN_NUM    (byte irigin, std::vector<byte>targetin, byte patternin);
 FRAME_T frameMaker_SEND_FILE_NUM       (byte originin, std::vector<byte>targetin, byte bankin, byte filein);

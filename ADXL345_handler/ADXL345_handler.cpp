@@ -124,7 +124,7 @@ void ADXL345Handler::sendSensorValue(const SENSOR_VALUE_T &sensorValue) {
     // Usar la ID obtenida en lugar de 0xFF
     targets.push_back(currentElementID);
 
-    send_frame(frameMaker_SEND_SENSOR_VALUE(DEFAULT_BOTONERA, targets, sensorValue));
+    //send_frame(frameMaker_SEND_SENSOR_VALUE(DEFAULT_BOTONERA, targets, sensorValue));
    
 }
 
@@ -155,4 +155,68 @@ void ADXL345Handler::end()
                                                                     #ifdef DEBUG 
                                                                     DEBUG__________ln("I2C desactivado (acelerómetro end).");
                                                                     #endif
+}
+
+void ADXL345Handler::readInclinations() {
+    if (!initialized || !adxl) return;
+
+    sensors_event_t event;
+    if (!accel.getEvent(&event)) {
+        DEBUG__________ln("Error reading ADXL345 event!");
+        return;
+    }
+
+    float inclX = event.acceleration.x;
+    float inclY = event.acceleration.y;
+
+    // Si alguno supera el umbral desde la última lectura:
+    if (abs(inclX - lastInclinationX) >= threshold ||
+        abs(inclY - lastInclinationY) >= threshold) {
+#ifdef DEBUG
+        DEBUG__________("Inclinaciones detectadas -> X: ");
+        DEBUG__________(inclX);
+        DEBUG__________(", Y: ");
+        DEBUG__________(inclY);
+#endif
+        // Limitar a rango [-10,10]
+        inclX = constrain(inclX, -10, 10);
+        inclY = constrain(inclY, -10, 10);
+
+        long valX = convertInclinationToValue(inclX);
+        long valY = convertInclinationToValue(inclY);
+
+        SENSOR_DOUBLE_T sensorVal = createSensorDoubleValue(valX, valY);
+        sendSensorValueDouble(sensorVal);
+
+        lastInclinationX = inclX;
+        lastInclinationY = inclY;
+    }
+}
+
+SENSOR_DOUBLE_T ADXL345Handler::createSensorDoubleValue(long finalValueX, long finalValueY) {
+    SENSOR_DOUBLE_T s;
+    // Primer eje
+    s.msb_min  = 0x00; s.lsb_min  = 0x00;
+    s.msb_max  = 0x07; s.lsb_max  = 0xD0;
+    s.msb_val  = (byte)(finalValueX >> 8);
+    s.lsb_val  = (byte)(finalValueX & 0xFF);
+    // Segundo eje
+    s.msb_min2 = 0x00;   s.lsb_min2 = 0x00;
+    s.msb_max2 = 0x07;   s.lsb_max2 = 0xD0;
+    s.msb_val2 = (byte)(finalValueY >> 8);
+    s.lsb_val2 = (byte)(finalValueY & 0xFF);
+    return s;
+}
+
+void ADXL345Handler::sendSensorValueDouble(const SENSOR_DOUBLE_T &sensorValue) {
+    std::vector<byte> targets;
+    byte currentElementID = getCurrentElementID();
+    if (currentElementID == 0xFF) {
+#ifdef DEBUG
+        DEBUG__________ln("⚠️ No se pudo obtener la ID de elemento. Trama no enviada.");
+#endif
+        return;
+    }
+    targets.push_back(currentElementID);
+    send_frame(frameMaker_SEND_SENSOR_VALUE(DEFAULT_BOTONERA, targets, sensorValue));
 }

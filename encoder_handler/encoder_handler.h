@@ -7,10 +7,10 @@
 #include <vector>
 
 // Pines del encoder            //BOTONERA FRANC        BOTONERA MARC
-#define ENC_A 26                //26                    33                      (33 para nuevas botoneras sin placa)
-#define ENC_B 34                //34                    34                      (34 para nuevas botoneras sin placa)
+#define ENC_A 26                //26                    34                      (33 para nuevas botoneras sin placa)
+#define ENC_B 34                //34                    33                      (34 para nuevas botoneras sin placa)
 #define ENC_BUTTON 33           //33                    26                      (26 para nuevas botoneras sin placa)
-
+                                                        //3V3 desconectado
 
 // Declaración de funciones relacionadas con el encoder
 void encoder_init_func();
@@ -48,6 +48,8 @@ void handleConfirmRestoreMenu();
 void handleConfirmRestoreElementMenu();
 
 bool isInMainMenu() ;
+
+int getTotalModesForFile(const String &file);
 
 enum EncoderAction {
     NADA,

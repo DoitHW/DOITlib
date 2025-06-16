@@ -1081,26 +1081,32 @@ FRAME_T frameMaker_SEND_RGB (byte originin, std::vector<byte>targetin, COLOR_T c
     return frame;
 }
 
-FRAME_T frameMaker_SEND_SENSOR_VALUE(byte originin, std::vector<byte>targetin, SENSOR_VALUE_T sensorin){
+FRAME_T frameMaker_SEND_SENSOR_VALUE(byte originin, std::vector<byte>targetin, SENSOR_DOUBLE_T sensorin){
     FRAME_T frame;
     memset(&frame, 0, sizeof(FRAME_T));
     frame.data.resize(L_SEND_SENSOR_VALUE_1);
     uint16_t  frameLength = 0x07 + targetin.size() + L_SEND_SENSOR_VALUE_1;
     frame.start= NEW_START;
-    frame.frameLengthLsb = frameLength & 0xFF;     
+    frame.frameLengthLsb = frameLength & 0xFF;
     frame.frameLengthMsb = (frameLength >> 8) & 0xFF; 
     frame.origin= originin;
     frame.numTargets = targetin.size();
     frame.target= targetin;
     frame.function= F_SEND_SENSOR_VALUE_1;
     frame.dataLengthMsb = (L_SEND_SENSOR_VALUE_1 >> 8) & 0xFF; 
-    frame.dataLengthLsb = L_SEND_SENSOR_VALUE_1 & 0xFF;   
+    frame.dataLengthLsb = L_SEND_SENSOR_VALUE_1 & 0xFF;
     frame.data[0]= sensorin.msb_min;
     frame.data[1]= sensorin.lsb_min;
     frame.data[2]= sensorin.msb_max;
     frame.data[3]= sensorin.lsb_max;
     frame.data[4]= sensorin.msb_val;
     frame.data[5]= sensorin.lsb_val;
+    frame.data[6]= sensorin.msb_min2;
+    frame.data[7]= sensorin.lsb_min2;
+    frame.data[8]= sensorin.msb_max2;
+    frame.data[9]= sensorin.lsb_max2;
+    frame.data[10]= sensorin.msb_val2;
+    frame.data[11]= sensorin.lsb_val2;
     frame.checksum= checksum_calc(frame);
     frame.end= NEW_END;
     return frame;

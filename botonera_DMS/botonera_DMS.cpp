@@ -7,6 +7,7 @@
 #include <EEPROM.h>
 #include <encoder_handler/encoder_handler.h>
 #include <display_handler/display_handler.h>
+#include <RelayManager_DMS/RelayStateManager.h>
 
 #define MIN_VALID_ELEMENT_SIZE (OFFSET_ID + 1) // Se espera que el archivo tenga al menos OFFSET_ID+1 bytes
 
@@ -79,13 +80,36 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
     if (LEF.data.empty()) {
         DEBUG__________ln("No hay datos para esta función.");
     } else {
-        if (LEF.function == 0xCA || LEF.function == 0xCB) { // Sensores
-            int minVal = (LEF.data[0] << 8) | LEF.data[1];
-            int maxVal = (LEF.data[2] << 8) | LEF.data[3];
-            int sensedVal = (LEF.data[4] << 8) | LEF.data[5];
-
-            DEBUG__________printf("MIN = %d, MAX= %d, VAL= %d\n", minVal, maxVal, sensedVal);
-        } 
+        if (LEF.function == 0xCA) {
+            if (LEF.data.size() >= 12) {
+                int minX = (LEF.data[0]  << 8) | LEF.data[1];
+                int maxX = (LEF.data[2]  << 8) | LEF.data[3];
+                int valX = (LEF.data[4]  << 8) | LEF.data[5];
+                int minY = (LEF.data[6]  << 8) | LEF.data[7];
+                int maxY = (LEF.data[8]  << 8) | LEF.data[9];
+                int valY = (LEF.data[10] << 8) | LEF.data[11];
+                DEBUG__________printf(
+                    "Eje X → MIN=%d, MAX=%d, VAL=%d;  Eje Y → MIN=%d, MAX=%d, VAL=%d\n",
+                    minX, maxX, valX, minY, maxY, valY
+                );
+            } else {
+                DEBUG__________ln("⚠️ Trama SENSOR CA incompleta (esperados 12 bytes).");
+            }
+        }
+        // --- Sensor único (3 valores) sigue con función 0xCB ---
+        else if (LEF.function == 0xCB) {
+            if (LEF.data.size() >= 6) {
+                int minVal    = (LEF.data[0] << 8) | LEF.data[1];
+                int maxVal    = (LEF.data[2] << 8) | LEF.data[3];
+                int sensedVal = (LEF.data[4] << 8) | LEF.data[5];
+                DEBUG__________printf(
+                    "MIN=%d, MAX=%d, VAL=%d\n",
+                    minVal, maxVal, sensedVal
+                );
+            } else {
+                DEBUG__________ln("⚠️ Trama SENSOR CB incompleta (esperados 6 bytes).");
+            }
+        }
         else if (LEF.function == 0xC1) { // Color recibido
             String colorName;
             switch (LEF.data[0]) {
@@ -153,6 +177,19 @@ void BOTONERA_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
 
         case F_SET_ELEM_MODE:{
           
+            break;
+        }
+
+        case F_SEND_FLAG_BYTE:{
+            // ① El ID que origina el cambio de relé
+            uint8_t sourceID = printTargetID[0];
+
+            // ② El estado que nos envía (bit 0)
+            bool flags_bit0 = (LEF.data[0] & 0x01) != 0;
+
+            // ③ Sincronizamos inmediatamente nuestro mapa
+            RelayStateManager::set(sourceID, flags_bit0);
+            Serial.println("Estado del relé actualizado para ID " + String(sourceID) + ": " + String(flags_bit0 ? "ON" : "OFF"));
             break;
         }
         case F_SEND_COLOR: {
@@ -295,6 +332,16 @@ void BOTONERA_::sectorIn_handler(std::vector<byte> data, byte targetin) {
 
     break;
     }
+
+    case ELEM_CURRENT_FLAGS_SECTOR:{
+    uint8_t sourceID = targetin;
+    bool flags_bit0 = (data[1] & 0x01) != 0;
+    // Actualizamos el estado local
+    RelayStateManager::set(sourceID, flags_bit0);
+        Serial.println("Estado del relé actualizado para ID " + String(sourceID) + ": " + String(flags_bit0 ? "ON" : "OFF"));
+    break;
+    }
+    
     default:
     
         break;
@@ -762,7 +809,7 @@ bool BOTONERA_::procesar_sector(int sector,
 
             // Formato mejorado: "Nombre\n\nID: X"
             snprintf(mensaje, sizeof(mensaje),
-                     "%s ID %d",
+                     "%s Sincronizando %d",
                      nombreAMostrar,
                      targetID);
 
@@ -1538,7 +1585,7 @@ inicio_escanear_sala_completo:
             fase + 1, attachRequestNames[fase]
         );
         iniciarEscaneoElemento(
-            fase == 0 ? "Buscando 0xDD (1/2)..." : "Buscando 0xDD (2/2)..."
+            fase == 0 ? "Buscando fase (1/2)..." : "Buscando fase (2/2)..."
         );
         frameReceived = false;
         delay(100);
@@ -1555,13 +1602,13 @@ inicio_escanear_sala_completo:
         }
 
         DEBUG__________printf(
-            "Esperando respuestas de dispositivos 0xDD durante 30 segundos (Fase %d)...\n",
+            "Esperando respuestas de dispositivos 0xDD durante 60 segundos (Fase %d)...\n",
             fase + 1
         );
         unsigned long tiempoInicioEsperaDD = millis();
         int ddResponsesProcessedThisPhase = 0;
 
-        while (millis() - tiempoInicioEsperaDD < 31000) {
+        while (millis() - tiempoInicioEsperaDD < 61000) {
             if (esperar_respuesta(50)) {
                 LAST_ENTRY_FRAME_T LEF = extract_info_from_frameIn(uartBuffer);
                 frameReceived = false;
@@ -1676,7 +1723,7 @@ inicio_escanear_sala_completo:
                 }
             }
             delay(10);
-        }  // while 20 s por fase
+        }  // while 60 s por fase
 
         DEBUG__________printf(
             "--- Fin de la ventana de 30 segundos para dispositivos 0xDD (Fase %d) ---\n",
@@ -1698,6 +1745,9 @@ inicio_escanear_sala_completo:
     iniciarEscaneoElemento("Escaneo Finalizado");
     actualizarBarraProgreso(32, 32, nullptr);
     DEBUG__________ln("=== ✅ FIN ESCANEO DE SALA COMPLETO (SIN REINICIO POR 0xDD) ✅ ===");
+    formatSubMenuActive = false;
+    hiddenMenuActive = false; 
+    drawCurrentElement();
 }
 
 
