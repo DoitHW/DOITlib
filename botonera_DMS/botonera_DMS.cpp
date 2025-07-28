@@ -8,6 +8,7 @@
 #include <encoder_handler/encoder_handler.h>
 #include <display_handler/display_handler.h>
 #include <RelayManager_DMS/RelayStateManager.h>
+#include <Translations_handler/translations.h>
 
 #define MIN_VALID_ELEMENT_SIZE (OFFSET_ID + 1) // Se espera que el archivo tenga al menos OFFSET_ID+1 bytes
 
@@ -169,6 +170,7 @@ void BOTONERA_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
         case F_RETURN_ELEM_SECTOR: {
         DEBUG__________ln("Ha llegado un F_RETURN_ELEM_SECTOR");
         element->sectorIn_handler(LEF.data, LEF.origin);
+        awaitingResponse = false;
 
             break;
         }
@@ -219,15 +221,20 @@ void BOTONERA_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             } else if (receivedCommand == WIN_CMD)
             {
                 byte res= rand() % 4;
-                doitPlayer.play_file(WIN_RESP_BANK, 11 + res);
+                byte lang = static_cast<uint8_t>(currentLanguage);
+                byte file = lang * 10 + res + 1;
+                doitPlayer.play_file(WIN_RESP_BANK, file);
             } else if (receivedCommand == FAIL_CMD)
             {
                 byte res= rand() % 4;
-                doitPlayer.play_file(FAIL_RESP_BANK, 11 + res);
+                byte lang = static_cast<uint8_t>(currentLanguage);
+                byte file = lang * 10 + res +1;
+                doitPlayer.play_file(FAIL_RESP_BANK, file);
             }
             break;
         }
 
+        
         default: {
                                                                 #ifdef DEBUG
                                                                     DEBUG__________ln("Se ha recibido una función desconocida.");
@@ -292,6 +299,26 @@ void BOTONERA_::sectorIn_handler(std::vector<byte> data, byte targetin) {
 
             // Redibujar la pantalla para reflejar los cambios
             drawCurrentElement();
+
+            for (size_t i = 0; i < elementFiles.size(); ++i) {
+                fs::File idFile = SPIFFS.open(elementFiles[i], "r");
+                if (!idFile) continue;
+                idFile.seek(OFFSET_ID, SeekSet);
+                byte idCheck = 0;
+                idFile.read(&idCheck, 1);
+                idFile.close();
+
+                if (idCheck == targetin) {
+                    selectedStates[i] = (receivedMode != 0);
+                    DEBUG__________printf("🔁 Estado de selección actualizado: %s => %s\n",
+                                        elementFiles[i].c_str(),
+                                        selectedStates[i] ? "Seleccionado" : "No seleccionado");
+                    if (i == currentIndex) {
+                        drawCurrentElement();
+                    }
+                    break;
+                }
+            }
 
             String currentFile = elementFiles[currentIndex];
             fs::File f = SPIFFS.open(currentFile, "r");

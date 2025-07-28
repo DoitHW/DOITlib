@@ -34,3 +34,6 @@ private:
 };
 
 extern PulsadoresHandler pulsadores;
+extern std::vector<uint8_t> idsSPIFFS;   // IDs ordenadas               (solo Comunicador)
+extern int  relayStep;              // -1 = BROADCAST encendido
+extern uint8_t communicatorActiveID;

@@ -146,7 +146,7 @@ FRAME_T frameMaker_REQ_ELEM_SECTOR(byte originin, byte targetin, byte idiomain, 
 
 void printFrameInfo(LAST_ENTRY_FRAME_T LEF);
 
-
+void sendRawFrame(const std::vector<byte>& rawData);
 
 
 #endif

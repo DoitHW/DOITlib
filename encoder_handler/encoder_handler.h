@@ -107,6 +107,16 @@ extern bool confirmRestoreMenuActive;
 extern int confirmRestoreSelection;
 extern bool confirmRestoreMenuElementActive;
 extern int confirmRestoreElementSelection;
+
+extern unsigned long lastFocusChangeTime;
+extern int lastQueriedElementIndex;
+
+
+extern unsigned long lastModeQueryTime;
+extern int pendingQueryIndex;
+extern uint8_t pendingQueryID;
+extern bool awaitingResponse;
+
  
 
 

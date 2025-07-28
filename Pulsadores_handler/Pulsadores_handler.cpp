@@ -66,12 +66,6 @@ void PulsadoresHandler::procesarPulsadores() {
     std::vector<byte> target;
     String currentFile = elementFiles[currentIndex];
     
-    if (currentFile == "Apagar") return;  // ← Ignora todas las pulsaciones si es "Apagar"
-    
-    // Ignorar pulsaciones si es un elemento dinámico no seleccionado
-    if (currentFile != "Ambientes" && currentFile != "Fichas" && !selectedStates[currentIndex]) return;
-
-    bool isFichas = (currentFile == "Fichas");
 
     if (inCognitiveMenu) {
         // Solo responder a pulsadores válidos para actividades cognitivas
@@ -101,32 +95,58 @@ void PulsadoresHandler::procesarPulsadores() {
             digitalWrite(filas[i], HIGH);
         }
         return;  // IMPORTANTE: salir de la función para no ejecutar la lógica normal
-    }    
+    }
 
-    if (!isFichas) {
-        if (currentFile == "Ambientes") {
+    if (currentFile == "Apagar") return;  // ← Ignora todas las pulsaciones si es "Apagar"
+    
+    // Ignorar pulsaciones si es un elemento dinámico no seleccionado
+    if (currentFile != "Ambientes" && currentFile != "Fichas" && !selectedStates[currentIndex]) return;
+
+    bool isFichas = (currentFile == "Fichas");
+
+    
+
+    if (!isFichas){
+
+        /*──── “Ambientes” → broadcast SOLO si el elemento está encendido ────*/
+        if (currentFile == "Ambientes"){
             bool ambientesSeleccionado = false;
-            for (size_t i = 0; i < elementFiles.size(); i++) {
-                if (elementFiles[i] == "Ambientes" && selectedStates[i]) {
+            for (size_t i = 0; i < elementFiles.size(); ++i){
+                if (elementFiles[i] == "Ambientes" && selectedStates[i]){
                     ambientesSeleccionado = true;
                     break;
                 }
             }
-            if (ambientesSeleccionado) {
+            if (ambientesSeleccionado){
                 target.push_back(BROADCAST);
             }
-        } else {
+        }
+
+        /*──── “Comunicador” → SIEMPRE broadcast (modo Básico) ────*/
+        else if (currentFile == "Comunicador"){
+            target.push_back(communicatorActiveID); // nunca va a SPIFFS
+        }
+
+        /*──── CUALQUIER OTRO ELEMENTO ────*/
+        else{
             byte elementID = BROADCAST;
-            if (currentFile == "Apagar") {
-                elementID = apagarSala.ID;
-            } else {
-                fs::File f = SPIFFS.open(currentFile, "r");
-                if (f) {
+
+            if (currentFile == "Apagar"){
+                elementID = apagarSala.ID; // ID fija en RAM
+            }
+            else{
+                /* Elementos almacenados en SPIFFS */
+                String path = currentFile.startsWith("/") ? currentFile : "/" + currentFile;
+                fs::File f = SPIFFS.open(path, "r");
+                if (f){
                     f.seek(OFFSET_ID, SeekSet);
                     f.read(&elementID, 1);
                     f.close();
-                } else {
-                    DEBUG__________printf("❌ Error al leer la ID del archivo %s\n", currentFile.c_str());
+                }
+                else{
+                #ifdef DEBUG
+                DEBUG__________printf("❌ Error al leer la ID del archivo %s\n", currentFile.c_str());
+                #endif
                 }
             }
             target.push_back(elementID);
@@ -145,10 +165,6 @@ void PulsadoresHandler::procesarPulsadores() {
     bool hasRelayN1      = getModeFlag(modeConfig, HAS_RELAY_N1);
     bool hasRelayN2      = getModeFlag(modeConfig, HAS_RELAY_N2);
     bool hasAdvanced     = getModeFlag(modeConfig, HAS_ADVANCED_COLOR);
-
-    if (hasAdvanced && hasPulse && !modeAlternateActive) {
-        hasPulse = false;
-    }
 
     int relayCount = (hasRelayN1 << 1) | hasRelayN2;
     relayCount = relayCount == 0 && hasRelay ? 1 : relayCount + (hasRelay ? 1 : 0);
@@ -288,6 +304,9 @@ void PulsadoresHandler::procesarPulsadores() {
     }
 }
 
+std::vector<uint8_t> idsSPIFFS;   // IDs ordenadas               (solo Comunicador)
+int  relayStep = -1;              // -1 = BROADCAST encendido
+uint8_t communicatorActiveID = 0xFF;   // 0xFF = broadcast
 
 void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
                                            bool hasPulse, bool hasPassive, bool hasRelay,
@@ -321,6 +340,39 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
     
     if (currentFile == "Fichas")
         return;
+
+    /*────────  COMUNICADOR · elemento sólo-relé  — filtra botones  ───────*/
+    if (currentFile == "Comunicador" && communicatorActiveID != BROADCAST) {
+
+        uint8_t cfg[2] = {0};
+        bool soloRele = false;
+        if (RelayStateManager::getModeConfigForID(communicatorActiveID, cfg)) {
+            bool hasCol = getModeFlag(cfg, HAS_BASIC_COLOR) ||
+                        getModeFlag(cfg, HAS_ADVANCED_COLOR);
+            bool hasRel = getModeFlag(cfg, HAS_RELAY);
+            soloRele    = (!hasCol && hasRel);           // sólo-relé
+        }
+
+        /* ——— Caso “solo-relé” ——— */
+        if (soloRele) {
+
+            /* Ignorar todo salvo AZUL y RELAY */
+            if (buttonColor != BLUE && buttonColor != RELAY) return;
+
+            /* --- 1 · Botón AZUL → toggle ON/OFF --- */
+            if (buttonColor == BLUE) {
+                if (event == BUTTON_PRESSED) {
+                    bool cur  = RelayStateManager::get(communicatorActiveID);
+                    bool next = !cur;
+                    send_frame(frameMaker_SEND_FLAG_BYTE(
+                        DEFAULT_BOTONERA, { communicatorActiveID },
+                        next ? 0x01 : 0x00));
+                    RelayStateManager::set(communicatorActiveID, next);
+                }
+                return;                                   // no más lógica para AZUL
+            }
+        }
+    }
 
     // ---------------------------- AMBIENTES ----------------------------
     if (currentFile == "Ambientes")
@@ -397,6 +449,141 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
         }
         return;
     }
+
+// ----------------------- COMUNICADOR · RELÉ DE “CICLO” -----------------------
+
+
+if (currentFile == "Comunicador" && buttonColor == RELAY)
+{
+    if (event != BUTTON_PRESSED) return;                 // solo actuamos en PRESSED
+    if (digitalRead(ENC_BUTTON) == LOW)  return;         // no interferir con encoder
+
+    /* 1 ─ Construir la lista de IDs (una sola vez) */
+    if (idsSPIFFS.empty()) {
+        for (const String &f : elementFiles) {
+            if (f == "Ambientes" || f == "Fichas" ||
+                f == "Comunicador" || f == "Apagar") continue;
+
+            fs::File fi = SPIFFS.open(f.startsWith("/") ? f : "/" + f, "r");
+            if (fi) {
+                uint8_t id;
+                fi.seek(OFFSET_ID, SeekSet);
+                fi.read(&id, 1);
+                fi.close();
+                idsSPIFFS.push_back(id);
+            }
+        }
+        std::sort(idsSPIFFS.begin(), idsSPIFFS.end());
+    }
+
+    /* ---------- helper: envía COLOR o FLAG según capacidades del ID ---------- */
+    auto sendColorOrRelay = [&](uint8_t id, bool on)
+    {
+        if (id == BROADCAST) {
+            send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, { id }, on ? WHITE : BLACK));
+            return;
+        }
+
+        /* localizar elemento con esa ID */
+        String fileFound = "";
+        bool isStatic = false;
+        for (const String &f : elementFiles) {
+            uint8_t fid;
+            if (f == "Ambientes" || f == "Fichas" || f == "Comunicador" || f == "Apagar") {
+                INFO_PACK_T* opt =
+                      (f == "Ambientes")   ? &ambientesOption   :
+                      (f == "Fichas")      ? &fichasOption      :
+                      (f == "Comunicador") ? &comunicadorOption :
+                                             &apagarSala;
+                fid      = opt->ID;
+                isStatic = true;
+            } else {
+                fs::File tf = SPIFFS.open(f.startsWith("/") ? f : "/" + f, "r");
+                if (!tf) continue;
+                tf.seek(OFFSET_ID, SeekSet);
+                tf.read(&fid, 1);
+                tf.close();
+            }
+            if (fid == id) { fileFound = f; break; }
+        }
+
+        if (fileFound == "") {
+            send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, { id }, on ? WHITE : BLACK));
+            return;
+        }
+
+        /* leer modeConfig actual */
+        uint8_t mCfg[2] = {0};
+        if (isStatic) {
+            INFO_PACK_T* opt =
+                  (fileFound == "Ambientes")   ? &ambientesOption   :
+                  (fileFound == "Fichas")      ? &fichasOption      :
+                  (fileFound == "Comunicador") ? &comunicadorOption :
+                                                 &apagarSala;
+            memcpy(mCfg, opt->mode[opt->currentMode].config, 2);
+        } else {
+            fs::File tf = SPIFFS.open(fileFound, "r");
+            if (tf) {
+                uint8_t cur;
+                tf.seek(OFFSET_CURRENTMODE, SeekSet);
+                tf.read(&cur, 1);
+                tf.seek(OFFSET_MODES + cur * SIZE_MODE + 216, SeekSet);
+                tf.read(mCfg, 2);
+                tf.close();
+            }
+        }
+
+        bool hasColor  = getModeFlag(mCfg, HAS_BASIC_COLOR) || getModeFlag(mCfg, HAS_ADVANCED_COLOR);
+        bool hasRelayF = getModeFlag(mCfg, HAS_RELAY);
+
+        if (hasColor) {
+            send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, { id }, on ? WHITE : BLACK));
+        } else if (hasRelayF) {
+            send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, { id }, on ? 0x01 : 0x00));
+        } else {
+            send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, { id }, on ? WHITE : BLACK));
+        }
+    };
+
+    /* 2 ─ Determinar ID negro / blanco */
+    uint8_t idBlack, idWhite;
+    if (idsSPIFFS.empty()) {                // sin elementos → broadcast ↔ broadcast
+        idBlack = idWhite = BROADCAST;
+    } else {
+        if (relayStep == -1) {              // primer toque
+            idBlack  = BROADCAST;
+            idWhite  = idsSPIFFS[0];
+            relayStep = 0;
+        }
+        else if (relayStep < (int)idsSPIFFS.size() - 1) {
+            idBlack  = idsSPIFFS[relayStep];
+            ++relayStep;
+            idWhite  = idsSPIFFS[relayStep];
+        }
+        else {                              // último ID → vuelta a broadcast
+            idBlack  = idsSPIFFS[relayStep];
+            idWhite  = BROADCAST;
+            relayStep = -1;
+        }
+    }
+
+    /* 3 ─ Enviar frames con lógica COLOR / RELAY */
+    sendColorOrRelay(idBlack, false);   // OFF / Negro
+    delay(30);
+    sendColorOrRelay(idWhite, true);    // ON  / Blanco
+
+    communicatorActiveID = idWhite;     // botones de color apuntan aquí
+
+    colorHandler.setCurrentFile("Comunicador");
+    colorHandler.setPatternBotonera(currentModeIndex, ledManager);
+
+#ifdef DEBUG
+    DEBUG__________printf("[COMUNICADOR-RELAY] BLACK→0x%02X  WHITE→0x%02X  paso=%d\n",
+                          idBlack, idWhite, relayStep);
+#endif
+    return;    // no continuar con lógica estándar
+}
+
     // ---------------------------- RELÉ ÚNICO (botón RELAY) ----------------------------
 if (buttonColor == RELAY) {
     // Sólo relé simple, no multirrelé ni aromaterapia

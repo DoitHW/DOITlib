@@ -25,27 +25,34 @@ void RelayStateManager::clear() {
     relayCapabilityMap.clear();
 }
 
-uint8_t RelayStateManager::getElementIDFromFile(const String &file) {
-    // Manejo de ficheros especiales
-    if (file == "Ambientes" || file == "Fichas") {
-        INFO_PACK_T* opt = (file == "Ambientes") ? &ambientesOption : &fichasOption;
-        return opt->ID;
-    }
-    if (file == "Apagar") {
-        return BROADCAST;
+uint8_t RelayStateManager::getElementIDFromFile(const String &file)
+{
+    // ---------- Elementos cargados en RAM ----------
+    if (file == "Ambientes" || file == "Fichas" || file == "Comunicador") {
+        INFO_PACK_T* opt = nullptr;
+        if      (file == "Ambientes")   opt = &ambientesOption;
+        else if (file == "Fichas")      opt = &fichasOption;
+        else                            opt = &comunicadorOption;     // 👈 NUEVO
+        return opt ? opt->ID : BROADCAST;
     }
 
-    // Ficheros SPIFFS
+    // ---------- Caso especial “Apagar” ----------
+    if (file == "Apagar") {
+        return BROADCAST;    // Se dirige a todos
+    }
+
+    // ---------- Elementos almacenados en SPIFFS ----------
     uint8_t elementID = BROADCAST;
-    fs::File f = SPIFFS.open(file, "r");
+    String path = file.startsWith("/") ? file : "/" + file;          // 👈 asegura la barra
+    fs::File f = SPIFFS.open(path, "r");
     if (f) {
         f.seek(OFFSET_ID, SeekSet);
         f.read(&elementID, 1);
-        f.close();  // ✅ Llave bien cerrada antes del 'else'
+        f.close();
+    #ifdef DEBUG
     } else {
-        #ifdef DEBUG
-        DEBUG__________ln("Error al leer la ID de " + file);
-        #endif
+        DEBUG__________ln("❌ Error al leer la ID de " + path);
+    #endif
     }
     return elementID;
 }
@@ -79,4 +86,46 @@ void RelayStateManager::initCapabilities(const std::vector<String>& elementFiles
 bool RelayStateManager::hasRelay(uint8_t elementID) {
     auto it = relayCapabilityMap.find(elementID);
     return (it != relayCapabilityMap.end()) && it->second;
+}
+
+bool RelayStateManager::getModeConfigForID(uint8_t id, uint8_t modeCfg[2])
+{
+    memset(modeCfg, 0, 2);
+
+    /* —— elementos estáticos en RAM ———————————————— */
+    const INFO_PACK_T* statics[] = { &ambientesOption, &fichasOption,
+                                     &comunicadorOption, &apagarSala };
+    for (const INFO_PACK_T* opt : statics) {
+        if (opt->ID == id) {
+            memcpy(modeCfg, opt->mode[opt->currentMode].config, 2);
+            return true;
+        }
+    }
+
+    /* —— buscar en archivos SPIFFS ———————————————— */
+    for (const String& f : elementFiles) {
+        if (f == "Ambientes" || f == "Fichas" ||
+            f == "Comunicador" || f == "Apagar") continue;
+
+        String path = f.startsWith("/") ? f : "/" + f;
+        fs::File file = SPIFFS.open(path, "r");
+        if (!file) continue;
+
+        uint8_t fid;
+        file.seek(OFFSET_ID, SeekSet);
+        file.read(&fid, 1);
+
+        if (fid == id) {                         // ← encontrado
+            uint8_t curMode;
+            file.seek(OFFSET_CURRENTMODE, SeekSet);
+            file.read(&curMode, 1);
+
+            file.seek(OFFSET_MODES + curMode * SIZE_MODE + 216, SeekSet);
+            file.read(modeCfg, 2);
+            file.close();
+            return true;
+        }
+        file.close();
+    }
+    return false;                                // no localizado
 }

@@ -17,4 +17,5 @@ public:
 
     // --- Nuevo: helper para extraer la ID desde un nombre de fichero ---
     static uint8_t getElementIDFromFile(const String &file);
+    static bool getModeConfigForID(uint8_t id, uint8_t modeCfg[2]);
 };

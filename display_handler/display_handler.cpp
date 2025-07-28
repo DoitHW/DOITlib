@@ -409,8 +409,11 @@ void drawCurrentElement() {
     };
 
     // --- Caso 1: Elementos fijos ("Ambientes" o "Fichas") ---
-    if (currentFile == "Ambientes" || currentFile == "Fichas") {
-         INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+    if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Comunicador"){
+         INFO_PACK_T* option = nullptr;
+         if      (currentFile == "Ambientes")   option = &ambientesOption;
+         else if (currentFile == "Fichas")      option = &fichasOption;
+         else                                   option = &comunicadorOption;
          currentMode = option->currentMode;
          int startX = (tft.width() - 64) / 2;
          int startY = (tft.height() - 64) / 2 - 20;
@@ -421,8 +424,10 @@ void drawCurrentElement() {
          // Dibujar el nombre del elemento
                   // **** MODIFICACIÓN: Obtener el nombre traducido ****
          // Si es "Ambientes" usamos la clave "AMBIENTES", si es "Fichas", "FICHAS"
-         String displayName = (currentFile == "Ambientes") ? String(getTranslation("AMBIENTES")) 
-                                                           : String(getTranslation("FICHAS"));
+         String displayName =
+        (currentFile == "Ambientes")   ? String(getTranslation("AMBIENTES"))  :
+        (currentFile == "Fichas")      ? String(getTranslation("FICHAS"))     :
+                                         String(getTranslation("COMUNICADOR"));
          // ******************************************************
          
          uiSprite.setFreeFont(&FreeSansBold12pt7b);
@@ -608,16 +613,22 @@ void drawCurrentElement() {
              modeDisplay = getModeDisplayName(modeDisplay, currentAlternateStates[visibleIndex]);
          }
          int modeTextWidth = uiSprite.textWidth(modeDisplay);
+         if (selectedStates[currentIndex]) {
          if (modeTextWidth > MODE_DISPLAY_WIDTH) {
-              modeScrollActive = true;
-              currentModeDisplayName = modeDisplay;
-              modeScrollOffset = 0;
-              modeScrollDirection = 1;
-              lastModeScrollUpdate = millis();
-              updateModeDisplay();
+                modeScrollActive = true;
+                currentModeDisplayName = modeDisplay;
+                modeScrollOffset = 0;
+                modeScrollDirection = 1;
+                lastModeScrollUpdate = millis();
+                updateModeDisplay();
+            } else {
+                modeScrollActive = false;
+                drawModeName(modeDisplay.c_str());
+            }
          } else {
-              modeScrollActive = false;
-              drawModeName(modeDisplay.c_str());
+            // Si está deseleccionado, limpiamos la zona del modo
+            uiSprite.fillRect(0, tft.height() - MODE_AREA_HEIGHT, MODE_DISPLAY_WIDTH, MODE_AREA_HEIGHT, BACKGROUND_COLOR);
+            modeScrollActive = false;
          }
          f.close();
          //drawSelectionCircle(selectedStates[currentIndex], startX, startY);
@@ -675,20 +686,203 @@ void animateTransition(int direction) {
 std::map<String, std::vector<bool>> elementAlternateStates;
 std::vector<bool> currentAlternateStates;
 
-void drawModesScreen() {
-    // Variables para scroll vertical suave.
-    static int scrollOffset = 0;
-    static int targetScrollOffset = 0;
-    const int visibleOptions = 4; // Número máximo de opciones visibles.
+// void drawModesScreen() {
+//     // Variables para scroll vertical suave.
+//     static int scrollOffset = 0;
+//     static int targetScrollOffset = 0;
+//     const int visibleOptions = 4; // Número máximo de opciones visibles.
 
-    // Variables para scroll horizontal del texto de la opción seleccionada.
-    static int modeTickerOffset = 0;
-    static int modeTickerDirection = 1;
+//     // Variables para scroll horizontal del texto de la opción seleccionada.
+//     static int modeTickerOffset = 0;
+//     static int modeTickerDirection = 1;
+//     static unsigned long modeLastFrameTime = 0;
+//     static int lastSelectedMode = -1;
+
+//     uiSprite.fillSprite(BACKGROUND_COLOR);
+
+//     uiSprite.setFreeFont(&FreeSans12pt7b);
+//     uiSprite.setTextColor(TEXT_COLOR);
+//     uiSprite.setTextDatum(TC_DATUM);
+//     uiSprite.setTextSize(1);
+//     uiSprite.drawString(getTranslation("MODOS"), 64, 5);
+
+//     String currentFile = elementFiles[currentIndex];
+
+//     int visibleModesMap[18];
+//     visibleModesMap[0] = -3;
+//     int count = 1;
+
+//     if (currentFile == "Ambientes" || currentFile == "Fichas") {
+//         INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+//         for (int i = 0; i < 16; i++) {
+//             if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
+//                 visibleModesMap[count++] = i;
+//             }
+//         }
+//     } else if (currentFile != "Apagar") {
+//         fs::File f = SPIFFS.open(currentFile, "r");
+//         if (f) {
+//             for (int i = 0; i < 16; i++) {
+//                 char modeName[25] = {0};
+//                 byte modeConfig[2] = {0};
+//                 f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet);
+//                 f.read((uint8_t*)modeName, 24);
+//                 f.seek(OFFSET_MODES + i * SIZE_MODE + 216, SeekSet);
+//                 f.read(modeConfig, 2);
+//                 if (strlen(modeName) > 0 && checkMostSignificantBit(modeConfig)) {
+//                     visibleModesMap[count++] = i;
+//                 }
+//             }
+//             f.close();
+//         }
+//     }
+
+//     visibleModesMap[count++] = -2;
+//     totalModes = count;
+
+//     if (currentModeIndex < 0 || currentModeIndex >= totalModes) {
+//         currentModeIndex = 0;
+//     }
+
+//     memcpy(globalVisibleModesMap, visibleModesMap, sizeof(int) * totalModes);
+
+//     // Ventana rodante: desplaza startIndex uno en vez de centrar
+//     static int startIndex = 0;
+//     if ((currentModeIndex - startIndex) > (visibleOptions - 2)
+//         && startIndex < (totalModes - visibleOptions)) {
+//         startIndex++;
+//     }
+//     else if ((currentModeIndex - startIndex) < 1
+//              && startIndex > 0) {
+//         startIndex--;
+//     }
+
+//     const int x = 10;
+//     const int textAreaW = 110;
+//     const int scrollBarX = 120;
+
+//     // Dibujar cada opción visible
+//     for (int i = 0; i < visibleOptions && (startIndex + i) < totalModes; i++) {
+//         int currentVisibleIndex = startIndex + i;
+//         int y = 30 + i * (CARD_HEIGHT + CARD_MARGIN);
+//         bool isSelected = (currentVisibleIndex == currentModeIndex);
+
+//         // Fondo del recuadro si está seleccionado
+//         if (isSelected) {
+//             uiSprite.fillRoundRect(x - 3, y - 1, textAreaW + 6, CARD_HEIGHT + 2, 3, CARD_COLOR);
+//         }
+
+//         uiSprite.setFreeFont(&FreeSans9pt7b);
+//         uiSprite.setTextSize(1);
+//         uiSprite.setTextDatum(TL_DATUM);
+//         uiSprite.setTextColor(TEXT_COLOR);
+
+//         int modeVal = visibleModesMap[currentVisibleIndex];
+//         String label;
+
+//         if (modeVal == -2) {
+//             label = getTranslation("VOLVER");
+//         } else if (modeVal == -3) {
+//             label = selectedStates[currentIndex]
+//                     ? getTranslation("APAGAR")
+//                     : getTranslation("ENCENDER");
+//         } else {
+//             char modeName[25] = {0};
+//             if (currentFile == "Ambientes" || currentFile == "Fichas") {
+//                 INFO_PACK_T* option = (currentFile == "Ambientes")
+//                                       ? &ambientesOption
+//                                       : &fichasOption;
+//                 strncpy(modeName, (char*)option->mode[modeVal].name, 24);
+//             } else {
+//                 fs::File f = SPIFFS.open(currentFile, "r");
+//                 if (f) {
+//                     f.seek(OFFSET_MODES + modeVal * SIZE_MODE, SeekSet);
+//                     f.read((uint8_t*)modeName, 24);
+//                     f.close();
+//                 }
+//             }
+//             label = String(modeName);
+//             if (currentFile == "Ambientes" || currentFile == "Fichas") {
+//                 label = getTranslation(label.c_str());
+//             }
+
+//             bool modeAlternateState = false;
+//             if (currentAlternateStates.size() > (size_t)(currentVisibleIndex - 1)
+//                 && visibleModesMap[currentVisibleIndex] != -2) {
+//                 modeAlternateState = currentAlternateStates[currentVisibleIndex - 1];
+//             }
+//             label = getModeDisplayName(label, modeAlternateState);
+//         }
+
+//         if (isSelected) {
+//             if (currentModeIndex != lastSelectedMode) {
+//                 modeTickerOffset = 0;
+//                 modeTickerDirection = 1;
+//                 lastSelectedMode = currentModeIndex;
+//             }
+
+//             int fullTextWidth = uiSprite.textWidth(label);
+//             if (fullTextWidth > textAreaW) {
+//                 const unsigned long frameInterval = 50;
+//                 unsigned long now = millis();
+//                 if (now - modeLastFrameTime >= frameInterval) {
+//                     modeTickerOffset += modeTickerDirection;
+//                     if (modeTickerOffset < 0) {
+//                         modeTickerOffset = 0;
+//                         modeTickerDirection = 1;
+//                     }
+//                     if (modeTickerOffset > (fullTextWidth - textAreaW)) {
+//                         modeTickerOffset = fullTextWidth - textAreaW;
+//                         modeTickerDirection = -1;
+//                     }
+//                     modeLastFrameTime = now;
+//                 }
+//                 TFT_eSprite modeSprite(&tft);
+//                 modeSprite.createSprite(textAreaW, CARD_HEIGHT);
+//                 modeSprite.fillSprite(CARD_COLOR);
+//                 modeSprite.setFreeFont(&FreeSans9pt7b);
+//                 modeSprite.setTextSize(1);
+//                 modeSprite.setTextDatum(TL_DATUM);
+//                 modeSprite.setTextColor(TEXT_COLOR, CARD_COLOR);
+//                 modeSprite.drawString(label, -modeTickerOffset, 0);
+//                 modeSprite.pushToSprite(&uiSprite, x, y);
+//                 modeSprite.deleteSprite();
+//             } else {
+//                 uiSprite.drawString(label, x, y);
+//             }
+//         } else {
+//             uiSprite.drawString(label, x, y);
+//         }
+//     }
+
+//     uiSprite.pushSprite(0, 0);
+
+//     // Actualizar scroll vertical suave
+//     int visibleCurrentModeIndex = currentModeIndex;
+//     if (visibleCurrentModeIndex >= 0) {
+//         targetScrollOffset = visibleCurrentModeIndex * (CARD_HEIGHT + CARD_MARGIN);
+//         if (targetScrollOffset > totalModes * (CARD_HEIGHT + CARD_MARGIN) - 100) {
+//             targetScrollOffset = totalModes * (CARD_HEIGHT + CARD_MARGIN) - 100;
+//         }
+//         if (targetScrollOffset < 0) targetScrollOffset = 0;
+//     }
+//     scrollOffset += (targetScrollOffset - scrollOffset) / 4;
+// }
+
+void drawModesScreen()
+{
+    /*────────────────── Variables de scroll y ticker ──────────────────*/
+    static int  scrollOffset        = 0;
+    static int  targetScrollOffset  = 0;
+    const  int  visibleOptions      = 4;
+
+    static int  modeTickerOffset    = 0;
+    static int  modeTickerDirection = 1;
     static unsigned long modeLastFrameTime = 0;
-    static int lastSelectedMode = -1;
+    static int  lastSelectedMode    = -1;
 
+    /*────────────────── Cabecera ──────────────────*/
     uiSprite.fillSprite(BACKGROUND_COLOR);
-
     uiSprite.setFreeFont(&FreeSans12pt7b);
     uiSprite.setTextColor(TEXT_COLOR);
     uiSprite.setTextDatum(TC_DATUM);
@@ -697,135 +891,161 @@ void drawModesScreen() {
 
     String currentFile = elementFiles[currentIndex];
 
-    int visibleModesMap[18];
-    visibleModesMap[0] = -3;
+    /*────────────────── Construir mapa de modos visibles ──────────────*/
+    int visibleModesMap[18];            // 16 modos + Enc/Ap + Volver
+    visibleModesMap[0] = -3;            // -3 → Encender / Apagar
     int count = 1;
 
-    if (currentFile == "Ambientes" || currentFile == "Fichas") {
-        INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
-        for (int i = 0; i < 16; i++) {
-            if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
+    if (currentFile == "Ambientes" ||
+        currentFile == "Fichas"    ||
+        currentFile == "Comunicador")                         // ← NUEVO
+    {
+        INFO_PACK_T* option =
+              (currentFile == "Ambientes")   ? &ambientesOption   :
+              (currentFile == "Fichas")      ? &fichasOption      :
+                                              &comunicadorOption;  // ← NUEVO
+
+        for (int i = 0; i < 16; ++i)
+            if (strlen((char*)option->mode[i].name) > 0 &&
+                checkMostSignificantBit(option->mode[i].config))
                 visibleModesMap[count++] = i;
-            }
-        }
-    } else if (currentFile != "Apagar") {
+    }
+    else if (currentFile != "Apagar")    // Elementos en SPIFFS
+    {
         fs::File f = SPIFFS.open(currentFile, "r");
-        if (f) {
-            for (int i = 0; i < 16; i++) {
+        if (f)
+        {
+            for (int i = 0; i < 16; ++i)
+            {
                 char modeName[25] = {0};
-                byte modeConfig[2] = {0};
+                byte modeCfg[2]   = {0};
                 f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet);
                 f.read((uint8_t*)modeName, 24);
                 f.seek(OFFSET_MODES + i * SIZE_MODE + 216, SeekSet);
-                f.read(modeConfig, 2);
-                if (strlen(modeName) > 0 && checkMostSignificantBit(modeConfig)) {
+                f.read(modeCfg, 2);
+                if (strlen(modeName) > 0 && checkMostSignificantBit(modeCfg))
                     visibleModesMap[count++] = i;
-                }
             }
             f.close();
         }
     }
 
-    visibleModesMap[count++] = -2;
+    visibleModesMap[count++] = -2;      // -2 → Volver
     totalModes = count;
 
-    if (currentModeIndex < 0 || currentModeIndex >= totalModes) {
+    if (currentModeIndex < 0 || currentModeIndex >= totalModes)
         currentModeIndex = 0;
-    }
 
     memcpy(globalVisibleModesMap, visibleModesMap, sizeof(int) * totalModes);
 
-    // Ventana rodante: desplaza startIndex uno en vez de centrar
+    /*────────────────── Gestión de ventana vertical ───────────────────*/
     static int startIndex = 0;
-    if ((currentModeIndex - startIndex) > (visibleOptions - 2)
-        && startIndex < (totalModes - visibleOptions)) {
-        startIndex++;
-    }
-    else if ((currentModeIndex - startIndex) < 1
-             && startIndex > 0) {
-        startIndex--;
-    }
+    if ((currentModeIndex - startIndex) > (visibleOptions - 2) &&
+        startIndex < (totalModes - visibleOptions))
+        ++startIndex;
+    else if ((currentModeIndex - startIndex) < 1 && startIndex > 0)
+        --startIndex;
 
-    const int x = 10;
-    const int textAreaW = 110;
-    const int scrollBarX = 120;
+    /*────────────────── Parámetros de dibujo ──────────────────────────*/
+    const int x           = 10;
+    const int textAreaW   = 110;
+    const int scrollBarX  = 120;  // (no usado aquí, pero lo mantenemos)
 
-    // Dibujar cada opción visible
-    for (int i = 0; i < visibleOptions && (startIndex + i) < totalModes; i++) {
+    /*────────────────── Dibujar las opciones visibles ─────────────────*/
+    for (int i = 0; i < visibleOptions && (startIndex + i) < totalModes; ++i)
+    {
         int currentVisibleIndex = startIndex + i;
         int y = 30 + i * (CARD_HEIGHT + CARD_MARGIN);
         bool isSelected = (currentVisibleIndex == currentModeIndex);
 
-        // Fondo del recuadro si está seleccionado
-        if (isSelected) {
-            uiSprite.fillRoundRect(x - 3, y - 1, textAreaW + 6, CARD_HEIGHT + 2, 3, CARD_COLOR);
-        }
+        /* Fondo si está seleccionado */
+        if (isSelected)
+            uiSprite.fillRoundRect(x - 3, y - 1,
+                                    textAreaW + 6, CARD_HEIGHT + 2,
+                                    3, CARD_COLOR);
 
         uiSprite.setFreeFont(&FreeSans9pt7b);
         uiSprite.setTextSize(1);
         uiSprite.setTextDatum(TL_DATUM);
         uiSprite.setTextColor(TEXT_COLOR);
 
-        int modeVal = visibleModesMap[currentVisibleIndex];
-        String label;
+        /* ───── Obtener etiqueta ─────*/
+        int     modeVal = visibleModesMap[currentVisibleIndex];
+        String  label;
 
-        if (modeVal == -2) {
-            label = getTranslation("VOLVER");
-        } else if (modeVal == -3) {
-            label = selectedStates[currentIndex]
-                    ? getTranslation("APAGAR")
-                    : getTranslation("ENCENDER");
-        } else {
+        if (modeVal == -2)           label = getTranslation("VOLVER");
+        else if (modeVal == -3)      label = selectedStates[currentIndex]
+                                           ? getTranslation("APAGAR")
+                                           : getTranslation("ENCENDER");
+        else
+        {
             char modeName[25] = {0};
-            if (currentFile == "Ambientes" || currentFile == "Fichas") {
-                INFO_PACK_T* option = (currentFile == "Ambientes")
-                                      ? &ambientesOption
-                                      : &fichasOption;
-                strncpy(modeName, (char*)option->mode[modeVal].name, 24);
-            } else {
+
+            if (currentFile == "Ambientes" ||
+                currentFile == "Fichas"    ||
+                currentFile == "Comunicador")            // ← NUEVO
+            {
+                INFO_PACK_T* opt =
+                      (currentFile == "Ambientes")   ? &ambientesOption   :
+                      (currentFile == "Fichas")      ? &fichasOption      :
+                                                      &comunicadorOption; // ← NUEVO
+                strncpy(modeName, (char*)opt->mode[modeVal].name, 24);
+            }
+            else     // Elemento en SPIFFS
+            {
                 fs::File f = SPIFFS.open(currentFile, "r");
-                if (f) {
+                if (f)
+                {
                     f.seek(OFFSET_MODES + modeVal * SIZE_MODE, SeekSet);
                     f.read((uint8_t*)modeName, 24);
                     f.close();
                 }
             }
+
             label = String(modeName);
-            if (currentFile == "Ambientes" || currentFile == "Fichas") {
+
+            /* Traducción de nombre de modo si es fijo */
+            if (currentFile == "Ambientes" ||
+                currentFile == "Fichas"    ||
+                currentFile == "Comunicador")          // ← NUEVO
+            {
                 label = getTranslation(label.c_str());
             }
 
-            bool modeAlternateState = false;
-            if (currentAlternateStates.size() > (size_t)(currentVisibleIndex - 1)
-                && visibleModesMap[currentVisibleIndex] != -2) {
-                modeAlternateState = currentAlternateStates[currentVisibleIndex - 1];
-            }
-            label = getModeDisplayName(label, modeAlternateState);
+            /* Estado alternativo */
+            bool modeAlt = false;
+            if (currentAlternateStates.size() > (size_t)(currentVisibleIndex - 1) &&
+                visibleModesMap[currentVisibleIndex] != -2)
+                modeAlt = currentAlternateStates[currentVisibleIndex - 1];
+
+            label = getModeDisplayName(label, modeAlt);
         }
 
-        if (isSelected) {
-            if (currentModeIndex != lastSelectedMode) {
-                modeTickerOffset = 0;
+        /* ───── Dibujar texto (ticker si hace falta) ─────*/
+        if (isSelected)
+        {
+            if (currentModeIndex != lastSelectedMode)
+            {
+                modeTickerOffset    = 0;
                 modeTickerDirection = 1;
-                lastSelectedMode = currentModeIndex;
+                lastSelectedMode    = currentModeIndex;
             }
 
-            int fullTextWidth = uiSprite.textWidth(label);
-            if (fullTextWidth > textAreaW) {
-                const unsigned long frameInterval = 50;
+            int fullW = uiSprite.textWidth(label);
+            if (fullW > textAreaW)
+            {
+                const unsigned long frameInt = 50;
                 unsigned long now = millis();
-                if (now - modeLastFrameTime >= frameInterval) {
+                if (now - modeLastFrameTime >= frameInt)
+                {
                     modeTickerOffset += modeTickerDirection;
-                    if (modeTickerOffset < 0) {
-                        modeTickerOffset = 0;
-                        modeTickerDirection = 1;
-                    }
-                    if (modeTickerOffset > (fullTextWidth - textAreaW)) {
-                        modeTickerOffset = fullTextWidth - textAreaW;
-                        modeTickerDirection = -1;
-                    }
+                    if (modeTickerOffset < 0)
+                    { modeTickerOffset = 0; modeTickerDirection = 1; }
+                    if (modeTickerOffset > (fullW - textAreaW))
+                    { modeTickerOffset = fullW - textAreaW; modeTickerDirection = -1; }
                     modeLastFrameTime = now;
                 }
+
                 TFT_eSprite modeSprite(&tft);
                 modeSprite.createSprite(textAreaW, CARD_HEIGHT);
                 modeSprite.fillSprite(CARD_COLOR);
@@ -836,27 +1056,28 @@ void drawModesScreen() {
                 modeSprite.drawString(label, -modeTickerOffset, 0);
                 modeSprite.pushToSprite(&uiSprite, x, y);
                 modeSprite.deleteSprite();
-            } else {
-                uiSprite.drawString(label, x, y);
             }
-        } else {
-            uiSprite.drawString(label, x, y);
+            else
+                uiSprite.drawString(label, x, y);
         }
+        else
+            uiSprite.drawString(label, x, y);
     }
 
     uiSprite.pushSprite(0, 0);
 
-    // Actualizar scroll vertical suave
-    int visibleCurrentModeIndex = currentModeIndex;
-    if (visibleCurrentModeIndex >= 0) {
-        targetScrollOffset = visibleCurrentModeIndex * (CARD_HEIGHT + CARD_MARGIN);
-        if (targetScrollOffset > totalModes * (CARD_HEIGHT + CARD_MARGIN) - 100) {
-            targetScrollOffset = totalModes * (CARD_HEIGHT + CARD_MARGIN) - 100;
-        }
-        if (targetScrollOffset < 0) targetScrollOffset = 0;
+    /*────────────────── Scroll vertical suave ─────────────────────────*/
+    int visibleCurrentIndex = currentModeIndex;
+    if (visibleCurrentIndex >= 0)
+    {
+        targetScrollOffset = visibleCurrentIndex * (CARD_HEIGHT + CARD_MARGIN);
+        int maxScroll = totalModes * (CARD_HEIGHT + CARD_MARGIN) - 100;
+        if (targetScrollOffset > maxScroll) targetScrollOffset = maxScroll;
+        if (targetScrollOffset < 0)         targetScrollOffset = 0;
     }
     scrollOffset += (targetScrollOffset - scrollOffset) / 4;
 }
+
 
 // Opciones del menú oculto
 const char* menuOptions[] = {

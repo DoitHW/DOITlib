@@ -1623,6 +1623,41 @@ FRAME_T frameMaker_RETURN_ELEM_INFO(byte originin, byte targetin, INFO_PACK_T* i
 
 */
 
+void sendRawFrame(const std::vector<byte>& rawData) {
+    if (rawData.size() < 10) {
+        DEBUG__________ln("❌ Trama demasiado corta para ser válida");
+        return;
+    }
+
+    FRAME_T frame;
+    size_t index = 0;
+
+    frame.start           = rawData[index++];
+    frame.frameLengthMsb  = rawData[index++];
+    frame.frameLengthLsb  = rawData[index++];
+    frame.origin          = rawData[index++];
+    frame.numTargets      = rawData[index++];
+
+    for (int i = 0; i < frame.numTargets; i++) {
+        frame.target.push_back(rawData[index++]);
+    }
+
+    frame.function        = rawData[index++];
+    frame.dataLengthMsb   = rawData[index++];
+    frame.dataLengthLsb   = rawData[index++];
+
+    int dataLength = (frame.dataLengthMsb << 8) | frame.dataLengthLsb;
+    for (int i = 0; i < dataLength; i++) {
+        frame.data.push_back(rawData[index++]);
+    }
+
+    frame.checksum = rawData[index++];
+    frame.end      = rawData[index++];
+
+    send_frame(frame);
+}
+
+
 
 
 

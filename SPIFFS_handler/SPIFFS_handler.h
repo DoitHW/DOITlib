@@ -23,6 +23,7 @@ static uint16_t lineBuffer[64];
 extern INFO_PACK_T ambientesOption;
 extern INFO_PACK_T fichasOption;
 extern INFO_PACK_T apagarSala;
+extern INFO_PACK_T comunicadorOption;
 bool readElementData(fs::File& f, char* elementName, char* modeName, int& startX, int& startY);
 bool writeBytesChecked(fs::File &f, const uint8_t* data, size_t length);
 void formatSPIFFS();

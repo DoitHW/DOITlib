@@ -7,7 +7,7 @@ void DOITSOUNDS_::begin(){
     
   if (player.begin(Serial2)) {
     player.volume(26);
-    player.playFolder(01, 8);
+    player.playFolder(1, 9);
                                                                         #ifdef DEBUG
                                                                         //DEBUG__________ln("DFPlayer Mini inicializado");
                                                                         #endif

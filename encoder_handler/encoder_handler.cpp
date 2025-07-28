@@ -70,6 +70,17 @@ bool ignoreInputs = false;
 bool ignoreEncoderClick = false;
 bool systemLocked = false;
 
+
+unsigned long lastFocusChangeTime = 0;
+int lastQueriedElementIndex = -1;
+
+unsigned long lastModeQueryTime = 0;
+int pendingQueryIndex = -1;
+uint8_t pendingQueryID = 0xFF;
+bool awaitingResponse = false;
+
+
+
 void handleEncoder() {
     // 1) Ignorar click residual
     if (ignoreEncoderClick) {
@@ -179,6 +190,9 @@ void handleEncoder() {
         if (!inModesScreen && elementFiles.size() > 1) {
             // Cambio de elemento
             currentIndex = (currentIndex + direction + elementFiles.size()) % elementFiles.size();
+            lastFocusChangeTime = millis();     // Marca el tiempo del cambio de foco
+            lastQueriedElementIndex = -1;       // Resetea: aún no se ha consultado este nuevo elemento
+
             String currentFile = elementFiles[currentIndex];
             static String lastElementFile = "";
             if (currentFile != lastElementFile) {
@@ -188,11 +202,19 @@ void handleEncoder() {
                     currentAlternateStates.clear();
                 }
                 lastElementFile = currentFile;
+
             }
             int realModeIndex = 0;
             byte modeConfig[2] = {0};
-            if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Apagar") {
-                INFO_PACK_T* opt = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+            if (currentFile == "Ambientes" || currentFile == "Fichas" ||
+                currentFile == "Comunicador" || currentFile == "Apagar")
+            {
+                INFO_PACK_T* opt = nullptr;
+                if      (currentFile == "Ambientes")   opt = &ambientesOption;
+                else if (currentFile == "Fichas")      opt = &fichasOption;
+                else if (currentFile == "Comunicador") opt = &comunicadorOption;
+                else                                   opt = &apagarSala;      // “Apagar”
+
                 realModeIndex = opt->currentMode;
                 memcpy(modeConfig, opt->mode[realModeIndex].config, 2);
             } else {
@@ -233,6 +255,47 @@ void handleEncoder() {
                 drawModesScreen();
             }
         }
+    }
+
+    //9.5 ⏱️ Envío diferido de consulta de modo tras 100ms de foco
+    if ((millis() - lastFocusChangeTime > 100) && lastQueriedElementIndex != currentIndex) {
+        String currentFile = elementFiles[currentIndex];
+        if (currentFile != "Comunicador" &&
+            currentFile != "Fichas" &&
+            currentFile != "Ambientes" &&
+            currentFile != "Apagar") {
+
+            fs::File f = SPIFFS.open(currentFile, "r");
+            if (f) {
+                f.seek(OFFSET_ID, SeekSet);
+                f.read(&pendingQueryID, 1);
+                f.close();
+
+                send_frame(frameMaker_REQ_ELEM_SECTOR(
+                    DEFAULT_BOTONERA,
+                    pendingQueryID,
+                    SPANISH_LANG,
+                    ELEM_CMODE_SECTOR
+                ));
+
+                lastModeQueryTime = millis();
+                pendingQueryIndex = currentIndex;
+                awaitingResponse = true;
+                lastQueriedElementIndex = currentIndex;
+
+                frameReceived = false;
+            }
+        }
+    }
+
+    // ⏳ Timeout de 200ms para detectar si el elemento no respondió
+    if (awaitingResponse && (millis() - lastModeQueryTime > 500)) {
+        if (!frameReceived && pendingQueryIndex >= 0 && pendingQueryIndex < (int)elementFiles.size()) {
+            selectedStates[pendingQueryIndex] = false;
+            DEBUG__________printf("⚠️ Elemento %s no respondió en 200ms → marcado como NO SELECCIONADO\n",
+                                elementFiles[pendingQueryIndex].c_str());
+        }
+        awaitingResponse = false;
     }
 
     // 10) Lectura del botón mantenido (solo si no está bloqueado)
@@ -390,7 +453,28 @@ void handleEncoder() {
                         buttonPressStart = 0;
                         isLongPress      = false;
                         return;
-                    } else {
+                    } 
+                    else if (currentFile == "Comunicador") {
+                    relayStep = -1;         
+                    idsSPIFFS.clear();
+                    communicatorActiveID = 0xFF;
+                    bool wasSel = selectedStates[currentIndex];
+                    selectedStates[currentIndex] = !wasSel;
+
+                    if (selectedStates[currentIndex]) {         // ENCENDER ⇒ START_CMD broadcast
+                        std::fill(selectedStates.begin(), selectedStates.end(), true);
+                        send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, { 0xFF }, START_CMD));
+                    } else {                                    // APAGAR ⇒ BLACKOUT broadcast
+                        std::fill(selectedStates.begin(), selectedStates.end(), false);
+                        send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, { 0xFF }, BLACKOUT));
+                    }
+
+                    drawCurrentElement();
+                    buttonPressStart = 0;
+                    isLongPress      = false;
+                    return;                                     
+                }
+                    else {
                         // No es “Apagar”, abrimos el submenú de modos
                         inModesScreen    = true;
                         currentModeIndex = 0;
@@ -432,9 +516,11 @@ void handleEncoder() {
                 }
                 else if (pressDuration < 500) {
                     // Si no es “Apagar” y nos pilló aquí (corte de lógica), entramos a modos
-                    inModesScreen    = true;
-                    currentModeIndex = 0;
-                    drawModesScreen();
+                    if (currentFile != "Comunicador") {
+                        inModesScreen    = true;
+                        currentModeIndex = 0;
+                        drawModesScreen();
+                    }
                 }
             } else {
                 // Si ya estábamos en menú de modos y fue press corto <500 ms
@@ -533,18 +619,47 @@ void handleModeSelection(const String& currentFile) {
             fs::File f = SPIFFS.open(currentFile, "r+");
             if (f) {
                 if (selectedStates[currentIndex]) {
-                    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{getCurrentElementID()}, START_CMD));
+                    // Encender
+                    send_frame(frameMaker_SEND_COMMAND(
+                        DEFAULT_BOTONERA,
+                        std::vector<byte>{getCurrentElementID()},
+                        START_CMD
+                    ));
                 } else {
-                    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{getCurrentElementID()}, BLACKOUT));
-                    fs::File f2 = SPIFFS.open(currentFile, "r+");
-                    if (f2) {
-                        byte basicMode = DEFAULT_BASIC_MODE;
-                        f2.seek(OFFSET_CURRENTMODE, SeekSet);
-                        f2.write(&basicMode, 1);
-                        f2.close();
+                    // Apagar
+                    send_frame(frameMaker_SEND_COMMAND(
+                        DEFAULT_BOTONERA,
+                        std::vector<byte>{getCurrentElementID()},
+                        BLACKOUT
+                    ));
+
+                    // 1) Restablecer modo básico en SPIFFS
+                    {
+                        fs::File f2 = SPIFFS.open(currentFile, "r+");
+                        if (f2) {
+                            byte basicMode = DEFAULT_BASIC_MODE;
+                            f2.seek(OFFSET_CURRENTMODE, SeekSet);
+                            f2.write(&basicMode, 1);
+
+                            // 2) Limpiar los 16 bytes de estados alternativos justo después
+                            const int OFFSET_ALTERNATE_STATES = OFFSET_CURRENTMODE + 1;
+                            byte zeros[16] = {0};
+                            f2.seek(OFFSET_ALTERNATE_STATES, SeekSet);
+                            f2.write(zeros, sizeof(zeros));
+
+                            f2.close();
+                        }
                     }
+
+                    // 3) Limpiar en RAM los flags alternativos de este elemento
+                    elementAlternateStates[currentFile].assign(
+                        elementAlternateStates[currentFile].size(), false
+                    );
+
+                    // 4) Mantener el resto de tu lógica
                     setAllElementsToBasicMode();
                     showMessageWithLoading(getTranslation("APAGANDO_ELEMENTO"), 3000);
+                    selectedStates[currentIndex] = false;
                 }
                 f.close();
             }
@@ -636,6 +751,11 @@ void handleModeSelection(const String& currentFile) {
     } else if (currentFile != "Apagar") {
         byte modeConfigTemp[2] = {0};
         memcpy(modeConfigTemp, modeConfig, 2);  // Usar la configuración que ya tenemos
+        if (!wasAlreadySelected) {
+            send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{getCurrentElementID()}, START_CMD));
+            delay(300);
+        }
+        
         send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, std::vector<byte>{getCurrentElementID()}, realModeIndex));
         delay(300);
         if (getModeFlag(modeConfigTemp, HAS_ALTERNATIVE_MODE)) {
@@ -650,10 +770,7 @@ void handleModeSelection(const String& currentFile) {
                 delay(300);
             }
         }
-        if (!wasAlreadySelected) {
-            send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{getCurrentElementID()}, START_CMD));
-            delay(300);
-        }
+        
         
     }
 
@@ -1361,6 +1478,13 @@ void printElementDetails() {
         for (int i = 0; i < 5; i++) {
             if (i) serialStr += " ";
             serialStr += String(fichasOption.serialNum[i], HEX);
+        }
+    }
+    else if (currentFile == "Comunicador") {          // 👈 NUEVO
+        idStr = String(comunicadorOption.ID, HEX);
+        for (int i = 0; i < 5; i++) {
+            if (i) serialStr += " ";
+            serialStr += String(comunicadorOption.serialNum[i], HEX);
         }
     }
     else if (currentFile == "Apagar") {

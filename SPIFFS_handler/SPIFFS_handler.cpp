@@ -132,6 +132,17 @@ void initializeDynamicOptions() {
 
     // Asumiendo que tienes un icono llamado apagar_64x64:
     memcpy(apagarSala.icono, apagar_sala_64x64, sizeof(apagarSala.icono));
+
+    memset(&comunicadorOption, 0, sizeof(INFO_PACK_T));
+    strncpy((char*)comunicadorOption.name, "COMUNICADOR", 24);
+    comunicadorOption.currentMode = 0;
+    strncpy((char*)comunicadorOption.mode[0].name, "BASICO", 24);
+    comunicadorOption.mode[0].config[0] = 0x80;   // ejemplo de flag “visible”
+    comunicadorOption.mode[0].config[1] = 0x09;
+    comunicadorOption.ID = 0xFF;
+    // Copiar aquí el icono de 64×64:
+    memcpy(comunicadorOption.icono, comunicador_64x64, sizeof(comunicadorOption.icono));
+
 }
 
 
@@ -181,15 +192,30 @@ void loadElementsFromSPIFFS() {
  
      elementFiles.push_back("Apagar");
      selectedStates.push_back(false);
+
+     elementFiles.push_back("Comunicador");
+     selectedStates.push_back(false);
+
 }
 
 byte getCurrentElementID() {
     byte elementID = BROADCAST;  
     String currentFile = elementFiles[currentIndex];
 
-    if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Apagar") {
-        INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
-        return option->ID;
+      // --- Elementos residentes en RAM ---
+    if (currentFile == "Ambientes"   ||
+        currentFile == "Fichas"      ||
+        currentFile == "Apagar"      ||
+        currentFile == "Comunicador")         
+
+    {
+        INFO_PACK_T* option = nullptr;
+        if      (currentFile == "Ambientes")   option = &ambientesOption;
+        else if (currentFile == "Fichas")      option = &fichasOption;
+        else if (currentFile == "Apagar")      option = &apagarSala;
+        else if (currentFile == "Comunicador") option = &comunicadorOption; 
+
+        return option ? option->ID : BROADCAST;
     }
 
     // Leer la ID desde SPIFFS solo si está seleccionado
@@ -223,13 +249,10 @@ bool getModeConfig(const String& fileName, byte mode, byte modeConfig[2]) {
 
     INFO_PACK_T* option = nullptr;
 
-    if (fileName == "Ambientes") {
-        option = &ambientesOption;
-    } else if (fileName == "Fichas") {
-        option = &fichasOption;
-    } else if (fileName == "Apagar") {
-        option = &apagarSala;
-    }
+    if      (fileName == "Ambientes")   option = &ambientesOption;
+    else if (fileName == "Fichas")      option = &fichasOption;
+    else if (fileName == "Apagar")      option = &apagarSala;
+    else if (fileName == "Comunicador") option = &comunicadorOption; 
 
     if (option != nullptr) {
         memcpy(modeConfig, option->mode[mode].config, 2);

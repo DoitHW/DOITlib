@@ -12,6 +12,7 @@
 #include <encoder_handler/encoder_handler.h>
 #include <microphone_DMS/microphone_DMS.h>
 #include <play_DMS/play_DMS.h>
+#include <RelayManager_DMS/RelayStateManager.h>
 //testing MARC 2
 //testing 2 3 4
 //testing 3
@@ -1029,6 +1030,38 @@ void COLORHANDLER_::welcomeEffect() {
 
 void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager) {
   ledManager.clearEffects(); // Limpiar efectos dinámicos previos
+  /*────────────────  COMUNICADOR · elemento sólo-relé  ────────────────*/
+    /*────────────────  COMUNICADOR · elemento sólo-relé  ────────────────*/
+  if (currentFile == "Comunicador") {
+      extern uint8_t communicatorActiveID;           // destino actual
+      if (communicatorActiveID != BROADCAST) {
+          uint8_t cfg[2] = {0};
+          if (RelayStateManager::getModeConfigForID(communicatorActiveID, cfg)) {
+              bool hasCol = getModeFlag(cfg, HAS_BASIC_COLOR) ||
+                            getModeFlag(cfg, HAS_ADVANCED_COLOR);
+              bool hasRel = getModeFlag(cfg, HAS_RELAY);
+
+              if (!hasCol && hasRel) {               // SÓLO RELÉ
+                  /* Apaga todo… */
+                  fill_solid(leds, NUM_LEDS, CRGB::Black);
+
+                  /* …enciende LED 0 con “fade” azul-cian */
+                  ledManager.clearEffects();
+                  ledManager.addEffect(new FadeEffect(*this, 0,
+                                                       CRGB::Blue,
+                                                       CRGB::Cyan,
+                                                       50));
+
+                  /* …enciende LED del botón AZUL */
+                  leds[8] = CRGB::Blue;
+
+                  FastLED.show();
+                  return;                            // no continuar con lógica normal
+              }
+          }
+      }
+  }
+
 
   if (mode >= 16) {
 #ifdef DEBUG
