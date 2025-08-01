@@ -23,6 +23,7 @@ volatile unsigned long last_received_time = 0;
 int lastReceivedTime = 0;
 
 volatile bool uartInterruptTriggered= false;
+extern uint16_t SERIAL_NUM;
 
 // LA FUNCION DIOS
 
@@ -212,107 +213,107 @@ byte checksum_calc(const FRAME_T &framein) {
     return (byte)sum;
 }
 
-void printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
-    DEBUG__________ln("\n==== 📨 Trama Recibida 📨 ====");
+// void printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
+//     DEBUG__________ln("\n==== 📨 Trama Recibida 📨 ====");
 
-    // Determinar origen
-    String origenStr;
-    if (LEF.origin == 0xDB) origenStr = "BOTONERA";
-    else if (LEF.origin == 0xDC) origenStr = "CONSOLA";
-    else if (LEF.origin == 0xFF) origenStr = "BROADCAST";
-    else origenStr = "DESCONOCIDO";
+//     // Determinar origen
+//     String origenStr;
+//     if (LEF.origin == 0xDB) origenStr = "BOTONERA";
+//     else if (LEF.origin == 0xDC) origenStr = "CONSOLA";
+//     else if (LEF.origin == 0xFF) origenStr = "BROADCAST";
+//     else origenStr = "DESCONOCIDO";
 
-    DEBUG__________printf("📌 Origen: %s (0x%02X)\n", origenStr.c_str(), LEF.origin);
+//     DEBUG__________printf("📌 Origen: %s (0x%02X)\n", origenStr.c_str(), LEF.origin);
 
-    // Determinar función
-    String functionStr;
-    switch (LEF.function) {
-        case 0xA0: functionStr = "F_REQ_ELEM_SECTOR"; break;
-        case 0xA1: functionStr = "F_REQ_ELEM_INFO"; break;
-        case 0xA2: functionStr = "F_REQ_ELEM_STATE"; break;
-        case 0xA3: functionStr = "F_REQ_ELEM_ICON"; break;
-        case 0xB1: functionStr = "F_SET_ELEM_ID"; break;
-        case 0xB2: functionStr = "F_SET_ELEM_MODE"; break;
-        case 0xB3: functionStr = "F_SET_ELEM_DEAF"; break;
-        case 0xC1: functionStr = "F_SEND_COLOR"; break;
-        case 0xC2: functionStr = "F_SEND_RGB"; break;
-        case 0xC3: functionStr = "F_SEND_BRIGHTNESS"; break;
-        case 0xCA: functionStr = "F_SEND_SENSOR_VALUE"; break;
-        case 0xCB: functionStr = "F_SEND_SENSOR_VALUE_2"; break;
-        case 0xCC: functionStr = "F_SEND_FILE_NUM"; break;
-        case 0xCD: functionStr = "F_SEND_PATTERN_NUM"; break;
-        case 0xCE: functionStr = "F_SEND_FLAG_BYTE"; break;
-        case 0xCF: functionStr = "F_SEND_COMMAND"; break;
-        case 0xD0: functionStr = "F_RETURN_ELEM_SECTOR"; break;
-        case 0xD1: functionStr = "F_RETURN_ELEM_INFO"; break;
-        case 0xD2: functionStr = "F_RETURN_ELEM_STATE"; break;
-        case 0xD3: functionStr = "F_RETURN_ELEM_ICON"; break;
-        case 0xDE: functionStr = "F_RETURN_ELEM_ERROR"; break;
-        default: functionStr = "FUNCIÓN DESCONOCIDA";
-    }
+//     // Determinar función
+//     String functionStr;
+//     switch (LEF.function) {
+//         case 0xA0: functionStr = "F_REQ_ELEM_SECTOR"; break;
+//         case 0xA1: functionStr = "F_REQ_ELEM_INFO"; break;
+//         case 0xA2: functionStr = "F_REQ_ELEM_STATE"; break;
+//         case 0xA3: functionStr = "F_REQ_ELEM_ICON"; break;
+//         case 0xB1: functionStr = "F_SET_ELEM_ID"; break;
+//         case 0xB2: functionStr = "F_SET_ELEM_MODE"; break;
+//         case 0xB3: functionStr = "F_SET_ELEM_DEAF"; break;
+//         case 0xC1: functionStr = "F_SEND_COLOR"; break;
+//         case 0xC2: functionStr = "F_SEND_RGB"; break;
+//         case 0xC3: functionStr = "F_SEND_BRIGHTNESS"; break;
+//         case 0xCA: functionStr = "F_SEND_SENSOR_VALUE"; break;
+//         case 0xCB: functionStr = "F_SEND_SENSOR_VALUE_2"; break;
+//         case 0xCC: functionStr = "F_SEND_FILE_NUM"; break;
+//         case 0xCD: functionStr = "F_SEND_PATTERN_NUM"; break;
+//         case 0xCE: functionStr = "F_SEND_FLAG_BYTE"; break;
+//         case 0xCF: functionStr = "F_SEND_COMMAND"; break;
+//         case 0xD0: functionStr = "F_RETURN_ELEM_SECTOR"; break;
+//         case 0xD1: functionStr = "F_RETURN_ELEM_INFO"; break;
+//         case 0xD2: functionStr = "F_RETURN_ELEM_STATE"; break;
+//         case 0xD3: functionStr = "F_RETURN_ELEM_ICON"; break;
+//         case 0xDE: functionStr = "F_RETURN_ELEM_ERROR"; break;
+//         default: functionStr = "FUNCIÓN DESCONOCIDA";
+//     }
 
-    DEBUG__________printf("🛠️  Función: %s (0x%02X)\n", functionStr.c_str(), LEF.function);
+//     DEBUG__________printf("🛠️  Función: %s (0x%02X)\n", functionStr.c_str(), LEF.function);
 
-    // Interpretación de datos
-    DEBUG__________("📦 Data: ");
-    if (LEF.data.empty()) {
-        DEBUG__________ln("No hay datos para esta función.");
-    } else {
-        if (LEF.function == 0xCA || LEF.function == 0xCB) { // Sensores
-            int minVal = (LEF.data[0] << 8) | LEF.data[1];
-            int maxVal = (LEF.data[2] << 8) | LEF.data[3];
-            int sensedVal = (LEF.data[4] << 8) | LEF.data[5];
+//     // Interpretación de datos
+//     DEBUG__________("📦 Data: ");
+//     if (LEF.data.empty()) {
+//         DEBUG__________ln("No hay datos para esta función.");
+//     } else {
+//         if (LEF.function == 0xCA || LEF.function == 0xCB) { // Sensores
+//             int minVal = (LEF.data[0] << 8) | LEF.data[1];
+//             int maxVal = (LEF.data[2] << 8) | LEF.data[3];
+//             int sensedVal = (LEF.data[4] << 8) | LEF.data[5];
 
-            DEBUG__________printf("MIN = %d, MAX= %d, VAL= %d\n", minVal, maxVal, sensedVal);
-        } 
-        else if (LEF.function == 0xC1) { // Color recibido
-            String colorName;
-            switch (LEF.data[0]) {
-                case 0: colorName = "BLANCO"; break;
-                case 1: colorName = "AMARILLO"; break;
-                case 2: colorName = "NARANJA"; break;
-                case 3: colorName = "ROJO"; break;
-                case 4: colorName = "VIOLETA"; break;
-                case 5: colorName = "AZUL"; break;
-                case 6: colorName = "CELESTE"; break;
-                case 7: colorName = "VERDE"; break;
-                case 8: colorName = "NEGRO"; break;
-                default: colorName = "COLOR DESCONOCIDO";
-            }
-            DEBUG__________printf("%s (0x%02X)\n", colorName.c_str(), LEF.data[0]);
-        } 
-        else if (LEF.function == F_SEND_COMMAND) { // Color recibido
-            String cmdName;
-            switch (LEF.data[0]) {
-                case BLACKOUT:        cmdName = "DESACTIVAR"; break;
-                case START_CMD:       cmdName = "ACTIVAR"; break;
-                case TEST_CMD:        cmdName = "TEST"; break;
-                case SEND_REG_RF_CMD: cmdName = "ENVIAR REG POR RF"; break;
-                default: cmdName = "A SABER...";
-            }
-            DEBUG__________printf("%s (0x%02X)\n", cmdName.c_str(), LEF.data[0]);
-        } 
-        else if (LEF.function == 0xCE) { // Cambio en el relé
-            DEBUG__________ln("Cambio de estado en el relé.");
-        } 
-        else if (LEF.function == 0xA0) { // Petición de sector
-            String idioma = (LEF.data[0] == 1) ? "ES" : "OTRO";
-            DEBUG__________printf("Idioma: %s, Sector: %d\n", idioma.c_str(), LEF.data[1]);
-        } 
-        else if (LEF.function == 0xCC) { // Petición de archivo
-            DEBUG__________printf("Carpeta (Bank): %d, Archivo (File): %d\n", LEF.data[0], LEF.data[1]);
-        } 
-        else {
-            // Imprimir todos los datos si no hay interpretación específica
-            for (size_t i = 0; i < LEF.data.size(); i++) {
-                DEBUG__________printf("0x%02X ", LEF.data[i]);
-            }
-            DEBUG__________ln();
-        }
-    }
+//             DEBUG__________printf("MIN = %d, MAX= %d, VAL= %d\n", minVal, maxVal, sensedVal);
+//         } 
+//         else if (LEF.function == 0xC1) { // Color recibido
+//             String colorName;
+//             switch (LEF.data[0]) {
+//                 case 0: colorName = "BLANCO"; break;
+//                 case 1: colorName = "AMARILLO"; break;
+//                 case 2: colorName = "NARANJA"; break;
+//                 case 3: colorName = "ROJO"; break;
+//                 case 4: colorName = "VIOLETA"; break;
+//                 case 5: colorName = "AZUL"; break;
+//                 case 6: colorName = "CELESTE"; break;
+//                 case 7: colorName = "VERDE"; break;
+//                 case 8: colorName = "NEGRO"; break;
+//                 default: colorName = "COLOR DESCONOCIDO";
+//             }
+//             DEBUG__________printf("%s (0x%02X)\n", colorName.c_str(), LEF.data[0]);
+//         } 
+//         else if (LEF.function == F_SEND_COMMAND) { // Color recibido
+//             String cmdName;
+//             switch (LEF.data[0]) {
+//                 case BLACKOUT:        cmdName = "DESACTIVAR"; break;
+//                 case START_CMD:       cmdName = "ACTIVAR"; break;
+//                 case TEST_CMD:        cmdName = "TEST"; break;
+//                 case SEND_REG_RF_CMD: cmdName = "ENVIAR REG POR RF"; break;
+//                 default: cmdName = "A SABER...";
+//             }
+//             DEBUG__________printf("%s (0x%02X)\n", cmdName.c_str(), LEF.data[0]);
+//         } 
+//         else if (LEF.function == 0xCE) { // Cambio en el relé
+//             DEBUG__________ln("Cambio de estado en el relé.");
+//         } 
+//         else if (LEF.function == 0xA0) { // Petición de sector
+//             String idioma = (LEF.data[0] == 1) ? "ES" : "OTRO";
+//             DEBUG__________printf("Idioma: %s, Sector: %d\n", idioma.c_str(), LEF.data[1]);
+//         } 
+//         else if (LEF.function == 0xCC) { // Petición de archivo
+//             DEBUG__________printf("Carpeta (Bank): %d, Archivo (File): %d\n", LEF.data[0], LEF.data[1]);
+//         } 
+//         else {
+//             // Imprimir todos los datos si no hay interpretación específica
+//             for (size_t i = 0; i < LEF.data.size(); i++) {
+//                 DEBUG__________printf("0x%02X ", LEF.data[i]);
+//             }
+//             DEBUG__________ln();
+//         }
+//     }
 
-    DEBUG__________ln("=============================");
-}
+//     DEBUG__________ln("=============================");
+// }
 
 LAST_ENTRY_FRAME_T extract_info_from_frameIn(const std::vector<uint8_t> &frame)
 {

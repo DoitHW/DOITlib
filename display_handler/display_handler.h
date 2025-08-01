@@ -44,6 +44,8 @@ void mostrarTextoAjustado(TFT_eSPI& tft,
                                  uint16_t xCentro,
                                  uint16_t yInicio,
                                  uint16_t maxWidth);
+void setFontForCurrentLanguage();
+void scrollFileNameTickerBounce(const String& fileName);
 
                                  
 extern bool isScrollingText;
@@ -61,4 +63,6 @@ extern int bankMenuCurrentSelection;   // 0: Confirmar, 1..n: banks
 extern int bankMenuWindowOffset;
 extern bool criticalBatteryLock; // lo usarás en otras partes
 extern float batteryPercentage;
+extern bool flagScrollFileName;
+extern String fileNameConfirm;
 

@@ -30,8 +30,17 @@ private:
     float lastInclinationX;
     float lastInclinationY;
     float threshold;        // Umbral de cambio significativo
+    float thresholdBinary;  // Umbral para sensor binario
     bool initialized;       // Estado de inicialización
     int errorCount;
+    static const unsigned long movementSampleInterval = 50;  // muestreo rápido
+    static const unsigned long inactivityTimeout     = 1000; // 1 s sin movimiento
+
+    unsigned long lastSampleTime    = 0;
+    unsigned long lastMovementTime  = 0;
+    bool         movementDetectedLast = false;
+    float        lastSampleX = 0, lastSampleY = 0;
+
 };
 
 // Declaración de variable global para el control del ADXL345

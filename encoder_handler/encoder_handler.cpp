@@ -170,7 +170,7 @@ void handleEncoder() {
                 case 4: currentLanguage = Language::FR;    break;
                 case 5: currentLanguage = Language::DE;    break;
                 case 6: currentLanguage = Language::EN;    break;
-                case 7: currentLanguage = Language::X;     break;
+                case 7: currentLanguage = Language::IT;     break;
                 default: currentLanguage = Language::X1;  break;
             }
             languageMenuActive = false;
@@ -1053,15 +1053,16 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
     
         drawBrightnessMenu(currentBrightness);
             break;
-        case 3: // Formatear SPIFFS
-            // Lógica para formatear SPIFFS
-            // formatSPIFFS();
-            // loadElementsFromSPIFFS();
-            // drawCurrentElement();
+        case 3: // Control
             hiddenMenuActive = false;
             formatSubMenuActive = true;
             formatMenuSelection = 0;
             buttonPressStart = 0;
+            extern int formatMenuCurrentIndex;
+            extern int32_t formatMenuLastValue;
+            formatMenuCurrentIndex = 0;
+            formatMenuLastValue = encoder.getCount();
+
             while (digitalRead(ENC_BUTTON) == LOW); // Espera a que se suelte el botón  
             drawFormatMenu(formatMenuSelection);
             break;
@@ -1188,11 +1189,17 @@ int confirmRestoreSelection = 0;  // 0 = Sí, 1 = No
 bool confirmRestoreMenuElementActive = false;
 int confirmRestoreElementSelection = 0;  // 0 = Sí, 1 = No
 
+int formatMenuCurrentIndex = 0;
+int32_t formatMenuLastValue = 0;
 
 void handleFormatMenu() {
-    static int currentIndex = 0;
     int32_t newEncoderValue = encoder.getCount();
-    static int32_t lastValue = newEncoderValue;
+    if (formatMenuLastValue == 0) formatMenuLastValue = newEncoderValue;  // Protección inicial
+
+    // Usa variables globales
+    int& currentIndex = formatMenuCurrentIndex;
+    int32_t& lastValue = formatMenuLastValue;
+
 
     if (newEncoderValue != lastValue) {
     int dir = (newEncoderValue > lastValue) ? 1 : -1;
@@ -1214,7 +1221,7 @@ void handleFormatMenu() {
     } else {
         if (buttonPressStart > 0 && millis() - buttonPressStart < 1000) {
             switch (formatMenuSelection) {
-                case 0: {// Añadir elemento
+                case 0: {// Escanear sala
                     element->escanearSala();
                     hiddenMenuActive = false;
                     formatSubMenuActive = false;
@@ -1240,7 +1247,7 @@ void handleFormatMenu() {
                     }
                     break;
 
-                case 2:  // Restaurar
+                case 2:  // Formatear SPIFFS
                     confirmRestoreMenuActive = true;
                     confirmRestoreSelection = 0;
                     formatSubMenuActive = false;
@@ -1265,6 +1272,9 @@ void handleFormatMenu() {
                     formatSubMenuActive = false;
                     hiddenMenuActive = true;
                     drawHiddenMenu(0);
+                    //currentIndex = 0;
+                    formatMenuCurrentIndex = 0;
+                    formatMenuLastValue = encoder.getCount();
                     break;
                 
             }
@@ -1275,6 +1285,7 @@ void handleFormatMenu() {
         }
         buttonPressStart = 0;
     }
+    
 }
 
 void handleConfirmRestoreMenu() {
@@ -1303,6 +1314,7 @@ void handleConfirmRestoreMenu() {
             } else {
                 // Opción "No"
                 confirmRestoreMenuActive = false;
+                formatSubMenuActive = false;
                 drawFormatMenu(formatMenuSelection);
             }
         }
@@ -1334,15 +1346,12 @@ void handleConfirmRestoreElementMenu() {
                 delay(5000);
                 send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, {BROADCAST}, BLACKOUT));
                 delay(500);
-                confirmRestoreMenuElementActive = false;  
-                formatSubMenuActive = true;
-                drawFormatMenu(formatMenuSelection);
-            } else {
-                // Opción "No"
-                confirmRestoreMenuElementActive = false;
-                formatSubMenuActive = true;
-                drawFormatMenu(formatMenuSelection);
-            }
+        
+            } 
+            confirmRestoreMenuElementActive = false;
+            formatSubMenuActive = true;
+            formatMenuSelection = 0;
+            drawFormatMenu(formatMenuSelection);
         }
         buttonPressStart = 0;
     }
@@ -1438,6 +1447,7 @@ void handleConfirmDelete() {
         }
         buttonPressStart = 0;
     }
+    flagScrollFileName = false;
 }
 
 bool isInMainMenu() {
@@ -1464,36 +1474,29 @@ void printElementDetails() {
     String idStr;
     String serialStr;
 
-    if (currentFile == "Ambientes") {
-        // Construir ID y serial de ambientesOption
-        idStr = String(ambientesOption.ID, HEX);
-        for (int i = 0; i < 5; i++) {
-            if (i) serialStr += " ";
-            serialStr += String(ambientesOption.serialNum[i], HEX);
-        }
+    if (currentFile == "Ambientes" || currentFile == "Fichas") {
+        idStr     = "N/A";
+        serialStr = "N/A";
     }
-    else if (currentFile == "Fichas") {
-        // Construir ID y serial de fichasOption
-        idStr = String(fichasOption.ID, HEX);
+    else if (currentFile == "Comunicador") {
+        // Formatear ID (2 dígitos hexadecimales)
+        char idBuf[3];
+        sprintf(idBuf, "%02X", comunicadorOption.ID);
+        idStr = idBuf;
+
+        // Formatear Serial sin espacios
+        serialStr = "";
         for (int i = 0; i < 5; i++) {
-            if (i) serialStr += " ";
-            serialStr += String(fichasOption.serialNum[i], HEX);
-        }
-    }
-    else if (currentFile == "Comunicador") {          // 👈 NUEVO
-        idStr = String(comunicadorOption.ID, HEX);
-        for (int i = 0; i < 5; i++) {
-            if (i) serialStr += " ";
-            serialStr += String(comunicadorOption.serialNum[i], HEX);
+            char buf[3];
+            sprintf(buf, "%02X", comunicadorOption.serialNum[i]);
+            serialStr += buf;
         }
     }
     else if (currentFile == "Apagar") {
-        // No tiene datos de ID/serial
         idStr     = "N/A";
         serialStr = "N/A";
     }
     else {
-        // Leer desde SPIFFS
         // Leer desde SPIFFS
         fs::File f = SPIFFS.open(currentFile, "r");
         if (!f) {
@@ -1502,27 +1505,36 @@ void printElementDetails() {
         }
         byte id;
         byte serial[5];
-        // Usar la sobrecarga que solo recibe la posición (equivale a SeekSet)
         f.seek(OFFSET_ID);
         f.read(&id, 1);
         f.seek(OFFSET_SERIAL);
         f.read(serial, 5);
         f.close();
 
-        idStr = String(id, HEX);
-        for (int i = 0; i < 5; i++) {
-            if (i) serialStr += " ";
-            serialStr += String(serial[i], HEX);
-        }
+        // ID
+        char idBuf[3];
+        sprintf(idBuf, "%02X", id);
+        idStr = idBuf;
 
+        // Serial sin espacios
+        serialStr = "";
+        for (int i = 0; i < 5; i++) {
+            char buf[3];
+            sprintf(buf, "%02X", serial[i]);
+            serialStr += buf;
+        }
     }
 
-    // Debug por Serial (opcional)
-    Serial.println("🔎 Detalles del elemento:");
-    Serial.print  ("ID: ");     Serial.println(idStr);
-    Serial.print  ("Serial: "); Serial.println(serialStr);
+    // Por seguridad, pasar a mayúsculas (por si sprintf usa minúsculas)
+    idStr.toUpperCase();
+    serialStr.toUpperCase();
 
-    // Mostrar en pantalla durante 5 segundos y volver al menú
+    // Debug opcional
+    Serial.println("🔎 Detalles del elemento:");
+    Serial.print("ID: ");     Serial.println(idStr);
+    Serial.print("Serial: "); Serial.println(serialStr);
+
+    // Mostrar en pantalla
     showElemInfo(10000, serialStr, idStr);
 }
 

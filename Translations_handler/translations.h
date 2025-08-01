@@ -14,7 +14,7 @@ enum class Language {
   ES_MX,   // Mex
   CA,      // Català
   EU,      // Euskera
-  X,       // X
+  IT,       // X
   X1       // X1
 };
 // Variable global para almacenar el idioma actual (por defecto ES)

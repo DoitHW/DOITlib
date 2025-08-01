@@ -6,14 +6,14 @@ Language currentLanguage = Language::ES;
 // Array de traducciones. Puedes agregar más cadenas según tus necesidades.
 const Translation translations[] = {
   // Clave               ES                           ES(MX)                      CA                                EU                                    FR                                   DE                             EN                            IT
-  {"MENU_AJUSTES",       "AJUSTES",                   "AJUSTES",                  "AJUSTOS",                        "EZKARRIA",                           "REGLAGES",                          "EINSTELLUNGEN",               "SETTINGS",                   "IMPOSTAZIONI"},
+  {"MENU_AJUSTES",       "AJUSTES",                   "AJUSTES",                  "CONFIG",                         "EZKARRIA",                           "REGLAGES",                          "EINSTELLUNGEN",               "SETTINGS",                   "IMPOSTAZIONI"},
   {"MODOS",              "MODOS",                     "MODOS",                    "MODES",                          "MODUAK",                             "MODES",                             "MODI",                        "MODES",                      "MODALITA"},
   {"ENCENDER",           "Encender",                  "Encender",                 "Encendre",                       "Piztu",                              "Allumer",                           "Einschalten",                 "Turn On",                    "Accendere"},
   {"APAGAR",             "Apagar",                    "Apagar",                   "Apagar",                         "Itzal",                              "Eteindre",                          "Ausschalten",                 "Turn Off",                   "Spegnere"},
   {"UPDATE_SALA",        "Actualizar sala",           "Actualizar sala",          "Actualitzar sala",               "Gela eguneratu",                     "Mettre a jour la salle",            "Raum aktualisieren",          "Update room",                "Aggiornare la stanza"},
   {"IDIOMA",             "Idioma",                    "Idioma",                   "Llengua",                        "Hizkuntza",                          "Langue",                            "Sprache",                     "Language",                   "Lingua"},
   {"SONIDO",             "Sonido",                    "Sonido",                   "So",                             "Soinu",                              "Son",                               "Ton",                         "Sound",                      "Suono"},
-  {"BRILLO",             "Brillo",                    "Brillo",                   "Brillantor",                     "Distira",                            "Luminosite",                        "Helligkeit",                  "Brightness",                 "Luminosita"},
+  {"BRILLO",             "Brillo",                    "Brillo",                   "Lluminositat",                   "Distira",                            "Luminosite",                        "Helligkeit",                  "Brightness",                 "Luminosita"},
   {"FORMATEAR",          "Formatear",                 "Formatear",                "Formatar",                       "Formatatu",                          "Formater",                          "Formatieren",                 "Format",                     "Formatta"},
   {"VOLVER",             "Volver",                    "Regresar",                 "Tornar",                         "Itzuli",                             "Retour",                            "Zurück",                      "Back",                       "Indietro"},
   {"APAGANDO_ELEMENTO",  "Apagando elemento...",      "Apagando elemento...",     "Apagant l'element...",           "Elementua itzaltzen...",             "Extinction de l'element...",        "Element ausschalten...",      "Turning off element...",     "Spegnendo elemento..."},
@@ -58,6 +58,7 @@ const char* getTranslation(const char* key) {
         case Language::FR:     return translations[i].fr;
         case Language::DE:     return translations[i].de;
         case Language::EN:     return translations[i].en;
+        case Language::IT:     return translations[i].it;
         default:               return translations[i].es;
       }
     }

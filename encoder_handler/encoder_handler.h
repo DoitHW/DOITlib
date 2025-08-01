@@ -117,6 +117,10 @@ extern int pendingQueryIndex;
 extern uint8_t pendingQueryID;
 extern bool awaitingResponse;
 
+extern int formatMenuCurrentIndex;
+extern int32_t formatMenuLastValue;
+
+
  
 
 

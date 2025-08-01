@@ -22,7 +22,7 @@
                                                 #endif
 
 
-                                                #define SERIAL_NUM        0xC0CA // -> 0xVV00= VERSION + 0x00MM= MES
+                                            
                                                 #define NOSERIAL_BY_FILE         // -> NOSERIAL_BY_FILE / SERIAL_BY_FILE --> Activar Serial por FileSystem, si esta definido, ignora el SERIAL_NUM.
                                                 #define SHOW_MAC                 // -> Opcional disparar MAC al inicio  (No sirve pa ná...) 
                                                 #define SLOW_RF                  // -> FAST_RF= 115200 / SLOW_RF= 9600 (NO TOCAR POR DIOSSSS)
@@ -381,6 +381,13 @@ enum COMMANDS_ {
   SEND_LAST_ORIGIN_CMD,
   SEND_SESSION_LOG_RF_CMD,
   FORMAT_LITTLEFS_CMD,
+  AVERAGE_SESSION_TIME_RF_REQ,
+  MOST_SELECTED_MODE_RF_REQ,
+  MOST_SELECTED_COLOR_RF_REQ,
+  MOST_SELECTED_AMBIENT_RF_REQ,
+  USAGE_GRAPH_RF_REQ,
+  LITTLEFS_MEM_STATS,
+  INTER_SESSION_TIMES
 };
 
 enum TOKEN_TYPE_{

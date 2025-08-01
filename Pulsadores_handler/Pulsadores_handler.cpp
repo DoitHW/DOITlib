@@ -61,7 +61,6 @@ bool PulsadoresHandler::isButtonPressed(byte color) {
     return false; // Ningún botón con ese color está presionado
 }
 
-
 void PulsadoresHandler::procesarPulsadores() {
     std::vector<byte> target;
     String currentFile = elementFiles[currentIndex];
@@ -83,7 +82,7 @@ void PulsadoresHandler::procesarPulsadores() {
                 bool currentPressed = (digitalRead(columnas[j]) == LOW);
                 target = { DEFAULT_CONSOLE };
                 if (!lastState[i][j] && currentPressed) {
-                    
+        
                     processButtonEvent(i, j, BUTTON_PRESSED, true, false, true, target);
                 }
                 if (lastState[i][j] && !currentPressed) {
@@ -398,6 +397,7 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
         return;
     }
 
+    bool hasBasic    = getModeFlag(modeConfig, HAS_BASIC_COLOR);
     bool hasAdvanced = getModeFlag(modeConfig, HAS_ADVANCED_COLOR);
     bool hasPatterns = getModeFlag(modeConfig, HAS_PATTERNS);
     bool hasRelayN1 = getModeFlag(modeConfig, HAS_RELAY_N1);
@@ -774,7 +774,8 @@ if (buttonColor == RELAY) {
     }
     else
     {
-        if (event == BUTTON_PRESSED)
+       
+        if ((hasBasic || hasAdvanced) && event == BUTTON_PRESSED)
         {
             send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, buttonColor));
 #ifdef DEBUG

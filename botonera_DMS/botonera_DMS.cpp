@@ -33,9 +33,9 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
     else if (LEF.origin == 0xDC) origenStr = "CONSOLA";
     else if (LEF.origin == 0xFF) origenStr = "BROADCAST";
     else if (LEF.origin == 0xDF) origenStr = "HACKING BOX";
-    else origenStr = "DESCONOCIDO";
+    else origenStr = (String)LEF.origin;
 
-    DEBUG__________printf("📌 Origen: %s (0x%02X)\n", origenStr.c_str(), LEF.origin);
+    DEBUG__________printf("📌 Origen:  %s (0x%02X)\n", origenStr.c_str(), LEF.origin);
 
     DEBUG__________("🎯 Targets: ");
     if (printTargetID.empty()) {
@@ -77,7 +77,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
     DEBUG__________printf("🛠️  Función: %s (0x%02X)\n", functionStr.c_str(), LEF.function);
 
     // Interpretación de datos
-    DEBUG__________("📦 Data: ");
+    DEBUG__________("📦 Data:    ");
     if (LEF.data.empty()) {
         DEBUG__________ln("No hay datos para esta función.");
     } else {
@@ -136,7 +136,62 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
         } 
         else if (LEF.function == 0xCC) { // Petición de archivo
             DEBUG__________printf("Carpeta (Bank): %d, Archivo (File): %d\n", LEF.data[0], LEF.data[1]);
+        }
+        else if (LEF.function == F_SEND_COMMAND) {
+        if (!LEF.data.empty()) {
+            uint8_t cmd = LEF.data[0];
+            String commandStr;
+            switch (cmd) {
+                case BLACKOUT:                          commandStr = "BLACKOUT"; break;
+                case START_CMD:                         commandStr = "START_CMD"; break;
+                case TEST_CMD:                          commandStr = "TEST_CMD"; break;
+                case SEND_REG_RF_CMD:                   commandStr = "SEND_REG_RF_CMD"; break;
+                case SEND_STATS_RF_CMD:                 commandStr = "SEND_STATS_RF_CMD"; break;
+                case ERR_DBG_ON:                        commandStr = "ERR_DBG_ON"; break;
+                case ERR_DBG_OFF:                       commandStr = "ERR_DBG_OFF"; break;
+                case SET_ELEM_DEAF:                     commandStr = "SET_ELEM_DEAF"; break;
+                case SET_ELEM_LONG_DEAF:                commandStr = "SET_ELEM_LONG_DEAF"; break;
+                case MAGIC_TEST_CMD:                    commandStr = "MAGIC_TEST_CMD"; break;
+                case MAGIC_TEST_2_CMD:                  commandStr = "MAGIC_TEST_2_CMD"; break;
+                case ALTERNATE_MODE_ON:                 commandStr = "ALTERNATE_MODE_ON"; break;
+                case ALTERNATE_MODE_OFF:                commandStr = "ALTERNATE_MODE_OFF"; break;
+                case OTA_AP_ON:                         commandStr = "OTA_AP_ON"; break;
+                case OTA_AP_OFF:                        commandStr = "OTA_AP_OFF"; break;
+                case COG_ACT_ON:                        commandStr = "COG_ACT_ON"; break;
+                case COG_ACT_OFF:                       commandStr = "COG_ACT_OFF"; break;
+                case SHOW_ID_CMD:                       commandStr = "SHOW_ID_CMD"; break;
+                case WIN_CMD:                           commandStr = "WIN_CMD"; break;
+                case FAIL_CMD:                          commandStr = "FAIL_CMD"; break;
+                case MOST_USED_MODE_RF_REQ:             commandStr = "MOST_USED_MODE_RF_REQ"; break;
+                case MOST_USED_COLOR_RF_REQ:            commandStr = "MOST_USED_COLOR_RF_REQ"; break;
+                case MOST_USED_AMBIENT_RF_REQ:          commandStr = "MOST_USED_AMBIENT_RF_REQ"; break;
+                case LIFETIME_TOTAL_RF_REQ:             commandStr = "LIFETIME_TOTAL_RF_REQ"; break;
+                case WORKTIME_TOTAL_RF_REQ:             commandStr = "WORKTIME_TOTAL_RF_REQ"; break;
+                case CURRENT_SESSION_TIME_RF_REQ:       commandStr = "CURRENT_SESSION_TIME_RF_REQ"; break;
+                case CURRENT_SESSION_FILENAME_RF_REQ:   commandStr = "CURRENT_SESSION_FILENAME_RF_REQ"; break;
+                case EVENTS_LOG_RF_REQ:                 commandStr = "EVENTS_LOG_RF_REQ"; break;
+                case LAST_EVENT_LOG_RF_REQ:             commandStr = "LAST_EVENT_LOG_RF_REQ"; break;
+                case LIST_SESSIONS_RF_REQ:              commandStr = "LIST_SESSIONS_RF_REQ"; break;
+                case CLEAR_SESSIONS_CMD:                commandStr = "CLEAR_SESSIONS_CMD"; break;
+                case RESET_ALL_STATS_CMD:               commandStr = "RESET_ALL_STATS_CMD"; break;
+                case SEND_LAST_ORIGIN_CMD:              commandStr = "SEND_LAST_ORIGIN_CMD"; break;
+                case SEND_SESSION_LOG_RF_CMD:           commandStr = "SEND_SESSION_LOG_RF_CMD"; break;
+                case FORMAT_LITTLEFS_CMD:               commandStr = "FORMAT_LITTLEFS_CMD"; break;
+                case AVERAGE_SESSION_TIME_RF_REQ:       commandStr = "AVERAGE_SESSION_TIME_RF_REQ"; break;
+                case MOST_SELECTED_MODE_RF_REQ:         commandStr = "MOST_SELECTED_MODE_RF_REQ"; break;
+                case MOST_SELECTED_COLOR_RF_REQ:        commandStr = "MOST_SELECTED_COLOR_RF_REQ"; break;
+                case MOST_SELECTED_AMBIENT_RF_REQ:      commandStr = "MOST_SELECTED_AMBIENT_RF_REQ"; break;
+                case USAGE_GRAPH_RF_REQ:                commandStr = "USAGE_GRAPH_RF_REQ"; break;
+                case LITTLEFS_MEM_STATS:                commandStr = "LITTLEFS_MEM_STATS"; break;
+                case INTER_SESSION_TIMES:               commandStr = "INTER_SESSION_TIMES"; break;
+                default:                                commandStr = "COMANDO DESCONOCIDO";
+            }
+            DEBUG__________printf("Comando: %s (0x%02X)\n", commandStr.c_str(), cmd);
         } 
+        else {
+            DEBUG__________ln("⚠️ No hay datos para el comando.");
+        }
+        }
         else {
             // Imprimir todos los datos si no hay interpretación específica
             for (size_t i = 0; i < LEF.data.size(); i++) {

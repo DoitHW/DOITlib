@@ -26,6 +26,9 @@ bool brightnessMenuActive = false;
 uint8_t currentBrightness = 100;       // Valor actual en porcentaje
 uint8_t tempBrightness = currentBrightness;  // Valor temporal mientras se ajusta
 
+bool flagScrollFileName = false;
+String fileNameConfirm = "";
+
 void drawBrightnessMenu(uint8_t brightness) {
     // Clear the sprite with background color
     uiSprite.fillSprite(BACKGROUND_COLOR);
@@ -202,16 +205,24 @@ void drawSelectionCircle(bool isSelected, int startX, int startY) {
     }
 }
 
+
 void drawNavigationArrows() {
-    int arrowSize = 20;
-    int arrowY = tft.height() / 2;
+    int arrowY = (tft.height() / 2) - 20;
+    int arrowSize = 8;
     
-    // Flecha izquierda
-    uiSprite.fillTriangle(5, arrowY, 15, arrowY - 10, 15, arrowY + 10, TFT_WHITE);
+    // Flecha izquierda (líneas gruesas)
+    for (int i = 0; i < 3; i++) {
+        uiSprite.drawLine(12 + i, arrowY - arrowSize + i, 5 + i, arrowY, TFT_WHITE);
+        uiSprite.drawLine(5 + i, arrowY, 12 + i, arrowY + arrowSize - i, TFT_WHITE);
+    }
     
-    // Flecha derecha
-    uiSprite.fillTriangle(tft.width() - 5, arrowY, tft.width() - 15, arrowY - 10, tft.width() - 15, arrowY + 10, TFT_WHITE);
+    // Flecha derecha (líneas gruesas)
+    for (int i = 0; i < 3; i++) {
+        uiSprite.drawLine(tft.width() - 12 - i, arrowY - arrowSize + i, tft.width() - 5 - i, arrowY, TFT_WHITE);
+        uiSprite.drawLine(tft.width() - 5 - i, arrowY, tft.width() - 12 - i, arrowY + arrowSize - i, TFT_WHITE);
+    }
 }
+
 
 // Parámetros para el área del nombre (ajusta según necesites)
 const int DISPLAY_WIDTH = 128;            // Ancho total del display
@@ -1101,7 +1112,7 @@ void drawHiddenMenu(int selection)
     uiSprite.fillSprite(BACKGROUND_COLOR);
 
     // Dibujar el título (ya traducido)
-    uiSprite.setFreeFont(&FreeSans12pt7b);
+    setFontForCurrentLanguage();
     uiSprite.setTextColor(TEXT_COLOR);
     uiSprite.setTextDatum(TC_DATUM);
     uiSprite.setTextSize(1);
@@ -1281,8 +1292,8 @@ String getModeDisplayName(const String &fullModeName, bool alternateActive) {
 // Función para dibujar el menú de selección de idioma con scroll vertical
 void drawLanguageMenu(int selection) {
     // Opciones de idioma: se definen 8 opciones
-    const char* languageOptions[] = {"ES", "ES(MX)", "CA", "EU", "FR", "DE", "EN"};
-    const int numLanguages = 7;
+    const char* languageOptions[] = {"ES", "ES(MX)", "CA", "EU", "FR", "DE", "EN", "IT"};
+    const int numLanguages = 8;
     const int visibleOptions = 4;
 
     int startIndex = 0;
@@ -1379,8 +1390,6 @@ void drawBankSelectionMenu(const std::vector<byte>& bankList, const std::vector<
             byte bank = bankList[menuIndex - 1];
             String familyName = getFamilyNameFromBank(bank);
             label = familyName;
-            
-            // Ya no añadimos [X] porque se usa el color para indicar la selección
         }
         
         // Si la opción seleccionada tiene texto muy largo, aplicar ticker horizontal similar a drawModesScreen.
@@ -1861,6 +1870,8 @@ void drawConfirmDelete(const String& fileName) {
     }
 
     uiSprite.pushSprite(0, 0);
+    flagScrollFileName = (uiSprite.textWidth(fileName) > 120);
+    fileNameConfirm = fileName;  // Guarda copia global si no lo haces ya
 }
 
 void scrollTextTickerBounceFormat(int selection) {
@@ -2102,7 +2113,7 @@ void drawConfirmRestoreElementMenu(int selection) {
     uiSprite.setTextSize(1);
     uiSprite.setTextColor(TEXT_COLOR);
 
-    uiSprite.drawString("Restaurar elementos?", 64, 10);
+    uiSprite.drawString("Restaurar?", 64, 10);
 
     const char* options[] = {"Si", "No"};
     for (int i = 0; i < 2; i++) {
@@ -2122,50 +2133,55 @@ void drawConfirmRestoreElementMenu(int selection) {
 // Debes tener disponible la función mostrarTextoAjustado tal como la definiste antes.
 
 void mostrarTextoAjustado(TFT_eSPI& tft,
-                                 const char* texto,
-                                 uint16_t xCentro,
-                                 uint16_t yInicio,
-                                 uint16_t maxWidth)
-{
-    uint8_t prevFont = tft.textfont;
+                          const char* texto,
+                          uint16_t xCentro,
+                          uint16_t yInicio,
+                          uint16_t maxWidth) {
+    uint8_t prevFont  = tft.textfont;
     uint8_t prevDatum = tft.getTextDatum();
 
     tft.setTextColor(TFT_WHITE);
     tft.setTextDatum(MC_DATUM);
     tft.setTextFont(2);
 
-    const uint16_t lineHeight   = tft.fontHeight();
-    const uint16_t screenHeight = 128;
+    const uint16_t lineHeight     = tft.fontHeight();
     const uint16_t maxTextHeight = 55;
 
-    tft.fillRect(5, yInicio - lineHeight/2, 118, maxTextHeight, TFT_BLACK);
-
+    // Borrar área de texto
+    tft.fillRect(5, yInicio - lineHeight / 2, 118, maxTextHeight, TFT_BLACK);
 
     const char* ptr = texto;
     uint16_t y = yInicio;
+
     while (*ptr && y + lineHeight <= yInicio + maxTextHeight) {
         const char* scan = ptr;
         size_t lastSpace = 0, charsCount = 0;
         uint16_t w = 0;
+
         while (*scan) {
             ++charsCount;
             if (charsCount >= 128) break;
+
             char buf[128];
             memcpy(buf, ptr, charsCount);
             buf[charsCount] = '\0';
+
             w = tft.textWidth(buf);
             if (w > maxWidth) { --charsCount; break; }
             if (*scan == ' ') lastSpace = charsCount;
             ++scan;
         }
+
         size_t lineLen = (*scan == '\0') ? charsCount
                           : (lastSpace > 0 ? lastSpace : charsCount);
+
         char lineBuf[128];
         memcpy(lineBuf, ptr, lineLen);
         lineBuf[lineLen] = '\0';
         tft.drawString(lineBuf, xCentro, y);
         ptr += lineLen;
         while (*ptr == ' ') ++ptr;
+
         y += lineHeight;
     }
 
@@ -2173,45 +2189,124 @@ void mostrarTextoAjustado(TFT_eSPI& tft,
     tft.setTextDatum(prevDatum);
 }
 
-
 void showElemInfo(unsigned long delayTime,
-                  const String& serialNumber,
-                  const String& elementID) {
-    // 1) Limpiar toda la pantalla
+                  const String& serialNumberRaw,
+                  const String& elementIDRaw) {
+    // 1) Limpiar pantalla
     tft.fillScreen(TFT_BLACK);
 
-    // 2) Preparar cadenas a mostrar
-    String idLine     = "ID: " + elementID;
-    String serialLine = "Serial: " + serialNumber;
+    // 2) Convertir a mayúsculas
+    String elementID     = elementIDRaw;
+    String serialNumber  = serialNumberRaw;
+    elementID.toUpperCase();
+    serialNumber.toUpperCase();
 
-    // 3) Parámetros para centrar y ajustar el texto
-    const uint16_t xCentro   = tft.width() / 2;  // centro horizontal
-    const uint16_t maxWidth  = tft.width()  - 10; // margen de 5px a cada lado
+    // 3) Preparar textos
+    String idLine      = "ID: " + elementID;
+    String serialLabel = "Serial";
+    String serialValue = serialNumber;  // ya está limpio, sin espacios
 
-    // 4) Mostrar ID (empezando en y = 30)
-    mostrarTextoAjustado(tft,
-                         idLine.c_str(),
-                         xCentro,
-                         30,         // yInicio para la primera línea
-                         maxWidth);
+    // 4) Coordenadas comunes
+    const uint16_t xCentro   = tft.width() / 2;
+    const uint16_t maxWidth  = tft.width() - 10;
 
-    // 5) Mostrar Serial (empezando en y = 30 + altura de bloque)
-    //    Como en mostrarTextoAjustado el bloque máximo de texto es 55px,
-    //    desplazamos 30 + 55 + 10 de separación = 95px
-    mostrarTextoAjustado(tft,
-                         serialLine.c_str(),
-                         xCentro,
-                         60,         // yInicio para la segunda línea
-                         maxWidth);
+    // 5) Mostrar ID
+    mostrarTextoAjustado(tft, idLine.c_str(), xCentro, 20, maxWidth);
 
-    // 6) Mantener la pantalla durante delayTime ms
+    // 6) Mostrar etiqueta "Serial:"
+    mostrarTextoAjustado(tft, serialLabel.c_str(), xCentro, 55, maxWidth);
+
+    // 7) Mostrar serial como una sola línea sin wrap
+    mostrarTextoAjustado(tft, serialValue.c_str(), xCentro, 85, maxWidth);
+
+    // 8) Delay
     unsigned long start = millis();
     while (millis() - start < delayTime) {
-        // Aquí podrías refrescar watchdog u otras tareas si fuera necesario
+        // Tareas opcionales
     }
 
-    // 7) Volver al menú principal
+    // 9) Volver al menú
     drawCurrentElement();
+}
+
+void setFontForCurrentLanguage() {
+    if (currentLanguage == Language::IT || currentLanguage == Language::DE /*|| currentLanguage == Language::CA*/) {
+        uiSprite.setFreeFont(&FreeSans9pt7b);
+    } else {
+        uiSprite.setFreeFont(&FreeSans12pt7b);
+    }
+}
+
+
+void scrollFileNameTickerBounce(const String& fileName) {
+    static int pixelOffset = 0;
+    static int scrollDirection = 1;
+    static unsigned long lastScrollTime = 0;
+    static bool inPause = false;
+    static unsigned long pauseStartTime = 0;
+
+    const unsigned long scrollInterval = 20;    // Ajusta aquí para velocidad (20 ms = 50 fps)
+    const unsigned long pauseDuration  = 500;  // 1 s en extremos
+
+    const int textAreaW = 128;
+    const int textAreaH = 22;
+    const int textAreaX = 0;
+    const int textAreaY = 47 - (textAreaH / 2);  // Centrado vertical en y=35
+
+    // Solo scroll si hace falta
+    uiSprite.setFreeFont(&FreeSans9pt7b);
+    uiSprite.setTextWrap(false);
+    uiSprite.setTextSize(1);
+    int fullTextWidth = uiSprite.textWidth(fileName);
+    if (fullTextWidth <= textAreaW) return;
+
+    unsigned long now = millis();
+
+    // Pausa en extremos
+    if (inPause) {
+        if (now - pauseStartTime >= pauseDuration) {
+            inPause = false;
+        } else {
+            return;
+        }
+    }
+
+    // Avanza el offset cada scrollInterval
+    if (now - lastScrollTime >= scrollInterval) {
+        pixelOffset += scrollDirection;
+
+        if (pixelOffset <= 0) {
+            pixelOffset = 0;
+            scrollDirection = 1;
+            inPause = true;
+            pauseStartTime = now;
+        }
+
+        int maxOffset = fullTextWidth - textAreaW;
+        if (pixelOffset >= maxOffset) {
+            pixelOffset = maxOffset;
+            scrollDirection = -1;
+            inPause = true;
+            pauseStartTime = now;
+        }
+
+        lastScrollTime = now;
+    }
+
+    // Pintamos SOLO el ticker, que ya limpia su fondo
+    TFT_eSprite tickerSprite(&tft);
+    if (!tickerSprite.createSprite(textAreaW, textAreaH)) return;
+
+    tickerSprite.setFreeFont(&FreeSans9pt7b);
+    tickerSprite.setTextWrap(false);
+    tickerSprite.setTextSize(1);
+    tickerSprite.setTextColor(TEXT_COLOR);
+    tickerSprite.setTextDatum(TL_DATUM);
+    tickerSprite.fillSprite(BACKGROUND_COLOR);
+
+    tickerSprite.drawString(fileName, -pixelOffset, 0);
+    tickerSprite.pushSprite(textAreaX, textAreaY);
+    tickerSprite.deleteSprite();
 }
 
 
