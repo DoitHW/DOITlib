@@ -2,7 +2,6 @@
 #include <Arduino.h>
 #include <Frame_DMS/Frame_DMS.h>
 #include <SPIFFS_handler/SPIFFS_handler.h>
-#include <info_elements_DMS/info_elements_DMS.h>
 #include <encoder_handler/encoder_handler.h>
 
 

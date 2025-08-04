@@ -3,6 +3,7 @@
 #include <display_handler/display_handler.h>
 #include "icons_64x64_DMS/icons_64x64_DMS.h"
 #include <Translations_handler/translations.h>
+#include <play_DMS/play_DMS.h>
 
 
 
@@ -500,4 +501,50 @@ void loadDeletableElements() {
     }
     deletableElementFiles.push_back(getTranslation("VOLVER"));
 }
+
+void saveLanguageToSPIFFS(Language lang) {
+    File f = SPIFFS.open("/config_lang.txt", FILE_WRITE);
+    if (f) {
+        f.write((byte)lang);
+        f.close();
+    }
+}
+
+Language loadLanguageFromSPIFFS() {
+    File f = SPIFFS.open("/config_lang.txt", FILE_READ);
+    if (f && f.available()) {
+        byte val = f.read();
+        f.close();
+        if (val >= 1 && val <= (byte)Language::X1) {
+            return static_cast<Language>(val);
+        }
+    }
+    return Language::ES;  // idioma por defecto si no existe o es inválido
+}
+
+void saveSoundSettingsToSPIFFS() {
+    File f = SPIFFS.open("/config_sonido.txt", FILE_WRITE);
+    if (f) {
+        f.write(selectedVoiceGender);  // 0 = mujer, 1 = hombre
+        f.write(negativeResponse ? 1 : 0);  // true = 1, false = 0
+        f.write(selectedVolume);  // 0 = normal, 1 = atenuado
+        f.close();
+    }
+}
+
+void loadSoundSettingsFromSPIFFS() {
+    File f = SPIFFS.open("/config_sonido.txt", FILE_READ);
+    if (f && f.available() >= 3) {
+        selectedVoiceGender = f.read();          // 0 o 1
+        token.genre = selectedVoiceGender;       // Sincronizar token.genre
+        negativeResponse = f.read() == 1;        // true o false
+        selectedVolume = f.read();               // 0 o 1
+        doitPlayer.player.volume(selectedVolume == 0 ? 26 : 20);  // Aplicar volumen
+        f.close();
+    }
+}
+
+
+
+
 

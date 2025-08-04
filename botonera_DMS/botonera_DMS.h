@@ -31,7 +31,7 @@ class BOTONERA_ : public ELEMENT_{
         void mostrarMensajeTemporal(int respuesta, int dTime);
         byte getNextAvailableID();
 
-        byte validar_serial();
+        //byte validar_serial();
         void procesar_datos_sector(LAST_ENTRY_FRAME_T &LEF, int sector, INFO_PACK_T* infoPack);
         bool guardar_elemento(INFO_PACK_T* infoPack);
         void reasignar_id_elemento(INFO_PACK_T* infoPack = nullptr);
@@ -46,6 +46,7 @@ class BOTONERA_ : public ELEMENT_{
         void printFrameInfo(LAST_ENTRY_FRAME_T LEF);
         void activateCognitiveMode();
         void deactivateCognitiveMode();
+ 
 
         ////////////////////////////////
 

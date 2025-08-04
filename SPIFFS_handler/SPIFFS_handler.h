@@ -3,6 +3,9 @@
 #include <SPIFFS.h>
 #include <string>
 #include <Frame_DMS/Frame_DMS.h>
+#include <Translations_handler/translations.h>
+#include <play_DMS/play_DMS.h>
+#include <token_DMS/token_DMS.h>
 
 // Cálculo de offsets dentro de INFO_PACK_T:
 const size_t OFFSET_NAME = 0;                              
@@ -24,6 +27,11 @@ extern INFO_PACK_T ambientesOption;
 extern INFO_PACK_T fichasOption;
 extern INFO_PACK_T apagarSala;
 extern INFO_PACK_T comunicadorOption;
+extern TOKEN_ token;
+extern DOITSOUNDS_ doitPlayer;
+
+
+
 bool readElementData(fs::File& f, char* elementName, char* modeName, int& startX, int& startY);
 bool writeBytesChecked(fs::File &f, const uint8_t* data, size_t length);
 void formatSPIFFS();
@@ -44,3 +52,7 @@ void saveBrightnessToSPIFFS(uint8_t value);
 uint8_t loadBrightnessFromSPIFFS();
 std::vector<byte> readBankList();
 void loadDeletableElements();
+void saveLanguageToSPIFFS(Language lang);
+Language loadLanguageFromSPIFFS();
+void saveSoundSettingsToSPIFFS();
+void loadSoundSettingsFromSPIFFS();

@@ -697,189 +697,6 @@ void animateTransition(int direction) {
 std::map<String, std::vector<bool>> elementAlternateStates;
 std::vector<bool> currentAlternateStates;
 
-// void drawModesScreen() {
-//     // Variables para scroll vertical suave.
-//     static int scrollOffset = 0;
-//     static int targetScrollOffset = 0;
-//     const int visibleOptions = 4; // Número máximo de opciones visibles.
-
-//     // Variables para scroll horizontal del texto de la opción seleccionada.
-//     static int modeTickerOffset = 0;
-//     static int modeTickerDirection = 1;
-//     static unsigned long modeLastFrameTime = 0;
-//     static int lastSelectedMode = -1;
-
-//     uiSprite.fillSprite(BACKGROUND_COLOR);
-
-//     uiSprite.setFreeFont(&FreeSans12pt7b);
-//     uiSprite.setTextColor(TEXT_COLOR);
-//     uiSprite.setTextDatum(TC_DATUM);
-//     uiSprite.setTextSize(1);
-//     uiSprite.drawString(getTranslation("MODOS"), 64, 5);
-
-//     String currentFile = elementFiles[currentIndex];
-
-//     int visibleModesMap[18];
-//     visibleModesMap[0] = -3;
-//     int count = 1;
-
-//     if (currentFile == "Ambientes" || currentFile == "Fichas") {
-//         INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
-//         for (int i = 0; i < 16; i++) {
-//             if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
-//                 visibleModesMap[count++] = i;
-//             }
-//         }
-//     } else if (currentFile != "Apagar") {
-//         fs::File f = SPIFFS.open(currentFile, "r");
-//         if (f) {
-//             for (int i = 0; i < 16; i++) {
-//                 char modeName[25] = {0};
-//                 byte modeConfig[2] = {0};
-//                 f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet);
-//                 f.read((uint8_t*)modeName, 24);
-//                 f.seek(OFFSET_MODES + i * SIZE_MODE + 216, SeekSet);
-//                 f.read(modeConfig, 2);
-//                 if (strlen(modeName) > 0 && checkMostSignificantBit(modeConfig)) {
-//                     visibleModesMap[count++] = i;
-//                 }
-//             }
-//             f.close();
-//         }
-//     }
-
-//     visibleModesMap[count++] = -2;
-//     totalModes = count;
-
-//     if (currentModeIndex < 0 || currentModeIndex >= totalModes) {
-//         currentModeIndex = 0;
-//     }
-
-//     memcpy(globalVisibleModesMap, visibleModesMap, sizeof(int) * totalModes);
-
-//     // Ventana rodante: desplaza startIndex uno en vez de centrar
-//     static int startIndex = 0;
-//     if ((currentModeIndex - startIndex) > (visibleOptions - 2)
-//         && startIndex < (totalModes - visibleOptions)) {
-//         startIndex++;
-//     }
-//     else if ((currentModeIndex - startIndex) < 1
-//              && startIndex > 0) {
-//         startIndex--;
-//     }
-
-//     const int x = 10;
-//     const int textAreaW = 110;
-//     const int scrollBarX = 120;
-
-//     // Dibujar cada opción visible
-//     for (int i = 0; i < visibleOptions && (startIndex + i) < totalModes; i++) {
-//         int currentVisibleIndex = startIndex + i;
-//         int y = 30 + i * (CARD_HEIGHT + CARD_MARGIN);
-//         bool isSelected = (currentVisibleIndex == currentModeIndex);
-
-//         // Fondo del recuadro si está seleccionado
-//         if (isSelected) {
-//             uiSprite.fillRoundRect(x - 3, y - 1, textAreaW + 6, CARD_HEIGHT + 2, 3, CARD_COLOR);
-//         }
-
-//         uiSprite.setFreeFont(&FreeSans9pt7b);
-//         uiSprite.setTextSize(1);
-//         uiSprite.setTextDatum(TL_DATUM);
-//         uiSprite.setTextColor(TEXT_COLOR);
-
-//         int modeVal = visibleModesMap[currentVisibleIndex];
-//         String label;
-
-//         if (modeVal == -2) {
-//             label = getTranslation("VOLVER");
-//         } else if (modeVal == -3) {
-//             label = selectedStates[currentIndex]
-//                     ? getTranslation("APAGAR")
-//                     : getTranslation("ENCENDER");
-//         } else {
-//             char modeName[25] = {0};
-//             if (currentFile == "Ambientes" || currentFile == "Fichas") {
-//                 INFO_PACK_T* option = (currentFile == "Ambientes")
-//                                       ? &ambientesOption
-//                                       : &fichasOption;
-//                 strncpy(modeName, (char*)option->mode[modeVal].name, 24);
-//             } else {
-//                 fs::File f = SPIFFS.open(currentFile, "r");
-//                 if (f) {
-//                     f.seek(OFFSET_MODES + modeVal * SIZE_MODE, SeekSet);
-//                     f.read((uint8_t*)modeName, 24);
-//                     f.close();
-//                 }
-//             }
-//             label = String(modeName);
-//             if (currentFile == "Ambientes" || currentFile == "Fichas") {
-//                 label = getTranslation(label.c_str());
-//             }
-
-//             bool modeAlternateState = false;
-//             if (currentAlternateStates.size() > (size_t)(currentVisibleIndex - 1)
-//                 && visibleModesMap[currentVisibleIndex] != -2) {
-//                 modeAlternateState = currentAlternateStates[currentVisibleIndex - 1];
-//             }
-//             label = getModeDisplayName(label, modeAlternateState);
-//         }
-
-//         if (isSelected) {
-//             if (currentModeIndex != lastSelectedMode) {
-//                 modeTickerOffset = 0;
-//                 modeTickerDirection = 1;
-//                 lastSelectedMode = currentModeIndex;
-//             }
-
-//             int fullTextWidth = uiSprite.textWidth(label);
-//             if (fullTextWidth > textAreaW) {
-//                 const unsigned long frameInterval = 50;
-//                 unsigned long now = millis();
-//                 if (now - modeLastFrameTime >= frameInterval) {
-//                     modeTickerOffset += modeTickerDirection;
-//                     if (modeTickerOffset < 0) {
-//                         modeTickerOffset = 0;
-//                         modeTickerDirection = 1;
-//                     }
-//                     if (modeTickerOffset > (fullTextWidth - textAreaW)) {
-//                         modeTickerOffset = fullTextWidth - textAreaW;
-//                         modeTickerDirection = -1;
-//                     }
-//                     modeLastFrameTime = now;
-//                 }
-//                 TFT_eSprite modeSprite(&tft);
-//                 modeSprite.createSprite(textAreaW, CARD_HEIGHT);
-//                 modeSprite.fillSprite(CARD_COLOR);
-//                 modeSprite.setFreeFont(&FreeSans9pt7b);
-//                 modeSprite.setTextSize(1);
-//                 modeSprite.setTextDatum(TL_DATUM);
-//                 modeSprite.setTextColor(TEXT_COLOR, CARD_COLOR);
-//                 modeSprite.drawString(label, -modeTickerOffset, 0);
-//                 modeSprite.pushToSprite(&uiSprite, x, y);
-//                 modeSprite.deleteSprite();
-//             } else {
-//                 uiSprite.drawString(label, x, y);
-//             }
-//         } else {
-//             uiSprite.drawString(label, x, y);
-//         }
-//     }
-
-//     uiSprite.pushSprite(0, 0);
-
-//     // Actualizar scroll vertical suave
-//     int visibleCurrentModeIndex = currentModeIndex;
-//     if (visibleCurrentModeIndex >= 0) {
-//         targetScrollOffset = visibleCurrentModeIndex * (CARD_HEIGHT + CARD_MARGIN);
-//         if (targetScrollOffset > totalModes * (CARD_HEIGHT + CARD_MARGIN) - 100) {
-//             targetScrollOffset = totalModes * (CARD_HEIGHT + CARD_MARGIN) - 100;
-//         }
-//         if (targetScrollOffset < 0) targetScrollOffset = 0;
-//     }
-//     scrollOffset += (targetScrollOffset - scrollOffset) / 4;
-// }
-
 void drawModesScreen()
 {
     /*────────────────── Variables de scroll y ticker ──────────────────*/
@@ -2308,5 +2125,74 @@ void scrollFileNameTickerBounce(const String& fileName) {
     tickerSprite.pushSprite(textAreaX, textAreaY);
     tickerSprite.deleteSprite();
 }
+
+
+void drawLoadingModalFrame(const char* message, int frameCount) {
+    uiSprite.fillSprite(BACKGROUND_COLOR);
+
+    // === TEXTO MULTILÍNEA AJUSTADO (estilo mostrarTextoAjustado) ===
+    uiSprite.setTextColor(TFT_WHITE, BACKGROUND_COLOR);
+    uiSprite.setTextDatum(MC_DATUM);
+    uiSprite.setTextFont(2);
+
+    const uint16_t xCentro        = 64;   // centro X de la pantalla
+    const uint16_t yInicio        = 30;   // Y inicial
+    const uint16_t maxWidth       = 120;  // ancho máximo
+    const uint16_t lineHeight     = uiSprite.fontHeight();
+    const uint16_t maxTextHeight  = 55;
+
+    // Borrar área de texto (por si hay residuos)
+    uiSprite.fillRect(5, yInicio - lineHeight / 2, 118, maxTextHeight, BACKGROUND_COLOR);
+
+    const char* ptr = message;
+    uint16_t y = yInicio;
+
+    while (*ptr && y + lineHeight <= yInicio + maxTextHeight) {
+        const char* scan = ptr;
+        size_t lastSpace = 0, charsCount = 0;
+        uint16_t w = 0;
+
+        while (*scan) {
+            ++charsCount;
+            if (charsCount >= 128) break;
+
+            char buf[128];
+            memcpy(buf, ptr, charsCount);
+            buf[charsCount] = '\0';
+
+            w = uiSprite.textWidth(buf);
+            if (w > maxWidth) { --charsCount; break; }
+            if (*scan == ' ') lastSpace = charsCount;
+            ++scan;
+        }
+
+        size_t lineLen = (*scan == '\0') ? charsCount
+                          : (lastSpace > 0 ? lastSpace : charsCount);
+
+        char lineBuf[128];
+        memcpy(lineBuf, ptr, lineLen);
+        lineBuf[lineLen] = '\0';
+        uiSprite.drawString(lineBuf, xCentro, y);
+        ptr += lineLen;
+        while (*ptr == ' ') ++ptr;
+
+        y += lineHeight;
+    }
+
+    // === ANIMACIÓN DE PUNTOS GIRANDO ===
+    int centerX = uiSprite.width() / 2;
+    int centerY = uiSprite.height() - 50;
+    int radius  = 10;
+
+    for (int i = 0; i < 8; i++) {
+        float angle = frameCount * 0.2 + i * PI / 4;
+        int x = centerX + radius * cos(angle);
+        int y = centerY + radius * sin(angle);
+        uiSprite.fillCircle(x, y, 2, TEXT_COLOR);
+    }
+
+    uiSprite.pushSprite(0, 0);
+}
+
 
 

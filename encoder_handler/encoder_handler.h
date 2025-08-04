@@ -1,7 +1,6 @@
 #pragma once
 
 #include <SPIFFS_handler/SPIFFS_handler.h>
-#include <info_elements_DMS/info_elements_DMS.h>
 #include <Arduino.h>
 #include <ESP32Encoder.h>
 #include <vector>
@@ -11,6 +10,25 @@
 #define ENC_B 34                //34                    33                      (34 para nuevas botoneras sin placa)
 #define ENC_BUTTON 33           //33                    26                      (26 para nuevas botoneras sin placa)
                                                         //3V3 desconectado
+
+enum MODE_CONFIGS{
+    HAS_BASIC_COLOR= 0,
+    HAS_PULSE,
+    HAS_ADVANCED_COLOR,
+    HAS_RELAY,
+    HAS_RELAY_N1,
+    HAS_RELAY_N2,
+    NOP_1,
+    HAS_SENS_VAL_1,
+    HAS_SENS_VAL_2,
+    NOP_2,
+    HAS_PASSIVE,
+    HAS_BINARY_SENSORS,
+    HAS_BANK_FILE,
+    HAS_PATTERNS,
+    HAS_ALTERNATIVE_MODE,
+    MODE_EXIST
+};
 
 // Declaración de funciones relacionadas con el encoder
 void encoder_init_func();

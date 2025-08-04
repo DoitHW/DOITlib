@@ -8,7 +8,6 @@
 #include <DynamicLEDManager_DMS/DynamicLEDManager_DMS.h>
 #include <ADXL345_handler/ADXL345_handler.h>
 #include <microphone_DMS/microphone_DMS.h>
-#include <info_elements_DMS/info_elements_DMS.h>
 #include <Translations_handler/translations.h>
 #include <token_DMS/token_DMS.h>
 #include <RelayManager_DMS/RelayStateManager.h>
@@ -173,6 +172,7 @@ void handleEncoder() {
                 case 7: currentLanguage = Language::IT;     break;
                 default: currentLanguage = Language::X1;  break;
             }
+            saveLanguageToSPIFFS(currentLanguage);
             languageMenuActive = false;
             buttonPressStart  = 0;
             drawCurrentElement();
@@ -917,7 +917,17 @@ void handleBrightnessMenu() {
             tempBrightness = newBrightness;
             drawBrightnessMenu(tempBrightness);
 
-            FastLED.setBrightness(map(tempBrightness, 0, 100, 0, 255));
+            //FastLED.setBrightness(map(tempBrightness, 0, 100, 0, 165));
+            uint8_t mappedBrightness = 0;
+
+            if (tempBrightness >= 100) {
+                mappedBrightness = 255;  // Brillo real máximo solo si está en 100%
+            } else {
+                mappedBrightness = map(tempBrightness, 0, 99, 0, 165);
+            }
+
+            FastLED.setBrightness(mappedBrightness);
+
             FastLED.show();
         }
     }
@@ -969,6 +979,7 @@ void handleSoundMenu() {
                 case 6: selectedVolume = 0; doitPlayer.player.volume(26); break;
                 case 7: selectedVolume = 1; doitPlayer.player.volume(20); break;
                 case 9: 
+                saveSoundSettingsToSPIFFS();
                 soundMenuActive = false;
                 drawCurrentElement();
                 DEBUG__________ln("✅ Ajustes de sonido confirmados:");
@@ -1500,7 +1511,7 @@ void printElementDetails() {
         // Leer desde SPIFFS
         fs::File f = SPIFFS.open(currentFile, "r");
         if (!f) {
-            Serial.println("❌ No se pudo abrir el archivo para mostrar detalles.");
+            DEBUG__________ln("❌ No se pudo abrir el archivo para mostrar detalles.");
             return;
         }
         byte id;
@@ -1530,9 +1541,9 @@ void printElementDetails() {
     serialStr.toUpperCase();
 
     // Debug opcional
-    Serial.println("🔎 Detalles del elemento:");
-    Serial.print("ID: ");     Serial.println(idStr);
-    Serial.print("Serial: "); Serial.println(serialStr);
+    DEBUG__________ln("🔎 Detalles del elemento:");
+    DEBUG__________("ID: ");     DEBUG__________ln(idStr);
+    DEBUG__________("Serial: "); DEBUG__________ln(serialStr);
 
     // Mostrar en pantalla
     showElemInfo(10000, serialStr, idStr);

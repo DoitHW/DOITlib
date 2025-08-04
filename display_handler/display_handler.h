@@ -47,6 +47,8 @@ void mostrarTextoAjustado(TFT_eSPI& tft,
 void setFontForCurrentLanguage();
 void scrollFileNameTickerBounce(const String& fileName);
 
+void drawLoadingModalFrame(const char* message, int frameCount);
+
                                  
 extern bool isScrollingText;
 extern TFT_eSPI tft;

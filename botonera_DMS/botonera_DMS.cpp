@@ -9,6 +9,7 @@
 #include <display_handler/display_handler.h>
 #include <RelayManager_DMS/RelayStateManager.h>
 #include <Translations_handler/translations.h>
+#include <display_handler/display_handler.h>
 
 #define MIN_VALID_ELEMENT_SIZE (OFFSET_ID + 1) // Se espera que el archivo tenga al menos OFFSET_ID+1 bytes
 
@@ -18,8 +19,6 @@ byte currentCognitiveCommand = COG_ACT_OFF;
 
 BOTONERA_::BOTONERA_() : ELEMENT_() {
             set_type(TYPE_BOTONERA);
-            
-
         }
 
 void BOTONERA_::botonera_begin(){}
@@ -246,7 +245,7 @@ void BOTONERA_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
 
             // ③ Sincronizamos inmediatamente nuestro mapa
             RelayStateManager::set(sourceID, flags_bit0);
-            Serial.println("Estado del relé actualizado para ID " + String(sourceID) + ": " + String(flags_bit0 ? "ON" : "OFF"));
+            DEBUG__________ln("Estado del relé actualizado para ID " + String(sourceID) + ": " + String(flags_bit0 ? "ON" : "OFF"));
             break;
         }
         case F_SEND_COLOR: {
@@ -420,7 +419,7 @@ void BOTONERA_::sectorIn_handler(std::vector<byte> data, byte targetin) {
     bool flags_bit0 = (data[1] & 0x01) != 0;
     // Actualizamos el estado local
     RelayStateManager::set(sourceID, flags_bit0);
-        Serial.println("Estado del relé actualizado para ID " + String(sourceID) + ": " + String(flags_bit0 ? "ON" : "OFF"));
+        DEBUG__________ln("Estado del relé actualizado para ID " + String(sourceID) + ": " + String(flags_bit0 ? "ON" : "OFF"));
     break;
     }
     
@@ -452,59 +451,59 @@ String BOTONERA_::getCurrentFilePath(byte elementID) {
 
 
 byte tempID;
-byte BOTONERA_::validar_serial() {
-    const int max_reintentos = 5;
+// byte BOTONERA_::validar_serial() {
+//     const int max_reintentos = 5;
     
-    iniciarEscaneoElemento("Buscando elementos...");
-    for (int intento = 0; intento < max_reintentos; intento++) {
-        // Mostrar algo en la interfaz de usuario, p.ej. "Escaneando..."
+//     iniciarEscaneoElemento("Buscando elementos...");
+//     for (int intento = 0; intento < max_reintentos; intento++) {
+//         // Mostrar algo en la interfaz de usuario, p.ej. "Escaneando..."
         
-        frameReceived = false;
-        // Petición de ELEM_SERIAL_SECTOR al DEFAULT_DEVICE
-        send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA,
-                                              DEFAULT_DEVICE,
-                                              SPANISH_LANG,
-                                              ELEM_SERIAL_SECTOR));
+//         frameReceived = false;
+//         // Petición de ELEM_SERIAL_SECTOR al DEFAULT_DEVICE
+//         send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA,
+//                                               DEFAULT_DEVICE,
+//                                               SPANISH_LANG,
+//                                               ELEM_SERIAL_SECTOR));
 
-        // unsigned long startTime = millis();
+//         // unsigned long startTime = millis();
 
-        // // Espera hasta 2.5s a que frameReceived se ponga en true
-        // while (!frameReceived && (millis() - startTime < 2500)) {
-        //     delay(10);
-        // }
-        if (!esperar_respuesta(2500)) {
-            DEBUG__________ln("No llegó respuesta de ELEM_SERIAL_SECTOR");
-        }
+//         // // Espera hasta 2.5s a que frameReceived se ponga en true
+//         // while (!frameReceived && (millis() - startTime < 2500)) {
+//         //     delay(10);
+//         // }
+//         if (!esperar_respuesta(2500)) {
+//             DEBUG__________ln("No llegó respuesta de ELEM_SERIAL_SECTOR");
+//         }
 
-        // Si hubo respuesta (frameReceived = true), procesamos
-        if (frameReceived) {
-            frameReceived = false; // Reiniciamos el flag
-            LAST_ENTRY_FRAME_T LEF = extract_info_from_frameIn(uartBuffer);
+//         // Si hubo respuesta (frameReceived = true), procesamos
+//         if (frameReceived) {
+//             frameReceived = false; // Reiniciamos el flag
+//             LAST_ENTRY_FRAME_T LEF = extract_info_from_frameIn(uartBuffer);
 
-            // Verificamos que la trama sea del sector correcto y tenga tamaño
-            if (LEF.data.size() >= 3 && LEF.data[0] == ELEM_SERIAL_SECTOR) {
-                // Guardamos el serial recibido
-                memcpy(lastSerial, &LEF.data[1], 5);
+//             // Verificamos que la trama sea del sector correcto y tenga tamaño
+//             if (LEF.data.size() >= 3 && LEF.data[0] == ELEM_SERIAL_SECTOR) {
+//                 // Guardamos el serial recibido
+//                 memcpy(lastSerial, &LEF.data[1], 5);
 
-                // Decidimos si es un elemento existente o nuevo
-                if (serialExistsInSPIFFS(lastSerial)) {
-                    // Elemento existente
-                    return 1;
-                } else {
-                    // Elemento nuevo
-                    return 2;
-                }
-            }
-        }
+//                 // Decidimos si es un elemento existente o nuevo
+//                 if (serialExistsInSPIFFS(lastSerial)) {
+//                     // Elemento existente
+//                     return 1;
+//                 } else {
+//                     // Elemento nuevo
+//                     return 2;
+//                 }
+//             }
+//         }
 
-        // Si llegamos aquí, este intento falló
-        DEBUG__________printf("⚠️ Intento %d/%d fallido\n", intento+1, max_reintentos);
-        delay(500);
-    }
+//         // Si llegamos aquí, este intento falló
+//         DEBUG__________printf("⚠️ Intento %d/%d fallido\n", intento+1, max_reintentos);
+//         delay(500);
+//     }
 
-    // Si terminamos el bucle, no hubo respuesta válida
-    return 0;
-}
+//     // Si terminamos el bucle, no hubo respuesta válida
+//     return 0;
+// }
 
 void BOTONERA_::procesar_datos_sector(LAST_ENTRY_FRAME_T &LEF, int sector, INFO_PACK_T* infoPack) {
     switch (sector) {
@@ -1057,7 +1056,7 @@ bool BOTONERA_::serialExistsInSPIFFS(byte serialNum[5]) {
 
 void BOTONERA_::finalizarEscaneoElemento() {
     tft.fillScreen(TFT_BLACK);
-    dibujarMarco(TFT_WHITE);
+    //dibujarMarco(TFT_WHITE);
     
     tft.setTextColor(TFT_GREEN);
     tft.setTextDatum(MC_DATUM);
@@ -1092,7 +1091,7 @@ void BOTONERA_::dibujarMarco(uint16_t color) {
 void BOTONERA_::mostrarMensajeTemporal(int respuesta, int dTime) {
     // Borrar la pantalla y dibujar el marco
     tft.fillScreen(TFT_BLACK);
-    dibujarMarco(TFT_WHITE);
+    //dibujarMarco(TFT_WHITE);
 
     // Determinar color y mensajes
     uint32_t colorTexto;
@@ -1109,8 +1108,8 @@ void BOTONERA_::mostrarMensajeTemporal(int respuesta, int dTime) {
         mensajeSecundario = "Verifique el estado del elemento"; // Mensaje genérico de advertencia
     } else if (respuesta == 2) { // ÉXITO / NUEVO (ej: elemento agregado, ID confirmada)
         colorTexto = TFT_GREEN;
-        mensajePrincipal = "ÉXITO";
-        mensajeSecundario = "Operación completada correctamente"; // Mensaje genérico de éxito
+        mensajePrincipal  = getTranslation("SUCCESS");
+        mensajeSecundario = getTranslation("ROOM_UPDATED");
     } else if (respuesta == 3) { // ERROR ESPECÍFICO (podrías definir más)
         colorTexto = TFT_RED;
         mensajePrincipal = "ERROR";
@@ -1148,7 +1147,7 @@ void BOTONERA_::mostrarMensajeTemporal(int respuesta, int dTime) {
 
     // Dibujar icono correspondiente
     int iconCenterX = 64;
-    int iconCenterY = 110;
+    int iconCenterY = 90;
     int iconSize = 10;
 
     if (respuesta == 0 || respuesta == 3 || (respuesta != 1 && respuesta != 2)) {  // ERROR (0, 3, default)
@@ -1524,7 +1523,7 @@ inicio_escanear_sala_completo:
     //iniciarEscaneoElemento("Escaneando Sala 1/32");
 
     
-    dibujarMarco(TFT_WHITE);
+    //dibujarMarco(TFT_WHITE);
 
     loadElementsFromSPIFFS();
 
@@ -1545,7 +1544,10 @@ inicio_escanear_sala_completo:
 
             // 1) Actualizar barra de progreso e indicar ID actual
             char etiquetaID[16];
-            snprintf(etiquetaID, sizeof(etiquetaID), "ID %d/32", currentID);
+            //snprintf(etiquetaID, sizeof(etiquetaID), "ID %d/32", currentID);
+            const char* textoBase = getTranslation("SEARCHING");
+            snprintf(etiquetaID, sizeof(etiquetaID), "%s %d/32", textoBase, currentID);
+
             actualizarBarraProgreso(currentID, 32, etiquetaID);
 
             // 2) Escanear
@@ -1650,8 +1652,12 @@ inicio_escanear_sala_completo:
     } while (changeFlag);
 
     DEBUG__________ln("=== Escaneo IDs 1-32 ESTABLE ===");
-    actualizarBarraProgreso(32, 32, "ID 32/32");
-    delay(500);
+    //actualizarBarraProgreso(32, 32, "ID 32/32");
+    int pasoActual = 32;
+    char etiquetaID[24];
+    snprintf(etiquetaID, sizeof(etiquetaID), "%s %d/32", getTranslation("SEARCHING"), pasoActual);
+    actualizarBarraProgreso(pasoActual, 32, etiquetaID);
+    delay(1000);
 
     // 🔶 PASO DE GESTIÓN DE 0xDD EN DOS FASES 🔶
     DEBUG__________ln("--- Iniciando gestión de dispositivos en ID 0xDD (DEFAULT_DEVICE) en dos fases ---");
@@ -1661,14 +1667,21 @@ inicio_escanear_sala_completo:
     byte attachRequestTypes[] = { ELEM_FIRST_SPLIT_ATTACH_REQ, ELEM_LAST_SPLIT_ATTACH_REQ };
     const char* attachRequestNames[] = { "FIRST_SPLIT_ATTACH_REQ", "LAST_SPLIT_ATTACH_REQ" };
 
+    unsigned long tiempoInicioEsperaDD = millis();
+    unsigned long lastAnimFrameTime = millis();
+    int frameCountAnim = 0;
+
+
     for (int fase = 0; fase < 2; ++fase) {
         DEBUG__________printf(
             "--- Fase %d de gestión 0xDD: Enviando %s ---\n",
             fase + 1, attachRequestNames[fase]
         );
-        iniciarEscaneoElemento(
-            fase == 0 ? "Buscando fase (1/2)..." : "Buscando fase (2/2)..."
-        );
+
+        // Iniciar el modal visual desde frame 0
+        int frameCountAnim = 0;
+        drawLoadingModalFrame(getTranslation(fase == 0 ? "UPDATING_1_2" : "UPDATING_2_2"), frameCountAnim);
+
         frameReceived = false;
         delay(100);
 
@@ -1691,6 +1704,13 @@ inicio_escanear_sala_completo:
         int ddResponsesProcessedThisPhase = 0;
 
         while (millis() - tiempoInicioEsperaDD < 61000) {
+
+            // Animación visual de puntos girando (no bloqueante)
+            if (millis() - lastAnimFrameTime >= 33) {
+                drawLoadingModalFrame(getTranslation(fase == 0 ? "UPDATING_1_2" : "UPDATING_2_2"), frameCountAnim++);
+                lastAnimFrameTime = millis();
+            }
+
             if (esperar_respuesta(50)) {
                 LAST_ENTRY_FRAME_T LEF = extract_info_from_frameIn(uartBuffer);
                 frameReceived = false;
@@ -1824,8 +1844,7 @@ inicio_escanear_sala_completo:
     }
 
     loadElementsFromSPIFFS();
-    iniciarEscaneoElemento("Escaneo Finalizado");
-    actualizarBarraProgreso(32, 32, nullptr);
+    mostrarMensajeTemporal(2, 3000);
     DEBUG__________ln("=== ✅ FIN ESCANEO DE SALA COMPLETO (SIN REINICIO POR 0xDD) ✅ ===");
     formatSubMenuActive = false;
     hiddenMenuActive = false; 
@@ -1837,7 +1856,7 @@ inicio_escanear_sala_completo:
 
 void BOTONERA_::iniciarEscaneoElemento(const char* mensajeInicial) {
     tft.fillScreen(TFT_BLACK);      // limpia TODO (solo aquí)
-    dibujarMarco(TFT_WHITE);        // marco fijo
+    //dibujarMarco(TFT_WHITE);        // marco fijo
 
     // muestra MULTILÍNEA (nombre + ID)
     mostrarTextoAjustado(tft,
@@ -1859,15 +1878,15 @@ void BOTONERA_::actualizarBarraProgreso(int pasoActual,
     const int anchoSprite = 118;
     const int altoSprite  = 60;
 
-    const int xBarra   = 14;
-    const int yBarra   = 20; // relativo al sprite
-    const int anchoMax = 100;
+    const int xBarra    = 9; //14 orig
+    const int yBarra    = 20; // relativo al sprite
+    const int anchoMax  = 100;
     const int altoBarra = 10;
-    const int padding = 4;
+    const int padding   = 4;
 
     barraSprite.createSprite(anchoSprite, altoSprite);
     barraSprite.fillSprite(TFT_BLACK);
-    dibujarMarco(TFT_WHITE);
+    //dibujarMarco(TFT_WHITE);
 
     barraSprite.setTextFont(2);
     barraSprite.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -1904,3 +1923,5 @@ void BOTONERA_::actualizarBarraProgreso(int pasoActual,
 
     barraSprite.deleteSprite();
 }
+
+

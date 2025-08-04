@@ -155,121 +155,15 @@ class COLORHANDLER_ {
     public:
         COLORHANDLER_();
         void begin(int numLeds);
-
-        void set_step(int numStep, CRGB color);
-        void reset_step(int numStep);
-        void result_win(bool superWin);
-        void result_fail();
-
-        CRGB get_CRGB_from_colorList(int index);
-        CRGB get_CRGB_from_pasiveColorList(int index);
-        CRGB targetColor;
-
-        void fade_in_out(byte red, byte green, byte blue);
-        void set_is_paused        (bool pau);
-        bool get_is_paused        ();
-
-        void set_passive          (bool pas);
-        bool get_passive          ();
-
-        void set_slow_passive(bool slow){slowPassive= slow;}
-        bool get_slow_passive()         {return slowPassive;}
-
-        void set_targetColor      (CRGB color);
-        void set_targetFade       (uint16_t fade);
-
-        CRGB get_currentColor     (){return currentColor;}
-        byte get_current_red      (CRGB color){return color.r;}
-        byte get_current_green    (CRGB color){return color.g;}
-        byte get_current_blue     (CRGB color){return color.b;}
-
-        void set_targetBrightness (byte brigthin);
-        byte get_targetBrightness ();
-
-        void set_activePattern (byte patternin);
-        byte get_activePattern ();
-
-        void set_currentBrightness(byte brigthin);
-        byte get_currentBrightness();
-
         void setPatternBotonera(byte mode, DynamicLEDManager& ledManager);
-
         void welcomeEffect();
-
-        void elem_color_action();
         CRGB* leds;
-        bool transitioning; 
-        unsigned long transitionStartTime;
-
-        void set_numLedsToLight(int num) { numLedsToLight = num; }
-        int get_numLedsToLight() const { return numLedsToLight; }
-
-        void set_numSegments(int segments) { numSegments = segments; }
-        int get_numSegments() const { return numSegments; }
-
-        //T4A FastLed FX
-        void showStrip ();
-        void setPixel  (int Pixel, byte red, byte green, byte blue);
-        void setAll    (byte red, byte green, byte blue);
-
-        void Fire(int Cooling, int Sparking, int SpeedDelay);
-        void setPixelHeatColor (int Pixel, byte temperature);
-        void meteorRain(byte red, byte green, byte blue, byte meteorSize, byte meteorTrailDecay, boolean meteorRandomDecay, int SpeedDelay);
-        void meteorRain2(bool launchNewMeteor, CRGB meteorColor);
-        void meteorRain2_random(bool launchNewMeteor);
-        void fadeToBlack(int ledNo, byte fadeValue);
-        void theaterChaseRainbow(int SpeedDelay);
-        byte * Wheel(byte WheelPos);
-        void BouncingBalls_PSA(byte red, byte green, byte blue, int BallCount);
-        void RunningLights(byte red, byte green, byte blue, int WaveDelay, float peakFactor, float frequencyFactor);
-        void SnowSparkle(byte red, byte green, byte blue, int SparkleDelay, int SpeedDelay);
-        void rainbowCycle(int SpeedDelay);
-        void FillLEDsFromPaletteColors( uint8_t colorIndex);
-
-        void sequencer_game(byte& colorin);
-        void simon_game(byte& colorin); 
-
-        void matrix_draw_circle(int centerX, int centerY, int radius, CRGB color);
-        void matrix_draw_triangle(int x1, int y1, int x2, int y2, int x3, int y3, CRGB color);
-        
-        #ifdef MIC
-            void BouncingBalls(byte red, byte green, byte blue);
-            void tone_color();
-            void tone_game();
-            void speak_game();
-            void voice_meteors();
-            void block_speak(CRGB colorin); 
-            void block_speak_SA(); 
-            void block_silence(CRGB colorin);
-            void block_silence_SA();
-        #endif
         int numLeds;
         void setCurrentFile(const String& file) { currentFile = file; } 
         bool color_mix_handler(int color1, int color2, byte *resultado);
         void mapCognitiveLEDs();
+
     private:
-
-    unsigned long lastUpdate = 0;
-    int position = 0;
-    bool isAnimating = false;
-    
-    int numLedsToLight;  // Número de LEDs a encender
-    int numSegments;     // Número de tramos
-
-    bool paused;
-    bool passive;
-    bool slowPassive;
-    byte activePattern;
-    CRGB startColor;
-    CRGB currentColor;
-  
-    CRGB currentLEDColor;
-    byte targetBrightness;
-    byte currentBrightness;
-
-    uint16_t fadeTime;
-
-    unsigned long lastUpdateTime;
     String currentFile;
 
 };

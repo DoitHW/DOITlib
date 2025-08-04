@@ -4,31 +4,25 @@
 #include <Arduino.h>
 
 //DELFINES GLOBALES
-                                                #define NOELEM
-                                                /*COLUMNA, FIBRAS, WALLWASHER, VUMETER, ETC*/
-                                                #define PLAYER                 // -> PLAYER / NOPLAYER
-                                                #define NFC                    // -> NFC / NONFC
-                                                #define MIC                    // -> Desactivar en produccion 
-                                                #define DEBUG
-                                                #define DEBUG_
-                                                #ifdef DEBUG_
-                                                  #define DEBUG__________ln(...)  Serial.println(__VA_ARGS__);
-                                                  #define DEBUG__________(...)    Serial.print(__VA_ARGS__);
-                                                  #define DEBUG__________printf(fmt, ...) Serial.printf(fmt, __VA_ARGS__);
-                                                #else
-                                                  #define DEBUG__________ln(...)
-                                                  #define DEBUG__________(...)
-                                                  #define DEBUG__________printf(fmt, ...)
-                                                #endif
+#define NOELEM
+#define BOTONERA
+#define PLAYER                 // -> PLAYER / NOPLAYER
+#define NFC                    // -> NFC / NONFC
+#define MIC                    // -> MIC / NOMIC
+#define ADXL                   // -> ADXL / NOADXL      
 
-
-                                            
-                                                #define NOSERIAL_BY_FILE         // -> NOSERIAL_BY_FILE / SERIAL_BY_FILE --> Activar Serial por FileSystem, si esta definido, ignora el SERIAL_NUM.
-                                                #define SHOW_MAC                 // -> Opcional disparar MAC al inicio  (No sirve pa ná...) 
-                                                #define SLOW_RF                  // -> FAST_RF= 115200 / SLOW_RF= 9600 (NO TOCAR POR DIOSSSS)
-                                                #define _ERR_THROW_START_        if(element->get_err_dbg())Serial1.println(
-                                                #define _ERR_THROW_END_          );
-                                                #define ADXL 
+#define DEBUG
+#define DEBUG_
+#ifdef DEBUG_
+  #define DEBUG__________ln(...)  Serial.println(__VA_ARGS__);
+  #define DEBUG__________(...)    Serial.print(__VA_ARGS__);
+  #define DEBUG__________printf(fmt, ...) Serial.printf(fmt, __VA_ARGS__);
+#else
+  #define DEBUG__________ln(...)
+  #define DEBUG__________(...)
+  #define DEBUG__________printf(fmt, ...)
+#endif
+                                                
 /*                                                                                                 
                                      .-+***+-:....                                                  
                                       .+@@@@@@@@@+:......:::.....                                   
@@ -59,30 +53,15 @@
            .*%-..          ..+@@.                                                                   
            ..                .:=.                                                                                                                                                                  
 */
-
-
-
 //
 
-#define BOTONERA
-    // OJO CHEINCH 
 
-#define MAX_TEXT_LENGTH 50
 #define I2C2_SDA 40
 #define I2C2_SCL 41
 
 #define I2S_WS   11//orig 16
 #define I2S_SD   12//orig 47
 #define I2S_SCK  13//orig 48
-
-
-#define ELEMENT_ID_FILE_PATH             "/ID_FILE.txt"
-#define ELEMENT_SERIALNUM_FILE_PATH      "/SERIALNUM_FILE.txt"
-#define ELEMENT_EVENT_REGISTER_FILE_PATH "/EVENT_REG_FILE.txt"
-#define ELEMENT_STATISTICS_FILE_PATH     "/STATS_REG_FILE.txt"
-
-
-#define MAX_EVENT_REGISTER_FILE_SIZE     1024  //1024 * 100
 
 #define RF_TX_PIN         18 
 #define RF_RX_PIN         17  
@@ -95,21 +74,10 @@
 
 #define UART_RX_BUFFER_SIZE 1024
 
-#define RESPONSE_TIME       0xFF
 
 #define SAMPLES             1024
 #define SAMPLING_FREQUENCY  44100
 
-#define MAX_BALLS 5  // Máximo de bolas simultáneas
-#define COLOR_VARIATION 30  // Variación máxima de color
-
-#define RESPONSE_TIME       0xFF
-
-#define SAMPLES             1024
-#define SAMPLING_FREQUENCY  44100
-
-#define MAX_BALLS 5  // Máximo de bolas simultáneas
-#define COLOR_VARIATION 30  // Variación máxima de color
 
 #define MIC_SENS 1500
 
@@ -179,15 +147,6 @@
 #define F_RETURN_ELEM_ERROR      0xDE
 #define L_RETURN_ELEM_ERROR      0x60 
 
-#define MIN_DEAF_TIME         10000
-#define MAX_DEAF_TIME         60000 
-
-#define NORMAL_FADE           0x1FF  // 4ff original
-#define SLOWEST_FADE          0x19FF
-#define FASTEST_FADE          0x0A
-#define SLOW_FADE             0xFA0
-#define RB_MOTION_VAL_FADE    0xFF
-#define MOTION_VAL_FADE       0xFF
 
 #define MAX_BRIGHTNESS        0xFF
 #define MID_BRIGHTNESS        0x7F
@@ -344,7 +303,6 @@
 #define GENERIC_TYPE        0x00 
 
 // TESTS
-
 enum COMMANDS_ { 
   BLACKOUT= 0,
   START_CMD,

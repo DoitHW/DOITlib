@@ -3,7 +3,6 @@
 #include <SPIFFS_handler/SPIFFS_handler.h>   // para abrir ficheros
 #include <defines_DMS/defines_DMS.h>         // OFFSET_MODES, SIZE_MODE, etc.
 #include <botonera_DMS/botonera_DMS.h>       // getModeConfig, getModeFlag
-#include <info_elements_DMS/info_elements_DMS.h>
 #include <encoder_handler/encoder_handler.h> 
 
 
