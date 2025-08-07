@@ -69,13 +69,7 @@ bool isInMainMenu() ;
 
 int getTotalModesForFile(const String &file);
 
-enum EncoderAction {
-    NADA,
-    BLOCK_SYSTEM,
-    SHOW_DETAILS
-};
 
-EncoderAction evaluateEncoderLongPress(unsigned long duration);
 void printElementDetails();
 // Variables externas requeridas
 extern std::vector<String> elementFiles;

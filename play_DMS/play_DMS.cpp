@@ -5,7 +5,8 @@
 
 void DOITSOUNDS_::begin(){
     
-  if (player.begin(Serial2)) {
+  if (player.begin(Serial2, false, true)) {
+    delay(800);
     player.volume(26);
     player.playFolder(1, 9);
                                                                         #ifdef DEBUG
@@ -21,6 +22,8 @@ void DOITSOUNDS_::begin(){
 }
 
 void DOITSOUNDS_::play_file(byte bankin, byte filein){
+  player.stop();
+  delay(30);              // 20–50 ms suele bastar
   player.playFolder(bankin, filein);
 }
 

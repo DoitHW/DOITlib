@@ -251,11 +251,13 @@ void PulsadoresHandler::procesarPulsadores() {
                 mixReady = true;
                 if (count == 0) {
                     if (!blackSent) {
+                        
                         send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, BLACK));
                         currentActiveColor = BLACK;
                         blackSent = true;
                     }
                 } else if (count == 1 && currentActiveColor != color1) {
+                 
                     send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, color1));
                     currentActiveColor = color1;
                     blackSent = false;
@@ -263,12 +265,14 @@ void PulsadoresHandler::procesarPulsadores() {
             } else if (count == 2 && mixReady) {
                 byte mixColor;
                 if (colorHandler.color_mix_handler(color1, color2, &mixColor)) {
+              
                     send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, mixColor));
                     currentActiveColor = mixColor;
                     blackSent = false;
                     mixReady = false;
                 } else {
                     if (!blackSent) {
+             
                         send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, BLACK));
                         currentActiveColor = BLACK;
                         blackSent = true;
@@ -291,10 +295,12 @@ void PulsadoresHandler::procesarPulsadores() {
                 }
             }
             if (activeColorValid && currentActiveColor != newActiveColor) {
+   
                 send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, newActiveColor));
                 currentActiveColor = newActiveColor;
                 blackSent = false;
             } else if (!activeColorValid && !blackSent) {
+       
                 send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, BLACK));
                 currentActiveColor = BLACK;
                 blackSent = true;
@@ -318,6 +324,7 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
     if (inCognitiveMenu) {
         if (event == BUTTON_PRESSED) {
             if (buttonColor != RELAY) {
+         
                 send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, buttonColor));
     #ifdef DEBUG
                 DEBUG__________printf("[COG] COLOR: PRESIÓN → %d\n", buttonColor);
@@ -437,6 +444,7 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
                 // Toggle independiente
                 relay_state ^= mask;
             }
+     
             send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, buttonColor)); // Color asociado al botón
             delay(20);
             send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, target, relay_state));
@@ -480,6 +488,7 @@ if (currentFile == "Comunicador" && buttonColor == RELAY)
     auto sendColorOrRelay = [&](uint8_t id, bool on)
     {
         if (id == BROADCAST) {
+
             send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, { id }, on ? WHITE : BLACK));
             return;
         }
@@ -508,6 +517,7 @@ if (currentFile == "Comunicador" && buttonColor == RELAY)
         }
 
         if (fileFound == "") {
+
             send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, { id }, on ? WHITE : BLACK));
             return;
         }
@@ -537,10 +547,12 @@ if (currentFile == "Comunicador" && buttonColor == RELAY)
         bool hasRelayF = getModeFlag(mCfg, HAS_RELAY);
 
         if (hasColor) {
+
             send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, { id }, on ? WHITE : BLACK));
         } else if (hasRelayF) {
             send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, { id }, on ? 0x01 : 0x00));
         } else {
+
             send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, { id }, on ? WHITE : BLACK));
         }
     };
@@ -720,6 +732,7 @@ if (buttonColor == RELAY) {
         {
             if (advancedMixed)
             {
+   
                 send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, BLACK));
                 lastBasicColor = BLACK;
                 advancedMixed = false;
@@ -732,6 +745,7 @@ if (buttonColor == RELAY) {
                 if (lastBasicColor == BLACK)
                 {
                     lastBasicColor = buttonColor;
+
                     send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, buttonColor));
 #ifdef DEBUG
                     DEBUG__________printf("ADVANCED NON-PULSE: Primer botón, enviando color %d\n", buttonColor);
@@ -742,6 +756,7 @@ if (buttonColor == RELAY) {
                     byte mixColor;
                     if (colorHandler.color_mix_handler(lastBasicColor, buttonColor, &mixColor))
                     {
+
                         send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, mixColor));
                         lastBasicColor = mixColor;
                         advancedMixed = true;
@@ -751,6 +766,7 @@ if (buttonColor == RELAY) {
                     }
                     else
                     {
+
                         send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, BLACK));
                         lastBasicColor = BLACK;
                         advancedMixed = false;
@@ -777,6 +793,7 @@ if (buttonColor == RELAY) {
        
         if ((hasBasic || hasAdvanced) && event == BUTTON_PRESSED)
         {
+       
             send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, target, buttonColor));
 #ifdef DEBUG
             DEBUG__________printf("COLOR BÁSICO: PRESIÓN, enviando color %d\n", buttonColor);

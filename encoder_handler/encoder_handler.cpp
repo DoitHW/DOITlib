@@ -447,7 +447,7 @@ void handleEncoder() {
                         send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, id, BLACKOUT));
                         setAllElementsToBasicMode();
                         doitPlayer.stop_file();
-                        showMessageWithLoading(getTranslation("APAGANDO_SALA"), 5000);
+                        showMessageWithLoading(getTranslation("APAGANDO_SALA"), 4000);
                         currentIndex     = 0;
                         drawCurrentElement();
                         buttonPressStart = 0;
@@ -467,6 +467,7 @@ void handleEncoder() {
                     } else {                                    // APAGAR ⇒ BLACKOUT broadcast
                         std::fill(selectedStates.begin(), selectedStates.end(), false);
                         send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, { 0xFF }, BLACKOUT));
+                        showMessageWithLoading(getTranslation("APAGANDO_ELEMENTOS"), 4000);
                     }
 
                     drawCurrentElement();
@@ -507,7 +508,7 @@ void handleEncoder() {
                     send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, id, BLACKOUT));
                     setAllElementsToBasicMode();
                     doitPlayer.stop_file();
-                    showMessageWithLoading(getTranslation("APAGANDO_SALA"), 5000);
+                    showMessageWithLoading(getTranslation("APAGANDO_SALA"), 4000);
                     currentIndex     = 0;
                     drawCurrentElement();
                     buttonPressStart = 0;
@@ -539,56 +540,58 @@ void handleEncoder() {
 bool modeAlternateActive = false;
 // Función handleModeSelection modificada
 void handleModeSelection(const String& currentFile) {
-     // —— BLOQUE DE “LIMPIEZA” DEL MODO SALIENTE ——
-    {
-        uint8_t oldConfig[2] = {0};
-        if ( getModeConfig(currentFile, currentModeIndex, oldConfig) ) {
-            byte targetID = getCurrentElementID();
-            // 1) Relay OFF si tocaba
-            if ( getModeFlag(oldConfig, HAS_RELAY) ) {
-                send_frame(frameMaker_SEND_FLAG_BYTE(
-                    DEFAULT_BOTONERA,
-                    std::vector<byte>{ targetID },
-                    0x00
-                ));
-            }
-            // 2) Sensor doble a cero si tocaba
-            if ( getModeFlag(oldConfig, HAS_SENS_VAL_1) ) {
-                SENSOR_DOUBLE_T zeroDouble = {};
-                send_frame(frameMaker_SEND_SENSOR_VALUE(
-                    DEFAULT_BOTONERA,
-                    std::vector<byte>{ targetID },
-                    zeroDouble
-                ));
-            }
-            // 3) Sensor simple a cero si tocaba
-            if ( getModeFlag(oldConfig, HAS_SENS_VAL_2) ) {
-                SENSOR_VALUE_T zeroSingle = {};
-                send_frame(frameMaker_SEND_SENSOR_VALUE_2(
-                    DEFAULT_BOTONERA,
-                    std::vector<byte>{ targetID },
-                    zeroSingle
-                ));
-            }
-            // 4) Color BLACK si estaba en BASIC_COLOR
-            if ( getModeFlag(oldConfig, HAS_BASIC_COLOR) ) {
-                send_frame(frameMaker_SEND_COLOR(
-                    DEFAULT_BOTONERA,
-                    std::vector<byte>{ targetID },
-                    BLACK
-                ));
-            }
-            // 5) Color BLACK si estaba en ADVANCED_COLOR
-            if ( getModeFlag(oldConfig, HAS_ADVANCED_COLOR) ) {
-                send_frame(frameMaker_SEND_COLOR(
-                    DEFAULT_BOTONERA,
-                    std::vector<byte>{ targetID },
-                    BLACK
-                ));
-            }
-        }
-    }
-    // —— FIN BLOQUE DE LIMPIEZA ——
+    //  // —— BLOQUE DE “LIMPIEZA” DEL MODO SALIENTE ——
+    // {
+    //     uint8_t oldConfig[2] = {0};
+    //     if ( getModeConfig(currentFile, currentModeIndex, oldConfig) ) {
+    //         byte targetID = getCurrentElementID();
+    //         // 1) Relay OFF si tocaba
+    //         if ( getModeFlag(oldConfig, HAS_RELAY) ) {
+    //             send_frame(frameMaker_SEND_FLAG_BYTE(
+    //                 DEFAULT_BOTONERA,
+    //                 std::vector<byte>{ targetID },
+    //                 0x00
+    //             ));
+    //         }
+    //         // 2) Sensor doble a cero si tocaba
+    //         if ( getModeFlag(oldConfig, HAS_SENS_VAL_1) ) {
+    //             SENSOR_DOUBLE_T zeroDouble = {};
+    //             send_frame(frameMaker_SEND_SENSOR_VALUE(
+    //                 DEFAULT_BOTONERA,
+    //                 std::vector<byte>{ targetID },
+    //                 zeroDouble
+    //             ));
+    //         }
+    //         // 3) Sensor simple a cero si tocaba
+    //         if ( getModeFlag(oldConfig, HAS_SENS_VAL_2) ) {
+    //             SENSOR_VALUE_T zeroSingle = {};
+    //             send_frame(frameMaker_SEND_SENSOR_VALUE_2(
+    //                 DEFAULT_BOTONERA,
+    //                 std::vector<byte>{ targetID },
+    //                 zeroSingle
+    //             ));
+    //         }
+    //         // 4) Color BLACK si estaba en BASIC_COLOR
+    //         if ( getModeFlag(oldConfig, HAS_BASIC_COLOR) ) {
+    //             Serial.println("COLOR SENDED: 1");
+    //             send_frame(frameMaker_SEND_COLOR(
+    //                 DEFAULT_BOTONERA,
+    //                 std::vector<byte>{ targetID },
+    //                 BLACK
+    //             ));
+    //         }
+    //         // 5) Color BLACK si estaba en ADVANCED_COLOR
+    //         if ( getModeFlag(oldConfig, HAS_ADVANCED_COLOR) ) {
+    //             Serial.println("COLOR SENDED: 2");
+    //             send_frame(frameMaker_SEND_COLOR(
+    //                 DEFAULT_BOTONERA,
+    //                 std::vector<byte>{ targetID },
+    //                 BLACK
+    //             ));
+    //         }
+    //     }
+    // }
+    // // —— FIN BLOQUE DE LIMPIEZA ——
 
     // Si se selecciona la opción "Regresar" (valor -2), salir del menú.
     if (globalVisibleModesMap[currentModeIndex] == -2) {
@@ -658,7 +661,7 @@ void handleModeSelection(const String& currentFile) {
 
                     // 4) Mantener el resto de tu lógica
                     setAllElementsToBasicMode();
-                    showMessageWithLoading(getTranslation("APAGANDO_ELEMENTO"), 3000);
+                    showMessageWithLoading(getTranslation("APAGANDO_ELEMENTO"), 2000);
                     selectedStates[currentIndex] = false;
                 }
                 f.close();
@@ -864,7 +867,7 @@ void toggleElementSelection(const String& currentFile) {
         elementID.push_back(0xFF);
         send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, BLACKOUT));
         setAllElementsToBasicMode();
-        showMessageWithLoading(getTranslation("APAGANDO_SALA"), 5000);
+        showMessageWithLoading(getTranslation("APAGANDO_SALA"), 4000);
         currentIndex = 0;
         inModesScreen = false;
         drawCurrentElement();
@@ -880,7 +883,7 @@ void toggleElementSelection(const String& currentFile) {
         send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, command));
 
         if (command == BLACKOUT) {
-            showMessageWithLoading(getTranslation("APAGANDO_ELEMENTO"), 3000);
+            showMessageWithLoading(getTranslation("APAGANDO_ELEMENTO"), 2000);
         }
 
         // Actualizar el modo del elemento a "básico" en SPIFFS
@@ -1224,7 +1227,6 @@ void handleFormatMenu() {
         }
     }
 
-
     if (digitalRead(ENC_BUTTON) == LOW) {
         if (buttonPressStart == 0) {
             buttonPressStart = millis();
@@ -1471,13 +1473,6 @@ bool isInMainMenu() {
            !bankSelectionActive &&
            !deleteElementMenuActive &&
            !confirmDeleteMenuActive;
-}
-
-
-EncoderAction evaluateEncoderLongPress(unsigned long duration) {
-    if (duration >= 3000 && duration <= 5000) return BLOCK_SYSTEM;
-    if (duration >= 6000 && duration <= 10000) return SHOW_DETAILS;
-    return NADA;
 }
 
 void printElementDetails() {

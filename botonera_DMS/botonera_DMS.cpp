@@ -307,6 +307,12 @@ void BOTONERA_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
 extern bool adxl;
 extern bool useMic;
 void BOTONERA_::sectorIn_handler(std::vector<byte> data, byte targetin) {
+
+    if (data.size() < 1) {
+        DEBUG__________ln("⚠️ Error: sectorIn_handler ha recibido una trama vacía.");
+        return;
+    }
+    
     byte sector = data[0];
     
     switch (sector)
@@ -1265,6 +1271,7 @@ void BOTONERA_::activateCognitiveMode() {
     drawCognitiveMenu();
     colorHandler.mapCognitiveLEDs(); // función que veremos abajo
 }
+
 void BOTONERA_::deactivateCognitiveMode() {
     inCognitiveMenu = false;
     drawCurrentElement(); // Volver a la pantalla principal
@@ -1272,7 +1279,6 @@ void BOTONERA_::deactivateCognitiveMode() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 bool scanDD = false;
-// === Funciones Auxiliares NUEVAS o MODIFICADAS ===
 
 /**
  * @brief Pings a targetID for its serial number.

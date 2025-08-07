@@ -97,7 +97,7 @@ void initializeDynamicOptions() {
 
     // ----- Fichas -----
     memset(&fichasOption, 0, sizeof(INFO_PACK_T));
-    strncpy((char*)fichasOption.name, "FICHAS", 24);
+    strncpy((char*)fichasOption.name, getTranslation("FICHAS"), 24);
     strncpy((char*)fichasOption.desc, "Interacción con fichas NFC.", 192);
     fichasOption.currentMode = 0;
     strncpy((char*)fichasOption.mode[0].name, "BASICO", 24);
@@ -119,7 +119,7 @@ void initializeDynamicOptions() {
 
     // ----- ApagarSala -----
     memset(&apagarSala, 0, sizeof(INFO_PACK_T));
-    strncpy((char*)apagarSala.name, "APAGAR", 24);
+    strncpy((char*)apagarSala.name, getTranslation("APAGAR"), 24);
     strncpy((char*)apagarSala.desc, "Apaga la sala por completo.", 192);
     apagarSala.mode[0].config[0] = 0x00;
     apagarSala.mode[0].config[1] = 0x00;
@@ -135,7 +135,7 @@ void initializeDynamicOptions() {
     memcpy(apagarSala.icono, apagar_sala_64x64, sizeof(apagarSala.icono));
 
     memset(&comunicadorOption, 0, sizeof(INFO_PACK_T));
-    strncpy((char*)comunicadorOption.name, "COMUNICADOR", 24);
+    strncpy((char*)comunicadorOption.name, getTranslation("COMUNICADOR"), 24);
     comunicadorOption.currentMode = 0;
     strncpy((char*)comunicadorOption.mode[0].name, "BASICO", 24);
     comunicadorOption.mode[0].config[0] = 0x80;   // ejemplo de flag “visible”
@@ -510,17 +510,31 @@ void saveLanguageToSPIFFS(Language lang) {
     }
 }
 
+// Language loadLanguageFromSPIFFS() {
+//     File f = SPIFFS.open("/config_lang.txt", FILE_READ);
+//     if (f && f.available()) {
+//         byte val = f.read();
+//         f.close();
+//         if (val >= 1 && val <= (byte)Language::X1) {
+//             return static_cast<Language>(val);
+//         }
+//     }
+//     return Language::ES;  // idioma por defecto si no existe o es inválido
+// }
+
 Language loadLanguageFromSPIFFS() {
     File f = SPIFFS.open("/config_lang.txt", FILE_READ);
     if (f && f.available()) {
         byte val = f.read();
         f.close();
+        if (val == 0xFF) return static_cast<Language>(-1);  // sin configurar
         if (val >= 1 && val <= (byte)Language::X1) {
             return static_cast<Language>(val);
         }
     }
-    return Language::ES;  // idioma por defecto si no existe o es inválido
+    return static_cast<Language>(-1); // valor sin configurar
 }
+
 
 void saveSoundSettingsToSPIFFS() {
     File f = SPIFFS.open("/config_sonido.txt", FILE_WRITE);

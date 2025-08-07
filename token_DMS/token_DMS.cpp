@@ -361,6 +361,7 @@ void TOKEN_::token_handler(TOKEN_DATA token, uint8_t lang_in, bool genre_in, uin
 
         if (tokenCurrentMode == TOKEN_BASIC_MODE) {
             if (token.cmd2 == TEMP_COLOR_CONF) {
+
                 send_frame(frameMaker_SEND_COLOR(myid, targets, 8)); // negro
             }
         }
@@ -379,6 +380,7 @@ void TOKEN_::token_handler(TOKEN_DATA token, uint8_t lang_in, bool genre_in, uin
 
                 if (token.cmd2 == TEMP_COLOR_CONF) {
                     delay(50);
+              
                     send_frame(frameMaker_SEND_COLOR(myid, targets, 8));
                     DEBUG__________ln("Primer token: Color temporal, apagando después del audio.");
                 }
@@ -421,6 +423,7 @@ void TOKEN_::token_handler(TOKEN_DATA token, uint8_t lang_in, bool genre_in, uin
                 delay(600);
 
                 if (token.cmd2 == TEMP_COLOR_CONF) {
+           
                     send_frame(frameMaker_SEND_COLOR(myid, targets, 8));
                     DEBUG__________ln("Segundo token: TEMP_COLOR_CONF, apagando color.");
                 } else if (token.cmd2 == PERM_COLOR_CONF) {
@@ -444,6 +447,7 @@ void TOKEN_::token_handler(TOKEN_DATA token, uint8_t lang_in, bool genre_in, uin
             delay(600);
 
             if (token.cmd2 == TEMP_COLOR_CONF) {
+
                 send_frame(frameMaker_SEND_COLOR(myid, targets, 8));
             } else if (token.cmd2 == PERM_COLOR_CONF) {
                 send_frame(frameMaker_SEND_RGB(myid, targets, colorout));

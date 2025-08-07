@@ -48,7 +48,7 @@ void setFontForCurrentLanguage();
 void scrollFileNameTickerBounce(const String& fileName);
 
 void drawLoadingModalFrame(const char* message, int frameCount);
-
+void showWelcomeAnimation();
                                  
 extern bool isScrollingText;
 extern TFT_eSPI tft;

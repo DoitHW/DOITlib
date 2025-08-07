@@ -26,7 +26,7 @@ void ELEMENT_::begin() {
     Serial1.onReceive(onUartInterrupt);
     //digitalWrite(RF_CONFIG_PIN, HIGH);
     delay(100);
-    if(!SPIFFS.begin()){
+    if(!SPIFFS.begin(true)){
         #ifdef DEBUG
             DEBUG__________ln("Error al montar SPIFFS");
         #endif

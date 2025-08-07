@@ -97,6 +97,52 @@ void display_init() {
     
 }
 
+void showWelcomeAnimation() {
+    int centerX = (tft.width() - 64) / 2;
+    int centerY = (tft.height() - 64) / 2;
+    int screenCenterX = tft.width() / 2;
+    int screenCenterY = tft.height() / 2;
+
+    // Mostrar logo con efecto de partículas animadas
+    for (int frame = 0; frame < 30; frame++) {
+        uiSprite.fillSprite(BACKGROUND_COLOR);
+        uiSprite.pushImage(centerX, centerY, 64, 64, (uint16_t*)doitLogo_64x64);
+
+        // Partículas que orbitan alrededor
+        for (int p = 0; p < 8; p++) {
+            float angle = (frame * 0.2 + p * 45) * PI / 180.0;
+            float radius = 35 + sin(frame * 0.1) * 10;
+            int px = screenCenterX + cos(angle) * radius;
+            int py = screenCenterY + sin(angle) * radius;
+
+            int brightness = 150 + sin(frame * 0.3 + p) * 100;
+            brightness = constrain(brightness, 0, 255);
+            uint16_t particleColor = tft.color565(brightness / 4, brightness / 6, brightness / 3);
+            uiSprite.fillCircle(px, py, 2, particleColor);
+        }
+
+        uiSprite.pushSprite(0, 0);
+        delay(80);
+    }
+
+    // Fade out elegante
+    for (int i = 10; i >= 0; i--) {
+        uiSprite.fillSprite(BACKGROUND_COLOR);
+        if (i > 3) {
+            uiSprite.pushImage(centerX, centerY, 64, 64, (uint16_t*)doitLogo_64x64);
+        }
+        uiSprite.pushSprite(0, 0);
+        delay(100);
+    }
+}
+
+// Función auxiliar para crear efectos de color suave
+uint16_t createGlowColor(int intensity, int hue) {
+    int r = (intensity * (128 + sin(hue) * 127)) / 255;
+    int g = (intensity * (128 + sin(hue + 2.1) * 127)) / 255;
+    int b = (intensity * (128 + sin(hue + 4.2) * 127)) / 255;
+    return tft.color565(r, g, b);
+}
 void drawNoElementsMessage() {
     uiSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
     uiSprite.setTextDatum(MC_DATUM);
@@ -309,6 +355,8 @@ String currentModeDisplayName = "";        // Cadena que contiene el nombre del 
 int modeScrollOffset = 0;                  // Desplazamiento actual en píxeles para el modo
 int modeScrollDirection = 1;               // Dirección: 1 para incrementar, -1 para decrementar
 unsigned long lastModeScrollUpdate = 0;    // Última actualización en ms
+
+
 
 // Actualiza la zona del nombre del modo usando el desplazamiento actual
 void updateModeDisplay() {
