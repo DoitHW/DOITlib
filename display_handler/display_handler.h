@@ -9,7 +9,7 @@
 
 // Declaración adelantada (forward) para no generar bucle de includes.
 class DynamicLEDManager;
-void display_init();
+void display_init(void) noexcept;
 void drawNoElementsMessage();
 void drawErrorMessage(const char* message);
 void drawElementIcon(fs::File& f, int startX, int startY);
@@ -67,4 +67,6 @@ extern bool criticalBatteryLock; // lo usarás en otras partes
 extern float batteryPercentage;
 extern bool flagScrollFileName;
 extern String fileNameConfirm;
+
+uint16_t colorWheel(uint8_t pos);
 

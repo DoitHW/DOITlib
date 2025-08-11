@@ -9,7 +9,7 @@ ADXL345Handler adxl345Handler;
 
 // Constructor
 ADXL345Handler::ADXL345Handler() 
-    : accel(Adafruit_ADXL345_Unified(12345)), lastInclination(0.0), threshold(1.0), thresholdBinary(0.7), initialized(false) {}
+    : accel(Adafruit_ADXL345_Unified(12345)), lastInclination(0.0), threshold(0.4), thresholdBinary(0.7), initialized(false) {}
 
 // Inicialización del ADXL345
 void ADXL345Handler::init()
@@ -305,3 +305,4 @@ void ADXL345Handler::sendSensorValueDouble(const SENSOR_DOUBLE_T &sensorValue) {
     targets.push_back(currentElementID);
     send_frame(frameMaker_SEND_SENSOR_VALUE(DEFAULT_BOTONERA, targets, sensorValue));
 }
+

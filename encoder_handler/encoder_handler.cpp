@@ -455,17 +455,33 @@ void handleEncoder() {
                         return;
                     } 
                     else if (currentFile == "Comunicador") {
-                    relayStep = -1;         
+                    relayStep = -1;
                     idsSPIFFS.clear();
                     communicatorActiveID = 0xFF;
-                    bool wasSel = selectedStates[currentIndex];
-                    selectedStates[currentIndex] = !wasSel;
 
-                    if (selectedStates[currentIndex]) {         // ENCENDER ⇒ START_CMD broadcast
-                        std::fill(selectedStates.begin(), selectedStates.end(), true);
+                    // Usamos el toggle del propio Comunicador como "intención" (encender/apagar en masa)
+                    bool turningOn = !selectedStates[currentIndex];
+
+                    auto isSelectableElement = [&](const String& name) {
+                        return !(name == "Ambientes" || name == "Fichas" || name == "Apagar");
+                        // añade aquí otros fijos que NO quieras seleccionar
+                    };
+
+                    // Aplica la selección solo a los elementos “reales”
+                    for (size_t i = 0; i < elementFiles.size(); ++i) {
+                        if (isSelectableElement(elementFiles[i])) {
+                            selectedStates[i] = turningOn;   // true al “encender todos”, false al “apagar todos”
+                        } else {
+                            // Asegura que los especiales se quedan deseleccionados
+                            selectedStates[i] = false;
+                        }
+                    }
+
+                    if (turningOn) {
+                        // START_CMD a todos (broadcast)
                         send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, { 0xFF }, START_CMD));
-                    } else {                                    // APAGAR ⇒ BLACKOUT broadcast
-                        std::fill(selectedStates.begin(), selectedStates.end(), false);
+                    } else {
+                        // BLACKOUT a todos (broadcast) + feedback
                         send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, { 0xFF }, BLACKOUT));
                         showMessageWithLoading(getTranslation("APAGANDO_ELEMENTOS"), 4000);
                     }
@@ -473,7 +489,7 @@ void handleEncoder() {
                     drawCurrentElement();
                     buttonPressStart = 0;
                     isLongPress      = false;
-                    return;                                     
+                    return;
                 }
                     else {
                         // No es “Apagar”, abrimos el submenú de modos

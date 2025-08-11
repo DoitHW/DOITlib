@@ -29,120 +29,301 @@ uint8_t tempBrightness = currentBrightness;  // Valor temporal mientras se ajust
 bool flagScrollFileName = false;
 String fileNameConfirm = "";
 
-void drawBrightnessMenu(uint8_t brightness) {
-    // Clear the sprite with background color
+/**
+ * @brief Dibuja la pantalla "Ajustar Brillo" con barra de progreso y ayudas de control.
+ *
+ * Muestra un encabezado centrado, un icono de sol, una barra de progreso con radio
+ * y color dinámico según el nivel de brillo, el porcentaje centrado y un marco.
+ *
+ * @param brightness Porcentaje de brillo [0..100]. Se forzará al rango si viene fuera de él.
+ *
+ * @pre Debe existir un sprite válido en la variable global `uiSprite` (TFT_eSPI Sprite)
+ *      y la función `drawSunIcon(int x, int y, uint16_t color)` debe estar disponible.
+ * @note Esta implementación asume una pantalla de 128x128 píxeles.
+ * @see drawSunIcon
+ */
+void drawBrightnessMenu(uint8_t brightness)
+{
+    // ---- Constantes de layout (evitamos "números mágicos") ----
+    constexpr int SCREEN_W             = 128;
+    constexpr int SCREEN_H             = 128;
+    constexpr int CENTER_X             = SCREEN_W / 2;          // 64
+    constexpr int HEADER_Y             = 15;
+    constexpr int SUN_X                = 30;
+    constexpr int SUN_Y                = 45;
+
+    // Barra de progreso
+    constexpr int BAR_X                = 45;
+    constexpr int BAR_Y                = 45;
+    constexpr int BAR_W                = 70;
+    constexpr int BAR_H                = 10;
+    constexpr int BAR_RADIUS           = 5;
+
+    // Textos secundarios
+    constexpr int PERCENT_Y            = 70;
+    constexpr int HINTS_Y              = 100;
+
+    // Borde exterior
+    constexpr int FRAME_X              = 4;
+    constexpr int FRAME_Y              = 4;
+    constexpr int FRAME_W              = 120;
+    constexpr int FRAME_H              = 120;
+    constexpr int FRAME_RADIUS         = 8;
+
+    // ---- Normalización de entrada ----
+    if (brightness > 100) brightness = 100; // clamp por seguridad
+
+    // ---- Limpieza de fondo ----
     uiSprite.fillSprite(BACKGROUND_COLOR);
-    
-    // Draw header with proper centering
+
+    // ---- Encabezado centrado ----
     uiSprite.setTextColor(TFT_WHITE, BACKGROUND_COLOR);
     uiSprite.setTextSize(1);
-    // Use text datum to center text properly
-    uiSprite.setTextDatum(MC_DATUM); // Middle-Center alignment
-    uiSprite.drawString("Ajustar Brillo", 64, 15, 2); // Centered at x=64 (middle of 128px screen)
-    
-    // Draw sun icon, moved slightly left for better balance
-    drawSunIcon(30, 45, TFT_YELLOW);
-    
-    // Draw rounded background bar, adjusted position
-    uiSprite.fillRoundRect(45, 45, 70, 10, 5, TFT_DARKGREY);
-    
-    // Draw active progress bar with rounded corners
-    int barWidth = map(brightness, 0, 100, 0, 70);
+    uiSprite.setTextDatum(MC_DATUM);                 // alineación centro-centro
+    uiSprite.drawString("Ajustar Brillo", CENTER_X, HEADER_Y, /*font*/ 2);
+
+    // ---- Icono ----
+    drawSunIcon(SUN_X, SUN_Y, TFT_YELLOW);
+
+    // ---- Barra de fondo ----
+    uiSprite.fillRoundRect(BAR_X, BAR_Y, BAR_W, BAR_H, BAR_RADIUS, TFT_DARKGREY);
+
+    // ---- Barra activa (ancho proporcional sin usar map()) ----
+    // Redondeo "correcto": (value * max + 50) / 100 para evitar truncado hacia abajo.
+    const int barWidth = (brightness * BAR_W + 50) / 100;
+
     if (barWidth > 0) {
-        // Use gradient color based on brightness
-        uint16_t barColor = brightness < 30 ? TFT_ORANGE : 
-                           (brightness < 70 ? TFT_YELLOW : TFT_WHITE);
-        uiSprite.fillRoundRect(45, 45, barWidth, 10, 5, barColor);
+        // Color dinámico según nivel (tramo bajo/medio/alto)
+        const uint16_t barColor =
+            (brightness < 30) ? TFT_ORANGE :
+            (brightness < 70) ? TFT_YELLOW :
+                                TFT_WHITE;
+
+        uiSprite.fillRoundRect(BAR_X, BAR_Y, barWidth, BAR_H, BAR_RADIUS, barColor);
     }
-    
-    // Draw percentage with proper centering
-    uiSprite.drawString(String(brightness) + "%", 64, 70, 2); // Centered text
-    
-    // Draw control hints at bottom, properly centered
+
+    // ---- Porcentaje centrado ----
+    uiSprite.drawString(String(brightness) + "%", CENTER_X, PERCENT_Y, /*font*/ 2);
+
+    // ---- Pistas de control (centradas) ----
     uiSprite.setTextSize(1);
-    uiSprite.drawString("- / +", 64, 100, 1); // Control hints
-    
-    // Draw border around the entire interface, properly centered
-    uiSprite.drawRoundRect(4, 4, 120, 120, 8, TFT_DARKGREY);
-    
-    // Push sprite to display
+    uiSprite.drawString("- / +", CENTER_X, HINTS_Y, /*font*/ 1);
+
+    // ---- Marco exterior ----
+    uiSprite.drawRoundRect(FRAME_X, FRAME_Y, FRAME_W, FRAME_H, FRAME_RADIUS, TFT_DARKGREY);
+
+    // ---- Envío a pantalla ----
     uiSprite.pushSprite(0, 0);
 }
 
-// Helper function to draw a sun icon
-void drawSunIcon(int16_t x, int16_t y, uint16_t color) {
-    // Center circle
+/**
+ * @brief Dibuja un icono de sol en la posición indicada.
+ * @param x      Coordenada X del centro del sol.
+ * @param y      Coordenada Y del centro del sol.
+ * @param color  Color del sol (tanto círculo como rayos), en formato de 16 bits RGB565.
+ */
+void drawSunIcon(int16_t x, int16_t y, uint16_t color)
+{
+    // ---- Círculo central ----
     uiSprite.fillCircle(x, y, 6, color);
-    
-    // Sun rays
+
+    // ---- Rayos del sol ----
     for (int i = 0; i < 8; i++) {
-        float angle = i * PI / 4;
-        int x1 = x + 8 * cos(angle);
-        int y1 = y + 8 * sin(angle);
-        int x2 = x + 12 * cos(angle);
-        int y2 = y + 12 * sin(angle);
+        // Ángulo en radianes (0, 45°, 90°, ...)
+        float angle = i * PI / 4.0f;
+
+        // Coordenadas de inicio del rayo (8 px desde el centro)
+        int x1 = x + static_cast<int>(8 * cos(angle));
+        int y1 = y + static_cast<int>(8 * sin(angle));
+
+        // Coordenadas de fin del rayo (12 px desde el centro)
+        int x2 = x + static_cast<int>(12 * cos(angle));
+        int y2 = y + static_cast<int>(12 * sin(angle));
+
         uiSprite.drawLine(x1, y1, x2, y2, color);
     }
 }
 
-void display_init() {
-    //DEBUG__________ln("Inicializando display...");
+
+/**
+ * @brief Inicializa el TFT y crea el sprite de trabajo a pantalla completa.
+ * @pre `tft` (TFT_eSPI) y `uiSprite` (TFT_eSprite) deben estar instanciados..
+ * @return void
+ * @note La profundidad de color del sprite se fija a 16 bpp (RGB565).
+ * @warning Si no hay RAM suficiente para el sprite, se mantiene el TFT
+ *          inicializado y limpio, pero la función retorna sin sprite.
+ */
+
+void display_init(void) noexcept
+{
+    // Preferencia: constantes como constexpr (evita enums anónimos)
+    constexpr uint8_t kInitialRotation = 0;   // 0: orientación por defecto
+    constexpr uint8_t kColorDepth      = 16;  // 16 bpp = RGB565, óptimo con TFT_eSPI
+
+    static_assert(kColorDepth == 8 || kColorDepth == 16,
+                  "Profundidad de color soportada: 8 o 16 bpp");
+
+    // 1) TFT: init básico y estado conocido
     tft.init();
-    tft.setRotation(0);
-    tft.fillScreen(BACKGROUND_COLOR);
-    tft.setSwapBytes(true);
-    uiSprite.createSprite(tft.width(), tft.height());
+    tft.setRotation(kInitialRotation);
+    tft.setSwapBytes(true);                    // RGB565 con orden correcto
+    tft.fillScreen(BACKGROUND_COLOR);          // Fondo consistente
+
+    // 2) Medidas *reales* del panel tras rotación
+    const int16_t screenWidth  = tft.width();
+    const int16_t screenHeight = tft.height();
+
+#ifdef DEBUG
+    // Validación defensiva en debug: dimensiones válidas (>0)
+    if (screenWidth <= 0 || screenHeight <= 0) {
+    #if defined(SERIAL_DEBUG)
+        Serial.println(F("[display_init] ERROR: dimensiones de pantalla no válidas."));
+    #endif
+        return;
+    }
+#endif
+
+    // 3) Sprite: evita fugas si ya existía
+    if (uiSprite.created()) {
+        uiSprite.deleteSprite();
+    }
+
+    // Configuración del sprite antes de reservar su framebuffer
+    uiSprite.setColorDepth(kColorDepth);
     uiSprite.setSwapBytes(true);
-    //DEBUG__________ln("Display inicializado.");
-    
+
+    // 4) Reserva del framebuffer del sprite (doble buffer en RAM)
+    // Nota: TFT_eSprite::createSprite devuelve puntero base o nullptr si falla.
+    uint8_t* fb = static_cast<uint8_t*>(uiSprite.createSprite(screenWidth, screenHeight));
+    if (fb == nullptr) {
+        // Sin RAM suficiente: dejamos el TFT limpio y abortamos silenciosamente.
+        // (Opcional) Traza de diagnóstico si hay serie.
+        #if defined(SERIAL_DEBUG)
+        Serial.println(F("[display_init] ERROR: sin RAM para crear el sprite."));
+        #endif
+        return;
+    }
+
+    // 5) Estado inicial del sprite y primer volcado
+    uiSprite.fillSprite(BACKGROUND_COLOR);
+    uiSprite.pushSprite(0, 0);                 // Deja pantalla y buffer sincronizados
 }
 
-void showWelcomeAnimation() {
-    int centerX = (tft.width() - 64) / 2;
-    int centerY = (tft.height() - 64) / 2;
-    int screenCenterX = tft.width() / 2;
-    int screenCenterY = tft.height() / 2;
 
-    // Mostrar logo con efecto de partículas animadas
-    for (int frame = 0; frame < 30; frame++) {
+void showWelcomeAnimation()
+{
+    // -------------------- Constantes de animación --------------------
+    constexpr int   kLogoSizePx          = 64;
+    constexpr int   kFramesIntro         = 30;
+    constexpr int   kParticles           = 12;
+    constexpr float kDegToRad            = 3.14159265f / 180.0f;
+    constexpr float kFrameAngleStepDeg   = 0.2f;     // avance angular por frame (deg)
+    constexpr float kParticleSpacingDeg  = 360.0f / kParticles;
+    constexpr float kBaseRadiusPx        = 35.0f;    // radio base de la órbita
+    constexpr float kRadiusAmplitudePx   = 10.0f;    // oscilación radial
+    constexpr float kRadiusFreq          = 0.1f;     // frecuencia sinusoidal del radio
+    constexpr float kBrightFreq          = 0.3f;     // frecuencia sinusoidal de brillo
+    constexpr int   kParticleRadiusPx    = 2;
+    constexpr int   kDelayIntroMs        = 80;       // retardo por frame (intro)
+    constexpr int   kFadeSteps           = 10;       // pasos de fundido
+    constexpr int   kDelayFadeMs         = 100;      // retardo por paso (fade)
+
+    // -------------------- Helper local: clamp sin <algorithm> --------------------
+    auto clampInt = [](int v, int lo, int hi) -> int {
+        return (v < lo) ? lo : (v > hi) ? hi : v;
+    };
+
+    // -------------------- Validación defensiva --------------------
+    // Evita dibujar si el sprite aún no está creado (p. ej. fallo de RAM).
+    if (!uiSprite.created()) {
+    #if defined(SERIAL_DEBUG)
+        Serial.println(F("[showWelcomeAnimation] Sprite no creado; animación cancelada."));
+    #endif
+        return;
+    }
+
+    // -------------------- Geometría de pantalla y logo --------------------
+    const int16_t screenW = tft.width();
+    const int16_t screenH = tft.height();
+#ifdef DEBUG
+    if (screenW <= 0 || screenH <= 0) {
+    #if defined(SERIAL_DEBUG)
+        Serial.println(F("[showWelcomeAnimation] Dimensiones de pantalla no válidas."));
+    #endif
+        return;
+    }
+#endif
+    const int centerX       = (screenW - kLogoSizePx) / 2;  // esquina sup-izq del logo
+    const int centerY       = (screenH - kLogoSizePx) / 2;
+    const int screenCenterX = screenW / 2;                  // centro geométrico
+    const int screenCenterY = screenH / 2;
+
+    // -------------------- Animación principal (logo + partículas) --------------------
+    for (int frame = 0; frame < kFramesIntro; ++frame) {
         uiSprite.fillSprite(BACKGROUND_COLOR);
-        uiSprite.pushImage(centerX, centerY, 64, 64, (uint16_t*)doitLogo_64x64);
 
-        // Partículas que orbitan alrededor
-        for (int p = 0; p < 8; p++) {
-            float angle = (frame * 0.2 + p * 45) * PI / 180.0;
-            float radius = 35 + sin(frame * 0.1) * 10;
-            int px = screenCenterX + cos(angle) * radius;
-            int py = screenCenterY + sin(angle) * radius;
+        // Dibuja el logo centrado
+        uiSprite.pushImage(
+            centerX, centerY,
+            kLogoSizePx, kLogoSizePx,
+            reinterpret_cast<const uint16_t*>(doitLogo_64x64)
+        );
 
-            int brightness = 150 + sin(frame * 0.3 + p) * 100;
-            brightness = constrain(brightness, 0, 255);
-            uint16_t particleColor = tft.color565(brightness / 4, brightness / 6, brightness / 3);
-            uiSprite.fillCircle(px, py, 2, particleColor);
+        // Partículas orbitando
+        for (int p = 0; p < kParticles; ++p) {
+            const float angleDeg = (frame * kFrameAngleStepDeg) + (p * kParticleSpacingDeg);
+            const float angleRad = angleDeg * kDegToRad;
+
+            const float radius   = kBaseRadiusPx + sinf(frame * kRadiusFreq) * kRadiusAmplitudePx;
+            const int   px       = screenCenterX + static_cast<int>(cosf(angleRad) * radius);
+            const int   py       = screenCenterY + static_cast<int>(sinf(angleRad) * radius);
+
+            // Brillo base con oscilación; se mantiene el rango 0..255
+            int brightness = static_cast<int>(150.0f + sinf(frame * kBrightFreq + p) * 100.0f);
+            brightness = clampInt(brightness, 0, 255);
+
+            // Color animado tipo “rueda” (API externa existente)
+            const uint16_t particleColor = colorWheel((frame * 8 + p * 32) & 0xFF);
+
+            uiSprite.fillCircle(px, py, kParticleRadiusPx, particleColor);
         }
 
         uiSprite.pushSprite(0, 0);
-        delay(80);
+        delay(kDelayIntroMs); // Retardo bloqueante deseado en la animación
     }
 
-    // Fade out elegante
-    for (int i = 10; i >= 0; i--) {
+    // -------------------- Fundido de salida del logo --------------------
+    for (int i = kFadeSteps; i >= 0; --i) {
         uiSprite.fillSprite(BACKGROUND_COLOR);
+
+        // Mantiene el logo visible en los primeros pasos para un fade “elegante”
         if (i > 3) {
-            uiSprite.pushImage(centerX, centerY, 64, 64, (uint16_t*)doitLogo_64x64);
+            uiSprite.pushImage(
+                centerX, centerY,
+                kLogoSizePx, kLogoSizePx,
+                reinterpret_cast<const uint16_t*>(doitLogo_64x64)
+            );
         }
+
         uiSprite.pushSprite(0, 0);
-        delay(100);
+        delay(kDelayFadeMs);
     }
 }
 
-// Función auxiliar para crear efectos de color suave
-uint16_t createGlowColor(int intensity, int hue) {
-    int r = (intensity * (128 + sin(hue) * 127)) / 255;
-    int g = (intensity * (128 + sin(hue + 2.1) * 127)) / 255;
-    int b = (intensity * (128 + sin(hue + 4.2) * 127)) / 255;
-    return tft.color565(r, g, b);
+uint16_t colorWheel(uint8_t pos) {
+  if (pos < 85)   return tft.color565(pos * 3, 255 - pos * 3, 0);
+  if (pos < 170) { pos -= 85;  return tft.color565(255 - pos * 3, 0, pos * 3); }
+  pos -= 170;     return tft.color565(0, pos * 3, 255 - pos * 3);
 }
+
+
+uint16_t createGlowColor(int intensity, float hue) {
+  int r = (intensity * (128 + sin(hue)       * 127)) / 255;
+  int g = (intensity * (128 + sin(hue + 2.1) * 127)) / 255;
+  int b = (intensity * (128 + sin(hue + 4.2) * 127)) / 255;
+  return tft.color565(r, g, b);
+}
+
 void drawNoElementsMessage() {
     uiSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
     uiSprite.setTextDatum(MC_DATUM);
@@ -420,6 +601,7 @@ void updateModeScroll() {
     }
 }
 
+extern float batteryVisualPercentage;
 // Modificación de drawCurrentElement para configurar el scroll del nombre cuando corresponda
 void drawCurrentElement() {
     uiSprite.fillSprite(BACKGROUND_COLOR);
@@ -708,7 +890,7 @@ void drawCurrentElement() {
          uiSprite.pushImage(0, 0, 16, 16, device_lock);
     }
 
-    drawBatteryIconMini(batteryPercentage);
+    drawBatteryIconMini(batteryVisualPercentage);
 
     uiSprite.pushSprite(0, 0);
     lastDisplayInteraction = millis();
@@ -1911,30 +2093,59 @@ const uint16_t* vbatallArray[5] = {
 unsigned long lastBatteryToggleTime = 0;
 bool batteryToggleState = false;
 
+// void drawBatteryIconMini(float percentage) {
+//     const int x = 128 - 30; // esquina superior derecha, adaptado al tamaño 30x15
+//     const int y = 2;
+
+//     const uint16_t* icon = nullptr;
+
+//     if (percentage < 25.0) {
+//         // Toggle entre 1 y 0 barra
+//         if (millis() - lastBatteryToggleTime > 500) {
+//             batteryToggleState = !batteryToggleState;
+//             lastBatteryToggleTime = millis();
+//         }
+//         icon = batteryToggleState ? vbatallArray[1] : vbatallArray[0];
+//     }
+//     else if (percentage < 66.0) {
+//         icon = vbatallArray[2];  // 2 barras
+//     }
+//     else {
+//         icon = vbatallArray[3];  // 3 barras
+//     }
+
+//     // Mostrar icono
+//     uiSprite.pushImage(x, y, 30, 15, icon);
+// }
+
 void drawBatteryIconMini(float percentage) {
-    const int x = 128 - 30; // esquina superior derecha, adaptado al tamaño 30x15
+    const int x = 128 - 30; // esquina sup. derecha
     const int y = 2;
+
+    // Si llega el sentinel → dibuja el icono de carga y salir
+    if (percentage > 150.0f) {  // BAT_VIS_CHARGING = 200
+        uiSprite.pushImage(x, y, 30, 15, vbat30x15_horizontal_cargando);
+        return;
+    }
 
     const uint16_t* icon = nullptr;
 
-    if (percentage < 25.0) {
+    if (percentage < 25.0f) {
         // Toggle entre 1 y 0 barra
         if (millis() - lastBatteryToggleTime > 500) {
             batteryToggleState = !batteryToggleState;
             lastBatteryToggleTime = millis();
         }
         icon = batteryToggleState ? vbatallArray[1] : vbatallArray[0];
-    }
-    else if (percentage < 66.0) {
+    } else if (percentage < 66.0f) {
         icon = vbatallArray[2];  // 2 barras
-    }
-    else {
+    } else {
         icon = vbatallArray[3];  // 3 barras
     }
 
-    // Mostrar icono
     uiSprite.pushImage(x, y, 30, 15, icon);
 }
+
 
 void drawCognitiveMenu() {
     uiSprite.fillSprite(BACKGROUND_COLOR);
@@ -2102,7 +2313,6 @@ void setFontForCurrentLanguage() {
     }
 }
 
-
 void scrollFileNameTickerBounce(const String& fileName) {
     static int pixelOffset = 0;
     static int scrollDirection = 1;
@@ -2173,7 +2383,6 @@ void scrollFileNameTickerBounce(const String& fileName) {
     tickerSprite.pushSprite(textAreaX, textAreaY);
     tickerSprite.deleteSprite();
 }
-
 
 void drawLoadingModalFrame(const char* message, int frameCount) {
     uiSprite.fillSprite(BACKGROUND_COLOR);

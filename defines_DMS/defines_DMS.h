@@ -14,8 +14,8 @@
 #define DEBUG
 #define DEBUG_
 #ifdef DEBUG_
-  #define DEBUG__________ln(...)  Serial.println(__VA_ARGS__);
-  #define DEBUG__________(...)    Serial.print(__VA_ARGS__);
+  #define DEBUG__________ln(...)          Serial.println(__VA_ARGS__);
+  #define DEBUG__________(...)            Serial.print(__VA_ARGS__);
   #define DEBUG__________printf(fmt, ...) Serial.printf(fmt, __VA_ARGS__);
 #else
   #define DEBUG__________ln(...)
@@ -56,12 +56,12 @@
 //
 
 
-#define I2C2_SDA 40
-#define I2C2_SCL 41
+#define I2C2_SDA          40
+#define I2C2_SCL          41
 
-#define I2S_WS   11//orig 16
-#define I2S_SD   12//orig 47
-#define I2S_SCK  13//orig 48
+#define I2S_WS            11//orig 16
+#define I2S_SD            12//orig 47
+#define I2S_SCK           13//orig 48
 
 #define RF_TX_PIN         18 
 #define RF_RX_PIN         17  
