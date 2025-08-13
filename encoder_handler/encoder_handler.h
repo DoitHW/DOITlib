@@ -36,7 +36,7 @@ void handleEncoder();
 void handleHiddenMenuNavigation(int &hiddenMenuSelection);
 
 // Declaración de funciones externas (forward declarations)
-void animateTransition(int direction);
+//void animateTransition(int direction);
 void drawModesScreen();
 void drawCurrentElement();
 
@@ -69,6 +69,7 @@ bool isInMainMenu() ;
 
 int getTotalModesForFile(const String &file);
 
+static inline uint8_t mapPercentToFastLEDBrightness(uint8_t percent);
 
 void printElementDetails();
 // Variables externas requeridas
@@ -131,6 +132,11 @@ extern bool awaitingResponse;
 
 extern int formatMenuCurrentIndex;
 extern int32_t formatMenuLastValue;
+
+enum BrightnessOption {
+    BRIGHTNESS_NORMAL = 0,
+    BRIGHTNESS_DIM    = 1
+};
 
 
  

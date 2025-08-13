@@ -58,13 +58,17 @@ class BOTONERA_ : public ELEMENT_{
         bool elementoAsignadoA_ID_enSPIFFS(byte idToFind);
         void iniciarEscaneoElemento(const char* mensajeInicial);
         void actualizarBarraProgreso(int pasoActual,int pasosTotales,const char* etiqueta = nullptr);
-        
-    
+
+        void actualizarBarraProgreso2(int pasoActual, int pasosTotales, const char* etiqueta);
+
         
 
     private:   
         byte lastAssignedID = DEFAULT_DEVICE;
         byte lastSerial[5] = {0};
+        // En BOTONERA_.h (zona privada)
+
+
 
 };
 

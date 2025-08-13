@@ -7,10 +7,14 @@
 #include <map>
 #include <string>
 
+#define BACKGROUND_COLOR TFT_BLACK
+#define TEXT_COLOR TFT_WHITE
+#define HIGHLIGHT_COLOR TFT_GREEN
+#define CARD_COLOR TFT_NAVY
+
 // Declaración adelantada (forward) para no generar bucle de includes.
 class DynamicLEDManager;
 void display_init(void) noexcept;
-void drawNoElementsMessage();
 void drawErrorMessage(const char* message);
 void drawElementIcon(fs::File& f, int startX, int startY);
 void drawHiddenMenu(int selection);
@@ -23,21 +27,18 @@ void display_sleep();
 void display_wakeup();
 void drawLanguageMenu(int selection);
 void drawBankSelectionMenu(const std::vector<byte>& bankList, const std::vector<bool>& selectedBanks, int currentSelection, int windowOffset);
-void drawBrightnessMenu(uint8_t brightness);
+void drawBrightnessMenu();
 void drawSunIcon(int16_t x, int16_t y, uint16_t color);
 void drawSoundMenu(int selection);
 void scrollTextTickerBounceSound(int selection);
 void drawFormatMenu(int selection);
 void drawDeleteElementMenu(int selection);
 void drawConfirmDelete(const String& fileName);
-void scrollTextTickerBounceFormat(int selection);
-void scrollTextTickerBounceDelete(int selection);
 void showCriticalBatteryMessage();
 void drawBatteryIconMini(float percentage);
 void drawCognitiveMenu();
 void drawConfirmRestoreMenu(int selection);
 void drawConfirmRestoreElementMenu(int selection);
-//void actualizarBarraProgreso(float progreso, const char* detalleTexto = nullptr);
 void showElemInfo(unsigned long delayTime, const String& serialNumber, const String& elementID);
 void mostrarTextoAjustado(TFT_eSPI& tft,
                                  const char* texto,
@@ -65,8 +66,10 @@ extern int bankMenuCurrentSelection;   // 0: Confirmar, 1..n: banks
 extern int bankMenuWindowOffset;
 extern bool criticalBatteryLock; // lo usarás en otras partes
 extern float batteryPercentage;
-extern bool flagScrollFileName;
-extern String fileNameConfirm;
 
 uint16_t colorWheel(uint8_t pos);
+
+extern int brightnessMenuIndex;
+
+void showMessageWithProgress(const char* message, unsigned long delayTime);
 

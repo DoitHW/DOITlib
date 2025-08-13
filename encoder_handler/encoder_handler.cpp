@@ -924,92 +924,164 @@ int lastEncoderCount = 0;
 bool encoderPressed = false;
 bool ignoreFirstRelease = true;
 
-void handleBrightnessMenu() {
-    int currentCount = encoder.getCount();
+// Índice seleccionado en el menú (0 = Normal, 1 = Atenuado)
+int brightnessMenuIndex = 0;
 
+/**
+ * @brief Gestiona la navegación y selección del menú de brillo.
+ * Lee el encoder rotativo para mover el cursor (con wrap 0↔1), detecta la
+ * liberación del botón para confirmar y aplica el nivel de brillo seleccionado.
+ * Redibuja el menú al cambiar la posición del encoder y, al confirmar,
+ * persiste el brillo, lo aplica a FastLED y sale al elemento principal.
+ */
+
+void handleBrightnessMenu()
+{
+    // ───────── Constantes y configuración ─────────
+    constexpr int kMinIndex = 0;
+    constexpr int kMaxIndex = 1;                 // Menú de 2 opciones: índices 0 y 1
+    constexpr uint8_t kBrightnessNormal = 255;   // Valor absoluto para brillo normal
+    constexpr uint8_t kBrightnessDim    = 50;    // Valor absoluto para brillo atenuado
+    constexpr bool kButtonActiveLow     = true;  // Botón del encoder activo en LOW
+
+    // ───────── Navegación con encoder (wrap 0↔1) ─────────
+    const int currentCount = encoder.getCount();
     if (currentCount != lastEncoderCount) {
-        int delta = currentCount - lastEncoderCount;
+        const int delta = currentCount - lastEncoderCount;
         lastEncoderCount = currentCount;
 
-        int newBrightness = constrain((int)tempBrightness + delta, 0, 100);
-        if (newBrightness != tempBrightness) {
-            tempBrightness = newBrightness;
-            drawBrightnessMenu(tempBrightness);
-
-            //FastLED.setBrightness(map(tempBrightness, 0, 100, 0, 165));
-            uint8_t mappedBrightness = 0;
-
-            if (tempBrightness >= 100) {
-                mappedBrightness = 255;  // Brillo real máximo solo si está en 100%
-            } else {
-                mappedBrightness = map(tempBrightness, 0, 99, 0, 165);
-            }
-
-            FastLED.setBrightness(mappedBrightness);
-
-            FastLED.show();
+        // Mantener semántica original: cualquier delta>0 => +1; delta<0 => -1
+        if (delta > 0) {
+            ++brightnessMenuIndex;
+        } else {
+            --brightnessMenuIndex;
         }
+
+        // Wrap dentro del rango [kMinIndex..kMaxIndex]
+        if (brightnessMenuIndex < kMinIndex) brightnessMenuIndex = kMaxIndex;
+        if (brightnessMenuIndex > kMaxIndex) brightnessMenuIndex = kMinIndex;
+
+        // Redibuja el menú tras moverse el cursor
+        drawBrightnessMenu();
     }
 
-    bool currentEncoderState = (digitalRead(ENC_BUTTON) == LOW);
+    // ───────── Confirmación por botón (flanco de suelta) ─────────
+    const bool rawButtonRead = (digitalRead(ENC_BUTTON) == LOW);
+    const bool currentEncoderState = kButtonActiveLow ? rawButtonRead : !rawButtonRead;
 
+    // Flanco de suelta: antes estaba presionado y ahora no lo está
     if (encoderPressed && !currentEncoderState) {
         if (ignoreFirstRelease) {
+            // Se consume la primera suelta para evitar una confirmación espuria
             ignoreFirstRelease = false;
         } else {
-            currentBrightness = tempBrightness;
+            // Selección del valor absoluto de brillo según la opción actual
+            const uint8_t valueToApply =
+                (brightnessMenuIndex == BRIGHTNESS_NORMAL) ? kBrightnessNormal : kBrightnessDim;
+
+            // 1) Actualizar variable global (0..255)
+            currentBrightness = valueToApply;
+
+            // 2) Guardar en SPIFFS (persistencia)
             saveBrightnessToSPIFFS(currentBrightness);
+
+            // 3) Aplicar a FastLED y refrescar
+            FastLED.setBrightness(currentBrightness);
+            FastLED.show();
+
+            // 4) Salir del menú y volver a la pantalla principal
             brightnessMenuActive = false;
             drawCurrentElement();
         }
     }
 
+    // Actualizar estado del botón para la próxima detección de flanco
     encoderPressed = currentEncoderState;
 }
 
+
+/**
+ * @brief Gestiona la navegación y confirmación del menú de sonido.
+ *
+ * Desplaza la selección con el encoder (wrap circular sobre las opciones válidas)
+ * y, ante una pulsación corta (< 1000 ms) del botón del encoder, aplica el ajuste
+ * correspondiente (género de voz, respuesta negativa, volumen) o confirma/sale.
+ */
+
 const int soundOptions[] = {0, 1, 3, 4, 6, 7, 9}; // Índices seleccionables
 const int numSoundOptions = sizeof(soundOptions) / sizeof(soundOptions[0]);
+void handleSoundMenu()
+{
+    // ──────────────── Constantes de comportamiento ────────────────
+    constexpr unsigned long kShortPressMs = 1000UL; // Umbral de pulsación corta
+    constexpr bool kButtonActiveLow = true;         // Botón activo en LOW
 
-void handleSoundMenu() {
-    static int currentIndex = 0;
-    int32_t newEncoderValue = encoder.getCount();
-    static int32_t lastValue = newEncoderValue;
+    // Valores de volumen asociados a las opciones (mantener semántica)
+    constexpr int kVolNormal  = 26;
+    constexpr int kVolAtenuado = 20;
+
+    // ──────────────── Lectura del encoder y navegación ─────────────
+    static int currentIndex = 0; // índice dentro de soundOptions[]
+    const int32_t newEncoderValue = encoder.getCount();
+    static int32_t lastValue = newEncoderValue; // se inicializa la primera vez
 
     if (newEncoderValue != lastValue) {
-        int dir = (newEncoderValue > lastValue) ? 1 : -1;
+        // Cualquier incremento => +1, decremento => -1
+        const int dir = (newEncoderValue > lastValue) ? 1 : -1;
         lastValue = newEncoderValue;
+
+        // Avance circular en el vector de opciones válidas
         currentIndex = (currentIndex + dir + numSoundOptions) % numSoundOptions;
+
+        // Actualizar selección efectiva (índice lógico del menú) y redibujar
         soundMenuSelection = soundOptions[currentIndex];
         drawSoundMenu(soundMenuSelection);
     }
 
-    if (digitalRead(ENC_BUTTON) == LOW) {
+    // ──────────────── Gestión de pulsación del botón ───────────────
+    const bool rawRead = (digitalRead(ENC_BUTTON) == LOW);
+    const bool buttonPressed = kButtonActiveLow ? rawRead : !rawRead;
+
+    if (buttonPressed) {
+        // Inicio de pulsación
         if (buttonPressStart == 0) {
             buttonPressStart = millis();
         }
     } else {
-        if (buttonPressStart > 0 && millis() - buttonPressStart < 1000) {
-            int sel = soundMenuSelection;
+        // Botón liberado: si hubo pulsación corta, ejecutar acción
+        if (buttonPressStart > 0 && (millis() - buttonPressStart) < kShortPressMs) {
+            const int sel = soundMenuSelection;
             switch (sel) {
-                case 0: selectedVoiceGender = 0; token.genre = 0; break;
-                case 1: selectedVoiceGender = 1; token.genre = 1; break;
-                case 3: negativeResponse = true; break;
-                case 4: negativeResponse = false; break;
-                case 6: selectedVolume = 0; doitPlayer.player.volume(26); break;
-                case 7: selectedVolume = 1; doitPlayer.player.volume(20); break;
-                case 9: 
-                saveSoundSettingsToSPIFFS();
-                soundMenuActive = false;
-                drawCurrentElement();
-                DEBUG__________ln("✅ Ajustes de sonido confirmados:");
-                DEBUG__________printf(" - Tipo de voz: %s\n", selectedVoiceGender == 0 ? "Mujer" : "Hombre");
-                DEBUG__________printf(" - Respuesta negativa: %s\n", negativeResponse ? "Con" : "Sin");
-                DEBUG__________printf(" - Volumen: %s\n", selectedVolume == 0 ? "Normal" : "Atenuado");
-                break;
+                case 0:  selectedVoiceGender = 0; token.genre = 0;                  break; // Voz: mujer
+                case 1:  selectedVoiceGender = 1; token.genre = 1;                  break; // Voz: hombre
+                case 3: negativeResponse = true;                                    break; // Respuesta negativa: activar
+                case 4: negativeResponse = false;                                   break; // Respuesta negativa: desactivar
+                case 6: selectedVolume = 0; doitPlayer.player.volume(kVolNormal);   break; // Volumen: normal
+                case 7: selectedVolume = 1; doitPlayer.player.volume(kVolAtenuado); break; // Volumen: atenuado
+                case 9: // Confirmar y salir
+                    saveSoundSettingsToSPIFFS();
+                    soundMenuActive = false;
+                    drawCurrentElement();
+                    DEBUG__________ln("✅ Ajustes de sonido confirmados:");
+                    DEBUG__________printf(" - Tipo de voz: %s\n", (selectedVoiceGender == 0) ? "Mujer" : "Hombre");
+                    DEBUG__________printf(" - Respuesta negativa: %s\n", negativeResponse ? "Con" : "Sin");
+                    DEBUG__________printf(" - Volumen: %s\n", (selectedVolume == 0) ? "Normal" : "Atenuado");
+                    break;
+
+                default:
+                    // Opción no accionable: no hacer nada (se mantiene el estado)
+                    break;
             }
-            drawSoundMenu(soundMenuSelection); // Refrescar para mostrar nuevo estado
+
+            // Refrescar para mostrar el nuevo estado tras la acción
+            drawSoundMenu(soundMenuSelection);
         }
+
+        // Reset de la marca de tiempo al soltar
         buttonPressStart = 0;
+    }
+    if (soundMenuActive) {
+        drawSoundMenu(soundMenuSelection);  // ticker y scroll integrados
     }
 }
 
@@ -1022,7 +1094,7 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
     // Al entrar al menú oculto por primera vez, resalta la primera opción sin confirmarla
     if (initialEntry) {
         hiddenMenuSelection = 0;  // Preselección visual sin confirmar
-        drawHiddenMenu(hiddenMenuSelection);
+        //drawHiddenMenu(hiddenMenuSelection);
         initialEntry = false;
         menuJustOpened = true;  // Bloquea la confirmación inmediata
     }
@@ -1032,7 +1104,7 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
         hiddenMenuSelection += (newEncoderValue > lastEncoderValue) ? 1 : -1;
         hiddenMenuSelection = constrain(hiddenMenuSelection, 0, 4); // Ahora hay 6 opciones (índices 0-5)
         lastEncoderValue = newEncoderValue;
-        drawHiddenMenu(hiddenMenuSelection);
+        //drawHiddenMenu(hiddenMenuSelection);
     }
 
     // Confirmación con el botón del encoder
@@ -1081,7 +1153,7 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
         encoderPressed = (digitalRead(ENC_BUTTON) == LOW);
         ignoreFirstRelease = true;
     
-        drawBrightnessMenu(currentBrightness);
+        drawBrightnessMenu();
             break;
         case 3: // Control
             hiddenMenuActive = false;
@@ -1110,7 +1182,9 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
             break;
     }
 }
-
+    if (hiddenMenuActive) {
+        drawHiddenMenu(hiddenMenuSelection);
+    }
 }
 
 
@@ -1239,7 +1313,7 @@ void handleFormatMenu() {
         if (proposedIndex >= 0 && proposedIndex < numFormatOptions) {
             currentIndex = proposedIndex;
             formatMenuSelection = formatOptions[currentIndex];
-            drawFormatMenu(formatMenuSelection);
+            //drawFormatMenu(formatMenuSelection);
         }
     }
 
@@ -1286,6 +1360,7 @@ void handleFormatMenu() {
                     DEBUG__________ln("[🆔] Mostrando ID");
                     send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, {BROADCAST}, SHOW_ID_CMD));
                     formatSubMenuActive = true;
+                    showMessageWithLoading(getTranslation("SHOW_ID"), 3000);
                     // drawCurrentElement(); // volver al menú principal
                     break;
                 
@@ -1314,7 +1389,10 @@ void handleFormatMenu() {
         }
         buttonPressStart = 0;
     }
-    
+    if (formatSubMenuActive && !confirmRestoreMenuActive && !deleteElementMenuActive && !confirmRestoreMenuElementActive) {
+        // Pasa el ÍNDICE actual para que el resaltado y el scroll coincidan
+        drawFormatMenu(currentIndex);
+    }
 }
 
 void handleConfirmRestoreMenu() {
@@ -1404,36 +1482,34 @@ void handleDeleteElementMenu() {
 
         currentIndex = (currentIndex + dir + deletableElementFiles.size()) % deletableElementFiles.size();
         deleteElementSelection = currentIndex;
-        drawDeleteElementMenu(deleteElementSelection);
+        // ❌ no dibujar aquí
     }
 
     if (digitalRead(ENC_BUTTON) == LOW) {
-        if (buttonPressStart == 0) {
-            buttonPressStart = millis();
-        }
+        if (buttonPressStart == 0) buttonPressStart = millis();
     } else {
         if (buttonPressStart > 0 && millis() - buttonPressStart < 1000) {
             String selected = deletableElementFiles[deleteElementSelection];
-        
+
             if (selected == getTranslation("VOLVER")) {
                 deleteElementMenuActive = false;
-                formatSubMenuActive = true;
-                drawFormatMenu(formatMenuSelection);
+                formatSubMenuActive     = true;
+                // El loop dibujará drawFormatMenu(...) en su bloque correspondiente
             } else {
                 DEBUG__________printf("[❓] Confirmar eliminación de: %s\n", selected.c_str());
-                confirmDeleteActive = true;
-                confirmSelection = 0;
-                confirmedFileToDelete = selected;
-        
+                confirmDeleteActive     = true;
+                confirmSelection        = 0;
+                confirmedFileToDelete   = selected;
+
                 deleteElementMenuActive = false;
                 confirmDeleteMenuActive = true;
-                drawConfirmDelete(selected);
+                // ✅ NO dibujes aquí: el loop lo hará inmediatamente este mismo tick
             }
         }
-        
         buttonPressStart = 0;
     }
 }
+
 bool confirmDeleteMenuActive = false;
 
 void handleConfirmDelete() {
@@ -1476,7 +1552,6 @@ void handleConfirmDelete() {
         }
         buttonPressStart = 0;
     }
-    flagScrollFileName = false;
 }
 
 bool isInMainMenu() {
@@ -1595,6 +1670,5 @@ int getTotalModesForFile(const String &file) {
     f.close();
     return count;
 }
-
 
 

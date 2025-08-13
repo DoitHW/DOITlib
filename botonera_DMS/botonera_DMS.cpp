@@ -882,31 +882,18 @@ bool BOTONERA_::procesar_sector(int sector,
         procesar_datos_sector(LEF, sector, infoPack);
 
         // 3) Si es el sector de nombre, lo mostramos:
+        static const char* nombreAMostrar = nullptr;
+
         if (sector == ELEM_NAME_SECTOR) {
-            // infoPack->name debe contener el nombre después de procesar_datos_sector
-            char mensaje[96]; // Aumentado el tamaño del buffer a 96
-
-            // ----- INICIO DE LA LÍNEA CORREGIDA -----
-            // Se asume que infoPack->name es un byte* (unsigned char*) que apunta a una cadena C-style (terminada en nulo).
-            // Se castea a const char* para strlen y para la asignación a nombreAMostrar.
-            const char* nombreAMostrar = (infoPack->name && strlen(reinterpret_cast<const char*>(infoPack->name)) > 0)
-                                         ? reinterpret_cast<const char*>(infoPack->name)
-                                         : "[Elemento Sin Nombre]";
-            // ----- FIN DE LA LÍNEA CORREGIDA -----
-
-            // Formato mejorado: "Nombre\n\nID: X"
-            snprintf(mensaje, sizeof(mensaje),
-                     "%s Sincronizando %d",
-                     nombreAMostrar,
-                     targetID);
-
-            iniciarEscaneoElemento(mensaje);
+            const char* nombre = reinterpret_cast<const char*>(infoPack->name);
+            nombreAMostrar = (nombre && *nombre) ? nombre : "[Elemento Sin Nombre]";
         }
 
+
         // 4) Actualizar sólo la barra de progreso (sin etiqueta explícita aquí):
-        actualizarBarraProgreso(sector,             // Paso actual (el sector que se acaba de procesar)
-                                ELEM_ICON_ROW_63_SECTOR, // Pasos totales (último sector esperado)
-                                nullptr);           // Sin etiqueta, para no sobrescribir el nombre/ID
+        actualizarBarraProgreso2(sector,                   // Paso actual (el sector que se acaba de procesar)
+                                ELEM_ICON_ROW_63_SECTOR,   // Pasos totales (último sector esperado)
+                                nombreAMostrar);           // Con etiqueta, para sobrescribir el nombre
 
         return true; // Sector procesado exitosamente
     }
@@ -1552,9 +1539,10 @@ inicio_escanear_sala_completo:
             char etiquetaID[16];
             //snprintf(etiquetaID, sizeof(etiquetaID), "ID %d/32", currentID);
             const char* textoBase = getTranslation("SEARCHING");
-            snprintf(etiquetaID, sizeof(etiquetaID), "%s %d/32", textoBase, currentID);
+            //snprintf(etiquetaID, sizeof(etiquetaID), "%s %d/32", textoBase, currentID);
 
-            actualizarBarraProgreso(currentID, 32, etiquetaID);
+            //actualizarBarraProgreso(currentID, 32, etiquetaID);
+            actualizarBarraProgreso2(currentID, 32, textoBase);
 
             // 2) Escanear
             byte serialRecibido[5];
@@ -1662,7 +1650,7 @@ inicio_escanear_sala_completo:
     int pasoActual = 32;
     char etiquetaID[24];
     snprintf(etiquetaID, sizeof(etiquetaID), "%s %d/32", getTranslation("SEARCHING"), pasoActual);
-    actualizarBarraProgreso(pasoActual, 32, etiquetaID);
+    actualizarBarraProgreso2(pasoActual, 32, etiquetaID);
     delay(1000);
 
     // 🔶 PASO DE GESTIÓN DE 0xDD EN DOS FASES 🔶
@@ -1686,7 +1674,7 @@ inicio_escanear_sala_completo:
 
         // Iniciar el modal visual desde frame 0
         int frameCountAnim = 0;
-        drawLoadingModalFrame(getTranslation(fase == 0 ? "UPDATING_1_2" : "UPDATING_2_2"), frameCountAnim);
+        drawLoadingModalFrame(getTranslation("UPDATING"), frameCountAnim);
 
         frameReceived = false;
         delay(100);
@@ -1713,7 +1701,7 @@ inicio_escanear_sala_completo:
 
             // Animación visual de puntos girando (no bloqueante)
             if (millis() - lastAnimFrameTime >= 33) {
-                drawLoadingModalFrame(getTranslation(fase == 0 ? "UPDATING_1_2" : "UPDATING_2_2"), frameCountAnim++);
+                drawLoadingModalFrame(getTranslation("UPDATING"), frameCountAnim++);
                 lastAnimFrameTime = millis();
             }
 
@@ -1930,4 +1918,304 @@ void BOTONERA_::actualizarBarraProgreso(int pasoActual,
     barraSprite.deleteSprite();
 }
 
+// void BOTONERA_::actualizarBarraProgreso2(int pasoActual,
+//                                         int pasosTotales,
+//                                         const char* etiqueta)
+// {
+//     // ───────────────────────── Config y estado persistente ─────────────────────────
+//     const int spriteX = 5;
+//     const int spriteY = 25;   // ← AJUSTADO para recentrar con la nueva altura
+//     const int W = 118;
+//     const int H = 81;         // ← AUMENTADO 3px más (era 78) - ajuste final
 
+//     // Ajuste global de posición vertical del bloque completo (marco + contenidos)
+//     // Usa valores negativos para subir el bloque (p.ej., -2, -3). Evita valores
+//     // tan grandes que hagan que el marco se salga por arriba del sprite.
+//     const int offsetY = 0;  // ← CAMBIADO a 0 para centrar mejor el contenido
+
+//     // Colores
+//     const uint16_t COL_BG    = TFT_BLACK;
+//     const uint16_t COL_TEXT  = TFT_WHITE;
+//     const uint16_t COL_TRACK = TFT_DARKGREY;
+//     const uint16_t COL_FILL  = TFT_BLUE;
+//     const uint16_t COL_STRIPE =
+//     #ifdef TFT_eSPI_VERSION
+//         tft.color565(0, 0, 110);   // azul más oscuro para la raya
+//     #else
+//         0x000E;
+//     #endif
+
+//     // Estado estático para animaciones y suavizado (sprite reutilizable)
+//     static bool     s_init        = false;
+//     static uint32_t s_lastMs      = 0;
+//     static float    s_barberPhase = 0.0f; // px
+//     static float    s_eqPhase     = 0.0f; // rad
+//     static float    s_progSmooth  = 0.0f; // 0..1
+
+//     // Crear o redimensionar sprite solo si hace falta (reutilizable)
+//     if (barraSprite.width() != W || barraSprite.height() != H) {
+//         barraSprite.setColorDepth(16);
+//         barraSprite.createSprite(W, H);
+//         barraSprite.setTextFont(2);
+//         barraSprite.setTextColor(COL_TEXT, COL_BG);
+//         s_init        = true;
+//         s_lastMs      = millis();
+//         s_barberPhase = 0.0f;
+//         s_eqPhase     = 0.0f;
+//         s_progSmooth  = 0.0f;
+//     } else if (!s_init) {
+//         barraSprite.setTextFont(2);
+//         barraSprite.setTextColor(COL_TEXT, COL_BG);
+//         s_init   = true;
+//         s_lastMs = millis();
+//     }
+
+//     // ───────────────────────── Layout (con offset aplicado) ────────────────────────
+//     const int M = 3;                 // margen interno
+//     const int r = 7;                 // radio del marco
+
+//     // Barra - centrada en el nuevo formato compacto
+//     const int altoBarra = 10;
+//     const int anchoMax  = 100;
+//     const int xBarra    = 9;                                  // relativo al sprite
+//     const int yBarra    = (H / 2 + 1) + offsetY;            // ← CENTRADA en formato más compacto
+
+//     // Etiqueta - con un poquito más de margen
+//     const int padding   = 4;
+//     const int yLabel    = (M + 22) + offsetY;                // ← AUMENTADO 2px más margen (era M + 16)
+
+//     // Ecualizador (entre etiqueta y barra; independiente del %)
+//     const int eqW       = 4;
+//     const int eqGap     = 3;
+//     const int eqHMin    = 5;
+//     const int eqHMax    = 10;
+//     const int eqTotalW  = 3*eqW + 2*eqGap;
+//     const int eqX       = xBarra + (anchoMax - eqTotalW) / 2;
+//     const int eqBaseY   = (yBarra - 6);                       // base por encima de la barra (ya incluye offset vía yBarra)
+
+//     // Porcentaje - con un poquito más de margen
+//     const int yPorcentaje = yBarra + altoBarra + 10;         // ← AUMENTADO 2px más espacio (era + 10)
+
+//     // ───────────────────────── Animación (tiempo real) ─────────────────────────────
+//     const uint32_t now = millis();
+//     float dt = (now - s_lastMs) / 1000.0f;
+//     if (dt < 0) dt = 0;
+//     s_lastMs = now;
+
+//     // Barber-pole (independiente del %)
+//     const float stripeSpeedPx = 60.0f;   // px/s
+//     const int   stripeStep    = 6;       // separación entre rayas
+//     s_barberPhase += stripeSpeedPx * dt;
+//     if (s_barberPhase >= stripeStep) s_barberPhase -= stripeStep;
+
+//     // Ecualizador (independiente del %)
+//     const float eqSpeedHz = 1.8f;
+//     s_eqPhase += 2.0f * PI * eqSpeedHz * dt;
+//     if (s_eqPhase > 2.0f * PI) s_eqPhase -= 2.0f * PI;
+
+//     // Suavizado del progreso (EMA)
+//     float progTarget = 0.0f;
+//     if (pasosTotales > 0) {
+//         int pasosClamped = max(0, pasoActual - 1);
+//         pasosClamped = min(pasosClamped, pasosTotales);
+//         progTarget = (float)pasosClamped / (float)pasosTotales;
+//     }
+//     const float k = 8.0f; // ganancia por segundo (~120 ms de constante de tiempo)
+//     s_progSmooth += (progTarget - s_progSmooth) * min(1.0f, k * dt);
+//     s_progSmooth = constrain(s_progSmooth, 0.0f, 1.0f);
+//     const int pixProg = (int)(anchoMax * s_progSmooth + 0.5f);
+
+//     // ───────────────────────── Dibujo ──────────────────────────────────────────────
+//     barraSprite.fillSprite(COL_BG);
+
+//     // Marco y esquinas "marcador" con offset
+//     barraSprite.drawRoundRect(M, M + offsetY, W - 2*M, H - 2*M, r, COL_TEXT);
+
+//     const int notch = 7;
+//     // sup-izq
+//     barraSprite.drawFastHLine(M,              M + offsetY,           notch, COL_TEXT);
+//     barraSprite.drawFastVLine(M,              M + offsetY,           notch, COL_TEXT);
+//     // sup-der
+//     barraSprite.drawFastHLine(W - M - notch,  M + offsetY,           notch, COL_TEXT);
+//     barraSprite.drawFastVLine(W - M - 1,      M + offsetY,           notch, COL_TEXT);
+//     // inf-izq
+//     barraSprite.drawFastHLine(M,              H - M - 1 + offsetY,   notch, COL_TEXT);
+//     barraSprite.drawFastVLine(M,              H - M - notch + offsetY, notch, COL_TEXT);
+//     // inf-der
+//     barraSprite.drawFastHLine(W - M - notch,  H - M - 1 + offsetY,   notch, COL_TEXT);
+//     barraSprite.drawFastVLine(W - M - 1,      H - M - notch + offsetY, notch, COL_TEXT);
+
+//     // Etiqueta (centrada dentro del marco)
+//     if (etiqueta != nullptr) {
+//         barraSprite.setTextDatum(BC_DATUM);
+//         barraSprite.setTextFont(2);
+//         barraSprite.setTextColor(COL_TEXT, COL_BG);
+//         barraSprite.drawString(etiqueta, W / 2, yLabel - padding);
+//     }
+
+//     // Ecualizador (3 barras animadas, independiente del %)
+//     for (int i = 0; i < 3; ++i) {
+//         float phase = s_eqPhase + i * (2.0f * PI / 3.0f);
+//         float s = (sinf(phase) * 0.5f + 0.5f); // 0..1
+//         int h = (int)(eqHMin + s * (eqHMax - eqHMin));
+//         int bx = eqX + i * (eqW + eqGap);
+//         int by = eqBaseY - h;
+//         barraSprite.fillRect(bx, by, eqW, h, COL_TEXT);
+//     }
+//     // Línea base del ecualizador
+//     barraSprite.drawFastHLine(xBarra, eqBaseY, anchoMax, COL_TEXT);
+
+//     // Pista de la barra
+//     barraSprite.fillRoundRect(xBarra, yBarra, anchoMax, altoBarra, 5, COL_TRACK);
+
+//     // Progreso + barber-pole (rayas animadas independientes del %)
+//     if (pixProg > 0) {
+//         barraSprite.fillRoundRect(xBarra, yBarra, pixProg, altoBarra, 5, COL_FILL);
+
+//         int offsetStripe = (int)s_barberPhase; // 0..stripeStep
+//         for (int sx = -altoBarra + offsetStripe; sx < pixProg; sx += stripeStep) {
+//             int x1 = xBarra + sx;
+//             int y1 = yBarra;
+//             int x2 = xBarra + sx + altoBarra;
+//             int y2 = yBarra + altoBarra - 1;
+
+//             // Recorte al ancho de progreso
+//             if (x2 > xBarra + pixProg) { int dx = x2 - (xBarra + pixProg); x2 -= dx; y2 -= dx; }
+//             if (x1 < xBarra)           { int dx = xBarra - x1;            x1 += dx; y1 += dx; }
+
+//             if (x1 <= x2) barraSprite.drawLine(x1, y1, x2, y2, COL_STRIPE);
+//         }
+//     }
+
+//     // Porcentaje centrado debajo - AHORA CON POSICIÓN FIJA DENTRO DEL MARCO
+//     const int pct = (int)(s_progSmooth * 100.0f + 0.5f);
+//     char bufPct[8];
+//     snprintf(bufPct, sizeof(bufPct), "%d%%", pct);
+//     barraSprite.setTextDatum(TC_DATUM);
+//     barraSprite.setTextFont(2);
+//     barraSprite.setTextColor(COL_TEXT, COL_BG);
+//     barraSprite.drawString(bufPct, xBarra + anchoMax / 2, yPorcentaje); // ← POSICIÓN FIJA
+
+//     // Empujar al TFT (posición original)
+//     barraSprite.pushSprite(spriteX, spriteY);
+// }
+
+
+// Convierte HSV a 16 bits RGB565
+uint16_t hsvToRGB565(float h, float s, float v) {
+    float r, g, b;
+    int i = int(h * 6);
+    float f = h * 6 - i;
+    float p = v * (1 - s);
+    float q = v * (1 - f * s);
+    float t = v * (1 - (1 - f) * s);
+    switch (i % 6) {
+        case 0: r = v; g = t; b = p; break;
+        case 1: r = q; g = v; b = p; break;
+        case 2: r = p; g = v; b = t; break;
+        case 3: r = p; g = q; b = v; break;
+        case 4: r = t; g = p; b = v; break;
+        case 5: r = v; g = p; b = q; break;
+    }
+    return tft.color565(uint8_t(r * 255), uint8_t(g * 255), uint8_t(b * 255));
+}
+
+
+void BOTONERA_::actualizarBarraProgreso2(int pasoActual,
+                                         int pasosTotales,
+                                         const char* etiqueta)
+{
+    // ───────────────── Estilos/lienzo (como showMessageWithProgress) ───────────────
+    const int W = tft.width();    // 128
+    const int H = tft.height();   // 128
+
+    // Área de contenido (antes “card”); ya SIN marco
+    const int cardW = 112;
+    const int cardH = 96;
+    const int cardX = (W - cardW) / 2; // 8
+    const int cardY = (H - cardH) / 2; // 16
+
+    // Cabecera
+    const int lineHeight = 20;
+    const int textX = cardX + 12;
+    const int textY = cardY + 14;
+
+    uiSprite.setTextDatum(TL_DATUM);
+    uiSprite.setFreeFont(&FreeSansBold9pt7b);
+    uiSprite.setTextSize(1);
+
+    // ───────────────── Geometría nueva: sin EQ, barra más ancha ───────────────────
+    const int contentX = cardX + 12;
+    const int contentW = cardW - 24;
+
+    // Barra centrada verticalmente y MÁS ancha/“gruesa”
+    const int barH = 14;                                // ↑ grosor (ajustable)
+    const int barX = contentX;                          // ocupa todo el ancho útil
+    const int barW = contentW;
+    const int barY = cardY + (cardH/2) - (barH/2);      // centrada vertical
+
+    // Porcentaje debajo y centrado respecto a la barra
+    const int pctYOffset = 10;                          // separación (ajustable)
+    const int pctY = barY + barH + pctYOffset;
+
+    // ───────────────── Estado animación / suavizado ───────────────────────────────
+    static bool     s_init=false;
+    static uint32_t s_lastMs=0;
+    static float    s_progSmooth=0.0f;
+    static int      s_frameCount=0;
+
+    if (!s_init) { s_init=true; s_lastMs=millis(); s_frameCount=0; }
+
+    const uint32_t now = millis();
+    float dt = (now - s_lastMs)/1000.0f; if (dt < 0) dt = 0;
+    s_lastMs = now; s_frameCount++;
+
+    float progTarget = 0.0f;
+    if (pasosTotales > 0) {
+        int pasosClamped = max(0, pasoActual - 1);
+        pasosClamped = min(pasosClamped, pasosTotales);
+        progTarget = (float)pasosClamped / (float)pasosTotales;
+    }
+    const float k = 8.0f;
+    s_progSmooth += (progTarget - s_progSmooth) * min(1.0f, k*dt);
+    s_progSmooth = constrain(s_progSmooth, 0.0f, 1.0f);
+    const int progW = (int)(barW * s_progSmooth + 0.5f);
+
+    // ───────────────── Dibujo ─────────────────────────────────────────────────────
+    uiSprite.fillSprite(BACKGROUND_COLOR);
+
+    // Cabecera (opcional)
+    if (etiqueta) {
+        uiSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
+        uiSprite.drawString(etiqueta, textX, textY);
+    }
+    // Separador sutil bajo cabecera (opcional, se puede retirar)
+    const int sepY = textY + lineHeight + 2;
+    if (sepY < barY - 14) uiSprite.drawFastHLine(cardX + 10, sepY, cardW - 20, TEXT_COLOR);
+
+    // Pista y progreso (barber-pole)
+    uiSprite.drawRoundRect(barX - 1, barY - 1, barW + 2, barH + 2, 4, TEXT_COLOR);
+    if (progW > 0) {
+        uiSprite.fillRoundRect(barX, barY, progW, barH, 4, TFT_CYAN);
+        const int stripeStep = 6;
+        const int offset = s_frameCount % stripeStep;
+        for (int sx = -barH + offset; sx < progW; sx += stripeStep) {
+            int x1 = barX + sx,       y1 = barY;
+            int x2 = barX + sx + barH, y2 = barY + barH - 1;
+            if (x2 > barX + progW) { int dx = x2 - (barX + progW); x2 -= dx; y2 -= dx; }
+            if (x1 < barX)         { int dx = barX - x1;          x1 += dx; y1 += dx; }
+            if (x1 <= x2) uiSprite.drawLine(x1, y1, x2, y2, BACKGROUND_COLOR);
+        }
+    }
+
+    // Porcentaje centrado debajo
+    char pctStr[8];
+    int percent = (int)(s_progSmooth * 100.0f + 0.5f);
+    snprintf(pctStr, sizeof(pctStr), "%d%%", percent);
+    int pctW = uiSprite.textWidth(pctStr);
+    int pctX = barX + (barW/2) - (pctW/2);
+    uiSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
+    uiSprite.drawString(pctStr, pctX, pctY);
+
+    uiSprite.pushSprite(0, 0);
+}
