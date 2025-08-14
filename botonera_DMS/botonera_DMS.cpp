@@ -1047,28 +1047,6 @@ bool BOTONERA_::serialExistsInSPIFFS(byte serialNum[5]) {
     return found;
 }
 
-void BOTONERA_::finalizarEscaneoElemento() {
-    tft.fillScreen(TFT_BLACK);
-    //dibujarMarco(TFT_WHITE);
-    
-    tft.setTextColor(TFT_GREEN);
-    tft.setTextDatum(MC_DATUM);
-    
-    tft.setTextFont(4); // Usa Font 4 para "Escaneo"
-    tft.drawString("Escaneo", 64, 40);
-    
-    tft.setTextFont(2); // Vuelve a Font 2 para "completado"
-    tft.drawString("completado", 64, 60);
-    
-    // Dibujar un icono de verificación
-    tft.fillCircle(64, 90, 10, TFT_GREEN);
-    tft.drawLine(58, 90, 62, 94, TFT_WHITE);
-    tft.drawLine(62, 94, 70, 86, TFT_WHITE);
-    
-    delay(3000);
-    drawCurrentElement();  // Volver a la pantalla principal
-}
-
 void BOTONERA_::dibujarMarco(uint16_t color) {
     tft.drawRoundRect(2, 2, 124, 124, 10, color);
     tft.drawRoundRect(4, 4, 120, 120, 8, color);
@@ -1082,9 +1060,8 @@ void BOTONERA_::dibujarMarco(uint16_t color) {
 #define MSG_ERROR_DESCONOCIDO 4
 
 void BOTONERA_::mostrarMensajeTemporal(int respuesta, int dTime) {
-    // Borrar la pantalla y dibujar el marco
-    tft.fillScreen(TFT_BLACK);
-    //dibujarMarco(TFT_WHITE);
+    // 1) Limpiar el sprite (fondo negro) y preparar estilos
+    uiSprite.fillSprite(TFT_BLACK);
 
     // Determinar color y mensajes
     uint32_t colorTexto;
@@ -1094,37 +1071,35 @@ void BOTONERA_::mostrarMensajeTemporal(int respuesta, int dTime) {
     if (respuesta == 0) { // ERROR GENERAL
         colorTexto = TFT_RED;
         mensajePrincipal = "ERROR";
-        mensajeSecundario = "Sin respuesta"; // O un mensaje más genérico si se usa para otros errores
-    } else if (respuesta == 1) { // ADVERTENCIA (ej: elemento existente, ID desajustada)
+        mensajeSecundario = "Sin respuesta";
+    } else if (respuesta == 1) { // ADVERTENCIA
         colorTexto = TFT_YELLOW;
         mensajePrincipal = "ADVERTENCIA";
-        mensajeSecundario = "Verifique el estado del elemento"; // Mensaje genérico de advertencia
-    } else if (respuesta == 2) { // ÉXITO / NUEVO (ej: elemento agregado, ID confirmada)
+        mensajeSecundario = "Verifique el estado del elemento";
+    } else if (respuesta == 2) { // ÉXITO / NUEVO
         colorTexto = TFT_GREEN;
         mensajePrincipal  = getTranslation("SUCCESS");
         mensajeSecundario = getTranslation("ROOM_UPDATED");
-    } else if (respuesta == 3) { // ERROR ESPECÍFICO (podrías definir más)
+    } else if (respuesta == 3) { // ERROR ESPECÍFICO
         colorTexto = TFT_RED;
         mensajePrincipal = "ERROR";
-        mensajeSecundario = "Fallo en la operación"; // Mensaje más específico
+        mensajeSecundario = "Fallo en la operación";
     } else { // ERROR DESCONOCIDO
         colorTexto = TFT_RED;
         mensajePrincipal = "ERROR";
         mensajeSecundario = "Error desconocido";
     }
 
-    // Mostrar mensaje principal centrado
-    tft.setTextFont(4);
-    if (respuesta == 1) tft.setTextFont(2);  // Fuente aún más pequeña
-    tft.setTextDatum(MC_DATUM);
-    tft.setTextColor(colorTexto);
-    tft.drawString(mensajePrincipal, 64, 30);
+    // 2) Mensaje principal centrado
+    uiSprite.setTextDatum(MC_DATUM);
+    uiSprite.setTextFont(respuesta == 1 ? 2 : 4);   // Advertencia usa fuente más pequeña
+    uiSprite.setTextColor(colorTexto, TFT_BLACK);    // Fondo negro para evitar “fantasmas”
+    uiSprite.drawString(mensajePrincipal, 64, 30);
 
-    // Configurar fuente pequeña para texto secundario
-    tft.setTextFont(2);
-    tft.setTextColor(TFT_WHITE);
+    // 3) Mensaje secundario (envuelto simple por longitud) centrado
+    uiSprite.setTextFont(2);
+    uiSprite.setTextColor(TFT_WHITE, TFT_BLACK);
 
-    // Dividir el texto secundario en líneas automáticamente
     const int maxCharsPerLine = 18;
     const int lineHeight = 20;
     char buffer[maxCharsPerLine + 1];
@@ -1133,44 +1108,55 @@ void BOTONERA_::mostrarMensajeTemporal(int respuesta, int dTime) {
 
     for (int i = 0; i < textLength; i += maxCharsPerLine) {
         strncpy(buffer, mensajeSecundario + i, maxCharsPerLine);
-        buffer[maxCharsPerLine] = '\0'; // Finalizar correctamente
-        tft.drawString(buffer, 65, yPos);
+        buffer[maxCharsPerLine] = '\0';
+        uiSprite.drawString(buffer, 64, yPos);
         yPos += lineHeight;
     }
 
-    // Dibujar icono correspondiente
-    int iconCenterX = 64;
-    int iconCenterY = 90;
-    int iconSize = 10;
+    // 4) Icono correspondiente (centrado)
+    const int iconCenterX = 64;
+    const int iconCenterY = 90;
+    const int iconSize    = 10;
 
-    if (respuesta == 0 || respuesta == 3 || (respuesta != 1 && respuesta != 2)) {  // ERROR (0, 3, default)
-        tft.fillCircle(iconCenterX, iconCenterY, iconSize, TFT_RED);
-        tft.drawLine(iconCenterX - iconSize/2 +2 , iconCenterY - iconSize/2 +2, iconCenterX + iconSize/2 -2, iconCenterY + iconSize/2 -2, TFT_WHITE);
-        tft.drawLine(iconCenterX + iconSize/2 -2, iconCenterY - iconSize/2 +2, iconCenterX - iconSize/2 +2, iconCenterY + iconSize/2 -2, TFT_WHITE);
+    if (respuesta == 0 || respuesta == 3 || (respuesta != 1 && respuesta != 2)) {
+        // ERROR (0, 3, default)
+        uiSprite.fillCircle(iconCenterX, iconCenterY, iconSize, TFT_RED);
+        uiSprite.drawLine(iconCenterX - iconSize/2 + 2, iconCenterY - iconSize/2 + 2,
+                          iconCenterX + iconSize/2 - 2, iconCenterY + iconSize/2 - 2, TFT_WHITE);
+        uiSprite.drawLine(iconCenterX + iconSize/2 - 2, iconCenterY - iconSize/2 + 2,
+                          iconCenterX - iconSize/2 + 2, iconCenterY + iconSize/2 - 2, TFT_WHITE);
     }
-    else if (respuesta == 2) {  // ÉXITO / NUEVO
-        tft.fillCircle(iconCenterX, iconCenterY, iconSize, TFT_GREEN);
-        tft.drawLine(iconCenterX - iconSize/2 +2 , iconCenterY, iconCenterX - iconSize/2 + 4, iconCenterY + 2, TFT_WHITE); // Ajustar tick
-        tft.drawLine(iconCenterX - iconSize/2 + 4, iconCenterY + 2, iconCenterX + iconSize/2 -1, iconCenterY - 3, TFT_WHITE); // Ajustar tick
+    else if (respuesta == 2) {
+        // ÉXITO
+        uiSprite.fillCircle(iconCenterX, iconCenterY, iconSize, TFT_GREEN);
+        uiSprite.drawLine(iconCenterX - iconSize/2 + 2, iconCenterY,
+                          iconCenterX - iconSize/2 + 4, iconCenterY + 2, TFT_WHITE);
+        uiSprite.drawLine(iconCenterX - iconSize/2 + 4, iconCenterY + 2,
+                          iconCenterX + iconSize/2 - 1, iconCenterY - 3, TFT_WHITE);
     }
-    else if (respuesta == 1) {  // ADVERTENCIA
-        int triangleSize = iconSize * 2;
-        float triangleHeight = triangleSize * 0.866f;
-        tft.fillTriangle(
-            iconCenterX, iconCenterY - (triangleHeight / 2),
-            iconCenterX - (triangleSize / 2), iconCenterY + (triangleHeight / 2),
-            iconCenterX + (triangleSize / 2), iconCenterY + (triangleHeight / 2),
-            TFT_YELLOW
-        );
-        int exclamationHeight = (int)(triangleHeight * 0.6); // Ajustado para más proporción
-        int barY = iconCenterY - (exclamationHeight / 2) +1; // +1 para bajarlo un poco
-        tft.fillRect(iconCenterX - 1, barY, 2, exclamationHeight - 3, TFT_BLACK); // barra
-        tft.fillRect(iconCenterX - 1, barY + exclamationHeight -3 + 1, 2, 2, TFT_BLACK); // punto
+    else if (respuesta == 1) {
+        // ADVERTENCIA (triángulo con exclamación)
+        const int triangleSize   = iconSize * 2;
+        const int triangleHeight = (int)(triangleSize * 0.866f);
+
+        const int x1 = iconCenterX;
+        const int y1 = iconCenterY - (triangleHeight / 2);
+        const int x2 = iconCenterX - (triangleSize / 2);
+        const int y2 = iconCenterY + (triangleHeight / 2);
+        const int x3 = iconCenterX + (triangleSize / 2);
+        const int y3 = iconCenterY + (triangleHeight / 2);
+
+        uiSprite.fillTriangle(x1, y1, x2, y2, x3, y3, TFT_YELLOW);
+
+        const int exclamationHeight = (int)(triangleHeight * 0.6f);
+        const int barY = iconCenterY - (exclamationHeight / 2) + 1;
+        uiSprite.fillRect(iconCenterX - 1, barY, 2, exclamationHeight - 3, TFT_BLACK);    // barra
+        uiSprite.fillRect(iconCenterX - 1, barY + (exclamationHeight - 3) + 1, 2, 2, TFT_BLACK); // punto
     }
 
-    // Esperar y regresar al menú
+    // 5) Empujar el sprite a pantalla y mantenerlo visible
+    uiSprite.pushSprite(0, 0);
     delay(dTime);
-    drawCurrentElement();
 }
 
 byte BOTONERA_::getNextAvailableID() {
@@ -1510,6 +1496,8 @@ bool BOTONERA_::elementoAsignadoA_ID_enSPIFFS(byte idToFind) {
 }
 
 void BOTONERA_::escanearSala() {
+    formatSubMenuActive = false;
+    hiddenMenuActive = false; 
 inicio_escanear_sala_completo:
     DEBUG__________ln("=== 🚀 INICIO ESCANEO DE SALA (CON SPLIT ATTACH) 🚀 ===");
     scanDD = false;  // Para que escanearID (1-32) pida ELEM_SERIAL_SECTOR
@@ -1648,8 +1636,7 @@ inicio_escanear_sala_completo:
     DEBUG__________ln("=== Escaneo IDs 1-32 ESTABLE ===");
     //actualizarBarraProgreso(32, 32, "ID 32/32");
     int pasoActual = 32;
-    char etiquetaID[24];
-    snprintf(etiquetaID, sizeof(etiquetaID), "%s %d/32", getTranslation("SEARCHING"), pasoActual);
+    const char* etiquetaID = getTranslation("SEARCHING");
     actualizarBarraProgreso2(pasoActual, 32, etiquetaID);
     delay(1000);
 
@@ -1697,7 +1684,7 @@ inicio_escanear_sala_completo:
         unsigned long tiempoInicioEsperaDD = millis();
         int ddResponsesProcessedThisPhase = 0;
 
-        while (millis() - tiempoInicioEsperaDD < 61000) {
+        while (millis() - tiempoInicioEsperaDD < 61000) { //61000
 
             // Animación visual de puntos girando (no bloqueante)
             if (millis() - lastAnimFrameTime >= 33) {
@@ -1840,9 +1827,7 @@ inicio_escanear_sala_completo:
     loadElementsFromSPIFFS();
     mostrarMensajeTemporal(2, 3000);
     DEBUG__________ln("=== ✅ FIN ESCANEO DE SALA COMPLETO (SIN REINICIO POR 0xDD) ✅ ===");
-    formatSubMenuActive = false;
-    hiddenMenuActive = false; 
-    drawCurrentElement();
+    
 }
 
 

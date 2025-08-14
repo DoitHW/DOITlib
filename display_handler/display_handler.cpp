@@ -1118,7 +1118,7 @@ void drawCurrentElement()
 
     drawBatteryIconMini(batteryVisualPercentage);
 
-    // Volcado total a pantalla
+
     uiSprite.pushSprite(0, 0);
 
     lastDisplayInteraction = millis();
@@ -2258,6 +2258,9 @@ void scrollTextTickerBounceSound(int selection)
 
 void drawFormatMenu(int selection)
 {
+
+    if (!formatSubMenuActive) return;
+
     /*──────── Constantes/layout ────────*/
     const int screenW         = tft.width();
     constexpr int kTitleY     = 5;
@@ -2426,6 +2429,7 @@ void drawFormatMenu(int selection)
     }
 
     listSprite.pushToSprite(&uiSprite, 0, kListStartY);
+
     uiSprite.pushSprite(0, 0);
 }
 

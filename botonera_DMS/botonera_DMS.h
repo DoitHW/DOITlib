@@ -26,7 +26,6 @@ class BOTONERA_ : public ELEMENT_{
         //void iniciarEscaneoElemento(const char* mensajeInicial);
         //void actualizarBarraProgreso(float progreso);
         //void actualizarBarraProgreso(float progreso, const char* detalleTexto = nullptr);
-        void finalizarEscaneoElemento();
         void dibujarMarco(uint16_t color);
         void mostrarMensajeTemporal(int respuesta, int dTime);
         byte getNextAvailableID();
@@ -35,7 +34,6 @@ class BOTONERA_ : public ELEMENT_{
         void procesar_datos_sector(LAST_ENTRY_FRAME_T &LEF, int sector, INFO_PACK_T* infoPack);
         bool guardar_elemento(INFO_PACK_T* infoPack);
         void reasignar_id_elemento(INFO_PACK_T* infoPack = nullptr);
-        void validar_elemento();
         bool esperar_respuesta(unsigned long timeout);
         void actualizar_elemento_existente() ;
         bool procesar_y_guardar_elemento_nuevo(byte targetID);

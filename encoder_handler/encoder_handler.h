@@ -31,8 +31,8 @@ enum MODE_CONFIGS{
 };
 
 // Declaración de funciones relacionadas con el encoder
-void encoder_init_func();
-void handleEncoder();
+void encoder_init_func() noexcept;
+void handleEncoder() noexcept;
 void handleHiddenMenuNavigation(int &hiddenMenuSelection);
 
 // Declaración de funciones externas (forward declarations)
@@ -40,14 +40,14 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection);
 void drawModesScreen();
 void drawCurrentElement();
 
-void handleModeSelection(const String& currentFile);
+void handleModeSelection(const String& currentFile) noexcept;
 void toggleElementSelection(const String& currentFile);
 //void requestAndSyncElementMode();
 
 bool getModeFlag(const uint8_t modeConfig[2], MODE_CONFIGS flag);
 void debugModeConfig(const uint8_t modeConfig[2]);
 
-std::vector<bool> initializeAlternateStates(const String &currentFile);
+std::vector<bool> initializeAlternateStates(const String &currentFile) noexcept;
 
 void handleBankSelectionMenu(std::vector<byte>& bankList, std::vector<bool>& selectedBanks);
 
