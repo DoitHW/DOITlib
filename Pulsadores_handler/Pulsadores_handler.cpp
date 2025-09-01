@@ -9,17 +9,34 @@
 #include <RelayManager_DMS/RelayStateManager.h>
 
 // Inicialización de pines y matriz de colores
-int filas[FILAS] = {4, 5, 6, 7};
+#if defined(BOTONERA_NEW)
+/* === BOTONERAS NUEVAS === */
+int filas[FILAS]       = {5, 4, 6, 7};
+int columnas[COLUMNAS] = {3, 2, 1};
+static bool lastState[FILAS][COLUMNAS];
+byte relay_state = false;
+
+byte pulsadorColor[FILAS][COLUMNAS] = {
+    {ORANGE, GREEN,  WHITE},
+    {BLUE,   RELAY,  RED},
+    {VIOLET, YELLOW, LIGHT_BLUE},
+    {BLACK,  BLACK,  BLACK} // Relleno
+};
+
+#elif defined(BOTONERA_OLD)
+/* === BOTONERAS ANTIGUAS === */
+int filas[FILAS]       = {4, 5, 6, 7};
 int columnas[COLUMNAS] = {1, 2, 3};
 static bool lastState[FILAS][COLUMNAS];
 byte relay_state = false;
 
 byte pulsadorColor[FILAS][COLUMNAS] = {
-    {ORANGE, GREEN, WHITE},
-    {BLUE, RELAY, RED},
+    {ORANGE,     GREEN,  WHITE},
+    {BLUE,       RELAY,  RED},
     {LIGHT_BLUE, YELLOW, VIOLET},
-    {BLACK, BLACK, BLACK} // Relleno para futuras expansiones
+    {BLACK,      BLACK,  BLACK} // Relleno
 };
+#endif
 
 // Constructor
 PulsadoresHandler::PulsadoresHandler() {}
@@ -69,7 +86,7 @@ void PulsadoresHandler::procesarPulsadores() {
     if (inCognitiveMenu) {
         // Solo responder a pulsadores válidos para actividades cognitivas
         static bool lastState[FILAS][COLUMNAS] = { { false } };
-        static unsigned long pressTime[FILAS][COLUMNAS] = { { 0 } };
+        //static unsigned long pressTime[FILAS][COLUMNAS] = { { 0 } };
     
         for (int i = 0; i < FILAS; i++) {
             digitalWrite(filas[i], LOW);
@@ -167,8 +184,8 @@ void PulsadoresHandler::procesarPulsadores() {
 
     int relayCount = (hasRelayN1 << 1) | hasRelayN2;
     relayCount = relayCount == 0 && hasRelay ? 1 : relayCount + (hasRelay ? 1 : 0);
-    bool isMultiRelay = relayCount > 1;
-    bool isAromaterapia = (!hasRelay && hasRelayN1 && hasRelayN2);    
+    //bool isMultiRelay = relayCount > 1;
+    //bool isAromaterapia = (!hasRelay && hasRelayN1 && hasRelayN2);    
 
     static bool lastState[FILAS][COLUMNAS] = { { false } };
     static unsigned long pressTime[FILAS][COLUMNAS] = { { 0 } };

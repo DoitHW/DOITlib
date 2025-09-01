@@ -203,256 +203,450 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
     DEBUG__________ln("=============================");
 }
 
+/**
+ * @brief Despacha y atiende un frame RX de control para la botonera.
+ *
+ * Procesa el campo de función de @p LEF y ejecuta la acción correspondiente:
+ * sincronización de sector, actualización de estado de relé, reproducción de
+ * sonidos y gestión de comandos (p. ej., modo cognitivo y respuestas WIN/FAIL).
+ *
+ * @param LEF Estructura de frame recibido. Se espera que contenga:
+ * - `function`: código de operación (p. ej. F_RETURN_ELEM_SECTOR, F_SEND_COMMAND, ...).
+ * - `data[]`: payload; se usa `data[0]` y, según el caso, `data[1]`.
+ * - `origin`: identificador de origen, reenviado a `sectorIn_handler`.
+ *
+ * @return void
+ *
+ * @pre `element` debe ser un puntero válido e inicializado.
+ * @pre El contexto debe ser de tarea (no ISR) si se usa `uxTaskGetStackHighWaterMark`.
+ * @pre Cuando `function == F_SEND_FILE_NUM` se requiere `LEF.data[0]` (banco) y `LEF.data[1]` (fichero).
+ * @pre Cuando `function == F_SEND_COMMAND` se requiere `LEF.data[0]` (código de comando).
+ *
+ * @note Las dependencias externas (`RelayStateManager`, `doitPlayer`, `activateCognitiveMode`,
+ * `deactivateCognitiveMode`, `printFrameInfo`, `sectorIn_handler`, etc.) deben estar disponibles.
+ *
+ * @warning Este manejador asume que `LEF.data` ofrece al menos 1–2 bytes según la función.
+ * Validar tamaño aguas arriba para evitar accesos fuera de rango.
+ *
+ * @see activateCognitiveMode, deactivateCognitiveMode, RelayStateManager::set, doitPlayer.play_file
+ */
 void BOTONERA_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
+    // Validación básica del objeto dependiente.
     if (!element) {
-                                                            #ifdef DEBUG
-                                                                DEBUG__________ln("Error: 'element' no está inicializado.");
-                                                            #endif
+    #ifdef DEBUG
+        DEBUG__________ln("Error: 'element' no está inicializado.");
+    #endif
         return;
     }
+
+    // Trazas del frame entrante (función, tamaños, etc.).
     printFrameInfo(LEF);
-    // Depuración del estado de la pila
-    UBaseType_t stackSize = uxTaskGetStackHighWaterMark(NULL);
-                                                            #ifdef DEBUG
-                                                               // DEBUG__________ln("Stack restante: " + String(stackSize));
-                                                            #endif
 
-    byte currentMode_ = element->get_currentMode();
+    // (Solo en depuración) Medimos agua alta de la pila para diagnóstico.
+    #ifdef DEBUG
+    {
+        UBaseType_t stackSizeBegin = uxTaskGetStackHighWaterMark(NULL);
+        (void)stackSizeBegin; // Evitar warning si no se imprime.
+        // DEBUG__________ln("Stack restante: " + String(stackSizeBegin));
+    }
+    #endif
 
+    // ----------------------------
+    // Constantes de protocolo/datos
+    // ----------------------------
+    constexpr uint8_t kFlagsBit0Mask    = 0x01u; // Bit 0: estado del relé remoto.
+    constexpr uint8_t kIdx0             = 0u;    // Índice común para LEF.data[0]
+    constexpr uint8_t kIdx1             = 1u;    // Índice común para LEF.data[1]
+    constexpr uint8_t kLangStride       = 10u;   // Separación de bancos por idioma.
+    constexpr uint8_t kWinFailVariants  = 4u;    // Nº de variantes WIN/FAIL por idioma.
+
+    // -------------------------------------------------------
+    // Despacho por tipo de función recibida en el frame (RX)
+    // -------------------------------------------------------
     switch (LEF.function) {
 
         case F_RETURN_ELEM_SECTOR: {
-        DEBUG__________ln("Ha llegado un F_RETURN_ELEM_SECTOR");
-        element->sectorIn_handler(LEF.data, LEF.origin);
-        awaitingResponse = false;
-
+            DEBUG__________ln("Ha llegado un F_RETURN_ELEM_SECTOR");
+            // Reenviamos el payload al elemento y marcamos fin de espera.
+            element->sectorIn_handler(LEF.data, LEF.origin);
+            awaitingResponse = false;
             break;
         }
 
-        break;
-
-        case F_SET_ELEM_MODE:{
-          
+        case F_SET_ELEM_MODE: {
+            // Reservado para futura ampliación. Mantener por compatibilidad.
             break;
         }
 
-        case F_SEND_FLAG_BYTE:{
-            // ① El ID que origina el cambio de relé
-            uint8_t sourceID = printTargetID[0];
+        case F_SEND_FLAG_BYTE: {
+            // ① ID que origina el cambio de relé (fuente).
+            const uint8_t sourceID = printTargetID[kIdx0];
 
-            // ② El estado que nos envía (bit 0)
-            bool flags_bit0 = (LEF.data[0] & 0x01) != 0;
+            // ② Estado del bit 0 procedente del payload.
+            const bool flags_bit0 = (LEF.data[kIdx0] & kFlagsBit0Mask) != 0u;
 
-            // ③ Sincronizamos inmediatamente nuestro mapa
+            // ③ Sincronizamos inmediatamente el mapa de relés.
             RelayStateManager::set(sourceID, flags_bit0);
-            DEBUG__________ln("Estado del relé actualizado para ID " + String(sourceID) + ": " + String(flags_bit0 ? "ON" : "OFF"));
+
+            DEBUG__________ln("Estado del relé actualizado para ID " + String(sourceID) +
+                              ": " + String(flags_bit0 ? "ON" : "OFF"));
             break;
         }
+
         case F_SEND_COLOR: {
-            
-            
+            // Reservado para futura gestión de color. Sin efectos por ahora.
             break;
         }
+
         case F_SEND_FILE_NUM: {
             DEBUG__________ln("Recibido un play sound");
-
-            doitPlayer.play_file(LEF.data[0],LEF.data[1]);
-            
+            // LEF.data[0] = banco, LEF.data[1] = fichero.
+            doitPlayer.play_file(LEF.data[kIdx0], LEF.data[kIdx1]);
             break;
         }
 
         case F_SEND_COMMAND: {
-            byte receivedCommand = LEF.data[0];
+            const uint8_t receivedCommand = LEF.data[kIdx0];
             currentCognitiveCommand = receivedCommand;
+
             DEBUG__________ln("Comando recibido: " + String(receivedCommand, HEX));
-            
+
             if (receivedCommand == COG_ACT_ON) {
                 DEBUG__________ln("Activando modo cognitivo...");
                 activateCognitiveMode();
+
             } else if (receivedCommand == COG_ACT_OFF) {
                 DEBUG__________ln("Desactivando modo cognitivo...");
                 deactivateCognitiveMode();
-            } else if (receivedCommand == WIN_CMD)
-            {
-                byte res= rand() % 4;
-                byte lang = static_cast<uint8_t>(currentLanguage);
-                byte file = lang * 10 + res + 1;
+
+            } else if (receivedCommand == WIN_CMD) {
+                // Selección pseudoaleatoria de respuesta WIN según idioma.
+                const uint8_t res  = static_cast<uint8_t>(rand() % kWinFailVariants);
+                const uint8_t lang = static_cast<uint8_t>(currentLanguage);
+                const uint8_t file = static_cast<uint8_t>(lang * kLangStride + res + 1u);
                 doitPlayer.play_file(WIN_RESP_BANK, file);
-            } else if (receivedCommand == FAIL_CMD)
-            {
-                byte res= rand() % 4;
-                byte lang = static_cast<uint8_t>(currentLanguage);
-                byte file = lang * 10 + res +1;
+
+            } else if (receivedCommand == FAIL_CMD) {
+                // Selección pseudoaleatoria de respuesta FAIL según idioma.
+                const uint8_t res  = static_cast<uint8_t>(rand() % kWinFailVariants);
+                const uint8_t lang = static_cast<uint8_t>(currentLanguage);
+                const uint8_t file = static_cast<uint8_t>(lang * kLangStride + res + 1u);
                 doitPlayer.play_file(FAIL_RESP_BANK, file);
             }
             break;
         }
 
-        
         default: {
-                                                                #ifdef DEBUG
-                                                                    DEBUG__________ln("Se ha recibido una función desconocida.");
-                                                                #endif
+        #ifdef DEBUG
+            DEBUG__________ln("Se ha recibido una función desconocida.");
+        #endif
             break;
         }
     }
 
-    // Depuración al final de la función
-    stackSize = uxTaskGetStackHighWaterMark(NULL);
-                                                                #ifdef DEBUG
-                                                                   // DEBUG__________ln("Stack restante al final: " + String(stackSize));
-                                                                #endif
+    // (Solo en depuración) Lectura final del agua alta de la pila.
+    #ifdef DEBUG
+    {
+        UBaseType_t stackSizeEnd = uxTaskGetStackHighWaterMark(NULL);
+        (void)stackSizeEnd;
+        // DEBUG__________ln("Stack restante al final: " + String(stackSizeEnd));
+    }
+    #endif
 }
 
 extern bool adxl;
 extern bool useMic;
-void BOTONERA_::sectorIn_handler(std::vector<byte> data, byte targetin) {
 
+/**
+ * @brief Procesa datos de sector recibidos para un elemento (botonera) y sincroniza estado.
+ *
+ * Despacha por tipo de sector (nombre, descripción, modo actual, icono, flags, etc.),
+ * actualizando almacenamiento SPIFFS, variables internas y visualización (redibujado)
+ * cuando corresponde.
+ *
+ * @param data Trama recibida. Formato: data[0] = código de sector; según sector, se
+ *             requiere data[1] (p.ej. modo/flags). Longitud mínima: 1 byte.
+ * @param targetin Identificador del elemento remoto (ID origen del frame).
+ *
+ * @return void
+ *
+ * @pre SPIFFS debe estar montado y accesible. Los offsets (OFFSET_*) deben ser válidos
+ *      para la estructura de fichero de los elementos.
+ * @pre Debe invocarse en contexto de tarea (no ISR) si posteriormente se redibuja UI.
+ *
+ * @note En ELEM_CMODE_SECTOR: data[1] = modo actual; se persiste en OFFSET_CURRENTMODE,
+ *       se actualizan flags de sensores y patrón de color del elemento actual.
+ * @note En ELEM_CURRENT_FLAGS_SECTOR: data[1] usa el bit 0 como estado ON/OFF del relé.
+ *
+ * @warning Este manejador accede a data[1] en algunos sectores. Si la trama no tiene
+ *          al menos 2 bytes, se ignora el sector con traza de depuración.
+ *
+ * @see drawCurrentElement, RelayStateManager::set, getModeFlag, colorHandler.setPatternBotonera
+ */
+void BOTONERA_::sectorIn_handler(std::vector<byte> data, byte targetin) {
+    // ----------------------------
+    // Validación inicial de trama
+    // ----------------------------
     if (data.size() < 1) {
         DEBUG__________ln("⚠️ Error: sectorIn_handler ha recibido una trama vacía.");
         return;
     }
-    
-    byte sector = data[0];
-    
-    switch (sector)
-    {
-    case ELEM_NAME_SECTOR:{
-    
-        //Aquí copiar data a partir de data[1] a INFO_PACK_T
-        break;
-    }
-    case ELEM_DESC_SECTOR:  {
-        //Aquí copiar data a partir de data[1] a INFO_PACK_T
-        break;
-    }
-     case ELEM_CMODE_SECTOR:{
-        
-        
-                    // Procesar modo actual recibido
-            byte receivedMode = data[1];
-            DEBUG__________ln("📢 ID: "+String(targetin) + " con MODO " +String(receivedMode));
 
-            // Leer el modo almacenado en SPIFFS
-     
+    // ----------------------------
+    // Constantes locales
+    // ----------------------------
+    constexpr byte kIdx0 = 0u;
+    constexpr byte kIdx1 = 1u;
+    constexpr byte kBit0Mask = 0x01u;
+
+    // Offset interno dentro del modo para la configuración (reemplaza '216' mágico)
+    constexpr size_t kOffsetConfigInMode = 216u;
+    constexpr size_t kModeConfigBytes    = 2u;
+
+    const byte sector = data[kIdx0];
+
+    switch (sector) {
+
+        case ELEM_NAME_SECTOR: {
+            // TODO: Copiar data a partir de data[1] a INFO_PACK_T (nombre).
+            // Requiere contrato de longitud y estructura del paquete.
+            break;
+        }
+
+        case ELEM_DESC_SECTOR: {
+            // TODO: Copiar data a partir de data[1] a INFO_PACK_T (descripción).
+            // Requiere contrato de longitud y estructura del paquete.
+            break;
+        }
+
+        case ELEM_CMODE_SECTOR: {
+            // Necesitamos al menos 2 bytes: [sector, modo]
+            if (data.size() < 2) {
+                DEBUG__________ln("⚠️ ELEM_CMODE_SECTOR con longitud insuficiente (<2).");
+                break;
+            }
+
+            // ----------------------------
+            // 1) Modo recibido
+            // ----------------------------
+            const byte receivedMode = data[kIdx1];
+            DEBUG__________ln("📢 ID: " + String(targetin) + " con MODO " + String(receivedMode));
+
+            // ----------------------------
+            // 2) Leer/actualizar modo en SPIFFS
+            // ----------------------------
             fs::File file = SPIFFS.open(getCurrentFilePath(targetin), "r+");
             if (!file) {
                 DEBUG__________ln("Error: No se pudo abrir el archivo en SPIFFS.");
                 break;
             }
 
-            // Obtener el modo actual almacenado
-            file.seek(OFFSET_CURRENTMODE, SeekSet);
-            byte storedMode;
-            file.read(&storedMode, 1);
+            // Leer modo almacenado (con inicialización defensiva)
+            byte storedMode = 0;
+            if (!file.seek(OFFSET_CURRENTMODE, SeekSet)) {
+                DEBUG__________ln("⚠️ No se pudo posicionar en OFFSET_CURRENTMODE.");
+            } else {
+                (void)file.read(&storedMode, 1);
+            }
 
-            // Comparar y actualizar si es necesario
+            // Comparar y actualizar si procede
             if (storedMode != receivedMode) {
                 DEBUG__________printf("Actualizando el modo en SPIFFS: %d -> %d\n", storedMode, receivedMode);
-                file.seek(OFFSET_CURRENTMODE, SeekSet);
-                file.write(&receivedMode, 1);
+                if (!file.seek(OFFSET_CURRENTMODE, SeekSet)) {
+                    DEBUG__________ln("⚠️ No se pudo reposicionar en OFFSET_CURRENTMODE para escribir.");
+                } else {
+                    (void)file.write(&receivedMode, 1);
+                }
             } else {
                 DEBUG__________ln("El modo recibido coincide con el almacenado en SPIFFS.");
             }
 
             file.close();
 
-            // Redibujar la pantalla para reflejar los cambios
+            // ----------------------------
+            // 3) Redibujar pantalla
+            // ----------------------------
             drawCurrentElement();
 
+            // ----------------------------
+            // 4) Actualizar estado de selección por ID
+            // ----------------------------
             for (size_t i = 0; i < elementFiles.size(); ++i) {
                 fs::File idFile = SPIFFS.open(elementFiles[i], "r");
                 if (!idFile) continue;
-                idFile.seek(OFFSET_ID, SeekSet);
+
+                if (!idFile.seek(OFFSET_ID, SeekSet)) {
+                    idFile.close();
+                    continue;
+                }
+
                 byte idCheck = 0;
-                idFile.read(&idCheck, 1);
+                (void)idFile.read(&idCheck, 1);
                 idFile.close();
 
                 if (idCheck == targetin) {
-                    selectedStates[i] = (receivedMode != 0);
-                    DEBUG__________printf("🔁 Estado de selección actualizado: %s => %s\n",
-                                        elementFiles[i].c_str(),
-                                        selectedStates[i] ? "Seleccionado" : "No seleccionado");
-                    if (i == currentIndex) {
+                    // Protección por si selectedStates y elementFiles difieren en tamaño
+                    if (i < selectedStates.size()) {
+                        selectedStates[i] = (receivedMode != 0);
+                        DEBUG__________printf("🔁 Estado de selección actualizado: %s => %s\n",
+                                              elementFiles[i].c_str(),
+                                              selectedStates[i] ? "Seleccionado" : "No seleccionado");
+                    } else {
+                        DEBUG__________ln("⚠️ selectedStates desincronizado con elementFiles (índice fuera de rango).");
+                    }
+
+                    // Si coincide con el elemento visible, redibujar
+                    if (i == static_cast<size_t>(currentIndex)) {
                         drawCurrentElement();
                     }
                     break;
                 }
             }
 
-            String currentFile = elementFiles[currentIndex];
-            fs::File f = SPIFFS.open(currentFile, "r");
-            if (f) {
-                f.seek(OFFSET_ID, SeekSet);
-                byte currentElementID;
-                f.read(&currentElementID, 1);
-                f.close();
+            // ----------------------------
+            // 5) Si el elemento en pantalla es el target, recargar configuración
+            // ----------------------------
+            if (static_cast<size_t>(currentIndex) < elementFiles.size()) {
+                const String currentFile = elementFiles[currentIndex];
 
-                if (currentElementID == targetin) {
-                    // --- Releer configuración del nuevo modo ---
-                    byte currentMode = 0;
-                    byte modeConfig[2] = {0};
+                fs::File f = SPIFFS.open(currentFile, "r");
+                if (f) {
+                    if (f.seek(OFFSET_ID, SeekSet)) {
+                        byte currentElementID = 0;
+                        (void)f.read(&currentElementID, 1);
+                        f.close();
 
-                    fs::File f2 = SPIFFS.open(currentFile, "r");
-                    if (f2) {
-                        f2.seek(OFFSET_CURRENTMODE, SeekSet);
-                        f2.read(&currentMode, 1);
-                        f2.seek(OFFSET_MODES + (currentMode * SIZE_MODE) + 216, SeekSet); // OFFSET_CONFIG dentro del modo
-                        f2.read(modeConfig, 2);
-                        f2.close();
+                        if (currentElementID == targetin) {
+                            // --- Releer configuración del nuevo modo ---
+                            byte currentMode = 0;
+                            byte modeConfig[kModeConfigBytes] = {0};
+
+                            fs::File f2 = SPIFFS.open(currentFile, "r");
+                            if (f2) {
+                                // Leer modo actual
+                                if (f2.seek(OFFSET_CURRENTMODE, SeekSet)) {
+                                    (void)f2.read(&currentMode, 1);
+                                }
+
+                                // Calcular offset de la configuración dentro del modo
+                                const size_t cfgOffset =
+                                    static_cast<size_t>(OFFSET_MODES) +
+                                    static_cast<size_t>(currentMode) * static_cast<size_t>(SIZE_MODE) +
+                                    kOffsetConfigInMode;
+
+                                if (f2.seek(cfgOffset, SeekSet)) {
+                                    (void)f2.read(modeConfig, kModeConfigBytes);
+                                } else {
+                                    DEBUG__________ln("⚠️ No se pudo posicionar en OFFSET_CONFIG del modo.");
+                                }
+                                f2.close();
+                            }
+
+                            // Actualizar sensores según flags
+                            adxl   = getModeFlag(modeConfig, HAS_SENS_VAL_1);
+                            useMic = getModeFlag(modeConfig, HAS_SENS_VAL_2);
+
+                            // Actualizar patrón de color
+                            colorHandler.setCurrentFile(currentFile);
+                            colorHandler.setPatternBotonera(currentMode, ledManager);
+
+                            DEBUG__________ln("🔁 Configuración de modo actual actualizada tras recibir ELEM_CMODE_SECTOR.");
+                        }
+                    } else {
+                        f.close();
                     }
-
-                    // Actualizar sensores según los flags
-                    adxl = getModeFlag(modeConfig, HAS_SENS_VAL_1);
-                    useMic = getModeFlag(modeConfig, HAS_SENS_VAL_2);
-
-                    // Actualizar patrón de color
-                    colorHandler.setCurrentFile(currentFile);
-                    colorHandler.setPatternBotonera(currentMode, ledManager);
-
-                    DEBUG__________ln("🔁 Configuración de modo actual actualizada tras recibir ELEM_CMODE_SECTOR.");
                 }
+            } else {
+                DEBUG__________ln("⚠️ currentIndex fuera de rango respecto a elementFiles.");
             }
-        break;
-    }
-    case ELEM_ICON_ROW_63_SECTOR:{
 
-    break;
-    }
+            break;
+        }
 
-    case ELEM_CURRENT_FLAGS_SECTOR:{
-    uint8_t sourceID = targetin;
-    bool flags_bit0 = (data[1] & 0x01) != 0;
-    // Actualizamos el estado local
-    RelayStateManager::set(sourceID, flags_bit0);
-        DEBUG__________ln("Estado del relé actualizado para ID " + String(sourceID) + ": " + String(flags_bit0 ? "ON" : "OFF"));
-    break;
-    }
-    
-    default:
-    
-        break;
+        case ELEM_ICON_ROW_63_SECTOR: {
+            // Reservado: gestión de fila de iconos 63.
+            break;
+        }
+
+        case ELEM_CURRENT_FLAGS_SECTOR: {
+            // Necesitamos al menos 2 bytes: [sector, flags]
+            if (data.size() < 2) {
+                DEBUG__________ln("⚠️ ELEM_CURRENT_FLAGS_SECTOR con longitud insuficiente (<2).");
+                break;
+            }
+
+            const byte sourceID = targetin;
+            const bool flags_bit0 = (data[kIdx1] & kBit0Mask) != 0;
+
+            // Actualizamos el estado local del relé
+            RelayStateManager::set(sourceID, flags_bit0);
+
+            DEBUG__________ln("Estado del relé actualizado para ID " + String(sourceID) + ": " +
+                              String(flags_bit0 ? "ON" : "OFF"));
+            break;
+        }
+
+        default: {
+            // Sectores no manejados: intencionalmente ignorado.
+            break;
+        }
     }
 }
 
+/**
+ * @brief Busca el fichero de SPIFFS asociado a un elemento por su ID.
+ *
+ * Recorre la lista `elementFiles`, abre cada fichero en modo lectura,
+ * lee el byte en `OFFSET_ID` y devuelve el nombre del primero que coincide
+ * con `elementID`. Si no encuentra coincidencias, devuelve una cadena vacía.
+ *
+ * @param elementID Identificador del elemento a localizar (0..255).
+ * @return String Ruta/nombre de fichero correspondiente al ID, o cadena vacía si no se encontró.
+ *
+ * @pre SPIFFS debe estar montado y accesible.
+ * @pre Cada entrada de `elementFiles` debe ser un fichero válido que contenga un byte de ID en `OFFSET_ID`.
+ *
+ * @note Si existen múltiples ficheros con el mismo ID, se devuelve el primero encontrado.
+ * @warning El retorno puede ser cadena vacía; el llamador debe manejar este caso antes de abrir en modo escritura.
+ */
 String BOTONERA_::getCurrentFilePath(byte elementID) {
+    // Constantes locales para evitar números mágicos.
+    constexpr size_t kIdSize = 1u;   // Leemos exactamente 1 byte de ID.
+
+    // Recorremos el catálogo de ficheros de elemento.
     for (const String& fileName : elementFiles) {
 
         fs::File file = SPIFFS.open(fileName, "r");
-        if (!file) continue;
+        if (!file) {
+            // Fichero inexistente o inaccesible: pasamos al siguiente.
+            continue;
+        }
 
-        file.seek(OFFSET_ID, SeekSet);
-        byte id;
-        file.read(&id, 1);
+        // Posicionamos en el offset donde reside el ID del elemento.
+        if (!file.seek(OFFSET_ID, SeekSet)) {
+            file.close();
+            continue;
+        }
+
+        // Leemos el byte de ID almacenado en el fichero.
+        byte id = 0;
+        const size_t readBytes = file.read(&id, kIdSize);
         file.close();
 
+        if (readBytes != kIdSize) {
+            // Lectura incompleta: ignoramos este fichero.
+            continue;
+        }
+
+        // Si el ID coincide, devolvemos la ruta inmediatamente.
         if (id == elementID) {
-            return fileName;  // Devolver el archivo que coincide con la ID
+            return fileName;
         }
     }
 
+    // No se encontró ningún fichero con ese ID.
     DEBUG__________printf("Error: No se encontró un archivo para el elemento ID %d.\n", elementID);
-    return String();  // Retornar cadena vacía si no se encuentra
+    return String();  // Cadena vacía indica "no encontrado".
 }
 
 
@@ -1524,7 +1718,7 @@ inicio_escanear_sala_completo:
             DEBUG__________printf("🔍 Escaneando ID: 0x%02X (%d/32)\n", currentID, currentID);
 
             // 1) Actualizar barra de progreso e indicar ID actual
-            char etiquetaID[16];
+            //char etiquetaID[16];
             //snprintf(etiquetaID, sizeof(etiquetaID), "ID %d/32", currentID);
             const char* textoBase = getTranslation("SEARCHING");
             //snprintf(etiquetaID, sizeof(etiquetaID), "%s %d/32", textoBase, currentID);
@@ -1681,7 +1875,7 @@ inicio_escanear_sala_completo:
             "Esperando respuestas de dispositivos 0xDD durante 60 segundos (Fase %d)...\n",
             fase + 1
         );
-        unsigned long tiempoInicioEsperaDD = millis();
+        tiempoInicioEsperaDD = millis();
         int ddResponsesProcessedThisPhase = 0;
 
         while (millis() - tiempoInicioEsperaDD < 61000) { //61000
@@ -2086,26 +2280,6 @@ void BOTONERA_::actualizarBarraProgreso(int pasoActual,
 // }
 
 
-// Convierte HSV a 16 bits RGB565
-uint16_t hsvToRGB565(float h, float s, float v) {
-    float r, g, b;
-    int i = int(h * 6);
-    float f = h * 6 - i;
-    float p = v * (1 - s);
-    float q = v * (1 - f * s);
-    float t = v * (1 - (1 - f) * s);
-    switch (i % 6) {
-        case 0: r = v; g = t; b = p; break;
-        case 1: r = q; g = v; b = p; break;
-        case 2: r = p; g = v; b = t; break;
-        case 3: r = p; g = q; b = v; break;
-        case 4: r = t; g = p; b = v; break;
-        case 5: r = v; g = p; b = q; break;
-    }
-    return tft.color565(uint8_t(r * 255), uint8_t(g * 255), uint8_t(b * 255));
-}
-
-
 void BOTONERA_::actualizarBarraProgreso2(int pasoActual,
                                          int pasosTotales,
                                          const char* etiqueta)
@@ -2128,6 +2302,12 @@ void BOTONERA_::actualizarBarraProgreso2(int pasoActual,
     uiSprite.setTextDatum(TL_DATUM);
     uiSprite.setFreeFont(&FreeSansBold9pt7b);
     uiSprite.setTextSize(1);
+
+    // uiSprite.setTextDatum(TL_DATUM);
+    // uiSprite.setFreeFont(nullptr);
+    // uiSprite.setTextFont(1);  // 6×8 pixeles
+    // uiSprite.setTextSize(1);
+
 
     // ───────────────── Geometría nueva: sin EQ, barra más ancha ───────────────────
     const int contentX = cardX + 12;
@@ -2171,8 +2351,28 @@ void BOTONERA_::actualizarBarraProgreso2(int pasoActual,
 
     // Cabecera (opcional)
     if (etiqueta) {
-        uiSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
-        uiSprite.drawString(etiqueta, textX, textY);
+    const int headerMaxW = cardW - 16; // margen lateral de 12 px por cada lado
+
+    uiSprite.setTextDatum(TL_DATUM);
+
+    // 1) Fuente normal grande
+    uiSprite.setFreeFont(&FreeSansBold9pt7b);
+    uiSprite.setTextSize(1);
+
+    int anchoTexto = uiSprite.textWidth(etiqueta);
+
+    if (anchoTexto > headerMaxW) {
+        // 2) Cambiar a fuente más pequeña si no cabe
+        uiSprite.setFreeFont(nullptr); // salir de FreeFont
+        uiSprite.setTextFont(2);       // fuente integrada 16 px alto
+        uiSprite.setTextSize(1);
+
+        // ⚠️ opcional: volver a medir para comprobar que ahora sí cabe
+        // y si aún no cabe, usar Font 1 o recortar con "..."
+    }
+
+    uiSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
+    uiSprite.drawString(etiqueta, textX, textY);
     }
     // Separador sutil bajo cabecera (opcional, se puede retirar)
     const int sepY = textY + lineHeight + 2;

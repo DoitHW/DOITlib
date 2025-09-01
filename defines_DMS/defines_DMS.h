@@ -4,6 +4,7 @@
 #include <Arduino.h>
 
 //DELFINES GLOBALES
+#define BOTONERA_NEW
 #define NOELEM
 #define BOTONERA
 #define PLAYER                 // -> PLAYER / NOPLAYER
@@ -59,9 +60,9 @@
 #define I2C2_SDA          40
 #define I2C2_SCL          41
 
-#define I2S_WS            11//orig 16
-#define I2S_SD            12//orig 47
-#define I2S_SCK           13//orig 48
+#define I2S_WS            16//orig 16
+#define I2S_SD            47//orig 47
+#define I2S_SCK           48//orig 48
 
 #define RF_TX_PIN         18 
 #define RF_RX_PIN         17  

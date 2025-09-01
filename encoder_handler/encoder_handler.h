@@ -5,11 +5,19 @@
 #include <ESP32Encoder.h>
 #include <vector>
 
+                                                        //3V3 desconectado
+#if defined(BOTONERA_NEW)
+// Pines del encoder            //BOTONERA FRANC        BOTONERA MARC
+#define ENC_A 34                //26                    34                      (33 para nuevas botoneras sin placa)
+#define ENC_B 33                //34                    33                      (34 para nuevas botoneras sin placa)
+#define ENC_BUTTON 26           //33                    26                      (26 para nuevas botoneras sin placa)
+
+#elif defined(BOTONERA_OLD)
 // Pines del encoder            //BOTONERA FRANC        BOTONERA MARC
 #define ENC_A 26                //26                    34                      (33 para nuevas botoneras sin placa)
 #define ENC_B 34                //34                    33                      (34 para nuevas botoneras sin placa)
 #define ENC_BUTTON 33           //33                    26                      (26 para nuevas botoneras sin placa)
-                                                        //3V3 desconectado
+#endif
 
 enum MODE_CONFIGS{
     HAS_BASIC_COLOR= 0,
@@ -33,7 +41,7 @@ enum MODE_CONFIGS{
 // Declaración de funciones relacionadas con el encoder
 void encoder_init_func() noexcept;
 void handleEncoder() noexcept;
-void handleHiddenMenuNavigation(int &hiddenMenuSelection);
+void handleHiddenMenuNavigation(int &hiddenMenuSelection) noexcept;
 
 // Declaración de funciones externas (forward declarations)
 //void animateTransition(int direction);
@@ -41,15 +49,15 @@ void drawModesScreen();
 void drawCurrentElement();
 
 void handleModeSelection(const String& currentFile) noexcept;
-void toggleElementSelection(const String& currentFile);
+void toggleElementSelection(const String& currentFile) noexcept;
 //void requestAndSyncElementMode();
 
-bool getModeFlag(const uint8_t modeConfig[2], MODE_CONFIGS flag);
-void debugModeConfig(const uint8_t modeConfig[2]);
+bool getModeFlag(const uint8_t modeConfig[2], MODE_CONFIGS flag) noexcept;
+void debugModeConfig(const uint8_t modeConfig[2]) noexcept;
 
 std::vector<bool> initializeAlternateStates(const String &currentFile) noexcept;
 
-void handleBankSelectionMenu(std::vector<byte>& bankList, std::vector<bool>& selectedBanks);
+void handleBankSelectionMenu(std::vector<byte>& bankList, std::vector<bool>& selectedBanks) noexcept;
 
 void handleBrightnessMenu();
 
@@ -61,15 +69,13 @@ void handleDeleteElementMenu();
 
 void handleConfirmDelete();
 
-void handleConfirmRestoreMenu();
+void handleConfirmRestoreMenu() noexcept;
 
 void handleConfirmRestoreElementMenu();
 
 bool isInMainMenu() ;
 
 int getTotalModesForFile(const String &file);
-
-static inline uint8_t mapPercentToFastLEDBrightness(uint8_t percent);
 
 void printElementDetails();
 // Variables externas requeridas

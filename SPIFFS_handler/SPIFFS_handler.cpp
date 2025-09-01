@@ -5,6 +5,7 @@
 #include <Translations_handler/translations.h>
 #include <play_DMS/play_DMS.h>
 
+uint16_t lineBuffer[64];   // definición real
 
 
 bool writeBytesChecked(fs::File &f, const uint8_t* data, size_t length) {

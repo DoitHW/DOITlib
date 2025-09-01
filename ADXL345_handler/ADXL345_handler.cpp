@@ -233,7 +233,7 @@ void ADXL345Handler::readInclinations() {
         // Inicio de movimiento → enviar ‘1’ de inmediato
         if (movementDetected && !movementDetectedLast) {
             std::vector<byte> targets = { getCurrentElementID() };
-            SENSOR_DOUBLE_T binVal = {0,0, 0,1, 0,1};  // min=0,max=1,val=1
+            SENSOR_DOUBLE_T binVal = {0,0, 0,1, 0,1, 0,0, 0,0, 0,0};
             send_frame(frameMaker_SEND_SENSOR_VALUE(
               DEFAULT_BOTONERA, targets, binVal
             ));
@@ -249,7 +249,7 @@ void ADXL345Handler::readInclinations() {
         if (movementDetectedLast &&
             (now - lastMovementTime >= inactivityTimeout)) {
             std::vector<byte> targets = { getCurrentElementID() };
-            SENSOR_DOUBLE_T binVal = {0,0, 0,1, 0,0};  // min=0,max=1,val=0
+            SENSOR_DOUBLE_T binVal = {0,0, 0,1, 0,0, 0,0, 0,0, 0,0};  // min=0,max=1,val=0
             send_frame(frameMaker_SEND_SENSOR_VALUE(
               DEFAULT_BOTONERA, targets, binVal
             ));

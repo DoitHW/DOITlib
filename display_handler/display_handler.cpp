@@ -1884,7 +1884,6 @@ void drawBankSelectionMenu(const std::vector<byte>& bankList, const std::vector<
     uiSprite.pushSprite(0, 0);
 }
 
-
 /**
  * @brief Dibuja el menú de sonido con scroll, resaltado y estado de selección.
  *

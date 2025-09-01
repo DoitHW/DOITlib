@@ -6,6 +6,8 @@
 #include <Translations_handler/translations.h>
 #include <play_DMS/play_DMS.h>
 #include <token_DMS/token_DMS.h>
+#include <stdint.h>   // en C o C++
+
 
 // Cálculo de offsets dentro de INFO_PACK_T:
 const size_t OFFSET_NAME = 0;                              
@@ -22,7 +24,7 @@ const size_t OFFSET_SITUACION = OFFSET_ICONO + (ICON_ROWS * ICON_COLUMNS * 2); /
 
 // icono =64*64*2=8192 bytes total ~11900
 
-static uint16_t lineBuffer[64]; 
+extern uint16_t lineBuffer[64]; 
 extern INFO_PACK_T ambientesOption;
 extern INFO_PACK_T fichasOption;
 extern INFO_PACK_T apagarSala;

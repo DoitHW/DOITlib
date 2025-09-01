@@ -108,7 +108,7 @@ void IRAM_ATTR onUartInterrupt() {
             //DEBUG__________ln("expectedFrameLength = " +String(expectedFrameLength))
             totalFrameLength = expectedFrameLength + 3;
     
-                if (totalFrameLength > MAX_FRAME_LENGTH || totalFrameLength < MIN_FRAME_LENGTH) {
+                if (totalFrameLength < MIN_FRAME_LENGTH) {
                     receiveState = WAITING_START;
                     uartBuffer.clear();
                    

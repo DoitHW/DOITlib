@@ -142,7 +142,7 @@ void handleEncoder() noexcept
     constexpr unsigned long kDetailsLongPressMs     = 6000UL;
     constexpr unsigned long kUnlockMinMs            = 500UL;   // Comentario original decía 1000; código usa 500
     constexpr unsigned long kUnlockMaxMs            = 5000UL;
-    constexpr unsigned long kFocusQueryDelayMs      = 100UL;
+    constexpr unsigned long kFocusQueryDelayMs      = 200UL;   // Tiempo que debe transcurrir tras hacer foco para preguntar el modo a un elemento
     constexpr unsigned long kResponseTimeoutMs      = 500UL;   // Comentario original decía 200; código usa 500
     constexpr int           kNumLanguages           = 8;
     constexpr int           kMaxModesPerFile        = 16;
@@ -983,17 +983,69 @@ std::vector<bool> initializeAlternateStates(const String &currentFile) noexcept
     return std::vector<bool>(kMaxModesPerFile, false);
 }
 
-void toggleElementSelection(const String& currentFile) {
-    // Alternar el estado de selección del elemento actual
+/**
+ * @brief Alterna la selección del elemento actual y envía los comandos asociados.
+ *
+ * Cambia el estado `selectedStates[currentIndex]` y:
+ * - Para ficheros de SPIFFS: lee su ID (OFFSET_ID), envía START/BLACKOUT y
+ *   fuerza el modo básico (OFFSET_CURRENTMODE = DEFAULT_BASIC_MODE).
+ * - Para "Apagar": deselecciona todos, reinicia estados alternativos globales,
+ *   envía BLACKOUT en broadcast (0xFF) y vuelve al índice 0.
+ * - Para "Ambientes"/"Fichas": solo alterna selección local (sin I/O).
+ *
+ * Si el elemento queda deseleccionado (false) y no es "Apagar", reinicia su
+ * vector de estados alternativos en RAM mediante `initializeAlternateStates()`.
+ *
+ * @param currentFile Nombre lógico del elemento (fichero en SPIFFS o
+ *        etiquetas especiales: "Ambientes", "Fichas", "Apagar").
+ * @return void
+ *
+ * @pre
+ *  - `currentIndex` dentro de rango de `selectedStates` y `elementFiles`.
+ *  - SPIFFS montado si `currentFile` pertenece al FS.
+ *  - `initializeAlternateStates()`, `elementAlternateStates`, `currentAlternateStates`
+ *    y `send_frame()/frameMaker_*` disponibles.
+ *
+ * @note ID broadcast 0xFF para "Apagar". Para elementos de SPIFFS, ID leído en `OFFSET_ID`.
+ * @warning Realiza I/O bloqueante sobre SPIFFS y envíos de tramas; no invocar desde ISR.
+ */
+void toggleElementSelection(const String& currentFile) noexcept
+{
+    // -------------------------
+    // Constantes y utilidades
+    // -------------------------
+    constexpr byte kBroadcastId = 0xFF;
+
+    const auto isElementFromSPIFFS = [&](const String& name) -> bool {
+        // Mantiene la lógica original basada en startsWith
+        return !name.startsWith("Ambientes") &&
+               !name.startsWith("Fichas")    &&
+               !name.startsWith("Apagar");
+    };
+
+    // -------------------------
+    // Validaciones defensivas
+    // -------------------------
+    if (static_cast<size_t>(currentIndex) >= selectedStates.size()) {
+#ifdef DEBUG
+        DEBUG__________printf("⚠️ toggleElementSelection: currentIndex fuera de rango (%d)\n", currentIndex);
+#endif
+        return;
+    }
+
+    // -------------------------
+    // 1) Alternar selección local
+    // -------------------------
     selectedStates[currentIndex] = !selectedStates[currentIndex];
 
-    // Obtener la ID del elemento (si es de SPIFFS; si es fijo, usamos ID 0)
+    // -------------------------
+    // 2) Resolver ID del elemento
+    // -------------------------
     std::vector<byte> elementID;
-    bool isElementFromSPIFFS = !currentFile.startsWith("Ambientes") &&
-                               !currentFile.startsWith("Fichas") &&
-                               !currentFile.startsWith("Apagar");
+    elementID.reserve(1);
 
-    if (isElementFromSPIFFS) {
+    const bool fromSPIFFS = isElementFromSPIFFS(currentFile);
+    if (fromSPIFFS) {
         fs::File f = SPIFFS.open(currentFile, "r+");
         if (f) {
             byte id = 0;
@@ -1006,68 +1058,81 @@ void toggleElementSelection(const String& currentFile) {
             elementID.push_back(0);
         }
     } else {
-        elementID.push_back(0);
+        elementID.push_back(0); // ID 0 para elementos especiales (amb/fichas)
     }
 
-    // Si se deselecciona el elemento (estado false), reiniciamos el vector de modos para ese elemento
-    if (!selectedStates[currentIndex]) {
-        // Para elementos que NO sean "Apagar"
-        if (!currentFile.startsWith("Apagar")) {
-            // Reinicializar el vector de estados alternativos para el elemento actual
-            std::vector<bool> newStates = initializeAlternateStates(currentFile);
-            // Actualizar tanto el map global como el vector local
-            elementAlternateStates[currentFile] = newStates;
-            currentAlternateStates = newStates;
-        }
+    // ---------------------------------------------------------
+    // 3) Si se deselecciona y no es "Apagar", reiniciar alternativos
+    // ---------------------------------------------------------
+    if (!selectedStates[currentIndex] && !currentFile.startsWith("Apagar")) {
+        std::vector<bool> newStates = initializeAlternateStates(currentFile);
+        elementAlternateStates[currentFile] = newStates;
+        currentAlternateStates = newStates;
     }
 
-    // Si se presiona el botón "Apagar", reiniciamos los modos de TODOS los elementos
+    // ----------------------------------------
+    // 4) Caso especial: botón "Apagar" (global)
+    // ----------------------------------------
     if (currentFile == "Apagar") {
-        // Reiniciar la selección de todos los elementos
-        for (size_t i = 0; i < selectedStates.size(); i++) {
+        // Deseleccionar todos
+        for (size_t i = 0; i < selectedStates.size(); ++i) {
             selectedStates[i] = false;
         }
-        // Reinicializar los estados alternativos para cada elemento en el map global
+        // Reinicializar estados alternativos de todos los elementos
         for (auto &entry : elementAlternateStates) {
             entry.second = initializeAlternateStates(entry.first);
         }
-        std::vector<byte> elementID;
-        elementID.push_back(0xFF);
-        send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, BLACKOUT));
+
+        // Envío broadcast BLACKOUT
+        std::vector<byte> bcID{ kBroadcastId };
+        send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, bcID, BLACKOUT));
+
         setAllElementsToBasicMode();
         showMessageWithLoading(getTranslation("APAGANDO_SALA"), 4000);
-        currentIndex = 0;
-        inModesScreen = false;
+
+        currentIndex   = 0;
+        inModesScreen  = false;
         drawCurrentElement();
         return;
     }
-    
-    // Para elementos de SPIFFS, se envía el comando de selección según el estado
-    if (isElementFromSPIFFS) {
-        byte command = selectedStates[currentIndex] ? START_CMD : BLACKOUT;
+
+    // ------------------------------------------------
+    // 5) Elementos de SPIFFS: envío START/BLACKOUT + FS
+    // ------------------------------------------------
+    if (fromSPIFFS) {
+        const byte command = selectedStates[currentIndex] ? START_CMD : BLACKOUT;
+
+#ifdef DEBUG
         DEBUG__________printf("Enviando comando %s a la ID %d\n",
-                      command == START_CMD ? "START_CMD" : "BLACKOUT",
-                      elementID[0]);
+                              command == START_CMD ? "START_CMD" : "BLACKOUT",
+                              elementID[0]);
+#endif
         send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, command));
 
         if (command == BLACKOUT) {
             showMessageWithLoading(getTranslation("APAGANDO_ELEMENTO"), 2000);
         }
 
-        // Actualizar el modo del elemento a "básico" en SPIFFS
+        // Forzar modo básico en fichero (OFFSET_CURRENTMODE)
         fs::File f = SPIFFS.open(currentFile, "r+");
         if (f) {
-            byte basicMode = DEFAULT_BASIC_MODE;  // modo 1
+            byte basicMode = DEFAULT_BASIC_MODE;  // modo básico
             f.seek(OFFSET_CURRENTMODE, SeekSet);
             f.write(&basicMode, 1);
             f.close();
-            DEBUG__________printf("Modo actualizado a básico (1) en SPIFFS para el elemento %s\n", currentFile.c_str());
+
+#ifdef DEBUG
+            DEBUG__________printf("Modo actualizado a básico en SPIFFS para el elemento %s\n",
+                                  currentFile.c_str());
+#endif
         } else {
             DEBUG__________ln("Error al abrir el archivo para actualizar el modo.");
         }
     }
-    
-    // Redibujar el elemento actual para reflejar la selección/deselección
+
+    // -------------------------
+    // 6) Redibujar UI
+    // -------------------------
     drawCurrentElement();
 }
 
@@ -1086,7 +1151,6 @@ int brightnessMenuIndex = 0;
  * Redibuja el menú al cambiar la posición del encoder y, al confirmar,
  * persiste el brillo, lo aplica a FastLED y sale al elemento principal.
  */
-
 void handleBrightnessMenu()
 {
     // ───────── Constantes y configuración ─────────
@@ -1151,6 +1215,8 @@ void handleBrightnessMenu()
     encoderPressed = currentEncoderState;
 }
 
+const int soundOptions[] = {0, 1, 3, 4, 6, 7, 9}; // Índices seleccionables
+const int numSoundOptions = sizeof(soundOptions) / sizeof(soundOptions[0]);
 
 /**
  * @brief Gestiona la navegación y confirmación del menú de sonido.
@@ -1159,9 +1225,6 @@ void handleBrightnessMenu()
  * y, ante una pulsación corta (< 1000 ms) del botón del encoder, aplica el ajuste
  * correspondiente (género de voz, respuesta negativa, volumen) o confirma/sale.
  */
-
-const int soundOptions[] = {0, 1, 3, 4, 6, 7, 9}; // Índices seleccionables
-const int numSoundOptions = sizeof(soundOptions) / sizeof(soundOptions[0]);
 void handleSoundMenu()
 {
     // ──────────────── Constantes de comportamiento ────────────────
@@ -1237,176 +1300,337 @@ void handleSoundMenu()
     }
 }
 
-void handleHiddenMenuNavigation(int &hiddenMenuSelection) {
-    int32_t newEncoderValue = encoder.getCount();
-    static bool encoderButtonPressed = false;
-    static bool initialEntry = true;
-    static bool menuJustOpened = true;  // Nueva variable para controlar la confirmación automática
+/**
+ * @brief Navega y confirma opciones del menú oculto usando el encoder y su pulsador.
+ *
+ * Gestiona la preselección al entrar, el desplazamiento por las opciones con el giro
+ * del encoder y la confirmación con el pulsador. Activa submenús (idioma, sonido,
+ * brillo, formateo/“control”) o vuelve al menú principal.
+ *
+ * @param[out] hiddenMenuSelection Índice de opción seleccionada visualmente (rango 0..4).
+ * @return void
+ */
+void handleHiddenMenuNavigation(int &hiddenMenuSelection) noexcept
+{
+    // ----------------------------
+    // Constantes y utilidades
+    // ----------------------------
+    constexpr int kHiddenMenuMaxIndex = 4; // Opciones 0..4 (5 opciones reales)
 
-    // Al entrar al menú oculto por primera vez, resalta la primera opción sin confirmarla
+    auto isButtonPressed = []() -> bool { return digitalRead(ENC_BUTTON) == LOW; };
+    auto isButtonReleased = []() -> bool { return digitalRead(ENC_BUTTON) == HIGH; };
+
+    // Estado interno persistente entre llamadas
+    static bool encoderButtonPressed = false;
+    static bool initialEntry         = true;
+    static bool menuJustOpened       = true; // Bloquea la confirmación inmediata al abrir
+
+    // Lectura del contador del encoder
+    const int32_t newEncoderValue = encoder.getCount();
+
+    // ---------------------------------
+    // 1) Entrada inicial al menú oculto
+    // ---------------------------------
     if (initialEntry) {
-        hiddenMenuSelection = 0;  // Preselección visual sin confirmar
-        //drawHiddenMenu(hiddenMenuSelection);
-        initialEntry = false;
-        menuJustOpened = true;  // Bloquea la confirmación inmediata
+        hiddenMenuSelection = 0;   // Preselección visual sin confirmar
+        initialEntry        = false;
+        menuJustOpened      = true; // Evita confirmar si el botón ya estaba pulsado
+        // drawHiddenMenu(hiddenMenuSelection); // (opcional, mantenido como en el original)
     }
 
-    // Navegación por el menú con el encoder
+    // ---------------------------------
+    // 2) Navegación por giro del encoder
+    // ---------------------------------
     if (newEncoderValue != lastEncoderValue) {
         hiddenMenuSelection += (newEncoderValue > lastEncoderValue) ? 1 : -1;
-        hiddenMenuSelection = constrain(hiddenMenuSelection, 0, 4); // Ahora hay 6 opciones (índices 0-5)
-        lastEncoderValue = newEncoderValue;
-        //drawHiddenMenu(hiddenMenuSelection);
+        hiddenMenuSelection  = constrain(hiddenMenuSelection, 0, kHiddenMenuMaxIndex);
+        lastEncoderValue     = newEncoderValue;
+        // drawHiddenMenu(hiddenMenuSelection); // (se redibuja al final si sigue activo)
     }
 
-    // Confirmación con el botón del encoder
-    if (digitalRead(ENC_BUTTON) == HIGH) {
-        menuJustOpened = false;  // Solo ahora permite confirmaciones
+    // ---------------------------------
+    // 3) Gestión del pulsador del encoder
+    //    - Se permite confirmar sólo tras detectar una suelta
+    // ---------------------------------
+    if (isButtonReleased()) {
+        menuJustOpened       = false; // A partir de ahora se permite confirmar
         encoderButtonPressed = false;
     }
 
-    if (digitalRead(ENC_BUTTON) == LOW && !encoderButtonPressed && !menuJustOpened) {
-    encoderButtonPressed = true;
-    ignoreEncoderClick = true;
-    byte respuesta = 0;
-    switch (hiddenMenuSelection) {
-        case 0: // Cambiar idioma
-        // Activar el submenú de idioma
-        languageMenuActive = true;
-        languageMenuSelection = 0;  // Inicialmente se selecciona la primera opción (ES)
-        // Dibujar el submenú
-        drawLanguageMenu(languageMenuSelection);
-        hiddenMenuActive = false;
-            break;
-            
-        case 1: // Sonido
-        soundMenuActive = true;
-        soundMenuSelection = 0;
-        drawSoundMenu(soundMenuSelection);
-        hiddenMenuActive = false;
-                                                                                            #ifdef DEBUG
-                                                                                            DEBUG__________ln("Cambiando Sonido...");
-                                                                                            #endif
-            break;
-        case 2: // Brillo
-                                                                                            #ifdef DEBUG
-                                                                                            DEBUG__________ln("Ajustando brillo...");
-                                                                                            #endif
+    // Pulsación nueva y menú ya “armado” para confirmar
+    if (isButtonPressed() && !encoderButtonPressed && !menuJustOpened) {
+        encoderButtonPressed = true;
+        ignoreEncoderClick   = true; // Evita relecturas residuales al salir de submenús
 
-        hiddenMenuActive = false;                // 🛑 Desactivar menú oculto
-        brightnessMenuActive = true;             // ✅ Activar menú brillo
-    
-        currentBrightness = loadBrightnessFromSPIFFS();
-        tempBrightness = currentBrightness;
-        encoder.setCount(currentBrightness);
-    
-        // 🔄 Reiniciar estados
-        lastEncoderCount = currentBrightness;
-        encoderPressed = (digitalRead(ENC_BUTTON) == LOW);
-        ignoreFirstRelease = true;
-    
-        drawBrightnessMenu();
-            break;
-        case 3: // Control
-            hiddenMenuActive = false;
-            formatSubMenuActive = true;
-            formatMenuSelection = 0;
-            buttonPressStart = 0;
-            extern int formatMenuCurrentIndex;
-            extern int32_t formatMenuLastValue;
-            formatMenuCurrentIndex = 0;
-            formatMenuLastValue = encoder.getCount();
+        switch (hiddenMenuSelection) {
+            case 0: { // Idioma
+                languageMenuActive   = true;
+                languageMenuSelection = 0;
+                drawLanguageMenu(languageMenuSelection);
+                hiddenMenuActive     = false;
+            } break;
 
-            while (digitalRead(ENC_BUTTON) == LOW); // Espera a que se suelte el botón  
-            drawFormatMenu(formatMenuSelection);
-            break;
-        case 4: // Volver
-                                                                                            #ifdef DEBUG
-                                                                                            DEBUG__________ln("Volviendo al menú principal");
-                                                                                            #endif
-            
-            PulsadoresHandler::limpiarEstados();
-            drawCurrentElement();
-            initialEntry = false;
-            hiddenMenuActive = false;
-            break;
-        default:
-            break;
+            case 1: { // Sonido
+                soundMenuActive    = true;
+                soundMenuSelection = 0;
+                drawSoundMenu(soundMenuSelection);
+                hiddenMenuActive   = false;
+                #ifdef DEBUG
+                                DEBUG__________ln("Cambiando Sonido...");
+                #endif
+            } break;
+
+            case 2: { // Brillo
+                #ifdef DEBUG
+                                DEBUG__________ln("Ajustando brillo...");
+                #endif
+                hiddenMenuActive    = false;  // Desactiva menú oculto
+                brightnessMenuActive = true;  // Activa menú de brillo
+
+                currentBrightness = loadBrightnessFromSPIFFS();
+                tempBrightness    = currentBrightness;
+                encoder.setCount(currentBrightness);
+
+                // Reinicio de estados auxiliares del submenú de brillo
+                lastEncoderCount   = currentBrightness;
+                encoderPressed     = isButtonPressed();
+                ignoreFirstRelease = true;
+
+                drawBrightnessMenu();
+            } break;
+
+            case 3: { // Control / Formateo
+                hiddenMenuActive   = false;
+                formatSubMenuActive = true;
+                formatMenuSelection = 0;
+                buttonPressStart    = 0;
+
+                // Variables externas utilizadas por el submenú
+                extern int   formatMenuCurrentIndex;
+                extern int32_t formatMenuLastValue;
+                formatMenuCurrentIndex = 0;
+                formatMenuLastValue    = encoder.getCount();
+
+                // Espera activa hasta soltar (igual que en el original; bloqueante)
+                while (isButtonPressed()) { /* busy wait */ }
+
+                drawFormatMenu(formatMenuSelection);
+            } break;
+
+            case 4: { // Volver
+                #ifdef DEBUG
+                                DEBUG__________ln("Volviendo al menú principal");
+                #endif
+                PulsadoresHandler::limpiarEstados();
+                drawCurrentElement();
+                initialEntry    = false;
+                hiddenMenuActive = false;
+            } break;
+
+            default:
+                // Índice fuera de las opciones contempladas (defensivo)
+                break;
+        }
     }
-}
+
+    // ---------------------------------
+    // 4) Redibujado si el menú sigue activo
+    // ---------------------------------
     if (hiddenMenuActive) {
         drawHiddenMenu(hiddenMenuSelection);
     }
 }
 
+/**
+ * @brief Lee un flag (bit) de la configuración de un modo.
+ *
+ * Interpreta `modeConfig[0]` como el byte más significativo (MSB) y
+ * `modeConfig[1]` como el menos significativo (LSB), formando un `uint16_t`
+ * en formato big-endian. El enum `flag` indica el desplazamiento del bit
+ * desde el LSB (bit 0).
+ *
+ * @param modeConfig Array de 2 bytes (MSB, LSB) que codifican la configuración.
+ * @param flag Enumeración `MODE_CONFIGS` que indica el índice de bit a leer (0..15).
+ * @return true si el bit indicado está a 1; false si está a 0 o parámetros inválidos.
+ *
+ * @pre `modeConfig` debe apuntar a al menos 2 bytes válidos.
+ * @warning No valida si `flag` está fuera de 0..15; en tal caso el resultado es indefinido.
+ */
+bool getModeFlag(const uint8_t modeConfig[2], MODE_CONFIGS flag) noexcept
+{
+    // Validación defensiva: evitar puntero nulo
+    if (!modeConfig) {
+        #ifdef DEBUG
+                DEBUG__________ln("⚠️ getModeFlag: modeConfig es nulo");
+        #endif
+        return false;
+    }
 
-bool getModeFlag(const uint8_t modeConfig[2], MODE_CONFIGS flag) {
-    // Construir el uint16_t interpretando data[0] como el MSByte y data[1] como el LSByte (big-endian)
-    uint16_t config = (uint16_t(modeConfig[0]) << 8) | uint16_t(modeConfig[1]);
-    // Extraer el bit (el enum indica el offset desde el bit 0, LSB)
-    return (config >> flag) & 1;
+    // Construir valor de 16 bits en big-endian:
+    // modeConfig[0] = MSB, modeConfig[1] = LSB
+    const uint16_t config = (static_cast<uint16_t>(modeConfig[0]) << 8) |
+                             static_cast<uint16_t>(modeConfig[1]);
+
+    // Extraer el bit especificado por 'flag'
+    return ((config >> static_cast<uint8_t>(flag)) & 0x1u) != 0u;
 }
 
+/**
+ * @brief Vuelca por puerto serie el estado de cada flag de `modeConfig`.
+ *
+ * Interpreta `modeConfig` como valor de 16 bits en big-endian (MSB = modeConfig[0],
+ * LSB = modeConfig[1]) y recorre los flags definidos por el enum `MODE_CONFIGS`
+ * desde `HAS_BASIC_COLOR` hasta `MODE_EXIST`, imprimiendo si cada bit está activo.
+ *
+ * @param modeConfig Array de 2 bytes (MSB, LSB) con la configuración del modo.
+ * @return void
+ *
+ * @pre `modeConfig` debe apuntar a 2 bytes válidos.
+ * @note Imprime además el valor bruto (MSB/LSB y 0xFFFF).
+ * @warning Función de depuración; realiza E/S por serie. No llamar desde ISR.
+ * @see getModeFlag()
+ */
+void debugModeConfig(const uint8_t modeConfig[2]) noexcept
+{
+    // Validación defensiva de puntero
+    if (!modeConfig) {
+        #ifdef DEBUG
+                DEBUG__________ln("===== Estado de modeConfig =====");
+                DEBUG__________ln("⚠️ modeConfig es nulo");
+        #endif
+        return;
+    }
 
-void debugModeConfig(const uint8_t modeConfig[2]) {
-    DEBUG__________ln("===== Estado de modeConfig =====");
-    for (int i = HAS_BASIC_COLOR; i <= MODE_EXIST; i++) {
-        MODE_CONFIGS flag = static_cast<MODE_CONFIGS>(i);
-        bool isActive = getModeFlag(modeConfig, flag);
+    // Construcción del valor de 16 bits en big-endian
+    const uint16_t cfg =
+        (static_cast<uint16_t>(modeConfig[0]) << 8) |
+         static_cast<uint16_t>(modeConfig[1]);
+
+    #ifdef DEBUG
+        DEBUG__________ln("===== Estado de modeConfig =====");
+        DEBUG__________printf("RAW: MSB=0x%02X LSB=0x%02X (0x%04X)\n",
+                            modeConfig[0], modeConfig[1], cfg);
+    #endif
+
+    // Rango del enum a iterar (asumimos contiguo entre ambos extremos)
+    constexpr int kStart = static_cast<int>(HAS_BASIC_COLOR);
+    constexpr int kEnd   = static_cast<int>(MODE_EXIST);
+
+    for (int i = kStart; i <= kEnd; ++i) {
+        const MODE_CONFIGS flag = static_cast<MODE_CONFIGS>(i);
+        const bool isActive     = getModeFlag(modeConfig, flag);
+
+        // Etiqueta legible por flag (mantiene nombres del enum; evita etiquetas inconsistentes)
         switch (flag) {
-            case HAS_BASIC_COLOR:   DEBUG__________("HAS_BASIC_COLOR"); break;
-            case HAS_PULSE:         DEBUG__________("HAS_PULSE"); break;
-            case HAS_ADVANCED_COLOR:DEBUG__________("HAS_ADVANCED_COLOR"); break;
-            case HAS_RELAY:         DEBUG__________("HAS_RELAY"); break;
-            case HAS_RELAY_N1:       DEBUG__________("HAS_RELAY_2"); break;
-            case HAS_RELAY_N2:       DEBUG__________("HAS_RELAY_3"); break;
-            case NOP_1:              DEBUG__________("HAS_RELAY_4"); break;
-            case HAS_SENS_VAL_1:    DEBUG__________("HAS_SENS_VAL_1"); break;
-            case HAS_SENS_VAL_2:    DEBUG__________("HAS_SENS_VAL_2"); break;
-            case NOP_2:             DEBUG__________("ACCEPTS_X_Y_VAL"); break;
-            case HAS_PASSIVE:       DEBUG__________("HAS_PASSIVE"); break;
-            case HAS_BINARY_SENSORS:DEBUG__________("HAS_BINARY_SENSORS"); break;
-            case HAS_BANK_FILE:     DEBUG__________("HAS_BANK_FILE"); break;
-            case HAS_PATTERNS:      DEBUG__________("HAS_PATTERNS"); break;
-            case HAS_ALTERNATIVE_MODE:DEBUG__________("HAS_ALTERNATIVE_MODE"); break;
-            case MODE_EXIST:        DEBUG__________("MODE_EXIST"); break;
+            case HAS_BASIC_COLOR:       DEBUG__________("HAS_BASIC_COLOR"); break;
+            case HAS_PULSE:             DEBUG__________("HAS_PULSE"); break;
+            case HAS_ADVANCED_COLOR:    DEBUG__________("HAS_ADVANCED_COLOR"); break;
+            case HAS_RELAY:             DEBUG__________("HAS_RELAY"); break;
+            case HAS_RELAY_N1:          DEBUG__________("HAS_RELAY_N1"); break;
+            case HAS_RELAY_N2:          DEBUG__________("HAS_RELAY_N2"); break;
+            case NOP_1:                 DEBUG__________("NOP_1"); break;
+            case HAS_SENS_VAL_1:        DEBUG__________("HAS_SENS_VAL_1"); break;
+            case HAS_SENS_VAL_2:        DEBUG__________("HAS_SENS_VAL_2"); break;
+            case NOP_2:                 DEBUG__________("NOP_2"); break;
+            case HAS_PASSIVE:           DEBUG__________("HAS_PASSIVE"); break;
+            case HAS_BINARY_SENSORS:    DEBUG__________("HAS_BINARY_SENSORS"); break;
+            case HAS_BANK_FILE:         DEBUG__________("HAS_BANK_FILE"); break;
+            case HAS_PATTERNS:          DEBUG__________("HAS_PATTERNS"); break;
+            case HAS_ALTERNATIVE_MODE:  DEBUG__________("HAS_ALTERNATIVE_MODE"); break;
+            case MODE_EXIST:            DEBUG__________("MODE_EXIST"); break;
+            default:                    DEBUG__________("UNKNOWN_FLAG"); break;
         }
         DEBUG__________(" = ");
         DEBUG__________ln(isActive ? "1" : "0");
     }
 }
 
-void handleBankSelectionMenu(std::vector<byte>& bankList, std::vector<bool>& selectedBanks) {
-    // Calcular total de opciones (Confirmar + banks)
-    int totalItems = bankList.size() + 1;
+/**
+ * @brief Gestiona el menú de selección de bancos con el encoder y su pulsador.
+ *
+ * Permite navegar por la lista (opción 0 = "Confirmar" + N bancos), alternar la selección
+ * de cada banco y confirmar para salir. Actualiza la ventana visible del menú y redibuja
+ * la UI según cambios de foco o selección.
+ *
+ * @param[in,out] bankList       Vector con los IDs de banco (tamaño N).
+ * @param[in,out] selectedBanks  Vector de flags de selección por banco (tamaño N).
+ * @return void
+ *
+ * @pre
+ *  - `encoder` inicializado; `lastEncoderValue` contiene la última cuenta válida.
+ *  - `ENC_BUTTON` configurado (LOW = pulsado).
+ *  - `bankMenuCurrentSelection`, `bankMenuWindowOffset`, `bankMenuVisibleItems` son globales válidos.
+ *  - `drawBankSelectionMenu(...)`, `drawCurrentElement()`, `bankSelectionActive` disponibles.
+ *
+ * @note Índice 0 del menú corresponde a "Confirmar". Los bancos empiezan en el índice 1.
+ * @warning Incluye esperas bloqueantes (`delay`) y bucle de espera al soltar botón; no invocar desde ISR.
+ */
+void handleBankSelectionMenu(std::vector<byte>& bankList, std::vector<bool>& selectedBanks) noexcept
+{
+    // -------------------------
+    // Constantes (evita "números mágicos")
+    // -------------------------
+    constexpr unsigned long kDebouncePressMs = 200UL; // anti-rebote al pulsar
+    constexpr unsigned long kWaitReleaseMs   = 10UL;  // espera entre lecturas al soltar
 
-    // Leer el valor actual del encoder y actualizar bankMenuCurrentSelection
-    int32_t newEncoderValue = encoder.getCount();
+    // -------------------------
+    // Utilidades y defensivas
+    // -------------------------
+    auto isButtonPressed  = []() -> bool { return digitalRead(ENC_BUTTON) == LOW;  };
+    //auto isButtonReleased = []() -> bool { return digitalRead(ENC_BUTTON) == HIGH; };
+
+    // Total de items del menú: 1 ("Confirmar") + bancos
+    const int totalItems = static_cast<int>(bankList.size()) + 1;
+    if (totalItems <= 0) {
+    #ifdef DEBUG
+            DEBUG__________ln("⚠️ handleBankSelectionMenu: sin items en el menú.");
+    #endif
+        return;
+    }
+
+    // -------------------------
+    // Navegación con el encoder
+    // -------------------------
+    const int32_t newEncoderValue = encoder.getCount();
     if (newEncoderValue != lastEncoderValue) {
-        int32_t direction = (newEncoderValue > lastEncoderValue) ? 1 : -1;
+        const int32_t direction = (newEncoderValue > lastEncoderValue) ? 1 : -1;
+
+        // Avance circular por los items
         bankMenuCurrentSelection += direction;
-        if (bankMenuCurrentSelection < 0) bankMenuCurrentSelection = totalItems - 1;
-        if (bankMenuCurrentSelection >= totalItems) bankMenuCurrentSelection = 0;
+        if (bankMenuCurrentSelection < 0)                          bankMenuCurrentSelection = totalItems - 1;
+        if (bankMenuCurrentSelection >= totalItems)                bankMenuCurrentSelection = 0;
+
         lastEncoderValue = newEncoderValue;
 
-        // Ajustar window offset para que currentSelection sea visible
+        // Mantener la selección dentro de la ventana visible
         if (bankMenuCurrentSelection < bankMenuWindowOffset) {
             bankMenuWindowOffset = bankMenuCurrentSelection;
         } else if (bankMenuCurrentSelection >= bankMenuWindowOffset + bankMenuVisibleItems) {
             bankMenuWindowOffset = bankMenuCurrentSelection - bankMenuVisibleItems + 1;
         }
-        // Redibujar el menú con los parámetros actualizados
+
+        // Clamp defensivo del offset de ventana (por si totalItems < bankMenuVisibleItems)
+        if (bankMenuWindowOffset < 0) bankMenuWindowOffset = 0;
+        const int maxWindowStart = (totalItems > bankMenuVisibleItems) ? (totalItems - bankMenuVisibleItems) : 0;
+        if (bankMenuWindowOffset > maxWindowStart) bankMenuWindowOffset = maxWindowStart;
+
+        // Redibujar con los parámetros actualizados
         drawBankSelectionMenu(bankList, selectedBanks, bankMenuCurrentSelection, bankMenuWindowOffset);
     }
 
-    // Detectar pulsación del botón del encoder (con debounce)
-    if (digitalRead(ENC_BUTTON) == LOW) {
-        delay(200);
-        // Si la opción actual es "Confirmar" (índice 0), finalizar el menú
+    // -------------------------
+    // Confirmación / toggle con botón
+    // -------------------------
+    if (isButtonPressed()) {
+        delay(kDebouncePressMs); // Debounce simple
+
+        // Opción "Confirmar" (índice 0): salir del menú
         if (bankMenuCurrentSelection == 0) {
-            // Aquí podrías imprimir la selección para depuración
+#ifdef DEBUG
             DEBUG__________ln("Bancos seleccionados:");
-            for (size_t i = 0; i < selectedBanks.size(); i++) {
+            const size_t pairs = (selectedBanks.size() < bankList.size())
+                                 ? selectedBanks.size() : bankList.size();
+            for (size_t i = 0; i < pairs; ++i) {
                 if (selectedBanks[i]) {
                     DEBUG__________("0x");
                     DEBUG__________(bankList[i], HEX);
@@ -1414,27 +1638,33 @@ void handleBankSelectionMenu(std::vector<byte>& bankList, std::vector<bool>& sel
                 }
             }
             DEBUG__________ln();
-            // Reiniciar el encoder para el siguiente uso
+#endif
+            // Reiniciar encoder para siguiente uso
             encoder.clearCount();
             lastEncoderValue = encoder.getCount();
-            // Desactivar el menú de selección y regresar al menú principal
+
+            // Cerrar menú y volver
             bankSelectionActive = false;
             drawCurrentElement();
             return;
-        } else {
-            // Si no es Confirmar, alternar el estado del bank correspondiente
-            int bankIndex = bankMenuCurrentSelection - 1;
-            if (bankIndex >= 0 && bankIndex < (int)bankList.size()) {
-                selectedBanks[bankIndex] = !selectedBanks[bankIndex];
-            }
-            // Redibujar el menú para reflejar el cambio
-            drawBankSelectionMenu(bankList, selectedBanks, bankMenuCurrentSelection, bankMenuWindowOffset);
-            // Esperar a que se suelte el botón para evitar múltiples toggles
-            while (digitalRead(ENC_BUTTON) == LOW) {
-                delay(10);
-            }
-            delay(200);
         }
+
+        // Toggle de un banco (índices 1..N → bancos 0..N-1)
+        const int bankIndex = bankMenuCurrentSelection - 1;
+        if (bankIndex >= 0 && bankIndex < static_cast<int>(bankList.size()) &&
+            bankIndex < static_cast<int>(selectedBanks.size()))
+        {
+            selectedBanks[bankIndex] = !selectedBanks[bankIndex];
+        }
+
+        // Redibujar para reflejar el cambio
+        drawBankSelectionMenu(bankList, selectedBanks, bankMenuCurrentSelection, bankMenuWindowOffset);
+
+        // Esperar a la suelta para evitar toggles múltiples por una sola pulsación
+        while (isButtonPressed()) {
+            delay(kWaitReleaseMs);
+        }
+        delay(kDebouncePressMs); // debounce tras soltar
     }
 }
 
@@ -1448,162 +1678,329 @@ int confirmRestoreElementSelection = 0;  // 0 = Sí, 1 = No
 int formatMenuCurrentIndex = 0;
 int32_t formatMenuLastValue = 0;
 
-void handleFormatMenu() {
-    int32_t newEncoderValue = encoder.getCount();
-    if (formatMenuLastValue == 0) formatMenuLastValue = newEncoderValue;  // Protección inicial
+/**
+ * @brief Gestiona el submenú de formateo/control usando el encoder y su pulsador.
+ *
+ * Mueve la selección con el giro del encoder y, en pulsación corta (<1000 ms),
+ * ejecuta la acción asociada: escanear sala, eliminar elemento, formatear SPIFFS,
+ * mostrar ID, restaurar elementos, o volver.
+ *
+ * @return void
+ *
+ * @pre
+ *  - `encoder` inicializado; `ENC_BUTTON` configurado (LOW = pulsado).
+ *  - Globales válidas: `formatMenuCurrentIndex`, `formatMenuLastValue`,
+ *    `formatMenuSelection`, `numFormatOptions`, `formatOptions[]`,
+ *    flags `formatSubMenuActive`, `hiddenMenuActive`, y funciones de dibujo/envío.
+ *  - `element` expone `escanearSala()`. `SPIFFS` montado si se formatea/restaura.
+ *
+ * @note Se usa pulsación corta <1000 ms para confirmar; no hay pulsación larga aquí.
+ * @warning Contiene esperas bloqueantes (e.g., al mostrar mensajes/menús externos).
+ *          No invocar desde ISR.
+ */
+void handleFormatMenu()
+{
+    // -----------------------------
+    // Constantes (evita números mágicos)
+    // -----------------------------
+    constexpr unsigned long kShortPressMaxMs = 1000UL;
 
-    // Usa variables globales
-    int& currentIndex = formatMenuCurrentIndex;
-    int32_t& lastValue = formatMenuLastValue;
+    // -----------------------------
+    // Aliases a globales (como en el original)
+    // -----------------------------
+    int&     currentIndex = formatMenuCurrentIndex;
+    int32_t& lastValue    = formatMenuLastValue;
 
+    // -----------------------------
+    // Lectura del encoder y protección de primera entrada
+    // -----------------------------
+    const int32_t newEncoderValue = encoder.getCount();
 
+    // Protección inicial: si no tenemos referencia previa, toma la cuenta actual.
+    // (Mejor que comparar con 0, que puede ser un valor legítimo del encoder)
+    static bool firstEntry = true;
+    if (firstEntry) {
+        lastValue  = newEncoderValue;
+        firstEntry = false;
+    } else if (lastValue == 0 && newEncoderValue != 0) {
+        // Conserva tu “protección inicial” por compatibilidad, pero con matiz
+        lastValue = newEncoderValue;
+    }
+
+    // -----------------------------
+    // Navegación por giro del encoder
+    // -----------------------------
     if (newEncoderValue != lastValue) {
-    int dir = (newEncoderValue > lastValue) ? 1 : -1;
-    lastValue = newEncoderValue;
+        const int dir = (newEncoderValue > lastValue) ? 1 : -1;
+        lastValue     = newEncoderValue;
 
-    int proposedIndex = currentIndex + dir;
+        const int proposedIndex = currentIndex + dir;
         if (proposedIndex >= 0 && proposedIndex < numFormatOptions) {
-            currentIndex = proposedIndex;
-            formatMenuSelection = formatOptions[currentIndex];
+            currentIndex        = proposedIndex;
+            // Defensiva: asegurar índice válido antes de indexar
+            if (currentIndex >= 0 && currentIndex < numFormatOptions) {
+                formatMenuSelection = formatOptions[currentIndex];
+            }
         }
     }
 
+    // -----------------------------
+    // Pulsador del encoder: detección de pulsación corta
+    // -----------------------------
+    if (digitalRead(ENC_BUTTON) == LOW) {
+        if (buttonPressStart == 0) {
+            buttonPressStart = millis();
+        }
+        return; // mantener pulsado no ejecuta acción aquí
+    }
+
+    // Al soltar, si fue una pulsación corta, ejecutar acción
+    if (buttonPressStart > 0 && (millis() - buttonPressStart) < kShortPressMaxMs) {
+        switch (formatMenuSelection) {
+            case 0: { // Escanear sala
+                formatSubMenuActive = false;
+                hiddenMenuActive    = false;
+                element->escanearSala();
+                drawCurrentElement();
+            } break;
+
+            case 1: { // Eliminar elemento
+                loadDeletableElements();
+                if (!deletableElementFiles.empty()) {
+#ifdef DEBUG
+                    DEBUG__________ln("[📂] Lista de elementos disponibles para eliminar:");
+                    for (size_t i = 0; i < deletableElementFiles.size(); ++i) {
+                        DEBUG__________printf(" - %s\n", deletableElementFiles[i].c_str());
+                    }
+#endif
+                    deleteElementMenuActive = true;
+                    deleteElementSelection  = 0;
+                    formatSubMenuActive     = false;
+                    drawDeleteElementMenu(deleteElementSelection);
+                    forceDrawDeleteElementMenu = true;
+                } else {
+#ifdef DEBUG
+                    DEBUG__________ln("No hay elementos para eliminar.");
+#endif
+                }
+            } break;
+
+            case 2: { // Formatear SPIFFS (confirmación global)
+                confirmRestoreMenuActive = true;
+                confirmRestoreSelection  = 0;
+                formatSubMenuActive      = false;
+                drawConfirmRestoreMenu(confirmRestoreSelection);
+            } break;
+
+            case 3: { // Mostrar ID
+#ifdef DEBUG
+                DEBUG__________ln("[🆔] Mostrando ID");
+#endif
+                // Broadcast para mostrar IDs en dispositivos
+                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, { BROADCAST }, SHOW_ID_CMD));
+                formatSubMenuActive = true;
+                showMessageWithLoading(getTranslation("SHOW_ID"), 3000);
+                // Se mantiene en el submenú; redibujado no forzado
+            } break;
+
+            case 4: { // Restaurar elementos (confirmación por elemento)
+#ifdef DEBUG
+                DEBUG__________ln("Restaurando elementos");
+#endif
+                confirmRestoreMenuElementActive = true;
+                confirmRestoreElementSelection  = 0;
+                formatSubMenuActive             = false;
+                drawConfirmRestoreElementMenu(confirmRestoreElementSelection);
+            } break;
+
+            case 5: { // Volver
+                formatSubMenuActive = false;
+                hiddenMenuActive    = true;
+                drawHiddenMenu(0);
+                // Reset de navegación para futuras entradas
+                formatMenuCurrentIndex = 0;
+                formatMenuLastValue    = encoder.getCount();
+            } break;
+
+            default:
+                // Índice/acción no definida: no hacer nada
+                break;
+        }
+    }
+
+    // Reset de temporización de pulsador (siempre al soltar)
+    buttonPressStart = 0;
+}
+
+/**
+ * @brief Gestiona el menú de confirmación de restauración (Sí/No) con el encoder.
+ *
+ * Permite alternar entre dos opciones con el giro del encoder y confirma con pulsación
+ * corta (<1000 ms). Si se confirma "Sí", formatea SPIFFS, recarga elementos y reinicia
+ * el sistema. Si se elige "No", vuelve al submenú de formato.
+ *
+ * @return void
+ *
+ * @pre `encoder` inicializado; `ENC_BUTTON` configurado (LOW=pulsado).
+ * @pre Globales válidas: `confirmRestoreSelection`, `confirmRestoreMenuActive`,
+ *      `formatSubMenuActive`, `formatMenuSelection`.
+ * @pre Funciones/recursos: `drawConfirmRestoreMenu()`, `formatSPIFFS()`,
+ *      `loadElementsFromSPIFFS()`, `drawFormatMenu()`, `uiSprite`, `ESP.restart()`.
+ *
+ * @note El índice de selección es binario (0=Sí, 1=No). El recorrido es circular.
+ * @warning Incluye reinicio del sistema en la opción "Sí".
+ * @see drawConfirmRestoreMenu(), formatSPIFFS(), loadElementsFromSPIFFS(), drawFormatMenu()
+ */
+void handleConfirmRestoreMenu() noexcept
+{
+    // -------------------------
+    // Constantes
+    // -------------------------
+    constexpr unsigned long kShortPressMaxMs = 1000UL;
+
+    // -------------------------
+    // Seguimiento del encoder (usa la cuenta absoluta como referencia)
+    // -------------------------
+    static int32_t lastEncoderCount = 0;             // Estado local persistente
+    const  int32_t newCount         = encoder.getCount();
+
+    if (newCount != lastEncoderCount) {
+        const int dir = (newCount > lastEncoderCount) ? 1 : -1;
+        lastEncoderCount = newCount;
+
+        // Dos opciones: 0 (Sí) y 1 (No), recorrido circular
+        confirmRestoreSelection = (confirmRestoreSelection + dir + 2) % 2;
+
+        // Redibujo con la nueva selección
+        drawConfirmRestoreMenu(confirmRestoreSelection);
+    }
+
+    // -------------------------
+    // Gestión del pulsador (pulsación corta para confirmar)
+    // -------------------------
     if (digitalRead(ENC_BUTTON) == LOW) {
         if (buttonPressStart == 0) {
             buttonPressStart = millis();
         }
     } else {
-        if (buttonPressStart > 0 && millis() - buttonPressStart < 1000) {
-            switch (formatMenuSelection) {
-                case 0: {// Escanear sala
-                    formatSubMenuActive = false;
-                    hiddenMenuActive = false;
-                    element->escanearSala();
-                    drawCurrentElement();
-                    break;
-                }
-                case 1:  // Eliminar elemento
-                    loadDeletableElements();
-                    if (deletableElementFiles.size() > 0) {
-                        DEBUG__________ln("[📂] Lista de elementos disponibles para eliminar:");
-                        for (size_t i = 0; i < deletableElementFiles.size(); ++i) {
-                            DEBUG__________printf(" - %s\n", deletableElementFiles[i].c_str());
-                        }
-
-                        deleteElementMenuActive = true;
-                        deleteElementSelection = 0;
-                        formatSubMenuActive = false;
-                        drawDeleteElementMenu(deleteElementSelection);
-                        forceDrawDeleteElementMenu = true;
-
-                    } else {
-                        DEBUG__________ln("No hay elementos para eliminar.");
-                    }
-                    break;
-
-                case 2:  // Formatear SPIFFS
-                    confirmRestoreMenuActive = true;
-                    confirmRestoreSelection = 0;
-                    formatSubMenuActive = false;
-                    drawConfirmRestoreMenu(confirmRestoreSelection);
-                    break;
-                case 3:  // Mostrar ID
-                    DEBUG__________ln("[🆔] Mostrando ID");
-                    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, {BROADCAST}, SHOW_ID_CMD));
-                    formatSubMenuActive = true;
-                    showMessageWithLoading(getTranslation("SHOW_ID"), 3000);
-                    // drawCurrentElement(); // volver al menú principal
-                    break;
-                
-                case 4:  // Restaurar (formatear SPIFFS)
-                    DEBUG__________ln("Restaurando elementos");
-                    confirmRestoreMenuElementActive = true;
-                    confirmRestoreElementSelection = 0;
-                    formatSubMenuActive = false;
-                    drawConfirmRestoreElementMenu(confirmRestoreElementSelection);
-                break;
-
-                case 5:  // Volver
-                    formatSubMenuActive = false;
-                    hiddenMenuActive = true;
-                    drawHiddenMenu(0);
-                    //currentIndex = 0;
-                    formatMenuCurrentIndex = 0;
-                    formatMenuLastValue = encoder.getCount();
-                    break;
-            }
-        }
-        buttonPressStart = 0;
-    }
-}
-
-void handleConfirmRestoreMenu() {
-    static int lastSelection = 0;
-    int32_t newValue = encoder.getCount();
-
-    if (newValue != lastSelection) {
-        int dir = (newValue > lastSelection) ? 1 : -1;
-        lastSelection = newValue;
-        confirmRestoreSelection = (confirmRestoreSelection + dir + 2) % 2;
-        drawConfirmRestoreMenu(confirmRestoreSelection);
-    }
-
-    if (digitalRead(ENC_BUTTON) == LOW) {
-        if (buttonPressStart == 0) buttonPressStart = millis();
-    } else {
-        if (buttonPressStart > 0 && millis() - buttonPressStart < 1000) {
+        // Al soltar, comprobar si ha sido una pulsación corta
+        if (buttonPressStart > 0 && (millis() - buttonPressStart) < kShortPressMaxMs) {
             if (confirmRestoreSelection == 0) {
-                // Opción "Sí"
-                DEBUG__________ln("[⚠️] Restaurando sala...");
+                // --- Opción "Sí" ---
+                #ifdef DEBUG
+                                DEBUG__________ln("[⚠️] Restaurando sala...");
+                #endif
                 formatSPIFFS();
                 loadElementsFromSPIFFS();
+
+                // Cerrar menús y limpiar pantalla antes del reinicio
                 confirmRestoreMenuActive = false;
-                formatSubMenuActive = false;
+                formatSubMenuActive      = false;
                 uiSprite.fillSprite(BACKGROUND_COLOR);
                 uiSprite.pushSprite(0, 0);
-                ESP.restart();  // Reinicia el sistema tras formatear
+
+                ESP.restart(); // Reinicio del sistema
             } else {
-                // Opción "No"
+                // --- Opción "No" ---
                 confirmRestoreMenuActive = false;
-                formatSubMenuActive = false;
+                formatSubMenuActive      = false;
                 drawFormatMenu(formatMenuSelection);
             }
         }
+        // Reset del temporizador de pulsación (siempre al soltar)
         buttonPressStart = 0;
     }
 }
 
+/**
+ * @brief Gestiona el menú de confirmación para restaurar elementos mediante encoder y pulsación corta.
+ *
+ * Lee el contador del encoder para mover la selección (2 opciones, navegación circular)
+ * y, al detectar una pulsación corta (< 1000 ms) del botón del encoder, ejecuta la acción
+ * asociada: si la opción seleccionada es "Sí", envía una secuencia de tramas para restaurar
+ * elementos; después sale del menú de confirmación y abre el submenú de formato.
+ *
+ * @return void
+ * @pre
+ *  - `encoder` inicializado y operativo.
+ *  - `ENC_BUTTON` configurado como entrada (activo a nivel bajo).
+ *  - Variables/funciones globales válidas: `confirmRestoreElementSelection`,
+ *    `drawConfirmRestoreElementMenu(int)`, `confirmRestoreMenuElementActive`,
+ *    `formatSubMenuActive`, `formatMenuSelection`, `drawFormatMenu(int)`,
+ *    `buttonPressStart`, `send_frame(...)`, `frameMaker_*`, `DEFAULT_BOTONERA`,
+ *    `{BROADCAST}`, `DEFAULT_DEVICE`, `SHOW_ID_CMD`, `BLACKOUT`.
+ *  - No llamar desde ISR (usa `delay()` y llamadas potencialmente bloqueantes).
+ * @note
+ *  - Pulsación corta: < 1000 ms. Botón activo en LOW.
+ *  - Número de opciones del menú: 2 (índices 0..1).
+ *  - La secuencia de restauración incluye retardos bloqueantes (600 ms, 5000 ms, 500 ms).
+ * @warning
+ *  - Función bloqueante durante la secuencia de restauración.
+ *  - No implementa *debounce*; depende del hardware/lectura estable.
+ * @see drawConfirmRestoreElementMenu, drawFormatMenu, send_frame
+ */
 void handleConfirmRestoreElementMenu() {
-    static int lastSelection = 0;
-    int32_t newValue = encoder.getCount();
+    // --- Constantes (evitan números mágicos) ---
+    constexpr uint8_t  kNumOptions              = 2;      // Opciones del menú (0..1)
+    constexpr uint32_t kShortPressThresholdMs   = 1000U;  // Umbral de pulsación corta
+    constexpr uint32_t kDelaySetElemMs          = 600U;   // Retardo tras SET_ELEM_ID
+    constexpr uint32_t kDelayShowIdMs           = 5000U;  // Retardo mostrando IDs
+    constexpr uint32_t kDelayBlackoutMs         = 500U;   // Retardo tras BLACKOUT
 
-    if (newValue != lastSelection) {
-        int dir = (newValue > lastSelection) ? 1 : -1;
-        lastSelection = newValue;
-        confirmRestoreElementSelection = (confirmRestoreElementSelection + dir + 2) % 2;
+    // --- Seguimiento del encoder ---
+    // Valor anterior del contador del encoder para detectar cambio y dirección.
+    static int32_t lastSelection = 0;
+
+    const int32_t newCount = encoder.getCount();
+    if (newCount != lastSelection) {
+        // Determina la dirección de giro (ignora la magnitud del salto -> coherente con original).
+        const int dir = (newCount > lastSelection) ? 1 : -1;
+        lastSelection = newCount;
+
+        // Actualiza selección en anillo [0, kNumOptions-1].
+        confirmRestoreElementSelection =
+            (confirmRestoreElementSelection + dir + kNumOptions) % kNumOptions;
+
+        // Redibuja el menú con la nueva selección.
         drawConfirmRestoreElementMenu(confirmRestoreElementSelection);
     }
 
-    if (digitalRead(ENC_BUTTON) == LOW) {
-        if (buttonPressStart == 0) buttonPressStart = millis();
-    } else {
-        if (buttonPressStart > 0 && millis() - buttonPressStart < 1000) {
-            if (confirmRestoreElementSelection == 0) {
-                // Opción "Sí"
-                DEBUG__________ln("[⚠️] Restaurando elementos...");
-                send_frame(frameMaker_SET_ELEM_ID(DEFAULT_BOTONERA, {BROADCAST}, DEFAULT_DEVICE));
-                delay(600);
-                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, {BROADCAST}, SHOW_ID_CMD));
-                delay(5000);
-                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, {BROADCAST}, BLACKOUT));
-                delay(500);
-        
-            } 
-            confirmRestoreMenuElementActive = false;
-            formatSubMenuActive = true;
-            formatMenuSelection = 0;
-            drawFormatMenu(formatMenuSelection);
+    // --- Gestión del botón del encoder (activo en LOW) ---
+    const int btnState = digitalRead(ENC_BUTTON);
+
+    if (btnState == LOW) {
+        // Inicio de pulsación: registra el instante solo una vez.
+        if (buttonPressStart == 0) {
+            buttonPressStart = millis();
         }
+    } else {
+        // Botón liberado: evalúa la duración de la pulsación.
+        if (buttonPressStart > 0) {
+            const uint32_t now     = millis();
+            const uint32_t elapsed = now - static_cast<uint32_t>(buttonPressStart);
+
+            if (elapsed < kShortPressThresholdMs) {
+                // --- Pulsación corta ---
+                if (confirmRestoreElementSelection == 0) {
+                    // Opción "Sí": ejecutar secuencia de restauración (bloqueante por diseño).
+                    DEBUG__________ln("[⚠️] Restaurando elementos...");
+                    showMessageWithLoading("Restaurando", 2000);
+                    send_frame(frameMaker_SET_ELEM_ID(DEFAULT_BOTONERA, {BROADCAST}, DEFAULT_DEVICE));
+                    delay(kDelaySetElemMs);
+                    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, {BROADCAST}, SHOW_ID_CMD));
+                    delay(kDelayShowIdMs);
+                    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, {BROADCAST}, BLACKOUT));
+                    delay(kDelayBlackoutMs);
+                }
+
+                // Tras confirmar (sí/no), cerrar este menú y abrir el de formato.
+                confirmRestoreMenuElementActive = false;
+                formatSubMenuActive = true;
+                formatMenuSelection = 0;
+                drawFormatMenu(formatMenuSelection);
+            }
+        }
+        // Reset del estado de pulsación al liberar el botón.
         buttonPressStart = 0;
     }
 }
@@ -1615,90 +2012,186 @@ bool confirmDeleteActive = false;
 int confirmSelection = 0;
 String confirmedFileToDelete = "";
 
+/**
+ * @brief Gestiona el menú de borrado de elementos con encoder y pulsación corta.
+ *
+ * Actualiza la selección (navegación circular) a partir del contador del encoder y,
+ * al detectar una pulsación corta (< 1000 ms) del botón del encoder, decide si:
+ * - Vuelve al submenú de formato (si el elemento seleccionado es "VOLVER"), o
+ * - Abre el menú de confirmación de borrado para el elemento seleccionado.
+ *
+ * No realiza dibujado; el loop principal es quien redibuja en el tick correspondiente.
+ *
+ * @return void
+ * @pre
+ *  - `encoder` inicializado y operativo.
+ *  - `ENC_BUTTON` configurado como entrada con nivel activo en LOW.
+ *  - `deletableElementFiles` contiene los nombres de elementos (incluyendo la opción "VOLVER").
+ *  - Variables globales válidas: `deleteElementSelection`, `deleteElementMenuActive`,
+ *    `formatSubMenuActive`, `confirmDeleteActive`, `confirmDeleteMenuActive`,
+ *    `confirmSelection`, `confirmedFileToDelete`, `buttonPressStart`.
+ *  - Funciones externas disponibles: `getTranslation(const char*)`.
+ *  - No llamar desde ISR (usa temporización con `millis()` y accede a estructuras globales).
+ * @note
+ *  - Pulsación corta: < 1000 ms (botón activo en LOW).
+ *  - Navegación circular sobre `deletableElementFiles`.
+ *  - No hay debounce por software; se asume hardware o filtrado externo adecuado.
+ * @warning
+ *  - Si `deletableElementFiles` está vacío, la pulsación se ignora (no hay elemento válido).
+ * @see getTranslation
+ */
 void handleDeleteElementMenu() {
-    static int currentIndex = 0;
-    int32_t newEncoderValue = encoder.getCount();
+    // --- Constantes (evitan números mágicos) ---
+    constexpr uint32_t kShortPressThresholdMs = 1000U; // Umbral de pulsación corta
+
+    // --- Estado del encoder ---
+    static int currentIndex = 0; // Índice actual dentro de la lista
+    const int32_t newEncoderValue = encoder.getCount();
+    // Inicialización dinámica en la primera llamada para evitar salto inicial
     static int32_t lastValue = newEncoderValue;
 
-    if (newEncoderValue != lastValue) {
-        int dir = (newEncoderValue > lastValue) ? 1 : -1;
-        lastValue = newEncoderValue;
+    const size_t listSize = deletableElementFiles.size();
 
-        currentIndex = (currentIndex + dir + deletableElementFiles.size()) % deletableElementFiles.size();
-        deleteElementSelection = currentIndex;
-        // ❌ no dibujar aquí
+    // Detecta cambio de encoder (solo dirección, no magnitud del salto)
+    if (newEncoderValue != lastValue) {
+        const int dir = (newEncoderValue > lastValue) ? 1 : -1;
+        lastValue = newEncoderValue; // Actualiza siempre, aun sin lista, para seguir el estado real
+
+        if (listSize > 0) {
+            const int n = static_cast<int>(listSize);
+            // Navegación circular: 0..n-1
+            currentIndex = (currentIndex + dir + n) % n;
+            deleteElementSelection = currentIndex;
+            // ❌ no dibujar aquí
+        }
     }
 
+    // --- Gestión del botón del encoder (activo en LOW) ---
     if (digitalRead(ENC_BUTTON) == LOW) {
-        if (buttonPressStart == 0) buttonPressStart = millis();
+        // Inicio de pulsación (marca el tiempo una sola vez)
+        if (buttonPressStart == 0) {
+            buttonPressStart = millis();
+        }
     } else {
-        if (buttonPressStart > 0 && millis() - buttonPressStart < 1000) {
-            String selected = deletableElementFiles[deleteElementSelection];
+        // Botón liberado: evaluar duración si había pulsación en curso
+        if (buttonPressStart > 0) {
+            const uint32_t now     = millis();
+            const uint32_t elapsed = now - static_cast<uint32_t>(buttonPressStart);
 
-            if (selected == getTranslation("VOLVER")) {
-                deleteElementMenuActive = false;
-                formatSubMenuActive     = true;
-                // El loop dibujará drawFormatMenu(...) en su bloque correspondiente
-            } else {
-                DEBUG__________printf("[❓] Confirmar eliminación de: %s\n", selected.c_str());
-                confirmDeleteActive     = true;
-                confirmSelection        = 0;
-                confirmedFileToDelete   = selected;
+            if (elapsed < kShortPressThresholdMs) {
+                // --- Pulsación corta ---
+                if (listSize > 0 && static_cast<size_t>(deleteElementSelection) < listSize) {
+                    const String selected = deletableElementFiles[deleteElementSelection];
 
-                deleteElementMenuActive = false;
-                confirmDeleteMenuActive = true;
-                // ✅ NO dibujes aquí: el loop lo hará inmediatamente este mismo tick
+                    if (selected == getTranslation("VOLVER")) {
+                        // Salir a submenú de formato
+                        deleteElementMenuActive = false;
+                        formatSubMenuActive     = true;
+                        // El loop dibujará drawFormatMenu(...) en su bloque correspondiente
+                    } else {
+                        // Pasar a menú de confirmación de borrado
+                        DEBUG__________printf("[❓] Confirmar eliminación de: %s\n", selected.c_str());
+                        confirmDeleteActive     = true;
+                        confirmSelection        = 0;
+                        confirmedFileToDelete   = selected;
+
+                        deleteElementMenuActive = false;
+                        confirmDeleteMenuActive = true;
+                        // ✅ NO dibujes aquí: el loop lo hará inmediatamente este mismo tick
+                    }
+                }
+                // Si la lista está vacía o el índice es inválido, se ignora la pulsación (defensivo).
             }
         }
+        // Reset del estado de pulsación al liberar el botón
         buttonPressStart = 0;
     }
 }
 
 bool confirmDeleteMenuActive = false;
 
+/**
+ * @brief Gestiona la pantalla de confirmación de borrado mediante el encoder y el pulsador.
+ * @return void
+ * @warning El borrado es permanente si el archivo existe en SPIFFS.
+ */
 void handleConfirmDelete() {
+    //--- Constantes de comportamiento/UX (evitan "números mágicos")
+    constexpr int      kConfirmOptions = 2;        // 0 = Sí, 1 = No
+    constexpr uint32_t kShortPressMs   = 1000u;    // Umbral de pulsación corta
+
+    //--- Estado del encoder (persistente entre invocaciones)
     static int32_t lastValue = encoder.getCount();
-    int32_t newValue = encoder.getCount();
+
+    //--- Lecturas actuales
+    const int32_t newValue = encoder.getCount();
+    const uint32_t nowMs   = millis();
+
+    //--- Navegación con el encoder: alterna entre Sí/No
     if (newValue != lastValue) {
-        int dir = (newValue > lastValue) ? 1 : -1;
+        const int dir = (newValue > lastValue) ? 1 : -1; // +1 derecha / -1 izquierda
         lastValue = newValue;
 
-        confirmSelection = (confirmSelection + dir + 2) % 2;
+        // Mantener confirmSelection en [0..kConfirmOptions-1]
+        confirmSelection = (confirmSelection + dir + kConfirmOptions) % kConfirmOptions;
+
+        // Refrescar UI de confirmación
         drawConfirmDelete(confirmedFileToDelete);
     }
 
+    //--- Gestión de pulsación del botón del encoder
     if (digitalRead(ENC_BUTTON) == LOW) {
+        // Botón presionado: capturar instante de inicio si no estaba ya en curso
         if (buttonPressStart == 0) {
-            buttonPressStart = millis();
+            buttonPressStart = nowMs;
         }
     } else {
-        if (buttonPressStart > 0 && millis() - buttonPressStart < 1000) {
+        // Botón liberado: si hubo pulsación y fue corta, ejecutar acción
+        if (buttonPressStart > 0 && static_cast<uint32_t>(nowMs - buttonPressStart) < kShortPressMs) {
             if (confirmSelection == 0) {
                 // ✅ Sí, eliminar
-                String fullPath = "/element_" + confirmedFileToDelete + ".bin";
+                const String fullPath = String("/element_") + confirmedFileToDelete + ".bin";
+
                 if (SPIFFS.exists(fullPath)) {
-                    SPIFFS.remove(fullPath);
-                    DEBUG__________printf("[🗑] Eliminado: %s\n", fullPath.c_str());
+                    // Intentar borrar; log de éxito (se mantiene la macro existente)
+                    if (SPIFFS.remove(fullPath)) {
+                        DEBUG__________printf("[🗑] Eliminado: %s\n", fullPath.c_str());
+                    } else {
+                        // Nota: no cambiamos el comportamiento; solo se omite log en fallo.
+                        // Puede añadirse log adicional si existe infraestructura.
+                    }
                 }
-                formatSubMenuActive = false;
-                confirmDeleteActive = false;
+
+                // Salir del flujo de confirmación y volver al principal
+                formatSubMenuActive     = false;
+                confirmDeleteActive     = false;
                 confirmDeleteMenuActive = false;
-                // Recargar elementos o reiniciar
+
+                // Recargar elementos y volver al menú principal
                 loadElementsFromSPIFFS();
-                drawCurrentElement();  // Volver al menú principal
+                drawCurrentElement();
             } else {
-                // ❌ Cancelar
-                confirmDeleteActive = false;
+                // ❌ Cancelar: volver al menú de borrado
+                confirmDeleteActive     = false;
                 deleteElementMenuActive = true;
                 confirmDeleteMenuActive = false;
+
                 drawDeleteElementMenu(deleteElementSelection);
             }
         }
+
+        // Reset del estado de pulsación (evita re-disparos)
         buttonPressStart = 0;
     }
 }
 
+/**
+ * @brief Indica si el sistema se encuentra actualmente en el menú principal.
+ * @return true si ningún submenú o pantalla secundaria está activo; false en caso contrario.
+ * @note Evalúa múltiples banderas internas que indican si otros menús están activos.
+ */
 bool isInMainMenu() {
+    // Retorna verdadero solo si ninguna pantalla secundaria está activa.
     return !inModesScreen &&
            !hiddenMenuActive &&
            !brightnessMenuActive &&
@@ -1710,63 +2203,118 @@ bool isInMainMenu() {
            !confirmDeleteMenuActive;
 }
 
+/**
+ * @brief Muestra en pantalla los detalles (ID y Serial) del elemento seleccionado.
+ *
+ * Obtiene el ID (1 byte) y el número de serie (5 bytes) y los formatea en
+ * hexadecimal sin separadores y en mayúsculas. Para entradas especiales
+ * ("Ambientes", "Fichas", "Apagar") se muestra "N/A". Para "Comunicador" se
+ * usan los campos de `comunicadorOption`. En el resto de casos se leen los
+ * datos desde SPIFFS usando los offsets configurados.
+ *
+ * @return void
+ * @pre SPIFFS debe estar montado; `elementFiles[currentIndex]` debe ser válido.
+ * @pre `OFFSET_ID` y `OFFSET_SERIAL` deben apuntar a posiciones válidas del archivo.
+ * @pre `showElemInfo(uint32_t, const String&, const String&)` debe estar disponible.
+ * @note El ID se muestra con 2 dígitos hexadecimales; el Serial con 10 (5 bytes).
+ * @warning Si falla la apertura, seek o lectura de archivo, la función retorna sin mostrar en pantalla.
+ * @see showElemInfo
+ */
+
 void printElementDetails() {
-    String currentFile = elementFiles[currentIndex];
+    // -------------------------------
+    // Constantes y utilidades locales
+    // -------------------------------
+    constexpr uint32_t kDisplayTimeoutMs = 10000U; // Evita número mágico en showElemInfo
+    constexpr size_t   kSerialLen        = 5U;     // Longitud en bytes del serial
+    constexpr size_t   kHexByteStrLen    = 3U;     // "FF" + '\0'
+    constexpr char     kNA[]             = "N/A";
+
+    // Lambda para convertir un byte a dos dígitos hex (mayúsculas)
+    auto byteToHex = [](uint8_t v, char out[kHexByteStrLen]) noexcept {
+        // %02X ya genera mayúsculas; se mantiene toUpperCase posterior por robustez.
+        (void)snprintf(out, kHexByteStrLen, "%02X", static_cast<unsigned>(v));
+    };
+
+    // Lambda para crear un String con los bytes en hex sin separadores
+    auto hexOfArray = [&](const uint8_t* data, size_t len) -> String {
+        String s;
+        s.reserve(len * 2U); // 2 chars por byte
+        char buf[kHexByteStrLen] = {};
+        for (size_t i = 0; i < len; ++i) {
+            byteToHex(data[i], buf);
+            s += buf;
+        }
+        return s;
+    };
+
+    // -------------------------------
+    // Selección del origen de datos
+    // -------------------------------
+    const String currentFile = elementFiles[currentIndex];
     String idStr;
     String serialStr;
 
-    if (currentFile == "Ambientes" || currentFile == "Fichas") {
-        idStr     = "N/A";
-        serialStr = "N/A";
+    if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Apagar") {
+        // Entradas especiales sin ID/Serial
+        idStr     = kNA;
+        serialStr = kNA;
     }
     else if (currentFile == "Comunicador") {
-        // Formatear ID (2 dígitos hexadecimales)
-        char idBuf[3];
-        sprintf(idBuf, "%02X", comunicadorOption.ID);
-        idStr = idBuf;
-
-        // Formatear Serial sin espacios
-        serialStr = "";
-        for (int i = 0; i < 5; i++) {
-            char buf[3];
-            sprintf(buf, "%02X", comunicadorOption.serialNum[i]);
-            serialStr += buf;
+        // Formateo desde estructura en memoria
+        {
+            char idBuf[kHexByteStrLen] = {};
+            byteToHex(static_cast<uint8_t>(comunicadorOption.ID), idBuf);
+            idStr = idBuf;
         }
-    }
-    else if (currentFile == "Apagar") {
-        idStr     = "N/A";
-        serialStr = "N/A";
+
+        // Serial de 5 bytes (sin separadores)
+        serialStr = hexOfArray(reinterpret_cast<const uint8_t*>(comunicadorOption.serialNum), kSerialLen);
     }
     else {
-        // Leer desde SPIFFS
+        // -------------------------------
+        // Lectura desde SPIFFS con checks
+        // -------------------------------
         fs::File f = SPIFFS.open(currentFile, "r");
         if (!f) {
             DEBUG__________ln("❌ No se pudo abrir el archivo para mostrar detalles.");
-            return;
+            return; // Mantiene semántica original en caso de fallo de apertura
         }
-        byte id;
-        byte serial[5];
-        f.seek(OFFSET_ID);
-        f.read(&id, 1);
-        f.seek(OFFSET_SERIAL);
-        f.read(serial, 5);
+
+        uint8_t id      = 0U;
+        uint8_t serial[kSerialLen] = {0U};
+
+        // Validaciones defensivas de seek/read
+        bool ok = true;
+        ok = ok && f.seek(OFFSET_ID);
+        if (ok) {
+            size_t n = f.read(&id, 1U);
+            ok = ok && (n == 1U);
+        }
+        ok = ok && f.seek(OFFSET_SERIAL);
+        if (ok) {
+            size_t n = f.read(serial, kSerialLen);
+            ok = ok && (n == kSerialLen);
+        }
         f.close();
 
-        // ID
-        char idBuf[3];
-        sprintf(idBuf, "%02X", id);
-        idStr = idBuf;
-
-        // Serial sin espacios
-        serialStr = "";
-        for (int i = 0; i < 5; i++) {
-            char buf[3];
-            sprintf(buf, "%02X", serial[i]);
-            serialStr += buf;
+        if (!ok) {
+            DEBUG__________ln("❌ Error de lectura/seek en archivo de elemento.");
+            return; // Evita mostrar datos corruptos
         }
+
+        // Formateo ID (2 dígitos hex)
+        {
+            char idBuf[kHexByteStrLen] = {};
+            byteToHex(id, idBuf);
+            idStr = idBuf;
+        }
+
+        // Formateo serial (5 bytes → 10 dígitos hex sin espacios)
+        serialStr = hexOfArray(serial, kSerialLen);
     }
 
-    // Por seguridad, pasar a mayúsculas (por si sprintf usa minúsculas)
+    // Normalización por seguridad (debería ser innecesario con %02X, pero no cuesta)
     idStr.toUpperCase();
     serialStr.toUpperCase();
 
@@ -1776,41 +2324,104 @@ void printElementDetails() {
     DEBUG__________("Serial: "); DEBUG__________ln(serialStr);
 
     // Mostrar en pantalla
-    showElemInfo(10000, serialStr, idStr);
+    showElemInfo(kDisplayTimeoutMs, serialStr, idStr);
 }
 
+/**
+ * @brief Calcula cuántos modos "visibles" existen para un archivo o categoría.
+ *
+ * Para "Ambientes" y "Fichas" cuenta los modos del paquete en RAM cuyo nombre no está vacío
+ * y cuyo bit más significativo en el campo de configuración está activo.
+ * Para "Apagar" y "Comunicador" retorna 0.
+ * Para otros archivos, lee 16 entradas desde SPIFFS: nombre (24 bytes) y configuración (2 bytes),
+ * y cuenta las que cumplan las mismas condiciones.
+ *
+ * @param file Nombre lógico de la categoría ("Ambientes", "Fichas", "Apagar", "Comunicador")
+ *             o ruta de archivo en SPIFFS.
+ * @return Número de modos visibles en el rango [0..16].
+ * @pre SPIFFS debe estar montado si `file` no es "Ambientes", "Fichas", "Apagar" o "Comunicador".
+ * @note Disposición en archivo: nombre (24 bytes) en `OFFSET_MODES + i*SIZE_MODE`, y config (2 bytes)
+ *       en `OFFSET_MODES + i*SIZE_MODE + 216`. Se asume orden little-endian para `config`.
+ * @warning Si un `seek`/`read` falla al leer una entrada desde SPIFFS, esa entrada se ignora.
+ * @see checkMostSignificantBit
+ */
 int getTotalModesForFile(const String &file) {
+    // -------------------------------
+    // Constantes para legibilidad
+    // -------------------------------
+    constexpr int    kMaxModes             = 16;    // Total de slots
+    constexpr size_t kModeNameLen          = 24U;   // Bytes de nombre por modo
+    constexpr size_t kCfgBytes             = 2U;    // Tamaño del campo config en archivo
+    constexpr size_t kCfgOffsetWithinMode  = 216U;  // Offset del campo config dentro de cada modo
+
+    // -------------------------------
+    // Casos en RAM: Ambientes / Fichas
+    // -------------------------------
     if (file == "Ambientes" || file == "Fichas") {
         INFO_PACK_T* opt = (file == "Ambientes") ? &ambientesOption : &fichasOption;
-        // Cuenta cuántos modos “visibles” hay en amb/fichas
+
         int count = 0;
-        for (int i = 0; i < 16; i++) {
-            if (strlen((char*)opt->mode[i].name) > 0 &&
+        for (int i = 0; i < kMaxModes; ++i) {
+            const char* name = reinterpret_cast<const char*>(opt->mode[i].name);
+            // Nombre no vacío y MSB de config activo => visible
+            if (name != nullptr &&
+                ::strlen(name) > 0 &&
                 checkMostSignificantBit(opt->mode[i].config)) {
-                count++;
+                ++count;
             }
         }
         return count;
     }
-    if (file == "Apagar") {
+
+    // -------------------------------
+    // Casos sin modos visibles
+    // -------------------------------
+    if (file == "Apagar" || file == "Comunicador") {
         return 0;
     }
-    // Para archivos SPIFFS:
+
+    // -------------------------------
+    // Lectura desde SPIFFS
+    // -------------------------------
     fs::File f = SPIFFS.open(file, "r");
-    if (!f) return 0;
-    int count = 0;
-    char modeName[25];
-    byte cfg[2];
-    for (int i = 0; i < 16; i++) {
-        f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet);
-        f.read((uint8_t*)modeName, 24);
-        modeName[24] = 0;
-        f.seek(OFFSET_MODES + i * SIZE_MODE + 216, SeekSet);
-        f.read(cfg, 2);
-        if (strlen(modeName) > 0 && checkMostSignificantBit(cfg)) {
-            count++;
+    if (!f) {
+        return 0; // Comportamiento original
+    }
+
+    int  count = 0;
+    char modeName[kModeNameLen + 1] = {}; // +1 para terminador
+    byte cfgRaw[kCfgBytes] = {0, 0};
+
+    for (int i = 0; i < kMaxModes; ++i) {
+        // Offset base de la entrada i
+        const size_t base = static_cast<size_t>(OFFSET_MODES) +
+                            static_cast<size_t>(i) * static_cast<size_t>(SIZE_MODE);
+
+        // --- Leer nombre (24 bytes) ---
+        if (!f.seek(base, SeekSet)) {
+            continue; // Entrada inválida: se ignora
+        }
+        size_t n = f.read(reinterpret_cast<uint8_t*>(modeName), kModeNameLen);
+        if (n != kModeNameLen) {
+            continue; // Lectura incompleta: se ignora
+        }
+        modeName[kModeNameLen] = '\0'; // Asegurar terminación
+
+        // --- Leer config (2 bytes tal cual) ---
+        if (!f.seek(base + kCfgOffsetWithinMode, SeekSet)) {
+            continue;
+        }
+        n = f.read(cfgRaw, kCfgBytes);
+        if (n != kCfgBytes) {
+            continue;
+        }
+
+        // --- Visibilidad: nombre no vacío + MSB activo ---
+        if (::strlen(modeName) > 0 && checkMostSignificantBit(cfgRaw)) {
+            ++count;
         }
     }
+
     f.close();
     return count;
 }
