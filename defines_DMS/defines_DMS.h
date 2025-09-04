@@ -4,13 +4,18 @@
 #include <Arduino.h>
 
 //DELFINES GLOBALES
-#define BOTONERA_NEW
+#define BOTONERA_OLD           // -> BOTONERA_OLD / BOTONERA_NEW
 #define NOELEM
 #define BOTONERA
 #define PLAYER                 // -> PLAYER / NOPLAYER
 #define NFC                    // -> NFC / NONFC
 #define MIC                    // -> MIC / NOMIC
-#define ADXL                   // -> ADXL / NOADXL      
+#define ADXL                   // -> ADXL / NOADXL     
+
+#define AP_ELEM_IP                    200, 200, 200, 1
+#define AP_SSID_NAME                  "DOIT_BOTONERA_LINK"
+#define AP_SSID_PASS                  "12345678"
+#define OTA_PASS                      "wakeupneo" 
 
 #define DEBUG
 #define DEBUG_
@@ -56,13 +61,19 @@
 */
 //
 
-
 #define I2C2_SDA          40
 #define I2C2_SCL          41
 
-#define I2S_WS            16//orig 16
-#define I2S_SD            47//orig 47
-#define I2S_SCK           48//orig 48
+#if defined(BOTONERA_OLD)
+  #define I2S_WS   11 //16 //orig 16
+  #define I2S_SD   12 //47 //orig 47
+  #define I2S_SCK  13 //48 //orig 48
+
+#elif defined(BOTONERA_NEW)
+  #define I2S_WS   16 //16 //orig 16
+  #define I2S_SD   47 //47 //orig 47
+  #define I2S_SCK  48 //48 //orig 48
+#endif
 
 #define RF_TX_PIN         18 
 #define RF_RX_PIN         17  

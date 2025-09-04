@@ -8,8 +8,10 @@
 #include <WiFi.h>
 #include <map>
 #include <algorithm>
+#include <ArduinoOTA.h>
 
 extern COLORHANDLER_ colorHandler;
+volatile bool ap_ota_activo = false;
 
 
 void ELEMENT_::begin() {
@@ -208,4 +210,62 @@ void ELEMENT_::configurar_RF(int baudRate) {
         //DEBUG__________ln("Configuración completa y módulo reiniciado correctamente.");
         #endif
     delay(10);
+}
+
+
+
+void ELEMENT_::activarAP_OTA() {
+    delay(100);
+    if (ap_ota_activo) {
+        DEBUG__________("OTA YA ESTA ACTIVO");
+        return;
+    }
+
+    DEBUG__________("Activando Access Point...");
+
+    // 1) Config IP del AP
+    IPAddress ap_ip(AP_ELEM_IP);
+    IPAddress gw(AP_ELEM_IP);
+    IPAddress mask(255, 255, 255, 0);
+    WiFi.softAPConfig(ap_ip, gw, mask);
+
+    // 2) Levantar AP
+    WiFi.softAP(AP_SSID, AP_PASSWORD);
+    DEBUG__________("IP ADDR: " + String(ap_ip));
+
+    // 3) Preparar OTA (protegido por password)
+    ArduinoOTA.setPassword(OTA_PASSWORD);
+
+    ArduinoOTA.onStart([]() {
+        String type = (ArduinoOTA.getCommand() == U_FLASH) ? "sketch" : "filesystem";
+        DEBUG__________("Iniciando actualización OTA de " + type);
+    });
+    ArduinoOTA.onEnd([]() {
+        DEBUG__________("\nFinalizando OTA");
+        // Si quieres auto-apagar el AP al terminar, marca algo y ciérralo desde loop().
+    });
+    ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+        // Progreso (silenciado para no saturar)
+        // DEBUG__________("Progreso OTA: " + String(progress * 100 / total) + "%");
+    });
+    ArduinoOTA.onError([](ota_error_t error) {
+        // DEBUG__________("Error OTA: " + String(error));
+    });
+
+    ArduinoOTA.begin();      // ¡Arranca el servidor OTA!
+    ap_ota_activo = true;
+    DEBUG__________("Access Point y OTA ACTIVADOS.");
+}
+
+void ELEMENT_::desactivarAP_OTA() {
+    if (!ap_ota_activo) {
+        DEBUG__________("AP y OTA ya están desactivados.");
+        return;
+    }
+    DEBUG__________("Desactivando OTA...");
+    ArduinoOTA.end();              // Cierra el servidor OTA
+    WiFi.softAPdisconnect(true);   // Apaga el AP
+    // Opcional: WiFi.mode(WIFI_OFF);
+    ap_ota_activo = false;
+    DEBUG__________("AP y OTA DESACTIVADOS.");
 }

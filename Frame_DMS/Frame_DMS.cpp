@@ -145,7 +145,8 @@ void IRAM_ATTR onUartInterrupt() {
                                     break;
                                 }
                             }
-                            isTarget = true; //eliminar esta línea
+
+                            // isTarget = true; //eliminar esta línea
                             if (isTarget) {
                                 //DEBUG__________ln();
                                 frameReceived = true; // Set flag for loop() to process

@@ -332,7 +332,15 @@ void BOTONERA_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
                 const uint8_t lang = static_cast<uint8_t>(currentLanguage);
                 const uint8_t file = static_cast<uint8_t>(lang * kLangStride + res + 1u);
                 doitPlayer.play_file(FAIL_RESP_BANK, file);
+            }else if (receivedCommand == OTA_AP_ON) {
+                DEBUG__________ln("Comando OTA_AP_ON recibido → Activando AP + OTA...");
+                element->activarAP_OTA();     // Llamada a la función OTA
             }
+            else if (receivedCommand == OTA_AP_OFF) {
+                DEBUG__________ln("Comando OTA_AP_OFF recibido → Desactivando AP + OTA...");
+                element->desactivarAP_OTA();
+            }
+
             break;
         }
 

@@ -31,11 +31,20 @@ class ELEMENT_ {
         //void      set_mode(uint8_t mode);
         byte      get_currentMode();
 
+        void activarAP_OTA();
+        void desactivarAP_OTA();
+
+        const char* AP_SSID =    AP_SSID_NAME;
+        const char* AP_PASSWORD= AP_SSID_PASS;
+        const char* OTA_PASSWORD= OTA_PASS;
+
     protected:
         virtual void  RX_main_handler(LAST_ENTRY_FRAME_T LEF){}
         byte     flag;
         uint8_t  currentMode;  
         byte     type;
 };
+
+extern volatile bool ap_ota_activo;
 
 #endif
