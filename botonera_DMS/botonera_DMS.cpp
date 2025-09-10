@@ -365,6 +365,19 @@ void BOTONERA_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
 extern bool adxl;
 extern bool useMic;
 
+static inline bool isSpiffsPath(const String& s) {
+    return s.length() > 0 && s[0] == '/';
+}
+
+static inline bool isRamElementId(byte id) {
+    // Ajusta si tienes más IDs RAM. 0x00 lo usas como “broadcast de sala”; no lo tratamos como elemento único.
+    return (id == DEFAULT_DICE) || (id == BROADCAST) || (id == DEFAULT_BOTONERA) || (id == DEFAULT_CONSOLE); // Dado, (Comunicador si alguna vez envía CMODE)
+}
+
+static inline bool isRamElementName(const String& name) {
+    return (name == "Ambientes" || name == "Fichas" || name == "Apagar" || name == "Comunicador" || name == "Dado");
+}
+
 /**
  * @brief Procesa datos de sector recibidos para un elemento (botonera) y sincroniza estado.
  *
@@ -428,148 +441,169 @@ void BOTONERA_::sectorIn_handler(std::vector<byte> data, byte targetin) {
         }
 
         case ELEM_CMODE_SECTOR: {
-            // Necesitamos al menos 2 bytes: [sector, modo]
-            if (data.size() < 2) {
-                DEBUG__________ln("⚠️ ELEM_CMODE_SECTOR con longitud insuficiente (<2).");
-                break;
-            }
-
-            // ----------------------------
-            // 1) Modo recibido
-            // ----------------------------
-            const byte receivedMode = data[kIdx1];
-            DEBUG__________ln("📢 ID: " + String(targetin) + " con MODO " + String(receivedMode));
-
-            // ----------------------------
-            // 2) Leer/actualizar modo en SPIFFS
-            // ----------------------------
-            fs::File file = SPIFFS.open(getCurrentFilePath(targetin), "r+");
-            if (!file) {
-                DEBUG__________ln("Error: No se pudo abrir el archivo en SPIFFS.");
-                break;
-            }
-
-            // Leer modo almacenado (con inicialización defensiva)
-            byte storedMode = 0;
-            if (!file.seek(OFFSET_CURRENTMODE, SeekSet)) {
-                DEBUG__________ln("⚠️ No se pudo posicionar en OFFSET_CURRENTMODE.");
-            } else {
-                (void)file.read(&storedMode, 1);
-            }
-
-            // Comparar y actualizar si procede
-            if (storedMode != receivedMode) {
-                DEBUG__________printf("Actualizando el modo en SPIFFS: %d -> %d\n", storedMode, receivedMode);
-                if (!file.seek(OFFSET_CURRENTMODE, SeekSet)) {
-                    DEBUG__________ln("⚠️ No se pudo reposicionar en OFFSET_CURRENTMODE para escribir.");
-                } else {
-                    (void)file.write(&receivedMode, 1);
-                }
-            } else {
-                DEBUG__________ln("El modo recibido coincide con el almacenado en SPIFFS.");
-            }
-
-            file.close();
-
-            // ----------------------------
-            // 3) Redibujar pantalla
-            // ----------------------------
-            drawCurrentElement();
-
-            // ----------------------------
-            // 4) Actualizar estado de selección por ID
-            // ----------------------------
-            for (size_t i = 0; i < elementFiles.size(); ++i) {
-                fs::File idFile = SPIFFS.open(elementFiles[i], "r");
-                if (!idFile) continue;
-
-                if (!idFile.seek(OFFSET_ID, SeekSet)) {
-                    idFile.close();
-                    continue;
-                }
-
-                byte idCheck = 0;
-                (void)idFile.read(&idCheck, 1);
-                idFile.close();
-
-                if (idCheck == targetin) {
-                    // Protección por si selectedStates y elementFiles difieren en tamaño
-                    if (i < selectedStates.size()) {
-                        selectedStates[i] = (receivedMode != 0);
-                        DEBUG__________printf("🔁 Estado de selección actualizado: %s => %s\n",
-                                              elementFiles[i].c_str(),
-                                              selectedStates[i] ? "Seleccionado" : "No seleccionado");
-                    } else {
-                        DEBUG__________ln("⚠️ selectedStates desincronizado con elementFiles (índice fuera de rango).");
-                    }
-
-                    // Si coincide con el elemento visible, redibujar
-                    if (i == static_cast<size_t>(currentIndex)) {
-                        drawCurrentElement();
-                    }
-                    break;
-                }
-            }
-
-            // ----------------------------
-            // 5) Si el elemento en pantalla es el target, recargar configuración
-            // ----------------------------
-            if (static_cast<size_t>(currentIndex) < elementFiles.size()) {
-                const String currentFile = elementFiles[currentIndex];
-
-                fs::File f = SPIFFS.open(currentFile, "r");
-                if (f) {
-                    if (f.seek(OFFSET_ID, SeekSet)) {
-                        byte currentElementID = 0;
-                        (void)f.read(&currentElementID, 1);
-                        f.close();
-
-                        if (currentElementID == targetin) {
-                            // --- Releer configuración del nuevo modo ---
-                            byte currentMode = 0;
-                            byte modeConfig[kModeConfigBytes] = {0};
-
-                            fs::File f2 = SPIFFS.open(currentFile, "r");
-                            if (f2) {
-                                // Leer modo actual
-                                if (f2.seek(OFFSET_CURRENTMODE, SeekSet)) {
-                                    (void)f2.read(&currentMode, 1);
-                                }
-
-                                // Calcular offset de la configuración dentro del modo
-                                const size_t cfgOffset =
-                                    static_cast<size_t>(OFFSET_MODES) +
-                                    static_cast<size_t>(currentMode) * static_cast<size_t>(SIZE_MODE) +
-                                    kOffsetConfigInMode;
-
-                                if (f2.seek(cfgOffset, SeekSet)) {
-                                    (void)f2.read(modeConfig, kModeConfigBytes);
-                                } else {
-                                    DEBUG__________ln("⚠️ No se pudo posicionar en OFFSET_CONFIG del modo.");
-                                }
-                                f2.close();
-                            }
-
-                            // Actualizar sensores según flags
-                            adxl   = getModeFlag(modeConfig, HAS_SENS_VAL_1);
-                            useMic = getModeFlag(modeConfig, HAS_SENS_VAL_2);
-
-                            // Actualizar patrón de color
-                            colorHandler.setCurrentFile(currentFile);
-                            colorHandler.setPatternBotonera(currentMode, ledManager);
-
-                            DEBUG__________ln("🔁 Configuración de modo actual actualizada tras recibir ELEM_CMODE_SECTOR.");
-                        }
-                    } else {
-                        f.close();
-                    }
-                }
-            } else {
-                DEBUG__________ln("⚠️ currentIndex fuera de rango respecto a elementFiles.");
-            }
-
+        if (data.size() < 2) {
+            DEBUG__________ln("⚠️ ELEM_CMODE_SECTOR con longitud insuficiente (<2).");
             break;
         }
+
+        const byte receivedMode = data[kIdx1];
+        DEBUG__________ln("📢 ID: " + String(targetin) + " con MODO " + String(receivedMode));
+
+        // ─────────────────────────────────────────────────────────
+        // 0) RAM elements (no tocar SPIFFS)
+        // ─────────────────────────────────────────────────────────
+        if (isRamElementId(targetin)) {
+            // Por ahora sólo Dado (0xDA) necesita reflejo de modo en RAM
+            if (targetin == DEFAULT_DICE) {
+                dadoOption.currentMode = receivedMode;
+
+                // Marcar seleccionado/des-seleccionado si existe en el listado
+                for (size_t i = 0; i < elementFiles.size(); ++i) {
+                    if (elementFiles[i] == "Dado") {
+                        if (i < selectedStates.size()) {
+                            selectedStates[i] = (receivedMode != 0);
+                        }
+                        // Si es el elemento visible, redibuja
+                        if ((int)i == currentIndex) {
+                            drawCurrentElement();
+                        }
+                        break;
+                    }
+                }
+            }
+
+            // Actualizar color/patrón si el elemento visible es el target (y es RAM)
+            if ((size_t)currentIndex < elementFiles.size() && isRamElementName(elementFiles[currentIndex])) {
+                colorHandler.setCurrentFile(elementFiles[currentIndex]);
+                colorHandler.setPatternBotonera(receivedMode, ledManager);
+                drawCurrentElement();
+            }
+
+            break; // RAM: no seguimos con SPIFFS
+        }
+
+        // ─────────────────────────────────────────────────────────
+        // 1) Elementos de SPIFFS
+        // ─────────────────────────────────────────────────────────
+        const String filePath = getCurrentFilePath(targetin);
+        if (!isSpiffsPath(filePath)) {
+            DEBUG__________ln("Error: No se encontró un archivo para el elemento ID " + String(targetin) + ".");
+            break;
+        }
+
+        // 2) Leer/actualizar modo en SPIFFS
+        fs::File file = SPIFFS.open(filePath, "r+");
+        if (!file) {
+            DEBUG__________ln("Error: No se pudo abrir el archivo en SPIFFS.");
+            break;
+        }
+
+        byte storedMode = 0;
+        if (!file.seek(OFFSET_CURRENTMODE, SeekSet)) {
+            DEBUG__________ln("⚠️ No se pudo posicionar en OFFSET_CURRENTMODE.");
+        } else {
+            (void)file.read(&storedMode, 1);
+        }
+
+        if (storedMode != receivedMode) {
+            DEBUG__________printf("Actualizando el modo en SPIFFS: %d -> %d\n", storedMode, receivedMode);
+            if (file.seek(OFFSET_CURRENTMODE, SeekSet)) {
+                (void)file.write(&receivedMode, 1);
+            } else {
+                DEBUG__________ln("⚠️ No se pudo reposicionar en OFFSET_CURRENTMODE para escribir.");
+            }
+        } else {
+            DEBUG__________ln("El modo recibido coincide con el almacenado en SPIFFS.");
+        }
+        file.close();
+
+        // 3) Redibujar pantalla
+        drawCurrentElement();
+
+        // 4) Actualizar estado de selección por ID (SÓLO SPIFFS)
+        for (size_t i = 0; i < elementFiles.size(); ++i) {
+            const String &path = elementFiles[i];
+            if (!isSpiffsPath(path)) continue;  // ← ← ← EVITA abrir "Ambientes", etc.
+
+            fs::File idFile = SPIFFS.open(path, "r");
+            if (!idFile) continue;
+
+            if (!idFile.seek(OFFSET_ID, SeekSet)) {
+                idFile.close();
+                continue;
+            }
+
+            byte idCheck = 0;
+            (void)idFile.read(&idCheck, 1);
+            idFile.close();
+
+            if (idCheck == targetin) {
+                if (i < selectedStates.size()) {
+                    selectedStates[i] = (receivedMode != 0);
+                    DEBUG__________printf("🔁 Estado de selección actualizado: %s => %s\n",
+                                        path.c_str(),
+                                        selectedStates[i] ? "Seleccionado" : "No seleccionado");
+                } else {
+                    DEBUG__________ln("⚠️ selectedStates desincronizado con elementFiles (índice fuera de rango).");
+                }
+
+                if ((int)i == currentIndex) {
+                    drawCurrentElement();
+                }
+                break;
+            }
+        }
+
+        // 5) Si el elemento visible es SPIFFS y coincide el ID, recargar flags/color
+        if ((size_t)currentIndex < elementFiles.size()) {
+            const String currentFile = elementFiles[currentIndex];
+            if (isSpiffsPath(currentFile)) {
+                fs::File f = SPIFFS.open(currentFile, "r");
+                if (f) {
+                    byte currentElementID = 0;
+                    if (f.seek(OFFSET_ID, SeekSet)) {
+                        (void)f.read(&currentElementID, 1);
+                    }
+                    f.close();
+
+                    if (currentElementID == targetin) {
+                        byte currentMode = 0;
+                        byte modeConfig[kModeConfigBytes] = {0};
+
+                        fs::File f2 = SPIFFS.open(currentFile, "r");
+                        if (f2) {
+                            if (f2.seek(OFFSET_CURRENTMODE, SeekSet)) {
+                                (void)f2.read(&currentMode, 1);
+                            }
+                            const size_t cfgOffset =
+                                (size_t)OFFSET_MODES +
+                                (size_t)currentMode * (size_t)SIZE_MODE +
+                                (size_t)kOffsetConfigInMode;
+                            if (f2.seek(cfgOffset, SeekSet)) {
+                                (void)f2.read(modeConfig, kModeConfigBytes);
+                            } else {
+                                DEBUG__________ln("⚠️ No se pudo posicionar en OFFSET_CONFIG del modo.");
+                            }
+                            f2.close();
+                        }
+
+                        adxl   = getModeFlag(modeConfig, HAS_SENS_VAL_1);
+                        useMic = getModeFlag(modeConfig, HAS_SENS_VAL_2);
+
+                        colorHandler.setCurrentFile(currentFile);
+                        colorHandler.setPatternBotonera(currentMode, ledManager);
+
+                        DEBUG__________ln("🔁 Configuración de modo actual actualizada tras recibir ELEM_CMODE_SECTOR.");
+                    }
+                }
+            }
+        } else {
+            DEBUG__________ln("⚠️ currentIndex fuera de rango respecto a elementFiles.");
+        }
+
+        break;
+    }
+
 
         case ELEM_ICON_ROW_63_SECTOR: {
             // Reservado: gestión de fila de iconos 63.

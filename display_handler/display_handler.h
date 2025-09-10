@@ -73,3 +73,14 @@ extern int brightnessMenuIndex;
 
 void showMessageWithProgress(const char* message, unsigned long delayTime);
 
+// Extra Elements menu
+void drawExtraElementsMenu(int selection);
+void drawConfirmEnableDadoMenu(int selection);
+
+extern bool extraElementsMenuActive;
+extern int  extraElementsMenuSelection;
+
+extern bool confirmEnableDadoActive;
+extern int  confirmEnableDadoSelection;
+
+

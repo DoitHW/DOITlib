@@ -144,6 +144,14 @@ enum BrightnessOption {
     BRIGHTNESS_DIM    = 1
 };
 
+void handleExtraElementsMenu();
+void handleConfirmEnableDadoMenu();
+
+extern bool extraElementsMenuActive;
+extern int  extraElementsMenuSelection;
+extern bool confirmEnableDadoActive;
+extern int  confirmEnableDadoSelection;
+
 
  
 

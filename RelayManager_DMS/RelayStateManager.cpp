@@ -99,7 +99,7 @@ bool RelayStateManager::getModeConfigForID(uint8_t id, uint8_t modeCfg[2])
             memcpy(modeCfg, opt->mode[opt->currentMode].config, 2);
             return true;
         }
-    }
+    } 
 
     /* —— buscar en archivos SPIFFS ———————————————— */
     for (const String& f : elementFiles) {

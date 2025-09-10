@@ -848,12 +848,14 @@ void drawCurrentElement()
     };
 
     // ─────────────────────────────── Caso 1: Fijos ───────────────────────────────
-    if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Comunicador")
+    if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Comunicador" || currentFile == "Dado")
     {
         INFO_PACK_T* option = nullptr;
         if      (currentFile == "Ambientes")   option = &ambientesOption;
         else if (currentFile == "Fichas")      option = &fichasOption;
-        else                                   option = &comunicadorOption;
+        else if (currentFile == "Comunicador") option = &comunicadorOption;
+        else                                   option = &dadoOption;
+
 
         currentMode = option->currentMode;
 
@@ -868,9 +870,11 @@ void drawCurrentElement()
 
         // Nombre del elemento (traducido)
         const String displayName =
-            (currentFile == "Ambientes") ? String(getTranslation("AMBIENTES")) :
-            (currentFile == "Fichas")    ? String(getTranslation("FICHAS"))    :
-                                           String(getTranslation("COMUNICADOR"));
+        (currentFile == "Ambientes")   ? String(getTranslation("AMBIENTES"))   :
+        (currentFile == "Fichas")      ? String(getTranslation("FICHAS"))      :
+        (currentFile == "Comunicador") ? String(getTranslation("COMUNICADOR")) :
+                                        String(getTranslation("DADO"));     
+
 
         // Medición con fuente grande
         uiSprite.setFreeFont(&FreeSansBold12pt7b);
@@ -1230,12 +1234,13 @@ void drawModesScreen()
     visibleModesMap[count++] = -3;
 
     // 2) Modos del elemento
-    if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Comunicador")
+    if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Comunicador" || currentFile == "Dado")
     {
         INFO_PACK_T* option =
-            (currentFile == "Ambientes") ? &ambientesOption :
-            (currentFile == "Fichas")    ? &fichasOption    :
-                                           &comunicadorOption;
+            (currentFile == "Ambientes")   ? &ambientesOption  :
+            (currentFile == "Fichas")      ? &fichasOption     :
+            (currentFile == "Comunicador") ? &comunicadorOption :
+                                             &dadoOption;      
 
         for (int i = 0; i < 16 && count < kMaxEntries - 1; ++i) {
             if (strlen((char*)option->mode[i].name) > 0 &&
@@ -2272,7 +2277,7 @@ void drawFormatMenu(int selection)
 
     const int scrollBarWidth  = 6;
     const int visibleOptions  = 4;
-    const int totalOptions    = 6;
+    const int totalOptions    = 7;
 
     const char* options[] = {
         getTranslation("UPDATE_SALA"),
@@ -2280,6 +2285,7 @@ void drawFormatMenu(int selection)
         getTranslation("FORMATEAR"),
         getTranslation("SHOW_ID"),
         getTranslation("RESTORE_ELEM"),
+        getTranslation("ELEMENTOS_ADICIONALES"),
         getTranslation("VOLVER")
     };
 
@@ -3678,4 +3684,313 @@ void showMessageWithProgress(const char* message, unsigned long delayTime) {
     ignoreInputs = false;
 }
 
+bool extraElementsMenuActive = false;
+int  extraElementsMenuSelection = 0;
 
+bool confirmEnableDadoActive = false;
+int  confirmEnableDadoSelection = 0;
+
+void drawExtraElementsMenu(int selection)
+{
+    /*──────── Constantes/layout ────────*/
+    const int screenW           = tft.width();
+    constexpr int kTitleY       = 5;
+    constexpr int kListStartY   = 30;
+    constexpr int kCardRadius   = 3;
+    constexpr int kHLPadX       = 3;
+    constexpr int kHLPadY       = 1;
+    constexpr int kRowTopInset  = (kHLPadY + 1);
+    constexpr int kTickerFrameMs= 50;
+
+    const int visibleOptions    = 2;   // Dado + Volver
+    const int total             = 2;
+
+    const int x              = 9;
+    const int scrollBarW     = 6;
+    const int scrollBarX     = screenW - scrollBarW - 3;
+    const int textAreaW      = scrollBarX - x - 2;
+
+    const int cardHeight     = CARD_HEIGHT;
+    const int cardMargin     = CARD_MARGIN;
+    const int stepY          = cardHeight + cardMargin;
+
+    /*──────── Estado TICKER título (persistente) ────────*/
+    static int  titleTickerOffset    = 0;
+    static int  titleTickerDirection = 1; // 1→derecha, -1→izquierda
+    static unsigned long titleLastFrameTime = 0;
+    static TFT_eSprite titleTicker(&tft);
+    static int titleW = 0, titleH = 0;
+
+    /*──────── Estado TICKER fila (persistente) ────────*/
+    static int lastSelectedIndex  = -1;
+    static int optTickerOffset    = 0;
+    static int optTickerDirection = 1; // 1→derecha, -1→izquierda
+    static unsigned long optLastFrameTime = 0;
+    static TFT_eSprite optTicker(&tft);
+    static int tickerW = 0, tickerH = 0;
+
+    /*──────── Preparar items (con traducción) ────────*/
+    const bool enabled = isDadoEnabled();
+    String dadoLine = String(getTranslation("DADO")) + " (" +
+                      String(getTranslation(enabled ? "HABILITADO" : "DESHABILITADO")) + ")";
+
+    const String items[] = {
+        dadoLine,
+        String(getTranslation("VOLVER"))
+    };
+
+    /*──────── Cabecera ────────*/
+    uiSprite.fillSprite(BACKGROUND_COLOR);
+
+    // Título con fuente grande, ticker si desborda
+    uiSprite.setFreeFont(&FreeSans12pt7b);
+    uiSprite.setTextColor(TEXT_COLOR);
+    uiSprite.setTextSize(1);
+    const String title = String(getTranslation("ELEMENTOS_ADICIONALES"));
+
+    const int titleTextW = uiSprite.textWidth(title);
+    const int titleAreaW = screenW - 8;  // margen 4px por lado
+
+    if (titleTextW > titleAreaW) {
+        const unsigned long now = millis();
+        if (now - titleLastFrameTime >= kTickerFrameMs) {
+            titleTickerOffset += titleTickerDirection;
+            if (titleTickerOffset < 0) { titleTickerOffset = 0; titleTickerDirection = 1; }
+            const int maxOffsetX = titleTextW - titleAreaW;
+            if (titleTickerOffset > maxOffsetX) { titleTickerOffset = maxOffsetX; titleTickerDirection = -1; }
+            titleLastFrameTime = now;
+        }
+
+        if (!titleTicker.created() || titleW != titleAreaW || titleH != uiSprite.fontHeight()) {
+            if (titleTicker.created()) titleTicker.deleteSprite();
+            titleTicker.createSprite(titleAreaW, uiSprite.fontHeight());
+            titleW = titleAreaW; titleH = uiSprite.fontHeight();
+        }
+
+        titleTicker.fillSprite(BACKGROUND_COLOR);
+        titleTicker.setFreeFont(&FreeSans12pt7b);
+        titleTicker.setTextSize(1);
+        titleTicker.setTextDatum(TL_DATUM);
+        titleTicker.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
+        titleTicker.drawString(title, -titleTickerOffset, 0);
+        // centrado horizontal usando un viewport
+        const int titleX = (screenW - titleAreaW) / 2;
+        titleTicker.pushToSprite(&uiSprite, titleX, kTitleY);
+    } else {
+        uiSprite.setTextDatum(TC_DATUM);
+        uiSprite.drawString(title, screenW/2, kTitleY);
+    }
+
+    /*──────── Viewport listado con clipping ────────*/
+    static TFT_eSprite listSprite(&tft);
+    static int listW = 0, listH = 0;
+    const int wantedListW = screenW;
+    const int wantedListH = visibleOptions * stepY;
+
+    if (!listSprite.created() || listW != wantedListW || listH != wantedListH) {
+        if (listSprite.created()) listSprite.deleteSprite();
+        listSprite.createSprite(wantedListW, wantedListH);
+        listW = wantedListW; listH = wantedListH;
+    }
+
+    listSprite.fillSprite(BACKGROUND_COLOR);
+    listSprite.setFreeFont(&FreeSans9pt7b);
+    listSprite.setTextSize(1);
+    listSprite.setTextDatum(TL_DATUM);
+    listSprite.setTextColor(TEXT_COLOR);
+
+    // No hay scroll vertical (2 items), pero dibujamos con el mismo layout
+    const int listYOffset = 0;
+    const int startIndex  = 0;
+    const int firstVI     = 0;
+    const int lastVI      = total - 1;
+
+    for (int vi = firstVI; vi <= lastVI; ++vi)
+    {
+        const int y = kRowTopInset + listYOffset + (vi - startIndex) * stepY;
+        const bool isSelected = (vi == selection);
+
+        // Resaltado con clamp al viewport
+        if (isSelected) {
+            int rectY = y - kHLPadY;
+            int rectH = cardHeight + (kHLPadY * 2);
+            if (rectY < 0)            { rectH += rectY; rectY = 0; }
+            if (rectY + rectH > listH){ rectH = listH - rectY; }
+            if (rectH > 0) {
+                listSprite.fillRoundRect(
+                    x - kHLPadX, rectY,
+                    textAreaW + (kHLPadX * 2),
+                    rectH, kCardRadius,
+                    CARD_COLOR
+                );
+            }
+        }
+
+        // Ticker horizontal SOLO en la fila seleccionada (igual que en Modos/Formato)
+        String label = items[vi];
+
+        if (isSelected) {
+            if (selection != lastSelectedIndex) {
+                optTickerOffset    = 0;
+                optTickerDirection = 1;
+                lastSelectedIndex  = selection;
+            }
+
+            const int fullW = listSprite.textWidth(label);
+            if (fullW > textAreaW) {
+                const unsigned long now = millis();
+                if (now - optLastFrameTime >= kTickerFrameMs) {
+                    optTickerOffset += optTickerDirection;
+                    if (optTickerOffset < 0) { optTickerOffset = 0; optTickerDirection = 1; }
+                    const int maxOffsetX = fullW - textAreaW;
+                    if (optTickerOffset > maxOffsetX) { optTickerOffset = maxOffsetX; optTickerDirection = -1; }
+                    optLastFrameTime = now;
+                }
+
+                if (!optTicker.created() || tickerW != textAreaW || tickerH != cardHeight) {
+                    if (optTicker.created()) optTicker.deleteSprite();
+                    optTicker.createSprite(textAreaW, cardHeight);
+                    tickerW = textAreaW; tickerH = cardHeight;
+                }
+
+                optTicker.fillSprite(CARD_COLOR);
+                optTicker.setFreeFont(&FreeSans9pt7b);
+                optTicker.setTextSize(1);
+                optTicker.setTextDatum(TL_DATUM);
+                optTicker.setTextColor(TEXT_COLOR, CARD_COLOR);
+                optTicker.drawString(label, -optTickerOffset, 0);
+                optTicker.pushToSprite(&listSprite, x, y);
+            } else {
+                listSprite.drawString(label, x, y);
+            }
+        } else {
+            listSprite.drawString(label, x, y);
+        }
+    }
+
+    listSprite.pushToSprite(&uiSprite, 0, kListStartY);
+    uiSprite.pushSprite(0, 0);
+}
+
+void drawConfirmEnableDadoMenu(int selection)
+{
+    // ── Constantes de layout (alineado a drawConfirmDelete) ───────────
+    const int screenW         = tft.width();
+    constexpr int kTitleY     = 5;
+    constexpr int kCardRadius = 4;
+
+    // Área centrada para el título (con ticker si desborda)
+    constexpr int kTitleAreaW = 120;
+    const int     kTitleAreaX = (screenW - kTitleAreaW) / 2;
+    const int     kTitleAreaH = 20;   // alto aprox. para 12pt
+    const int     kTitleAreaY = kTitleY;
+
+    // Botones Sí/No centrados
+    constexpr int kButtons      = 2;
+    constexpr int boxW          = 88;
+    constexpr int boxH          = 22;
+    constexpr int spacing       = 28;
+    const     int yBase         = 64; // misma pauta vertical
+    const     int rectXCentered = (screenW - (boxW + 8)) / 2; // caja centrada
+
+    // ── Estado del ticker del título ───────────────────────────────────
+    constexpr int kTickerFrameMs = 50;
+    static String lastTitle;
+    static int titleTickerOffset    = 0;
+    static int titleTickerDirection = 1;   // 1→derecha, -1→izquierda
+    static unsigned long titleLastFrame = 0;
+    static TFT_eSprite titleSprite(&tft);
+    static int titleW = 0, titleH = 0;
+
+    // ── Composición del título ─────────────────────────────────────────
+    const bool enabled = isDadoEnabled();
+    const String title = String(getTranslation(enabled ? "DESHABILITAR_DADO"
+                                                       : "HABILITAR_DADO"));
+
+    // ── Fondo + tipografías ───────────────────────────────────────────
+    uiSprite.fillSprite(BACKGROUND_COLOR);
+    uiSprite.setFreeFont(&FreeSans12pt7b);
+    uiSprite.setTextColor(TEXT_COLOR);
+    uiSprite.setTextSize(1);
+
+    // (Re)crear sprite del título si cambian dimensiones
+    if (!titleSprite.created() || titleW != kTitleAreaW || titleH != kTitleAreaH) {
+        if (titleSprite.created()) titleSprite.deleteSprite();
+        titleSprite.createSprite(kTitleAreaW, kTitleAreaH);
+        titleW = kTitleAreaW; titleH = kTitleAreaH;
+    }
+
+    // Reset del ticker si cambia el texto del título
+    if (title != lastTitle) {
+        titleTickerOffset    = 0;
+        titleTickerDirection = 1;
+        titleLastFrame       = 0;
+        lastTitle            = title;
+    }
+
+    // Medición con la fuente real del título
+    titleSprite.fillSprite(BACKGROUND_COLOR);
+    titleSprite.setFreeFont(&FreeSans12pt7b);
+    titleSprite.setTextWrap(false);
+    titleSprite.setTextSize(1);
+    titleSprite.setTextDatum(ML_DATUM);
+    titleSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
+
+    const int titleFullW = titleSprite.textWidth(title);
+    if (titleFullW <= kTitleAreaW) {
+        // Centrado visual cuando cabe
+        const int xCentered = (kTitleAreaW - titleFullW) / 2;
+        titleSprite.drawString(title, xCentered, kTitleAreaH / 2);
+    } else {
+        // Ticker “ping-pong”
+        const unsigned long now = millis();
+        if (titleLastFrame == 0 || (now - titleLastFrame) >= kTickerFrameMs) {
+            titleTickerOffset += titleTickerDirection;
+            if (titleTickerOffset < 0) {
+                titleTickerOffset = 0; titleTickerDirection = 1;
+            }
+            const int maxOffset = titleFullW - kTitleAreaW;
+            if (titleTickerOffset > maxOffset) {
+                titleTickerOffset = maxOffset; titleTickerDirection = -1;
+            }
+            titleLastFrame = now;
+        }
+        titleSprite.drawString(title, -titleTickerOffset, kTitleAreaH / 2);
+    }
+
+    // Pintar el título centrado en pantalla
+    titleSprite.pushToSprite(&uiSprite, kTitleAreaX, kTitleAreaY);
+
+    // ── Botones Sí / No (cajas centradas, texto centrado) ─────────────
+    uiSprite.setFreeFont(&FreeSans9pt7b);
+    uiSprite.setTextSize(1);
+    uiSprite.setTextDatum(MC_DATUM);
+
+    const char* opciones[] = { getTranslation("SI"), getTranslation("NO") };
+
+    // Clamp defensivo del índice seleccionado
+    int sel = selection;
+    if (sel < 0) sel = 0;
+    if (sel >= kButtons) sel = kButtons - 1;
+
+    for (int i = 0; i < kButtons; ++i) {
+        const int rectX  = rectXCentered;
+        const int rectY  = (yBase + i * spacing) - 2;
+        const int rectW  = boxW + 8;
+        const int rectH  = boxH + 4;
+
+        if (i == sel) {
+            uiSprite.fillRoundRect(rectX, rectY, rectW, rectH, kCardRadius, CARD_COLOR);
+            uiSprite.setTextColor(TEXT_COLOR, CARD_COLOR);
+        } else {
+            uiSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
+        }
+
+        const int cx = rectX + rectW / 2;
+        const int cy = rectY + rectH / 2;
+        uiSprite.drawString(opciones[i], cx, cy);
+    }
+
+    // ── Volcado final ──────────────────────────────────────────────────
+    uiSprite.pushSprite(0, 0);
+}

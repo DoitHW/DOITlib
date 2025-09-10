@@ -58,3 +58,16 @@ void saveLanguageToSPIFFS(Language lang);
 Language loadLanguageFromSPIFFS();
 void saveSoundSettingsToSPIFFS();
 void loadSoundSettingsFromSPIFFS();
+
+// ===== Elementos Adicionales (persistencia) =====
+struct ExtraElementsConfig {
+    bool dadoEnabled;
+};
+
+void saveExtraElementsConfig(const ExtraElementsConfig& cfg);
+ExtraElementsConfig loadExtraElementsConfig();
+bool isDadoEnabled();
+void setDadoEnabled(bool enabled);
+
+// Elemento fijo en RAM
+extern INFO_PACK_T dadoOption;

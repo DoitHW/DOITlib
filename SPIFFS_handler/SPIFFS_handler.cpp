@@ -6,6 +6,8 @@
 #include <play_DMS/play_DMS.h>
 
 uint16_t lineBuffer[64];   // definición real
+INFO_PACK_T dadoOption;
+static const char* EXTRA_CFG_PATH = "/config_extra.bin";
 
 
 bool writeBytesChecked(fs::File &f, const uint8_t* data, size_t length) {
@@ -131,9 +133,9 @@ void initializeDynamicOptions() {
     // apagarSala.mode[0].config[0] = 0x7F; // El valor que tú desees para este modo
     // apagarSala.mode[0].config[1] = 0xFF;
     apagarSala.situacion = 0;
-
     // Asumiendo que tienes un icono llamado apagar_64x64:
     memcpy(apagarSala.icono, apagar_sala_64x64, sizeof(apagarSala.icono));
+
 
     memset(&comunicadorOption, 0, sizeof(INFO_PACK_T));
     strncpy((char*)comunicadorOption.name, getTranslation("COMUNICADOR"), 24);
@@ -141,9 +143,32 @@ void initializeDynamicOptions() {
     strncpy((char*)comunicadorOption.mode[0].name, "BASICO", 24);
     comunicadorOption.mode[0].config[0] = 0x80;   // ejemplo de flag “visible”
     comunicadorOption.mode[0].config[1] = 0x09;
-    comunicadorOption.ID = 0xFF;
+    comunicadorOption.ID = 0xDB;
     // Copiar aquí el icono de 64×64:
     memcpy(comunicadorOption.icono, comunicador_64x64, sizeof(comunicadorOption.icono));
+
+    // -- DADO -- 
+    memset(&dadoOption, 0, sizeof(INFO_PACK_T));
+    strncpy((char*)dadoOption.name, "DADO", 24);
+    dadoOption.ID = DEFAULT_DICE;
+
+    dadoOption.mode[0].config[0] = 0x00;
+    dadoOption.mode[0].config[1] = 0x00;
+
+    // Modo 0: BASICO
+    strncpy((char*)dadoOption.mode[1].name, "BASICO", 24);
+    dadoOption.mode[1].config[0] = 0x80; // MSB=1 => EXIST/visible
+    dadoOption.mode[1].config[1] = 0x00; // sin más flags
+
+    // Modo 1: REBOTES
+    strncpy((char*)dadoOption.mode[2].name, "AVANZADO", 24);
+    dadoOption.mode[2].config[0] = 0x80;
+    dadoOption.mode[2].config[1] = 0x00;
+
+    dadoOption.currentMode = 0;
+
+    // Icono
+    memcpy(dadoOption.icono, dado_64x64, sizeof(dadoOption.icono));
 
 }
 
@@ -198,40 +223,45 @@ void loadElementsFromSPIFFS() {
      elementFiles.push_back("Comunicador");
      selectedStates.push_back(false);
 
+     if (isDadoEnabled()) {
+     elementFiles.push_back("Dado");
+     selectedStates.push_back(false);
+     }
+
+
 }
 
 byte getCurrentElementID() {
     byte elementID = BROADCAST;  
-    String currentFile = elementFiles[currentIndex];
+    const String& currentFile = elementFiles[currentIndex];
 
-      // --- Elementos residentes en RAM ---
+    // --- Elementos residentes en RAM (no abrir SPIFFS) ---
     if (currentFile == "Ambientes"   ||
         currentFile == "Fichas"      ||
         currentFile == "Apagar"      ||
-        currentFile == "Comunicador")         
-
+        currentFile == "Comunicador" ||
+        currentFile == "Dado")
     {
         INFO_PACK_T* option = nullptr;
         if      (currentFile == "Ambientes")   option = &ambientesOption;
         else if (currentFile == "Fichas")      option = &fichasOption;
         else if (currentFile == "Apagar")      option = &apagarSala;
         else if (currentFile == "Comunicador") option = &comunicadorOption; 
+        else /* Dado */                        option = &dadoOption;
 
         return option ? option->ID : BROADCAST;
     }
 
-    // Leer la ID desde SPIFFS solo si está seleccionado
-    
+    // --- Cualquier otro: leer ID desde SPIFFS ---
     fs::File f = SPIFFS.open(currentFile, "r");
     if (f) {
         f.seek(OFFSET_ID, SeekSet);
         f.read(&elementID, 1);
         f.close();
     } else {
-                                                                                    #ifdef DEBUG
-                                                                                    DEBUG__________ln("Error al leer la ID del archivo.");                                                                           
-                                                                                    #endif
-        
+        #ifdef DEBUG
+        DEBUG__________printf("❌ Error abriendo el archivo para leer ID: %s\n", currentFile.c_str());
+        #endif
     }
     return elementID;
 }
@@ -255,6 +285,7 @@ bool getModeConfig(const String& fileName, byte mode, byte modeConfig[2]) {
     else if (fileName == "Fichas")      option = &fichasOption;
     else if (fileName == "Apagar")      option = &apagarSala;
     else if (fileName == "Comunicador") option = &comunicadorOption; 
+    else if (fileName == "Dado")        option = &dadoOption;
 
     if (option != nullptr) {
         memcpy(modeConfig, option->mode[mode].config, 2);
@@ -286,39 +317,27 @@ bool getModeConfig(const String& fileName, byte mode, byte modeConfig[2]) {
 
 void setAllElementsToBasicMode() {
 
-    // Asegurarse de cargar la lista de elementos desde SPIFFS.
-    // Si ya se ejecutó previamente loadElementsFromSPIFFS(), se puede omitir esta línea.
-   // loadElementsFromSPIFFS();
-    
-    // Recorrer la lista de archivos obtenida
     for (size_t i = 0; i < elementFiles.size(); i++) {
-        String fileName = elementFiles[i];
-        // Sólo queremos actualizar los archivos de SPIFFS (aquellos que comienzan con "/element_")
-        if (!fileName.startsWith("/element_")) {
-            continue;
-        }
-        // También filtramos para que sean archivos .bin
-        if (!fileName.endsWith(".bin")) {
-            continue;
-        }
+        const String& fileName = elementFiles[i];
+
+        // Solo ficheros de elementos reales en SPIFFS:
+        if (!fileName.startsWith("/element_")) continue;
+        if (!fileName.endsWith(".bin"))        continue;
 
         fs::File f = SPIFFS.open(fileName, "r+");
         if (!f) {
-                                                                                    #ifdef DEBUG
-                                                                                    DEBUG__________ln("❌ Error abriendo " + fileName + " para escritura.");                                                                       
-                                                                                    #endif
+            #ifdef DEBUG
+            DEBUG__________printf("❌ Error abriendo %s para escritura.\n", fileName.c_str());
+            #endif
             continue;
         }
-        byte basicMode = DEFAULT_BASIC_MODE; // Modo básico, normalmente 1
+
+        byte basicMode = DEFAULT_BASIC_MODE;
         f.seek(OFFSET_CURRENTMODE, SeekSet);
         f.write(&basicMode, 1);
         f.flush();
         f.close();
-                                                                                    #ifdef DEBUG
-                                                                                    //DEBUG__________ln("✅ Modo básico actualizado en " + fileName);                                                                    
-                                                                                    #endif
-        
-    }   
+    }
 }
 
 void updateBankList(byte bank) {
@@ -558,6 +577,35 @@ void loadSoundSettingsFromSPIFFS() {
         f.close();
     }
 }
+
+
+// --- persistencia on/off de DADO ---
+void saveExtraElementsConfig(const ExtraElementsConfig& cfg) {
+    fs::File f = SPIFFS.open(EXTRA_CFG_PATH, FILE_WRITE);
+    if (!f) return;
+    uint8_t b = cfg.dadoEnabled ? 1 : 0;
+    f.write(&b, 1);
+    f.close();
+}
+
+ExtraElementsConfig loadExtraElementsConfig() {
+    ExtraElementsConfig cfg{ false };
+    fs::File f = SPIFFS.open(EXTRA_CFG_PATH, FILE_READ);
+    if (!f) return cfg;
+    uint8_t b = 0;
+    if (f.read(&b, 1) == 1) cfg.dadoEnabled = (b != 0);
+    f.close();
+    return cfg;
+}
+
+bool isDadoEnabled() { return loadExtraElementsConfig().dadoEnabled; }
+
+void setDadoEnabled(bool enabled) {
+    auto cfg = loadExtraElementsConfig();
+    cfg.dadoEnabled = enabled;
+    saveExtraElementsConfig(cfg);
+}
+
 
 
 

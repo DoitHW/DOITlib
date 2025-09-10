@@ -168,7 +168,7 @@ void handleEncoder() noexcept
     // Utilidades locales
     auto isButtonPressed = []() -> bool { return digitalRead(ENC_BUTTON) == LOW; };
     auto isSpecialFile = [](const String& name) -> bool {
-        return (name == "Ambientes" || name == "Fichas" || name == "Comunicador" || name == "Apagar");
+        return (name == "Ambientes" || name == "Fichas" || name == "Comunicador" || name == "Apagar" || name == "Dado");
     };
 
     // 1) Ignorar click residual (hasta soltar)
@@ -216,6 +216,9 @@ void handleEncoder() noexcept
     if (soundMenuActive        ) return;
     if (brightnessMenuActive   ) return;
     if (ignoreInputs           ) return;
+    if (confirmEnableDadoActive) { handleConfirmEnableDadoMenu(); return; }
+    if (extraElementsMenuActive) { handleExtraElementsMenu(); return; }
+
 
     // 5) Menú selección de bancos
     if (bankSelectionActive) {
@@ -298,14 +301,14 @@ void handleEncoder() noexcept
             int  realModeIndex = 0;
             byte modeConfig[2] = {0};
 
-            if (currentFile == "Ambientes" || currentFile == "Fichas" ||
-                currentFile == "Comunicador" || currentFile == "Apagar")
+            if (isSpecialFile(currentFile))
             {
                 INFO_PACK_T* opt = nullptr;
                 if      (currentFile == "Ambientes")   opt = &ambientesOption;
                 else if (currentFile == "Fichas")      opt = &fichasOption;
                 else if (currentFile == "Comunicador") opt = &comunicadorOption;
-                else                                   opt = &apagarSala;      // “Apagar”
+                else if (currentFile == "Apagar")      opt = &apagarSala;
+                else if (currentFile == "Dado")        opt = &dadoOption;  
 
                 realModeIndex = opt->currentMode;
                 memcpy(modeConfig, opt->mode[realModeIndex].config, 2);
@@ -359,28 +362,44 @@ void handleEncoder() noexcept
         lastQueriedElementIndex != currentIndex)
     {
         String currentFile = elementFiles[currentIndex];
+
+        uint8_t idToQuery     = 0;
+        bool    shouldQuery   = false;
+
         if (!isSpecialFile(currentFile)) {
+            // ===== Caso elementos en SPIFFS (como ya hacías) =====
             fs::File f = SPIFFS.open(currentFile, "r");
             if (f) {
                 f.seek(OFFSET_ID, SeekSet);
                 f.read(&pendingQueryID, 1);
                 f.close();
-
-                send_frame(frameMaker_REQ_ELEM_SECTOR(
-                    DEFAULT_BOTONERA,
-                    pendingQueryID,
-                    SPANISH_LANG,
-                    ELEM_CMODE_SECTOR
-                ));
-
-                lastModeQueryTime       = millis();
-                pendingQueryIndex       = currentIndex;
-                awaitingResponse        = true;
-                lastQueriedElementIndex = currentIndex;
-                frameReceived           = false;
+                idToQuery   = pendingQueryID;
+                shouldQuery = true;
             }
+        } else if (currentFile == "Dado") {
+            Serial1.write(0xDA);
+            delay(300);
+            idToQuery   = getCurrentElementID();
+            shouldQuery = true;
+        }
+
+        if (shouldQuery) {
+            send_frame(frameMaker_REQ_ELEM_SECTOR(
+                DEFAULT_BOTONERA,
+                idToQuery,
+                SPANISH_LANG,
+                ELEM_CMODE_SECTOR
+            ));
+
+            // Misma maquinaria de espera que ya tenías
+            lastModeQueryTime       = millis();
+            pendingQueryIndex       = currentIndex;
+            awaitingResponse        = true;
+            lastQueriedElementIndex = currentIndex;
+            frameReceived           = false;
         }
     }
+
 
     // ⏳ Timeout de 500 ms para detectar si el elemento no respondió
     if (awaitingResponse && (millis() - lastModeQueryTime > kResponseTimeoutMs)) {
@@ -432,7 +451,7 @@ void handleEncoder() noexcept
                         }
                         canToggle = getModeFlag(modeConfig, HAS_ALTERNATIVE_MODE);
                     }
-                    else if (currFile != "Apagar") {
+                    else if (!isSpecialFile(currFile)) {
                         fs::File f = SPIFFS.open(currFile, "r");
                         if (f) {
                             int count = 0;
@@ -543,6 +562,10 @@ void handleEncoder() noexcept
                             selectedStates[i] = false;
                         }
                         std::vector<byte> id = { 0xFF };
+                        if (isDadoEnabled()){
+                          Serial1.write(0xDA);
+                          delay(300UL);
+                        }
                         send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, id, BLACKOUT));
                         setAllElementsToBasicMode();
                         doitPlayer.stop_file();
@@ -755,6 +778,34 @@ void handleModeSelection(const String& currentFile) noexcept
                 doitPlayer.stop_file(); // (evitar doble llamada redundante)
             }
         }
+        else if (currentFile == "Dado") {
+            const byte id = DEFAULT_DICE;
+            const byte basicModeIndex = 1;
+
+            if (isDadoEnabled()){
+                Serial1.write(0xDA);
+                delay(kInterCmdDelayMs);
+           }
+
+
+            if (selectedStates[currentIndex]) {
+                // Encender → forzar BASICO (1) en UI y en el dispositivo
+                dadoOption.currentMode = basicModeIndex;
+                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{id}, START_CMD));
+                delay(kInterCmdDelayMs);
+                send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, std::vector<byte>{id}, basicModeIndex));
+            } else {
+                // Apagar → mantener BASICO como “modo por defecto” local
+                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{id}, BLACKOUT));
+                dadoOption.currentMode = basicModeIndex;
+            }
+
+            inModesScreen = false;
+            drawCurrentElement();
+            return;
+        }
+
+
         else if (currentFile != "Fichas" && currentFile != "Apagar") {
             // Elemento normal: envío START/BLACKOUT y mantenimiento de fichero de estado
             fs::File f = SPIFFS.open(currentFile, "r+");
@@ -808,9 +859,12 @@ void handleModeSelection(const String& currentFile) noexcept
     uint8_t modeConfig[2] = {0};
     int     realModeIndex = 0;
 
-    if (currentFile == "Ambientes" || currentFile == "Fichas") {
+    if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Dado") {
         // Lista en memoria (INFO_PACK_T)
-        INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+        INFO_PACK_T* option =
+        (currentFile == "Ambientes") ? &ambientesOption :
+        (currentFile == "Fichas")    ? &fichasOption    :
+                                       &dadoOption;  
         int count = 0;
         for (int i = 0; i < kMaxModesPerFile; ++i) {
             if (strlen((char*)option->mode[i].name) > 0 &&
@@ -893,6 +947,24 @@ void handleModeSelection(const String& currentFile) noexcept
             token.set_mode(tokenMode);
         }
     }
+    else if (currentFile == "Dado") {   // Dado residente en RAM con ID propio
+        const byte id = DEFAULT_DICE;
+
+        if (!wasAlreadySelected) {
+            // Si el Dado está habilitado y estaba apagado, “despiértalo” por serial antes del START
+            if (isDadoEnabled()) {
+                Serial1.write(0xDA);
+                delay(kInterCmdDelayMs);
+            }
+            // Ahora sí, arráncalo
+            send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{id}, START_CMD));
+            delay(kInterCmdDelayMs);
+        }
+
+        // Fijar el modo seleccionado
+        send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, std::vector<byte>{id}, realModeIndex));
+        // (Dado no usa modo alternativo, así que no enviamos ALTERNATE_MODE_*)
+    }
     else if (currentFile != "Apagar") {
         // Elemento normal
         byte modeConfigTemp[2] = {0};
@@ -956,31 +1028,62 @@ std::vector<bool> initializeAlternateStates(const String &currentFile) noexcept
 {
     constexpr int kMaxModesPerFile = 16;
 
-    // --- Elementos fijos: "Ambientes" / "Fichas" ---
-    if (currentFile == "Ambientes" || currentFile == "Fichas") {
-        // Importante: puntero NO-const si checkMostSignificantBit(byte*) no acepta const
-        INFO_PACK_T* option = (currentFile == "Ambientes") ? &ambientesOption : &fichasOption;
+    // --- RAM: Ambientes / Fichas / Comunicador / Dado ---
+    if (currentFile == "Ambientes"   ||
+        currentFile == "Fichas"      ||
+        currentFile == "Comunicador" ||
+        currentFile == "Dado")
+    {
+        INFO_PACK_T* opt =
+            (currentFile == "Ambientes")   ? &ambientesOption   :
+            (currentFile == "Fichas")      ? &fichasOption      :
+            (currentFile == "Comunicador") ? &comunicadorOption :
+                                             &dadoOption; // Dado
 
-        int visibleCount = 0;
+        std::vector<bool> v;
         for (int i = 0; i < kMaxModesPerFile; ++i) {
-            const char* name = reinterpret_cast<const char*>(option->mode[i].name);
-            // nombre no vacío + modo marcado como visible según su config
-            if (name[0] != '\0' && checkMostSignificantBit(option->mode[i].config)) {
-                ++visibleCount;
+            const char* name = reinterpret_cast<const char*>(opt->mode[i].name);
+            if (name[0] != '\0' && checkMostSignificantBit(opt->mode[i].config)) {
+                // si el modo soporta alternativo podrías inicializar a false igual
+                // (si luego quieres persistir, lo manejas en RAM)
+                v.push_back(false);
             }
         }
-
-        // Inicializa todos los visibles a "no alternativo"
-        return std::vector<bool>(visibleCount, false);
+        if (v.empty()) v.push_back(false); // seguridad
+        return v;
     }
 
-    // --- Elemento especial "Apagar" ---
+    // --- Apagar ---
     if (currentFile == "Apagar") {
         return std::vector<bool>(1, false);
     }
 
-    // --- Elementos en SPIFFS (cualquier otro) ---
-    return std::vector<bool>(kMaxModesPerFile, false);
+    // --- SPIFFS: calcular visibles leyendo el archivo ---
+    std::vector<bool> v;
+    fs::File f = SPIFFS.open(currentFile, "r");
+    if (!f) {
+        #ifdef DEBUG
+        DEBUG__________printf("❌ Error abriendo el archivo: %s\n", currentFile.c_str());
+        #endif
+        return v; // vacío, el resto del flujo debe tolerar lista vacía
+    }
+
+    for (int i = 0; i < kMaxModesPerFile; ++i) {
+        char modeName[25] = {0};
+        byte cfg[2]       = {0};
+        f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet);
+        f.read((uint8_t*)modeName, 24);
+        f.seek(OFFSET_MODES + i * SIZE_MODE + 216, SeekSet);
+        f.read(cfg, 2);
+        if (modeName[0] != '\0' && checkMostSignificantBit(cfg)) {
+            // si el modo soporta alternativo, inícialo a false igualmente
+            v.push_back(false);
+        }
+    }
+    f.close();
+
+    if (v.empty()) v.push_back(false); // seguridad
+    return v;
 }
 
 /**
@@ -1668,8 +1771,8 @@ void handleBankSelectionMenu(std::vector<byte>& bankList, std::vector<bool>& sel
     }
 }
 
-const int numFormatOptions = 6;
-const int formatOptions[numFormatOptions] = {0, 1, 2, 3, 4, 5};
+const int numFormatOptions = 7;
+const int formatOptions[numFormatOptions] = {0, 1, 2, 3, 4, 5, 6};
 bool confirmRestoreMenuActive = false;
 int confirmRestoreSelection = 0;  // 0 = Sí, 1 = No
 bool confirmRestoreMenuElementActive = false;
@@ -1813,7 +1916,17 @@ void handleFormatMenu()
                 drawConfirmRestoreElementMenu(confirmRestoreElementSelection);
             } break;
 
-            case 5: { // Volver
+            case 5: { // ← NUEVO: Elementos Adicionales
+#ifdef DEBUG
+                DEBUG__________ln("[➕] Elementos Adicionales");
+#endif
+                extraElementsMenuActive   = true;
+                extraElementsMenuSelection= 0;
+                formatSubMenuActive       = false;   // cerramos este submenú
+                drawExtraElementsMenu(extraElementsMenuSelection);
+            } break;
+
+            case 6: { // Volver
                 formatSubMenuActive = false;
                 hiddenMenuActive    = true;
                 drawHiddenMenu(0);
@@ -2191,7 +2304,7 @@ void handleConfirmDelete() {
  * @note Evalúa múltiples banderas internas que indican si otros menús están activos.
  */
 bool isInMainMenu() {
-    // Retorna verdadero solo si ninguna pantalla secundaria está activa.
+    // Pantalla principal = NO hay ningún submenú/diálogo activo
     return !inModesScreen &&
            !hiddenMenuActive &&
            !brightnessMenuActive &&
@@ -2200,8 +2313,14 @@ bool isInMainMenu() {
            !formatSubMenuActive &&
            !bankSelectionActive &&
            !deleteElementMenuActive &&
-           !confirmDeleteMenuActive;
+           !confirmDeleteMenuActive &&
+           !confirmRestoreMenuActive &&
+           !confirmRestoreMenuElementActive &&
+           !inCognitiveMenu &&
+           !extraElementsMenuActive &&
+           !confirmEnableDadoActive;
 }
+
 
 /**
  * @brief Muestra en pantalla los detalles (ID y Serial) del elemento seleccionado.
@@ -2426,4 +2545,76 @@ int getTotalModesForFile(const String &file) {
     return count;
 }
 
+void handleExtraElementsMenu() {
+    static int32_t lastVal = encoder.getCount();
+    int32_t newVal = encoder.getCount();
+    if (newVal != lastVal) {
+        int dir = (newVal > lastVal) ? 1 : -1;
+        lastVal = newVal;
+        extraElementsMenuSelection = (extraElementsMenuSelection + dir + 2) % 2;
+        drawExtraElementsMenu(extraElementsMenuSelection);
+    }
+
+    if (digitalRead(ENC_BUTTON) == LOW) {
+        if (buttonPressStart == 0) buttonPressStart = millis();
+        return;
+    }
+    if (buttonPressStart > 0) {
+        unsigned long press = millis() - buttonPressStart;
+        buttonPressStart = 0;
+        if (press < 500) {
+            if (extraElementsMenuSelection == 0) {
+                confirmEnableDadoActive = true;
+                confirmEnableDadoSelection = 0;
+                drawConfirmEnableDadoMenu(confirmEnableDadoSelection);
+            } else {
+                extraElementsMenuActive = false;
+                drawCurrentElement();
+            }
+        }
+    }
+}
+
+void handleConfirmEnableDadoMenu() {
+    static int32_t lastVal = encoder.getCount();
+    int32_t newVal = encoder.getCount();
+    if (newVal != lastVal) {
+        int dir = (newVal > lastVal) ? 1 : -1;
+        lastVal = newVal;
+        confirmEnableDadoSelection = (confirmEnableDadoSelection + dir + 2) % 2;
+        drawConfirmEnableDadoMenu(confirmEnableDadoSelection);
+    }
+
+    if (digitalRead(ENC_BUTTON) == LOW) {
+        if (buttonPressStart == 0) buttonPressStart = millis();
+        return;
+    }
+    if (buttonPressStart > 0) {
+        unsigned long press = millis() - buttonPressStart;
+        buttonPressStart = 0;
+        if (press < 500) {
+            if (confirmEnableDadoSelection == 0) {
+                // Sí → toggle persistente y recargar lista
+                bool enabled = isDadoEnabled();
+                setDadoEnabled(!enabled);
+                loadElementsFromSPIFFS();   // reconstruye elementFiles/selectedStates:contentReference[oaicite:9]{index=9}
+
+                // Opcional: centrar en Dado si se acaba de habilitar
+                if (!enabled) {
+                    for (size_t i = 0; i < elementFiles.size(); ++i) {
+                        if (elementFiles[i] == "Dado") { currentIndex = (int)i; break; }
+                    }
+                }
+
+                confirmEnableDadoActive = false;
+                extraElementsMenuActive = false;
+                drawCurrentElement();
+            } else {
+                // No
+                confirmEnableDadoActive = false;
+                drawExtraElementsMenu(extraElementsMenuSelection);
+            }
+        }
+    }
+}
 

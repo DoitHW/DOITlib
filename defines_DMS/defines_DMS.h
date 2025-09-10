@@ -4,7 +4,7 @@
 #include <Arduino.h>
 
 //DELFINES GLOBALES
-#define BOTONERA_OLD           // -> BOTONERA_OLD / BOTONERA_NEW
+#define BOTONERA_NEW           // -> BOTONERA_OLD / BOTONERA_NEW
 #define NOELEM
 #define BOTONERA
 #define PLAYER                 // -> PLAYER / NOPLAYER
