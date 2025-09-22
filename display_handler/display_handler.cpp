@@ -14,15 +14,12 @@
 #define CARD_MARGIN 5
 #define SCROLL_BAR_WIDTH 5
 
-
-
 TFT_eSPI tft = TFT_eSPI();
 TFT_eSprite uiSprite = TFT_eSprite(&tft);
 
 bool brightnessMenuActive = false;
 uint8_t currentBrightness = 100;       // Valor actual en porcentaje
 uint8_t tempBrightness = currentBrightness;  // Valor temporal mientras se ajusta
-
 
 /**
  * @brief  Muestra una lista de opciones de brillo (normal/atenuado) con cursor de selección,

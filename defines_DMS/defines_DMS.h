@@ -4,7 +4,7 @@
 #include <Arduino.h>
 
 //DELFINES GLOBALES
-#define BOTONERA_NEW           // -> BOTONERA_OLD / BOTONERA_NEW
+#define BOTONERA_OLD           // -> BOTONERA_OLD / BOTONERA_NEW
 #define NOELEM
 #define BOTONERA
 #define PLAYER                 // -> PLAYER / NOPLAYER
@@ -236,17 +236,18 @@
 
 #define WIN_RESP_BANK   2
 #define FAIL_RESP_BANK  4
+#define AMBIENTS_BANK   8
 
 #define WOMAN_VOICE     0
 #define MAN_VOICE       1
 // DEFINES INFO_ELEMENTS
-#define SPANISH_LANG        0x01
-#define ENGLISH_LANG        0x02
-#define FRENCH_LANG         0x03
-#define GERMAN_LANG         0x04
-#define CATALAN_LANG        0x05
-#define MEXICAN_LANG        0x06
-#define EUSKERA_LANG        0x07
+// #define SPANISH_LANG        0x01
+// #define ENGLISH_LANG        0x02
+// #define FRENCH_LANG         0x03
+// #define GERMAN_LANG         0x04
+// #define CATALAN_LANG        0x05
+// #define MEXICAN_LANG        0x06
+// #define EUSKERA_LANG        0x07
 
 #define SPANISH_FILE_OFFSET   10
 #define ENGLISH_FILE_OFFSET   20

@@ -505,7 +505,6 @@ float get_aux_var_01_from_sensorValue(LAST_ENTRY_FRAME_T LEFin) {
     return val;
 }
 
-
 byte get_color_from_sensorValue(LAST_ENTRY_FRAME_T LEFin) {
     byte minMSB = LEFin.data[0];
     byte minLSB = LEFin.data[1];

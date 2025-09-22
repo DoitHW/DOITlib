@@ -406,7 +406,7 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
             send_frame(frameMaker_SEND_PATTERN_NUM(DEFAULT_BOTONERA, target, sendColor));
             delay(100);
             if (sendColor != BLACK)
-                doitPlayer.play_file(8, sendColor + 1);
+                doitPlayer.play_file(8, sendColor);
             else
                 doitPlayer.stop_file();
             return;

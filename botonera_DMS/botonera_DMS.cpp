@@ -298,6 +298,25 @@ void BOTONERA_::RX_main_handler(LAST_ENTRY_FRAME_T LEF) {
             break;
         }
 
+        case F_SEND_PATTERN_NUM: {
+            // Bank fijo de “ambientes” y el file viene en LEF.data[0]
+            if (LEF.data.empty()) {
+                #ifdef DEBUG
+                DEBUG__________ln("F_SEND_PATTERN_NUM sin datos (esperado 1 byte de patrón).");
+                #endif
+                break;
+            }
+
+            const uint8_t pattern = LEF.data[0];
+
+            #ifdef DEBUG
+            DEBUG__________printf("F_SEND_PATTERN_NUM → bank=0x%02X, file=%u\n", AMBIENTS_BANK, pattern);
+            #endif
+
+            doitPlayer.play_file(AMBIENTS_BANK, pattern);
+            break;
+        }
+
         case F_SEND_FILE_NUM: {
             DEBUG__________ln("Recibido un play sound");
             // LEF.data[0] = banco, LEF.data[1] = fichero.
@@ -991,7 +1010,7 @@ bool BOTONERA_::confirmarCambioID(byte nuevaID) {
     DEBUG__________ln("Confirmamos cambio de id ####################");
     send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA,
                                           nuevaID,
-                                          SPANISH_LANG,
+                                          (byte) currentLanguage,
                                           ELEM_ID_SECTOR));
 
     if (!esperar_respuesta(2500)) {
@@ -1015,6 +1034,40 @@ bool BOTONERA_::confirmarCambioID(byte nuevaID) {
 
     return false; // Sector incorrecto o ID incorrecta
 }
+
+bool BOTONERA_::confirmarCambioIDConSerial(uint8_t nuevaID,
+                                           const uint8_t serialEsperado[5],
+                                           unsigned long timeoutPerAttempt,
+                                           int retries)
+{
+    for (int intento = 0; intento < retries; ++intento) {
+        frameReceived = false;
+
+        // Pedimos el SERIAL a la NUEVA ID para verificar identidad
+        send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA, nuevaID, (byte) currentLanguage, ELEM_SERIAL_SECTOR));
+
+        if (esperar_respuesta(timeoutPerAttempt)) {
+            const LAST_ENTRY_FRAME_T lef = extract_info_from_frameIn(uartBuffer);
+
+            // Validar que nos responden el sector de SERIAL y que el payload tiene al menos 1 + 5 bytes
+            if (lef.function == F_RETURN_ELEM_SECTOR &&
+                lef.data.size() >= 6 &&
+                lef.data[0] == ELEM_SERIAL_SECTOR)
+            {
+                const uint8_t* serialRx = &lef.data[1];
+                if (memcmp(serialRx, serialEsperado, 5) == 0) {
+                    return true; // ✅ La NUEVA ID pertenece al dispositivo esperado
+                }
+                // (Opcional) DEBUG: imprimir serialRx si no coincide
+            }
+        }
+
+        delay(80); // pequeño backoff
+    }
+
+    return false; // ❌ No coincide serial o no hubo respuesta válida
+}
+
 
 bool BOTONERA_::esperar_respuesta(unsigned long timeout) {
     unsigned long startTime = millis();
@@ -1092,7 +1145,7 @@ bool BOTONERA_::procesar_sector(int sector,
         frameReceived = false; // Asegúrate que esta variable es miembro de BOTONERA_ o accesible
         send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA,
                                               targetID,
-                                              SPANISH_LANG,
+                                              (byte) currentLanguage,
                                               sector));
 
         if (!esperar_respuesta(2000)) { // Usando tu timeout
@@ -1504,7 +1557,7 @@ bool BOTONERA_::escanearID(byte targetID, byte serial[5], unsigned long timeoutP
         frameReceived = false;
             send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA,
                                                   targetID,
-                                                  SPANISH_LANG,
+                                                  (byte) currentLanguage,
                                                   ELEM_SERIAL_SECTOR));
         
 
@@ -1904,12 +1957,12 @@ inicio_escanear_sala_completo:
 
         // Envío de petición RF
         send_frame(frameMaker_REQ_ELEM_SECTOR(
-            DEFAULT_BOTONERA, DEFAULT_DEVICE, SPANISH_LANG, attachRequestTypes[fase]
+            DEFAULT_BOTONERA, DEFAULT_DEVICE, (byte) currentLanguage, attachRequestTypes[fase]
         ));
         if (attachRequestTypes[fase] == ELEM_LAST_SPLIT_ATTACH_REQ) {
             delay(1000);
             send_frame(frameMaker_REQ_ELEM_SECTOR(
-                DEFAULT_BOTONERA, DEFAULT_DEVICE, SPANISH_LANG, attachRequestTypes[fase]
+                DEFAULT_BOTONERA, DEFAULT_DEVICE, (byte) currentLanguage, attachRequestTypes[fase]
             ));
         }
 
@@ -1979,7 +2032,7 @@ inicio_escanear_sala_completo:
                                 DEFAULT_BOTONERA, DEFAULT_DEVICE, idEnSpiffs
                             ));
                             delay(500);
-                            if (confirmarCambioID(idEnSpiffs)) {
+                            if (confirmarCambioIDConSerial(idEnSpiffs, serialRecibidoDD)){
                                 DEBUG__________printf(
                                     "Fase %d: Confirmado: 0xDD restaurado a ID 0x%02X.\n",
                                     fase + 1, idEnSpiffs
@@ -1987,10 +2040,7 @@ inicio_escanear_sala_completo:
                                 listaIDsOcupadasScanActual[idEnSpiffs - 1] = true;
                                 reasignacionExitosaEsteDD = true;
                             } else {
-                                DEBUG__________printf(
-                                    "Fase %d: ADVERTENCIA: No se pudo confirmar restauración.\n",
-                                    fase + 1
-                                );
+                                DEBUG__________ln("❌ Reafirmación fallida: la nueva ID no corresponde al serial esperado");
                             }
                         } else {
                             DEBUG__________printf(
@@ -2012,7 +2062,7 @@ inicio_escanear_sala_completo:
                                 DEFAULT_BOTONERA, DEFAULT_DEVICE, idLibre
                             ));
                             delay(250);
-                            if (confirmarCambioID(idLibre)) {
+                            if (confirmarCambioIDConSerial(idLibre, serialRecibidoDD)) {
                                 DEBUG__________printf(
                                     "Fase %d: Confirmado: 0xDD ahora en ID 0x%02X.\n",
                                     fase + 1, idLibre
@@ -2138,189 +2188,6 @@ void BOTONERA_::actualizarBarraProgreso(int pasoActual,
 
     barraSprite.deleteSprite();
 }
-
-// void BOTONERA_::actualizarBarraProgreso2(int pasoActual,
-//                                         int pasosTotales,
-//                                         const char* etiqueta)
-// {
-//     // ───────────────────────── Config y estado persistente ─────────────────────────
-//     const int spriteX = 5;
-//     const int spriteY = 25;   // ← AJUSTADO para recentrar con la nueva altura
-//     const int W = 118;
-//     const int H = 81;         // ← AUMENTADO 3px más (era 78) - ajuste final
-
-//     // Ajuste global de posición vertical del bloque completo (marco + contenidos)
-//     // Usa valores negativos para subir el bloque (p.ej., -2, -3). Evita valores
-//     // tan grandes que hagan que el marco se salga por arriba del sprite.
-//     const int offsetY = 0;  // ← CAMBIADO a 0 para centrar mejor el contenido
-
-//     // Colores
-//     const uint16_t COL_BG    = TFT_BLACK;
-//     const uint16_t COL_TEXT  = TFT_WHITE;
-//     const uint16_t COL_TRACK = TFT_DARKGREY;
-//     const uint16_t COL_FILL  = TFT_BLUE;
-//     const uint16_t COL_STRIPE =
-//     #ifdef TFT_eSPI_VERSION
-//         tft.color565(0, 0, 110);   // azul más oscuro para la raya
-//     #else
-//         0x000E;
-//     #endif
-
-//     // Estado estático para animaciones y suavizado (sprite reutilizable)
-//     static bool     s_init        = false;
-//     static uint32_t s_lastMs      = 0;
-//     static float    s_barberPhase = 0.0f; // px
-//     static float    s_eqPhase     = 0.0f; // rad
-//     static float    s_progSmooth  = 0.0f; // 0..1
-
-//     // Crear o redimensionar sprite solo si hace falta (reutilizable)
-//     if (barraSprite.width() != W || barraSprite.height() != H) {
-//         barraSprite.setColorDepth(16);
-//         barraSprite.createSprite(W, H);
-//         barraSprite.setTextFont(2);
-//         barraSprite.setTextColor(COL_TEXT, COL_BG);
-//         s_init        = true;
-//         s_lastMs      = millis();
-//         s_barberPhase = 0.0f;
-//         s_eqPhase     = 0.0f;
-//         s_progSmooth  = 0.0f;
-//     } else if (!s_init) {
-//         barraSprite.setTextFont(2);
-//         barraSprite.setTextColor(COL_TEXT, COL_BG);
-//         s_init   = true;
-//         s_lastMs = millis();
-//     }
-
-//     // ───────────────────────── Layout (con offset aplicado) ────────────────────────
-//     const int M = 3;                 // margen interno
-//     const int r = 7;                 // radio del marco
-
-//     // Barra - centrada en el nuevo formato compacto
-//     const int altoBarra = 10;
-//     const int anchoMax  = 100;
-//     const int xBarra    = 9;                                  // relativo al sprite
-//     const int yBarra    = (H / 2 + 1) + offsetY;            // ← CENTRADA en formato más compacto
-
-//     // Etiqueta - con un poquito más de margen
-//     const int padding   = 4;
-//     const int yLabel    = (M + 22) + offsetY;                // ← AUMENTADO 2px más margen (era M + 16)
-
-//     // Ecualizador (entre etiqueta y barra; independiente del %)
-//     const int eqW       = 4;
-//     const int eqGap     = 3;
-//     const int eqHMin    = 5;
-//     const int eqHMax    = 10;
-//     const int eqTotalW  = 3*eqW + 2*eqGap;
-//     const int eqX       = xBarra + (anchoMax - eqTotalW) / 2;
-//     const int eqBaseY   = (yBarra - 6);                       // base por encima de la barra (ya incluye offset vía yBarra)
-
-//     // Porcentaje - con un poquito más de margen
-//     const int yPorcentaje = yBarra + altoBarra + 10;         // ← AUMENTADO 2px más espacio (era + 10)
-
-//     // ───────────────────────── Animación (tiempo real) ─────────────────────────────
-//     const uint32_t now = millis();
-//     float dt = (now - s_lastMs) / 1000.0f;
-//     if (dt < 0) dt = 0;
-//     s_lastMs = now;
-
-//     // Barber-pole (independiente del %)
-//     const float stripeSpeedPx = 60.0f;   // px/s
-//     const int   stripeStep    = 6;       // separación entre rayas
-//     s_barberPhase += stripeSpeedPx * dt;
-//     if (s_barberPhase >= stripeStep) s_barberPhase -= stripeStep;
-
-//     // Ecualizador (independiente del %)
-//     const float eqSpeedHz = 1.8f;
-//     s_eqPhase += 2.0f * PI * eqSpeedHz * dt;
-//     if (s_eqPhase > 2.0f * PI) s_eqPhase -= 2.0f * PI;
-
-//     // Suavizado del progreso (EMA)
-//     float progTarget = 0.0f;
-//     if (pasosTotales > 0) {
-//         int pasosClamped = max(0, pasoActual - 1);
-//         pasosClamped = min(pasosClamped, pasosTotales);
-//         progTarget = (float)pasosClamped / (float)pasosTotales;
-//     }
-//     const float k = 8.0f; // ganancia por segundo (~120 ms de constante de tiempo)
-//     s_progSmooth += (progTarget - s_progSmooth) * min(1.0f, k * dt);
-//     s_progSmooth = constrain(s_progSmooth, 0.0f, 1.0f);
-//     const int pixProg = (int)(anchoMax * s_progSmooth + 0.5f);
-
-//     // ───────────────────────── Dibujo ──────────────────────────────────────────────
-//     barraSprite.fillSprite(COL_BG);
-
-//     // Marco y esquinas "marcador" con offset
-//     barraSprite.drawRoundRect(M, M + offsetY, W - 2*M, H - 2*M, r, COL_TEXT);
-
-//     const int notch = 7;
-//     // sup-izq
-//     barraSprite.drawFastHLine(M,              M + offsetY,           notch, COL_TEXT);
-//     barraSprite.drawFastVLine(M,              M + offsetY,           notch, COL_TEXT);
-//     // sup-der
-//     barraSprite.drawFastHLine(W - M - notch,  M + offsetY,           notch, COL_TEXT);
-//     barraSprite.drawFastVLine(W - M - 1,      M + offsetY,           notch, COL_TEXT);
-//     // inf-izq
-//     barraSprite.drawFastHLine(M,              H - M - 1 + offsetY,   notch, COL_TEXT);
-//     barraSprite.drawFastVLine(M,              H - M - notch + offsetY, notch, COL_TEXT);
-//     // inf-der
-//     barraSprite.drawFastHLine(W - M - notch,  H - M - 1 + offsetY,   notch, COL_TEXT);
-//     barraSprite.drawFastVLine(W - M - 1,      H - M - notch + offsetY, notch, COL_TEXT);
-
-//     // Etiqueta (centrada dentro del marco)
-//     if (etiqueta != nullptr) {
-//         barraSprite.setTextDatum(BC_DATUM);
-//         barraSprite.setTextFont(2);
-//         barraSprite.setTextColor(COL_TEXT, COL_BG);
-//         barraSprite.drawString(etiqueta, W / 2, yLabel - padding);
-//     }
-
-//     // Ecualizador (3 barras animadas, independiente del %)
-//     for (int i = 0; i < 3; ++i) {
-//         float phase = s_eqPhase + i * (2.0f * PI / 3.0f);
-//         float s = (sinf(phase) * 0.5f + 0.5f); // 0..1
-//         int h = (int)(eqHMin + s * (eqHMax - eqHMin));
-//         int bx = eqX + i * (eqW + eqGap);
-//         int by = eqBaseY - h;
-//         barraSprite.fillRect(bx, by, eqW, h, COL_TEXT);
-//     }
-//     // Línea base del ecualizador
-//     barraSprite.drawFastHLine(xBarra, eqBaseY, anchoMax, COL_TEXT);
-
-//     // Pista de la barra
-//     barraSprite.fillRoundRect(xBarra, yBarra, anchoMax, altoBarra, 5, COL_TRACK);
-
-//     // Progreso + barber-pole (rayas animadas independientes del %)
-//     if (pixProg > 0) {
-//         barraSprite.fillRoundRect(xBarra, yBarra, pixProg, altoBarra, 5, COL_FILL);
-
-//         int offsetStripe = (int)s_barberPhase; // 0..stripeStep
-//         for (int sx = -altoBarra + offsetStripe; sx < pixProg; sx += stripeStep) {
-//             int x1 = xBarra + sx;
-//             int y1 = yBarra;
-//             int x2 = xBarra + sx + altoBarra;
-//             int y2 = yBarra + altoBarra - 1;
-
-//             // Recorte al ancho de progreso
-//             if (x2 > xBarra + pixProg) { int dx = x2 - (xBarra + pixProg); x2 -= dx; y2 -= dx; }
-//             if (x1 < xBarra)           { int dx = xBarra - x1;            x1 += dx; y1 += dx; }
-
-//             if (x1 <= x2) barraSprite.drawLine(x1, y1, x2, y2, COL_STRIPE);
-//         }
-//     }
-
-//     // Porcentaje centrado debajo - AHORA CON POSICIÓN FIJA DENTRO DEL MARCO
-//     const int pct = (int)(s_progSmooth * 100.0f + 0.5f);
-//     char bufPct[8];
-//     snprintf(bufPct, sizeof(bufPct), "%d%%", pct);
-//     barraSprite.setTextDatum(TC_DATUM);
-//     barraSprite.setTextFont(2);
-//     barraSprite.setTextColor(COL_TEXT, COL_BG);
-//     barraSprite.drawString(bufPct, xBarra + anchoMax / 2, yPorcentaje); // ← POSICIÓN FIJA
-
-//     // Empujar al TFT (posición original)
-//     barraSprite.pushSprite(spriteX, spriteY);
-// }
-
 
 void BOTONERA_::actualizarBarraProgreso2(int pasoActual,
                                          int pasosTotales,

@@ -336,7 +336,7 @@ void handleEncoder() noexcept
                 send_frame(frameMaker_REQ_ELEM_SECTOR(
                     DEFAULT_BOTONERA,
                     id,
-                    SPANISH_LANG,
+                    (byte) currentLanguage,
                     ELEM_CURRENT_FLAGS_SECTOR
                 ));
             }
@@ -387,7 +387,7 @@ void handleEncoder() noexcept
             send_frame(frameMaker_REQ_ELEM_SECTOR(
                 DEFAULT_BOTONERA,
                 idToQuery,
-                SPANISH_LANG,
+                (byte) currentLanguage,
                 ELEM_CMODE_SECTOR
             ));
 
@@ -1310,6 +1310,7 @@ void handleBrightnessMenu()
 
             // 4) Salir del menú y volver a la pantalla principal
             brightnessMenuActive = false;
+            ignoreEncoderClick = true;
             drawCurrentElement();
         }
     }
@@ -1379,7 +1380,8 @@ void handleSoundMenu()
                 case 9: // Confirmar y salir
                     saveSoundSettingsToSPIFFS();
                     soundMenuActive = false;
-                    drawCurrentElement();
+                    ignoreEncoderClick = true;
+                    //drawCurrentElement();
                     DEBUG__________ln("✅ Ajustes de sonido confirmados:");
                     DEBUG__________printf(" - Tipo de voz: %s\n", (selectedVoiceGender == 0) ? "Mujer" : "Hombre");
                     DEBUG__________printf(" - Respuesta negativa: %s\n", negativeResponse ? "Con" : "Sin");
@@ -1430,6 +1432,15 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) noexcept
 
     // Lectura del contador del encoder
     const int32_t newEncoderValue = encoder.getCount();
+
+    static bool prevHiddenMenuActive = false;
+    if (hiddenMenuActive && !prevHiddenMenuActive) {
+        // Ajustes acaba de abrirse → tratarlo como entrada inicial “limpia”
+        initialEntry   = true;
+        menuJustOpened = true;
+        encoderButtonPressed = false;
+    }
+    prevHiddenMenuActive = hiddenMenuActive;
 
     // ---------------------------------
     // 1) Entrada inicial al menú oculto
@@ -1521,13 +1532,20 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) noexcept
             } break;
 
             case 4: { // Volver
-                #ifdef DEBUG
-                                DEBUG__________ln("Volviendo al menú principal");
-                #endif
+                // Consumir pulsación en curso antes de salir
+                while (digitalRead(ENC_BUTTON) == LOW) { /* busy wait breve */ }
+
+                // Evitar que la suelta siguiente dispare acciones en la pantalla principal
+                ignoreEncoderClick = true;
+
+                // Reiniciar estado interno para la próxima entrada a Ajustes
+                initialEntry   = true;
+                menuJustOpened = true;
+                encoderButtonPressed = false;
+
                 PulsadoresHandler::limpiarEstados();
-                drawCurrentElement();
-                initialEntry    = false;
                 hiddenMenuActive = false;
+                drawCurrentElement();
             } break;
 
             default:
@@ -1748,6 +1766,7 @@ void handleBankSelectionMenu(std::vector<byte>& bankList, std::vector<bool>& sel
 
             // Cerrar menú y volver
             bankSelectionActive = false;
+            ignoreEncoderClick = true;
             drawCurrentElement();
             return;
         }
@@ -1923,16 +1942,21 @@ void handleFormatMenu()
                 extraElementsMenuActive   = true;
                 extraElementsMenuSelection= 0;
                 formatSubMenuActive       = false;   // cerramos este submenú
-                drawExtraElementsMenu(extraElementsMenuSelection);
+                //drawExtraElementsMenu(extraElementsMenuSelection);
             } break;
 
             case 6: { // Volver
+            // Evitar que el mismo click confirme de nuevo algo en Ajustes
+                ignoreEncoderClick = true;
+
+                // (Opcional) asegurar suelta completa si quieres ser extra conservador
+                // while (digitalRead(ENC_BUTTON) == LOW) { delay(1); }
+
                 formatSubMenuActive = false;
                 hiddenMenuActive    = true;
                 drawHiddenMenu(0);
-                // Reset de navegación para futuras entradas
-                formatMenuCurrentIndex = 0;
-                formatMenuLastValue    = encoder.getCount();
+                // No podemos tocar las estáticas de handleHiddenMenuNavigation desde aquí,
+                // pero ignoreEncoderClick ya evita el re-disparo inmediato.
             } break;
 
             default:
@@ -2566,55 +2590,52 @@ void handleExtraElementsMenu() {
             if (extraElementsMenuSelection == 0) {
                 confirmEnableDadoActive = true;
                 confirmEnableDadoSelection = 0;
-                drawConfirmEnableDadoMenu(confirmEnableDadoSelection);
             } else {
                 extraElementsMenuActive = false;
-                drawCurrentElement();
             }
         }
     }
 }
 
-void handleConfirmEnableDadoMenu() {
+void handleConfirmEnableDadoMenu(){
     static int32_t lastVal = encoder.getCount();
     int32_t newVal = encoder.getCount();
-    if (newVal != lastVal) {
+    if (newVal != lastVal){
         int dir = (newVal > lastVal) ? 1 : -1;
         lastVal = newVal;
         confirmEnableDadoSelection = (confirmEnableDadoSelection + dir + 2) % 2;
         drawConfirmEnableDadoMenu(confirmEnableDadoSelection);
     }
 
-    if (digitalRead(ENC_BUTTON) == LOW) {
-        if (buttonPressStart == 0) buttonPressStart = millis();
+    if (digitalRead(ENC_BUTTON) == LOW){
+        if (buttonPressStart == 0)
+            buttonPressStart = millis();
         return;
     }
-    if (buttonPressStart > 0) {
+    if (buttonPressStart > 0){
         unsigned long press = millis() - buttonPressStart;
         buttonPressStart = 0;
-        if (press < 500) {
-            if (confirmEnableDadoSelection == 0) {
+        if (press < 500){
+            if (confirmEnableDadoSelection == 0){
                 // Sí → toggle persistente y recargar lista
                 bool enabled = isDadoEnabled();
                 setDadoEnabled(!enabled);
-                loadElementsFromSPIFFS();   // reconstruye elementFiles/selectedStates:contentReference[oaicite:9]{index=9}
+                loadElementsFromSPIFFS();
 
-                // Opcional: centrar en Dado si se acaba de habilitar
-                if (!enabled) {
-                    for (size_t i = 0; i < elementFiles.size(); ++i) {
-                        if (elementFiles[i] == "Dado") { currentIndex = (int)i; break; }
+                if (!enabled){
+                    for (size_t i = 0; i < elementFiles.size(); ++i){
+                        if (elementFiles[i] == "Dado"){
+                            currentIndex = (int)i;
+                            break;
+                        }
                     }
                 }
-
-                confirmEnableDadoActive = false;
-                extraElementsMenuActive = false;
-                drawCurrentElement();
-            } else {
-                // No
-                confirmEnableDadoActive = false;
-                drawExtraElementsMenu(extraElementsMenuSelection);
             }
+
+            // En ambos casos (Sí o No) cerramos y volvemos al menú principal
+            confirmEnableDadoActive = false;
+            extraElementsMenuActive = false;
+            //drawCurrentElement();
         }
     }
 }
-

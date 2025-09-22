@@ -39,6 +39,11 @@ class BOTONERA_ : public ELEMENT_{
         bool procesar_y_guardar_elemento_nuevo(byte targetID);
         bool procesar_sector(int sector, INFO_PACK_T* infoPack, uint8_t targetID);
         bool confirmarCambioID(byte nuevaID);
+        bool confirmarCambioIDConSerial(uint8_t nuevaID,
+                                        const uint8_t serialEsperado[5],
+                                        unsigned long timeoutPerAttempt = 1500,
+                                        int retries = 3);
+
         byte getIdFromSPIFFS(byte *serial);
         String getCurrentFilePath(byte elementID);
         void printFrameInfo(LAST_ENTRY_FRAME_T LEF);
