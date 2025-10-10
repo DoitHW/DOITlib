@@ -1,5 +1,6 @@
 #pragma once
 #include <Arduino.h>
+#include <Frame_DMS/Frame_DMS.h>
 #include <vector>
 
 // Definiciones de filas y columnas
@@ -29,11 +30,15 @@ private:
     bool blueButtonPressed = false;  // Estado del botón azul
     // Función auxiliar para procesar un evento de un botón
     void processButtonEvent(int i, int j, ButtonEventType event,
-                            bool hasPulse, bool hasPassive, bool hasRelay,
-                            std::vector<byte>& target);
+                                           bool hasPulse, bool hasPassive, bool hasRelay,
+                                           uint8_t targetType, const TARGETNS& targetNS);
 };
 
 extern PulsadoresHandler pulsadores;
 extern std::vector<uint8_t> idsSPIFFS;   // IDs ordenadas               (solo Comunicador)
 extern int  relayStep;              // -1 = BROADCAST encendido
-extern uint8_t communicatorActiveID;
+//extern uint8_t communicatorActiveID;
+
+extern std::vector<TARGETNS> nsSPIFFS;
+extern uint8_t  communicatorTargetType;
+extern TARGETNS communicatorActiveNS;

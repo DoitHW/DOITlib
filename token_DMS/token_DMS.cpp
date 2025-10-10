@@ -331,38 +331,55 @@ void TOKEN_::proponer_token(byte guessbank) {
     propossedToken.addr.file = fileRand;
 }
 
-void TOKEN_::token_handler(TOKEN_DATA token, uint8_t lang_in, bool genre_in, uint8_t myid, std::vector<uint8_t> targets) {
-    // Calcular offset de lenguaje si corresponde
+// Nueva firma: pasa la lista de NS de los destinos (dispositivos 0xDD)
+// origin debería ser DEFAULT_BOTONERA en la botonera
+void TOKEN_::token_handler(const TOKEN_DATA& token,
+                           uint8_t          lang_in,
+                           bool             genre_in,
+                           uint8_t          origin,
+                           const std::vector<TARGETNS>& targetsNS)
+{
+    // Si el banco es de “voz/idioma”, aplicar stride 10 por idioma
     byte lang = 0;
     if (token.addr.bank > 0x09 && token.addr.bank < 0x63) {
-        lang = lang_in * 10;
+        lang = static_cast<byte>(lang_in * 10);
     }
 
-    // Procesamos si la ficha es de efecto (TOKEN_FX) o sin efecto (TOKEN_NOFX)
+    // Sólo procesamos FX o NOFX
     if (token.cmd == TOKEN_FX || token.cmd == TOKEN_NOFX) {
-        // Enviar el color de la ficha
+
+        // 1) Color de la ficha (RGB directo)
         COLOR_T colorout;
         colorout.red   = token.color.r;
         colorout.green = token.color.g;
         colorout.blue  = token.color.b;
 
+        // Si hay configuración de color (temporal o permanente), “pinta” todo (broadcast)
         if (token.cmd2 != NO_COLOR_CONF) {
-            send_frame(frameMaker_SEND_RGB(myid, targets, colorout));
+            // broadcast → targetType = 0xFF, targetNS = NS_ZERO
+            send_frame(frameMaker_SEND_RGB(origin, BROADCAST, NS_ZERO, colorout));
             delay(200);
         }
 
-        delay(200); // Extra delay por estabilidad visual
+        delay(200); // estabilidad visual
 
-        DEBUG__________ln("Bank: " + String(token.addr.bank + genre_in, HEX) + ", File: " + String(token.addr.file + lang, HEX));
+        // 2) Audio asociado a la ficha
+        DEBUG__________ln("Bank: " + String(token.addr.bank + genre_in, HEX) +
+                          ", File: " + String(token.addr.file + lang,  HEX));
         doitPlayer.play_file(token.addr.bank + genre_in, token.addr.file + lang);
         delay(50);
         while (doitPlayer.is_playing()) { delay(10); }
         delay(500);
 
+        // 3) Comportamiento según modo del Token
         if (tokenCurrentMode == TOKEN_BASIC_MODE) {
-            if (token.cmd2 == TEMP_COLOR_CONF) {
 
-                send_frame(frameMaker_SEND_COLOR(myid, targets, 8)); // negro
+            if (token.cmd2 == TEMP_COLOR_CONF) {
+                // Apagar (negro) tras el audio en TODOS los destinos concretos
+                for (const TARGETNS& ns : targetsNS) {
+                    send_frame(frameMaker_SEND_COLOR(origin, DEFAULT_DEVICE, ns, /*NEGRO*/ 8));
+                    delay(10);
+                }
             }
         }
         else if (tokenCurrentMode == TOKEN_PARTNER_MODE) {
@@ -371,41 +388,51 @@ void TOKEN_::token_handler(TOKEN_DATA token, uint8_t lang_in, bool genre_in, uin
             static byte firstTokenFile = 0;
 
             if (!waitingForPartner) {
-                firstTokenBank = token.addr.bank;
-                firstTokenFile = token.addr.file;
+                // Guardar la 1ª ficha y esperar la pareja
+                firstTokenBank   = token.addr.bank;
+                firstTokenFile   = token.addr.file;
                 firstTokenStored = true;
                 waitingForPartner = true;
 
-                DEBUG__________printf("Primer token registrado: Bank = 0x%02X, File = 0x%02X\n", firstTokenBank, firstTokenFile);
+                DEBUG__________printf("Primer token registrado: Bank = 0x%02X, File = 0x%02X\n",
+                                      firstTokenBank, firstTokenFile);
 
                 if (token.cmd2 == TEMP_COLOR_CONF) {
                     delay(50);
-              
-                    send_frame(frameMaker_SEND_COLOR(myid, targets, 8));
+                    for (const TARGETNS& ns : targetsNS) {
+                        send_frame(frameMaker_SEND_COLOR(origin, DEFAULT_DEVICE, ns, /*NEGRO*/ 8));
+                        delay(10);
+                    }
                     DEBUG__________ln("Primer token: Color temporal, apagando después del audio.");
                 }
             } else {
+                // Ya había 1ª ficha almacenada: evaluar pareja
                 if (!firstTokenStored) {
                     DEBUG__________ln("Error: No se encontró el primer token almacenado.");
                     return;
                 }
 
                 bool match = false;
-                DEBUG__________printf("Comparando primer token (Bank = 0x%02X, File = 0x%02X) con los partners de la segunda ficha:\n", firstTokenBank, firstTokenFile);
-                for (int i = 0; i < 8; i++) {
-                    DEBUG__________printf("Partner %d: Bank = 0x%02X, File = 0x%02X\n", i, token.partner[i].bank, token.partner[i].file);
+                DEBUG__________printf("Comparando primer token (Bank = 0x%02X, File = 0x%02X) con partners:\n",
+                                      firstTokenBank, firstTokenFile);
 
-                    // Caso 1: Match exacto
-                    if (token.partner[i].bank == firstTokenBank && token.partner[i].file == firstTokenFile) {
+                for (int i = 0; i < 8; i++) {
+                    DEBUG__________printf("Partner %d: Bank = 0x%02X, File = 0x%02X\n",
+                                          i, token.partner[i].bank, token.partner[i].file);
+
+                    // Caso 1: match exacto
+                    if (token.partner[i].bank == firstTokenBank &&
+                        token.partner[i].file == firstTokenFile) {
                         match = true;
-                        DEBUG__________printf("✔️ Match exacto encontrado en partner %d\n", i);
+                        DEBUG__________printf("✔️ Match exacto en partner %d\n", i);
                         break;
                     }
-
-                    // Caso 2: Match por banco de familia (file = 0xFF)
-                    if (token.partner[i].file == 0xFF && token.partner[i].bank == firstTokenBank) {
+                    // Caso 2: mismo banco (file comodín 0xFF)
+                    if (token.partner[i].file == 0xFF &&
+                        token.partner[i].bank == firstTokenBank) {
                         match = true;
-                        DEBUG__________printf("🏷️ Match de familia encontrado en partner %d (bank = 0x%02X)\n", i, token.partner[i].bank);
+                        DEBUG__________printf("🏷️ Match de familia en partner %d (bank=0x%02X)\n",
+                                              i, token.partner[i].bank);
                         break;
                     }
                 }
@@ -414,49 +441,73 @@ void TOKEN_::token_handler(TOKEN_DATA token, uint8_t lang_in, bool genre_in, uin
                 while (doitPlayer.is_playing()) { delay(10); }
                 delay(200);
 
+                // Respuesta WIN/FAIL + audio correspondiente
                 int fileNum = match ? random(1, 4) : random(1, 3);
-                send_frame(frameMaker_SEND_RESPONSE(myid, targets, match ? WIN : FAIL));
-                doitPlayer.play_file((match ? WIN_RESP_BANK : FAIL_RESP_BANK) + genre_in, fileNum + lang);
+                for (const TARGETNS& ns : targetsNS) {
+                    send_frame(frameMaker_SEND_RESPONSE(origin, DEFAULT_DEVICE, ns, match ? WIN : FAIL));
+                    delay(10);
+                }
+                doitPlayer.play_file((match ? WIN_RESP_BANK : FAIL_RESP_BANK) + genre_in,
+                                     fileNum + lang);
 
                 delay(50);
                 while (doitPlayer.is_playing()) { delay(10); }
                 delay(600);
 
+                // Color post-respuesta según configuración
                 if (token.cmd2 == TEMP_COLOR_CONF) {
-           
-                    send_frame(frameMaker_SEND_COLOR(myid, targets, 8));
+                    for (const TARGETNS& ns : targetsNS) {
+                        send_frame(frameMaker_SEND_COLOR(origin, DEFAULT_DEVICE, ns, /*NEGRO*/ 8));
+                        delay(10);
+                    }
                     DEBUG__________ln("Segundo token: TEMP_COLOR_CONF, apagando color.");
                 } else if (token.cmd2 == PERM_COLOR_CONF) {
-                    send_frame(frameMaker_SEND_RGB(myid, targets, colorout));
+                    for (const TARGETNS& ns : targetsNS) {
+                        send_frame(frameMaker_SEND_RGB(origin, DEFAULT_DEVICE, ns, colorout));
+                        delay(10);
+                    }
                     DEBUG__________ln("Segundo token: PERM_COLOR_CONF, manteniendo color.");
                 }
 
-                waitingForPartner = false;
-                firstTokenStored = false;
+                waitingForPartner  = false;
+                firstTokenStored   = false;
             }
         }
         else if (tokenCurrentMode == TOKEN_GUESS_MODE) {
-            bool isCorrect = (token.addr.bank == propossedToken.addr.bank && token.addr.file == propossedToken.addr.file);
-            while (doitPlayer.is_playing()) { delay(10); }
-            delay(600);
-
-            send_frame(frameMaker_SEND_RESPONSE(myid, targets, isCorrect ? WIN : FAIL));
-            doitPlayer.play_file((isCorrect ? WIN_RESP_BANK : FAIL_RESP_BANK) + genre_in, random(1, isCorrect ? 4 : 3) + lang);
+            // ¿Acierto o fallo?
+            bool isCorrect = (token.addr.bank == propossedToken.addr.bank &&
+                              token.addr.file == propossedToken.addr.file);
 
             while (doitPlayer.is_playing()) { delay(10); }
             delay(600);
 
+            // Respuesta WIN/FAIL y audio
+            for (const TARGETNS& ns : targetsNS) {
+                send_frame(frameMaker_SEND_RESPONSE(origin, DEFAULT_DEVICE, ns, isCorrect ? WIN : FAIL));
+                delay(10);
+            }
+
+            doitPlayer.play_file((isCorrect ? WIN_RESP_BANK : FAIL_RESP_BANK) + genre_in,
+                                 random(1, isCorrect ? 4 : 3) + lang);
+
+            while (doitPlayer.is_playing()) { delay(10); }
+            delay(600);
+
+            // Color post-respuesta
             if (token.cmd2 == TEMP_COLOR_CONF) {
-
-                send_frame(frameMaker_SEND_COLOR(myid, targets, 8));
+                for (const TARGETNS& ns : targetsNS) {
+                    send_frame(frameMaker_SEND_COLOR(origin, DEFAULT_DEVICE, ns, /*NEGRO*/ 8));
+                    delay(10);
+                }
             } else if (token.cmd2 == PERM_COLOR_CONF) {
-                send_frame(frameMaker_SEND_RGB(myid, targets, colorout));
+                for (const TARGETNS& ns : targetsNS) {
+                    send_frame(frameMaker_SEND_RGB(origin, DEFAULT_DEVICE, ns, colorout));
+                    delay(10);
+                }
             }
         }
     }
 }
-
-
 
 void TOKEN_::printFicha(const TOKEN_DATA &f) {
   DEBUG__________("CMD: 0x"); DEBUG__________ln(f.cmd, HEX);

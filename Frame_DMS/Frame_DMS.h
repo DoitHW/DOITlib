@@ -21,7 +21,6 @@ extern int lastReceivedTime;
 
 void IRAM_ATTR onUartInterrupt();
 
-
 struct LAST_ENTRY_FRAME_T{
 
     byte origin;
@@ -30,21 +29,37 @@ struct LAST_ENTRY_FRAME_T{
     LAST_ENTRY_FRAME_T() : origin(0), function(0), data() {}
 };
 
+struct TARGETNS { byte mac01, mac02, mac03, mac04, mac05; };
+constexpr TARGETNS NS_ZERO = {0,0,0,0,0};   // para 0xDB, 0xDC, 0xFF...
 
 struct FRAME_T{
+  byte start;
+  byte frameLengthMsb;
+  byte frameLengthLsb;
+  byte origin;       // 0xDB botonera, 0xDC consola, ...
+  byte targetType;   // 0xDD dispositivo, 0xFF broadcast, ...
+  TARGETNS targetNS; // 5 bytes de serie del objetivo
+  byte function;
+  byte dataLengthMsb;
+  byte dataLengthLsb;
+  std::vector<byte> data;
+  byte checksum;
+  byte end;
+};
 
-    byte start;
-    byte frameLengthMsb;
-    byte frameLengthLsb;
-    byte origin;
-    byte numTargets;
-    std::vector<byte> target;
-    byte function;
-    byte dataLengthMsb;
-    byte dataLengthLsb;
-    std::vector<byte> data;
-    byte checksum;
-    byte end;
+enum ELEM_UNIT_CONF : uint8_t {
+
+    NO_ELEM= 0,
+    COLOR,
+    ACTION,
+    COLOR_ACTION
+};
+
+
+struct ELEM_UNIT{
+
+    ELEM_UNIT_CONF conf;
+    TARGETNS ns;
 };
 
 struct SENSOR_VALUE_T{
@@ -86,7 +101,7 @@ struct MODE_T{
 
 struct INFO_PACK_T{
 
-    byte name[24];
+    byte name[32];
     byte desc[192];
     byte serialNum[5];
     byte ID;
@@ -100,53 +115,90 @@ struct ICON_PACK_T{
     uint16_t icono[ICON_ROWS][ICON_COLUMNS]; 
 };
 
-struct INFO_STATE_T{
-    
-    byte exclusiveOrigins; // indica si esta configurado para atender exclusivamente a una ID
-    byte currentMode;   
-    byte settedFlags;   // indica que flags / reles estan activados
-    byte currentRed;
-    byte currentGreen;
-    byte currentBlue; 
-    byte serialNum[2]; 
-    byte workingTime[4]; 
-    byte lifeTime[4];
+enum BTN_FX : uint8_t {
+    SOLID = 0,           // Color fijo
+    SLOW_WAVE,           // Onda lenta (fade in/out)
+    FAST_WAVE,           // Onda rápida
+    RAINBOWLOOP,        // Arcoíris cíclico
+    BUBBLES_FX,          // Burbujas mejoradas
+    BREATHING,           // Respiración suave
+    FIRE,                // Efecto fuego
+    SPARKLE,             // Destellos aleatorios
+    COMET,               // Cometa con estela
+    PLASMA,              // Plasma dinámico
+    HEARTBEAT,           // Latido de corazón
+    AURORA_FX,              // Aurora boreal
+    STROBE,              // Estroboscópico
+    COLOR_WIPE,          // Barrido de color
+    THEATER_CHASE        // Persecución teatral
 };
 
+// Estructura individual de botón (corresponde a un LED físico)
+struct BUTTON {
+    uint8_t  led_indx;     // Índice 0..8 del LED en la botonera
+    uint8_t  numColor;     // Índice en paleta (si rgbFlag == false)
+    bool     rgbFlag;      // true = usar r,g,b; false = usar numColor
+    uint8_t  r;            // Valor rojo (0..255)
+    uint8_t  g;            // Valor verde (0..255)
+    uint8_t  b;            // Valor azul (0..255)
+    uint8_t  brightness;   // Brillo individual del botón (0..255)
+    BTN_FX   fx;           // Efecto visual asignado al botón
+};
 
-LAST_ENTRY_FRAME_T extract_info_from_frameIn(const std::vector<uint8_t> &frame);
+// Estructura que agrupa los 9 botones de la botonera
+struct COLORPAD_BTNMAP {
+    BUTTON Button_00;   // LED índice 0 (pulsador RELE)
+    BUTTON Button_01;   // LED índice 1 (BLANCO)
+    BUTTON Button_02;   // LED índice 2 (ROJO)
+    BUTTON Button_03;   // LED índice 3 (CELESTE)
+    BUTTON Button_04;   // LED índice 4 (AMARILLO)
+    BUTTON Button_05;   // LED índice 5 (NARANJA)
+    BUTTON Button_06;   // LED índice 6 (VERDE)
+    BUTTON Button_07;   // LED índice 7 (VIOLETA)
+    BUTTON Button_08;   // LED índice 8 (AZUL)
+};
+
+LAST_ENTRY_FRAME_T extract_info_from_frameIn (const std::vector<uint8_t> &frame);
 byte checksum_calc                           (const FRAME_T &framein);
 void send_frame                              (const FRAME_T &framein);
-
-byte get_mapped_sensor_value(byte minMSB, byte minLSB, byte maxLSB, byte maxMSB, byte valLSB, byte valMSB);
-
-byte get_brightness_from_sensorValue(LAST_ENTRY_FRAME_T LEFin);
-byte get_color_from_sensorValue(LAST_ENTRY_FRAME_T LEFin);
-float get_aux_var_01_from_sensorValue(LAST_ENTRY_FRAME_T LEFin);
-byte get_brightness_from_sensorValue_simetric(LAST_ENTRY_FRAME_T LEFin);
+void sendRawFrame                            (const std::vector<byte>& rawData);
 
 void  get_sector_data(byte *sector_data, byte lang, byte sector);
 
-FRAME_T frameMaker_SET_ELEM_MODE       (byte originin, std::vector<byte>targetin, byte modein);
-FRAME_T frameMaker_SET_ELEM_ID         (byte originin, byte targetin, byte IDin);  
-FRAME_T frameMaker_SET_ELEM_DEAF       (byte originin, std::vector<byte>targetin, byte timein);
+// === NUEVAS FIRMAS (todos con origin, targetType, TARGETNS) ===
+FRAME_T frameMaker_SET_ELEM_MODE        (byte originin, byte targetType, TARGETNS targetNS, byte modein);
+FRAME_T frameMaker_SET_ELEM_ID          (byte originin, byte targetType, TARGETNS targetNS, byte IDin);
+FRAME_T frameMaker_SET_ELEM_DEAF        (byte originin, byte targetType, TARGETNS targetNS, byte timein);
 
-FRAME_T frameMaker_SEND_COLOR          (byte originin, std::vector<byte>targetin, byte colorin);
-FRAME_T frameMaker_SEND_RGB             (byte originin, std::vector<byte>targetin, COLOR_T colorin);
-FRAME_T frameMaker_SEND_COMMAND           (byte originin, std::vector<byte>targetin, byte commandin);
-FRAME_T frameMaker_SEND_SENSOR_VALUE   (byte originin, std::vector<byte>targetin, SENSOR_DOUBLE_T sensorin);
-FRAME_T frameMaker_SEND_SENSOR_VALUE_2  (byte originin, std::vector<byte>targetin, SENSOR_VALUE_T sensorin);
-FRAME_T frameMaker_SEND_FLAG_BYTE      (byte originin, std::vector<byte>targetin, byte flagin);
-FRAME_T frameMaker_SEND_PATTERN_NUM    (byte irigin, std::vector<byte>targetin, byte patternin);
-FRAME_T frameMaker_SEND_FILE_NUM       (byte originin, std::vector<byte>targetin, byte bankin, byte filein);
-FRAME_T frameMaker_SEND_RESPONSE       (byte originin, std::vector<byte>targetin, byte response);
+FRAME_T frameMaker_SEND_COLOR           (byte originin, byte targetType, TARGETNS targetNS, byte colorin);
+FRAME_T frameMaker_SEND_RGB             (byte originin, byte targetType, TARGETNS targetNS, COLOR_T colorin);
+FRAME_T frameMaker_SEND_COMMAND         (byte originin, byte targetType, TARGETNS targetNS, byte commandin);
+FRAME_T frameMaker_SEND_SENSOR_VALUE    (byte originin, byte targetType, TARGETNS targetNS, SENSOR_DOUBLE_T sensorin);
+FRAME_T frameMaker_SEND_SENSOR_VALUE_2  (byte originin, byte targetType, TARGETNS targetNS, SENSOR_VALUE_T sensorin);
+FRAME_T frameMaker_SEND_FLAG_BYTE       (byte originin, byte targetType, TARGETNS targetNS, byte flagin);
+FRAME_T frameMaker_SEND_PATTERN_NUM     (byte originin, byte targetType, TARGETNS targetNS, byte patternin);
+FRAME_T frameMaker_SEND_FILE_NUM        (byte originin, byte targetType, TARGETNS targetNS, byte bankin, byte filein);
+FRAME_T frameMaker_SEND_RESPONSE        (byte originin, byte targetType, TARGETNS targetNS, byte response);
 
-FRAME_T frameMaker_RETURN_ELEM_SECTOR  (byte originin, byte targetin, byte *sector_data, byte sectorin);
-FRAME_T frameMaker_REQ_ELEM_SECTOR(byte originin, byte targetin, byte idiomain, byte sectorin);
+FRAME_T frameMaker_RETURN_ELEM_SECTOR   (uint8_t originin, uint8_t targetType, const TARGETNS& targetNS, const uint8_t* sector_data, uint8_t sectorin); 
+FRAME_T frameMaker_REQ_ELEM_SECTOR      (byte originin, byte targetType, TARGETNS targetNS, byte idiomain, byte sectorin);
+FRAME_T frameMaker_SET_BUTTONS_EXTMAP(
+    uint8_t               originType,   // DC
+    uint8_t               targetType,   // DB
+    const TARGETNS&       destNS,       // 00:00:00:00:00 = broadcast
+    const COLORPAD_BTNMAP &map          // 9 botones ya con led_indx 0..8
+);
+void buildColorpadFromBtnIds(
+    const BUTTON& b1, const BUTTON& b2, const BUTTON& b3,
+    const BUTTON& b4, const BUTTON& b5, const BUTTON& b6,
+    const BUTTON& b7, const BUTTON& b8, const BUTTON& b9,
+    COLORPAD_BTNMAP& outMap
+);
 
-void printFrameInfo(LAST_ENTRY_FRAME_T LEF);
-
-void sendRawFrame(const std::vector<byte>& rawData);
-
+// Debug
+void send_old_color(uint8_t color);
+inline uint8_t old_color_checksum(uint8_t color, uint8_t node, uint8_t func, uint8_t dl, uint8_t room );
 
 #endif
+
+

@@ -12,69 +12,51 @@
 #include <vector>
 #include <play_DMS/play_DMS.h>
 
+struct SectorMsg {
+    uint8_t sector{0xFF};            // data[0]
+    std::vector<uint8_t> payload;    // data[1..N] (puede iniciar con NS o no)
+    uint32_t tsMs{0};
+};
+
+// Protocolo (botón 1..9) → índice físico de LED (0..8)
+static constexpr uint8_t kBtnIdToLedIdx[10] = {
+  0xFF, // [0] no usado
+  8,    // 1 → LED8 (AZUL)
+  6,    // 2 → LED6 (VERDE)
+  4,    // 3 → LED4 (AMARILLO)
+  2,    // 4 → LED2 (ROJO)
+  0,    // 5 → LED0 (RELE)
+  7,    // 6 → LED7 (VIOLETA)
+  5,    // 7 → LED5 (NARANJA)
+  3,    // 8 → LED3 (CELESTE)
+  1     // 9 → LED1 (BLANCO)
+};
 
 class BOTONERA_ : public ELEMENT_{
 
     public:
         BOTONERA_();
-
         void botonera_begin();
         void RX_main_handler(LAST_ENTRY_FRAME_T LEF)override;
-        void sectorIn_handler(std::vector<byte> data, byte tragetin);
-        void print_info_pack(const INFO_PACK_T *infoPack);
+        void sectorIn_handler(const std::vector<byte>& data, const TARGETNS& originNS, uint8_t originType);
         bool serialExistsInSPIFFS(byte serialNum[5]);
-        //void iniciarEscaneoElemento(const char* mensajeInicial);
-        //void actualizarBarraProgreso(float progreso);
-        //void actualizarBarraProgreso(float progreso, const char* detalleTexto = nullptr);
         void dibujarMarco(uint16_t color);
         void mostrarMensajeTemporal(int respuesta, int dTime);
-        byte getNextAvailableID();
-
-        //byte validar_serial();
-        void procesar_datos_sector(LAST_ENTRY_FRAME_T &LEF, int sector, INFO_PACK_T* infoPack);
         bool guardar_elemento(INFO_PACK_T* infoPack);
-        void reasignar_id_elemento(INFO_PACK_T* infoPack = nullptr);
-        bool esperar_respuesta(unsigned long timeout);
-        void actualizar_elemento_existente() ;
-        bool procesar_y_guardar_elemento_nuevo(byte targetID);
-        bool procesar_sector(int sector, INFO_PACK_T* infoPack, uint8_t targetID);
-        bool confirmarCambioID(byte nuevaID);
-        bool confirmarCambioIDConSerial(uint8_t nuevaID,
-                                        const uint8_t serialEsperado[5],
-                                        unsigned long timeoutPerAttempt = 1500,
-                                        int retries = 3);
-
-        byte getIdFromSPIFFS(byte *serial);
-        String getCurrentFilePath(byte elementID);
+        bool esperar_respuesta(uint8_t expectedSector, const uint8_t* expectedNS, std::vector<uint8_t>& outPayload, unsigned long timeoutMs);
         void printFrameInfo(LAST_ENTRY_FRAME_T LEF);
         void activateCognitiveMode();
         void deactivateCognitiveMode();
- 
-
-        ////////////////////////////////
-
+        String getFilePathBySerial(const TARGETNS& ns);
         void escanearSala();
-        bool procesar_y_guardar_elemento_nuevo(byte targetID, const byte serialNumDelElemento[5]);
-        byte buscarPrimerIDLibre(const bool ocupadas[32]);
-        void actualizarIDenSPIFFS(const byte serial[5], byte nuevaID);
-        bool escanearID(byte targetID, byte serial[5], unsigned long timeoutPerAttempt, int retries);
-        bool elementoAsignadoA_ID_enSPIFFS(byte idToFind);
+        bool procesar_sector_NS(int sector, INFO_PACK_T* info, const TARGETNS& ns, const uint8_t* data, size_t len);
         void iniciarEscaneoElemento(const char* mensajeInicial);
-        void actualizarBarraProgreso(int pasoActual,int pasosTotales,const char* etiqueta = nullptr);
-
         void actualizarBarraProgreso2(int pasoActual, int pasosTotales, const char* etiqueta);
-
-        
 
     private:   
         byte lastAssignedID = DEFAULT_DEVICE;
         byte lastSerial[5] = {0};
-        // En BOTONERA_.h (zona privada)
-
-
-
 };
-
 
 extern BOTONERA_ *element;
 extern DOITSOUNDS_ doitPlayer;

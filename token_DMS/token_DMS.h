@@ -59,7 +59,11 @@ public:
     // Funciones para la lógica de la aplicación (se adaptan según se requiera)
     void set_mode(TOKEN_MODE_ modein) { tokenCurrentMode = modein; }
     void set_reset_partner(bool state) { reset_partner = state; }
-    void token_handler(TOKEN_DATA token, uint8_t lang, bool genre, uint8_t myid, std::vector<uint8_t> targets);
+    void token_handler(const TOKEN_DATA& token,
+                           uint8_t          lang_in,
+                           bool             genre_in,
+                           uint8_t          origin,
+                           const std::vector<TARGETNS>& targetsNS);
     void proponer_token(byte guessbank);
     void printFicha(const TOKEN_DATA &f);
 

@@ -10,7 +10,17 @@
 #define PLAYER                 // -> PLAYER / NOPLAYER
 #define NFC                    // -> NFC / NONFC
 #define MIC                    // -> MIC / NOMIC
-#define ADXL                   // -> ADXL / NOADXL     
+#define ADXL                   // -> ADXL / NOADXL    
+
+constexpr byte DEFAULT_TABLET       = 0xD1;
+constexpr byte DEFAULT_COLOR_PAD    = 0xD2;
+constexpr byte DEFAULT_MOTION_MAT   = 0XD3;
+constexpr byte DEFAULT_VOICE_MAT    = 0xD4;
+constexpr byte DEFAULT_VOICE_RECON  = 0xD5;
+constexpr byte DEFAULT_COLOR_MAT    = 0xD6;
+constexpr byte DEFAULT_SELECTOR_MAT = 0xD7;
+constexpr byte DEFAULT_JOYSTICK     = 0xD8;
+constexpr byte DEFAULT_PAD          = 0xD9;
 
 #define AP_ELEM_IP                    200, 200, 200, 1
 #define AP_SSID_NAME                  "DOIT_BOTONERA_LINK"
@@ -107,6 +117,7 @@
 #define DEFAULT_CONSOLE       0xDC 
 #define DEFAULT_DICE          0xDA
 #define DEFAULT_DEVICE        0xDD 
+
 #define DEFAULT_ERROR_ID      0xDE
 #define DEFAULT_TECH_TOOL_ID  0xDF
 
@@ -123,26 +134,30 @@
 #define L_SET_ELEM_DEAF       0x01
 
 
-#define F_SEND_RESPONSE       0xC0
-#define L_SEND_RESPONSE       0x01
-#define F_SEND_COLOR          0xC1
-#define L_SEND_COLOR          0x01 
-#define F_SEND_RGB            0xC2
-#define L_SEND_RGB            0x03
-#define F_SEND_BRIGHTNESS     0xC3
-#define L_SEND_BRIGHTNESS     0x02
-#define F_SEND_SENSOR_VALUE_1 0xCA
-#define L_SEND_SENSOR_VALUE_1 0x0C
-#define F_SEND_SENSOR_VALUE_2 0xCB
-#define L_SEND_SENSOR_VALUE_2 0x06
-#define F_SEND_FILE_NUM       0xCC
-#define L_SEND_FILE_NUM       0x02
-#define F_SEND_PATTERN_NUM    0xCD  
-#define L_SEND_PATTERN_NUM    0x01  
-#define F_SEND_FLAG_BYTE      0xCE
-#define L_SEND_FLAG_BYTE      0x01
-#define F_SEND_COMMAND        0xCF
-#define L_SEND_COMMAND        0x01
+#define F_SEND_RESPONSE           0xC0
+#define L_SEND_RESPONSE           0x01
+#define F_SEND_COLOR              0xC1
+#define L_SEND_COLOR              0x01 
+#define F_SEND_RGB                0xC2
+#define L_SEND_RGB                0x03
+#define F_SEND_BRIGHTNESS         0xC3
+#define L_SEND_BRIGHTNESS         0x02
+#define F_SET_BUTTONS_INDEXED_RGB 0xC5
+#define L_SET_BUTTONS_INDEXED_RGB 0x04
+#define F_SET_BUTTONS_EXTMAP      0xC7
+#define BTN_FLAG_RGB              0x01 
+#define F_SEND_SENSOR_VALUE_1     0xCA
+#define L_SEND_SENSOR_VALUE_1     0x0C
+#define F_SEND_SENSOR_VALUE_2     0xCB
+#define L_SEND_SENSOR_VALUE_2     0x06
+#define F_SEND_FILE_NUM           0xCC
+#define L_SEND_FILE_NUM           0x02
+#define F_SEND_PATTERN_NUM        0xCD  
+#define L_SEND_PATTERN_NUM        0x01  
+#define F_SEND_FLAG_BYTE          0xCE
+#define L_SEND_FLAG_BYTE          0x01
+#define F_SEND_COMMAND            0xCF
+#define L_SEND_COMMAND            0x01
 
 #define F_RETURN_ELEM_SECTOR     0xD0
 #define L_RETURN_ELEM_SECTOR_01  0x01
@@ -319,7 +334,8 @@
 enum COMMANDS_ { 
   BLACKOUT= 0,
   START_CMD,
-  TEST_CMD,
+  SLEEP_SERIAL_WAKEUP_CMD,
+  SLEEP_RANDOM_WAKEUP_CMD,
   SEND_REG_RF_CMD,
   SEND_STATS_RF_CMD,
   ERR_DBG_ON,
@@ -550,9 +566,7 @@ enum POSITION{
 
 enum SECTOR_LIST{
 
-  ELEM_FIRST_SPLIT_ATTACH_REQ= 0,
-  ELEM_LAST_SPLIT_ATTACH_REQ,
-  ELEM_NAME_SECTOR,
+  ELEM_NAME_SECTOR, // = 0
   ELEM_DESC_SECTOR,
   ELEM_LOCATION_SECTOR,
   ELEM_SERIAL_SECTOR,
@@ -605,7 +619,7 @@ enum SECTOR_LIST{
   ELEM_MODE_14_FLAG_SECTOR,
   ELEM_MODE_15_NAME_SECTOR,
   ELEM_MODE_15_DESC_SECTOR,
-  ELEM_MODE_15_FLAG_SECTOR,
+  ELEM_MODE_15_FLAG_SECTOR, //53
   ELEM_ICON_ROW_0_SECTOR,
   ELEM_ICON_ROW_1_SECTOR,
   ELEM_ICON_ROW_2_SECTOR,
@@ -669,7 +683,7 @@ enum SECTOR_LIST{
   ELEM_ICON_ROW_60_SECTOR,
   ELEM_ICON_ROW_61_SECTOR,
   ELEM_ICON_ROW_62_SECTOR,
-  ELEM_ICON_ROW_63_SECTOR,
+  ELEM_ICON_ROW_63_SECTOR, // = 117
   ELEM_MOST_USED_MODE_SECTOR,
   ELEM_MOST_USED_COLOR_SECTOR,
   ELEM_MOST_USED_PATTERN_SECTOR,
@@ -685,6 +699,24 @@ enum SECTOR_LIST{
   ELEM_CURRENT_FILE_SECTOR,
   ELEM_CURRENT_XMANAGER_SECTOR,
   ACTIVE_ELEM_LIST,
+  ELEM_INFO,     // nombre + desc
+  ELEM_M0_FULL,
+  ELEM_M1_FULL,  // nombreM + descM + configM 
+  ELEM_M2_FULL,   
+  ELEM_M3_FULL,   
+  ELEM_M4_FULL,   
+  ELEM_M5_FULL,   
+  ELEM_M6_FULL,   
+  ELEM_M7_FULL,   
+  ELEM_M8_FULL,   
+  ELEM_M9_FULL,   
+  ELEM_M10_FULL,  
+  ELEM_M11_FULL,  
+  ELEM_M12_FULL,  
+  ELEM_M13_FULL,  
+  ELEM_M14_FULL,  
+  ELEM_M15_FULL,    
+  ELEM_ROOM_NS_PACK
 };
 
 enum AMBIENTS{
@@ -699,6 +731,7 @@ enum AMBIENTS{
   FOREST,
   NEUTRAL
 };
+
 
 #define TT1 &TomThumb
 

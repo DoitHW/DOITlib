@@ -46,52 +46,6 @@ void ADXL345Handler::init()
     DEBUG__________ln("ADXL345 inicializado correctamente");
 }
 
-// Leer la inclinación del ADXL345
-// void ADXL345Handler::readInclination(char axis)
-// {
-//     if (!initialized || !adxl)
-//         return; // Si no está inicializado o está deshabilitado, no hace nada.
-
-//     //delay(5); // Breve retardo para que el bus I2C se estabilice
-//     sensors_event_t event;
-//     accel.getEvent(&event);
-//     float currentInclination;
-//     if (!accel.getEvent(&event)) {
-//         DEBUG__________ln("Error reading ADXL345 event!");
-//         return; // Exit if reading fails
-//         }
-
-//     switch (axis)
-//     {
-//     case 'x':
-//         currentInclination = event.acceleration.x;
-//         break;
-//     case 'y':
-//         currentInclination = -event.acceleration.y;
-//         break;
-//     default:
-//         return;
-//     }
-
-//     if (abs(currentInclination - lastInclination) >= threshold)
-//     {
-// #ifdef DEBUG
-//         DEBUG__________("Inclinación detectada (");
-//         DEBUG__________(axis);
-//         DEBUG__________("): ");
-// #endif
-
-//         currentInclination = constrain(currentInclination, -10, 10);
-//         DEBUG__________ln(currentInclination);
-
-//         long finalValue = convertInclinationToValue(currentInclination);
-//         SENSOR_VALUE_T sensorValue = createSensorValue(finalValue);
-//         sendSensorValue(sensorValue);
-
-//         lastInclination = currentInclination;
-//     }
-// }
-
 // Función para convertir la inclinación en un valor escalado
 long ADXL345Handler::convertInclinationToValue(float inclination) {
     long scaledInclination = inclination * 100;
@@ -160,42 +114,6 @@ void ADXL345Handler::end()
                                                                     #endif
 }
 
-// void ADXL345Handler::readInclinations() {
-//     if (!initialized || !adxl) return;
-
-//     sensors_event_t event;
-//     if (!accel.getEvent(&event)) {
-//         DEBUG__________ln("Error reading ADXL345 event!");
-//         return;
-//     }
-
-//     float inclX = event.acceleration.x;
-//     float inclY = event.acceleration.y;
-
-//     // Si alguno supera el umbral desde la última lectura:
-//     if (abs(inclX - lastInclinationX) >= threshold ||
-//         abs(inclY - lastInclinationY) >= threshold) {
-// #ifdef DEBUG
-//         DEBUG__________("Inclinaciones detectadas -> X: ");
-//         DEBUG__________(inclX);
-//         DEBUG__________(", Y: ");
-//         DEBUG__________(inclY);
-// #endif
-//         // Limitar a rango [-10,10]
-//         inclX = constrain(inclX, -10, 10);
-//         inclY = constrain(inclY, -10, 10);
-
-//         long valX = convertInclinationToValue(inclX);
-//         long valY = convertInclinationToValue(inclY);
-
-//         SENSOR_DOUBLE_T sensorVal = createSensorDoubleValue(valX, valY);
-//         sendSensorValueDouble(sensorVal);
-
-//         lastInclinationX = inclX;
-//         lastInclinationY = inclY;
-//     }
-// }
-
 void ADXL345Handler::readInclinations() {
     if (!initialized || !adxl) return;
 
@@ -232,11 +150,15 @@ void ADXL345Handler::readInclinations() {
 
         // Inicio de movimiento → enviar ‘1’ de inmediato
         if (movementDetected && !movementDetectedLast) {
-            std::vector<byte> targets = { getCurrentElementID() };
-            SENSOR_DOUBLE_T binVal = {0,0, 0,1, 0,1, 0,0, 0,0, 0,0};
-            send_frame(frameMaker_SEND_SENSOR_VALUE(
-              DEFAULT_BOTONERA, targets, binVal
-            ));
+        TARGETNS ns = getCurrentElementNS();
+        SENSOR_DOUBLE_T binVal = {0,0, 0,1, 0,1, 0,0, 0,0, 0,0};;
+        send_frame(frameMaker_SEND_SENSOR_VALUE(
+        DEFAULT_BOTONERA,     // origin = la botonera
+        DEFAULT_DEVICE,       // targetType = un dispositivo normal
+        ns,                  // el número de serie del elemento actual
+        binVal
+        ));
+
             movementDetectedLast = true;
         }
 
@@ -248,10 +170,13 @@ void ADXL345Handler::readInclinations() {
         // Si llevamos inactivityTimeout sin movimiento → enviar ‘0’
         if (movementDetectedLast &&
             (now - lastMovementTime >= inactivityTimeout)) {
-            std::vector<byte> targets = { getCurrentElementID() };
+            TARGETNS ns = getCurrentElementNS();
             SENSOR_DOUBLE_T binVal = {0,0, 0,1, 0,0, 0,0, 0,0, 0,0};  // min=0,max=1,val=0
             send_frame(frameMaker_SEND_SENSOR_VALUE(
-              DEFAULT_BOTONERA, targets, binVal
+            DEFAULT_BOTONERA,     // origin = la botonera
+            DEFAULT_DEVICE,       // targetType = un dispositivo normal
+            ns,                  // el número de serie del elemento actual
+            binVal
             ));
             movementDetectedLast = false;
         }
@@ -294,15 +219,30 @@ SENSOR_DOUBLE_T ADXL345Handler::createSensorDoubleValue(long finalValueX, long f
 }
 
 void ADXL345Handler::sendSensorValueDouble(const SENSOR_DOUBLE_T &sensorValue) {
-    std::vector<byte> targets;
-    byte currentElementID = getCurrentElementID();
-    if (currentElementID == 0xFF) {
+    TARGETNS ns = getCurrentElementNS();
+
+    // Verificar que el número de serie no sea nulo (ej. {0,0,0,0,0})
+    bool isValid = false;
+    for (int i = 0; i < 5; i++) {
+        if (((uint8_t*)&ns)[i] != 0) { 
+            isValid = true; 
+            break; 
+        }
+    }
+
+    if (!isValid) {
 #ifdef DEBUG
-        DEBUG__________ln("⚠️ No se pudo obtener la ID de elemento. Trama no enviada.");
+        DEBUG__________ln("⚠️ No se pudo obtener el número de serie del elemento. Trama no enviada.");
 #endif
         return;
     }
-    targets.push_back(currentElementID);
-    send_frame(frameMaker_SEND_SENSOR_VALUE(DEFAULT_BOTONERA, targets, sensorValue));
+
+    send_frame(frameMaker_SEND_SENSOR_VALUE(
+        DEFAULT_BOTONERA,   // origen = botonera
+        DEFAULT_DEVICE,     // destino = un dispositivo normal
+        ns,                // número de serie del elemento
+        sensorValue
+    ));
 }
+
 

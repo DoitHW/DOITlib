@@ -175,30 +175,21 @@ void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager)
   /*────────────────  COMUNICADOR · elemento sólo-relé  ────────────────*/
     /*────────────────  COMUNICADOR · elemento sólo-relé  ────────────────*/
   if (currentFile == "Comunicador") {
-      extern uint8_t communicatorActiveID;           // destino actual
-      if (communicatorActiveID != BROADCAST) {
+      extern TARGETNS communicatorActiveNS;   // NS del dispositivo activo
+      if (memcmp(&communicatorActiveNS, &NS_ZERO, sizeof(TARGETNS)) != 0) {
           uint8_t cfg[2] = {0};
-          if (RelayStateManager::getModeConfigForID(communicatorActiveID, cfg)) {
+          if (RelayStateManager::getModeConfigForNS(communicatorActiveNS, cfg)) {
               bool hasCol = getModeFlag(cfg, HAS_BASIC_COLOR) ||
                             getModeFlag(cfg, HAS_ADVANCED_COLOR);
               bool hasRel = getModeFlag(cfg, HAS_RELAY);
 
-              if (!hasCol && hasRel) {               // SÓLO RELÉ
-                  /* Apaga todo… */
+              if (!hasCol && hasRel) {   // SÓLO RELÉ
                   fill_solid(leds, NUM_LEDS, CRGB::Black);
-
-                  /* …enciende LED 0 con “fade” azul-cian */
                   ledManager.clearEffects();
-                  ledManager.addEffect(new FadeEffect(*this, 0,
-                                                       CRGB::Blue,
-                                                       CRGB::Cyan,
-                                                       50));
-
-                  /* …enciende LED del botón AZUL */
+                  ledManager.addEffect(new FadeEffect(*this, 0, CRGB::Blue, CRGB::Cyan, 50));
                   leds[8] = CRGB::Blue;
-
                   FastLED.show();
-                  return;                            // no continuar con lógica normal
+                  return;
               }
           }
       }
@@ -309,4 +300,21 @@ void COLORHANDLER_::mapCognitiveLEDs() {
   leds[8] = CRGB::Blue;
   FastLED.show();
 }
+
+CRGB COLORHANDLER_::colorFromIndex(uint8_t idx) const {
+  switch (idx) {
+    case 0:  return CRGB(0,0,0);       // Negro / off
+    case 1:  return CRGB(255,0,0);     // Rojo
+    case 2:  return CRGB(0,255,0);     // Verde
+    case 3:  return CRGB(255,255,0);   // Amarillo
+    case 4:  return CRGB(255,255,255); // Blanco
+    case 5:  return CRGB(0,0,255);     // Azul  (← tu “05”)
+    case 6:  return CRGB(128,0,255);   // Violeta
+    case 7:  return CRGB(255,128,0);   // Naranja
+    case 8:  return CRGB(0,255,255);   // Celeste/cyan
+    default: return CRGB(0,0,0);
+  }
+}
+
+
 

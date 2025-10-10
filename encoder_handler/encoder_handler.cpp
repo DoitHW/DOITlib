@@ -26,7 +26,7 @@ unsigned long buttonReleaseTime = 0;  // Track when button is released
 bool modeScreenEnteredByLongPress = false;  // Flag to track how modes screen was entered
 bool longPressDetected = false;
 std::vector<String> elementFiles;
-std::vector<bool> selectedStates;
+std::vector<char> selectedStates;
 int globalVisibleModesMap[17] = {0};  // Definición e inicialización 
 
 unsigned long lastDisplayInteraction = 0; // Última vez que se interactuó con la pantalla
@@ -102,9 +102,12 @@ int lastQueriedElementIndex = -1;
 
 unsigned long lastModeQueryTime = 0;
 int pendingQueryIndex = -1;
-uint8_t pendingQueryID = 0xFF;
+TARGETNS pendingQueryNS= {0,0,0,0,0}; 
 bool awaitingResponse = false;
 
+static inline bool isSpiffsPath(const String& s) {
+    return s.length() > 0 && s[0] == '/';
+}
 
 /**
  * @brief Gestiona el encoder rotativo y su pulsador para navegación de menús y acciones.
@@ -140,35 +143,82 @@ void handleEncoder() noexcept
     constexpr unsigned long kShortPressMaxMs        = 500UL;
     constexpr unsigned long kAltModeLongPressMs     = 2000UL;
     constexpr unsigned long kDetailsLongPressMs     = 6000UL;
-    constexpr unsigned long kUnlockMinMs            = 500UL;   // Comentario original decía 1000; código usa 500
+    constexpr unsigned long kUnlockMinMs            = 500UL;
     constexpr unsigned long kUnlockMaxMs            = 5000UL;
-    constexpr unsigned long kFocusQueryDelayMs      = 200UL;   // Tiempo que debe transcurrir tras hacer foco para preguntar el modo a un elemento
-    constexpr unsigned long kResponseTimeoutMs      = 500UL;   // Comentario original decía 200; código usa 500
+    constexpr unsigned long kFocusQueryDelayMs      = 200UL;
+    constexpr unsigned long kResponseTimeoutMs      = 500UL;
     constexpr int           kNumLanguages           = 8;
     constexpr int           kMaxModesPerFile        = 16;
     constexpr int           kModeNameLen            = 24;
 
-    // ---------------------------
-    // 0) Validaciones defensivas
-    // ---------------------------
+    // Target Types y NS "cero"
+    constexpr uint8_t TARGET_TYPE_BOTONERA = DEFAULT_BOTONERA; // 0xDB
+    constexpr uint8_t TARGET_TYPE_DEVICE   = DEFAULT_DEVICE;   // 0xDD
+    constexpr uint8_t TARGET_TYPE_BCAST    = BROADCAST;        // 0xFF
+    const TARGETNS ZERO_NS{0,0,0,0,0};
+
 #ifdef DEBUG
-    if (elementFiles.size() == 0) {
-        // Sin elementos no hay nada que gestionar
-        return;
-    }
+    if (elementFiles.size() == 0) return;
     if (currentIndex >= (int)elementFiles.size()) {
         DEBUG__________printf("⚠️ currentIndex fuera de rango (%d), reajustando a 0\n", currentIndex);
     }
 #endif
-    if (elementFiles.size() == 0) return;                 // Evitar accesos indebidos
-    if ((size_t)currentIndex >= elementFiles.size()) {     // Clamp defensivo
+    if (elementFiles.size() == 0) return;
+    if ((size_t)currentIndex >= elementFiles.size()) {
         currentIndex = 0;
     }
 
-    // Utilidades locales
     auto isButtonPressed = []() -> bool { return digitalRead(ENC_BUTTON) == LOW; };
     auto isSpecialFile = [](const String& name) -> bool {
         return (name == "Ambientes" || name == "Fichas" || name == "Comunicador" || name == "Apagar" || name == "Dado");
+    };
+    
+    // === Helper: aplicado inmediato de CMODE en UI + SPIFFS ===
+    auto applyModeImmediate = [&](const String& path, uint8_t cmode) {
+        // 1) Persistir CMODE (SPIFFS o RAM)
+        if (isSpiffsPath(path)) {
+            fs::File f = SPIFFS.open(path, "r+");
+            if (f) {
+                if (f.seek(OFFSET_CURRENTMODE, SeekSet)) {
+                    (void)f.write(&cmode, 1);
+                }
+                f.close();
+            }
+        } else {
+            if      (path == "Ambientes")   ambientesOption.currentMode   = cmode;
+            else if (path == "Fichas")      fichasOption.currentMode      = cmode;
+            else if (path == "Apagar")      apagarSala.currentMode        = cmode;
+            else if (path == "Comunicador") comunicadorOption.currentMode = cmode;
+            else if (path == "Dado")        dadoOption.currentMode        = cmode;
+        }
+
+        // 2) Marcar seleccionado si cmode != 0
+        if ((size_t)currentIndex < selectedStates.size()) {
+            selectedStates[currentIndex] = (cmode != 0);
+        }
+
+        // 3) Leer flags del modo y aplicarlos (solo si tienes archivo)
+        byte modeConfig[2] = {0};
+        if (isSpiffsPath(path)) {
+            fs::File f2 = SPIFFS.open(path, "r");
+            if (f2) {
+                const size_t cfgOffset =
+                    (size_t)OFFSET_MODES +
+                    (size_t)cmode * (size_t)SIZE_MODE +
+                    (size_t)216; // kOffsetConfigInMode (mismo que usas más arriba)
+                if (f2.seek(cfgOffset, SeekSet)) {
+                    (void)f2.read(modeConfig, 2);
+                }
+                f2.close();
+            }
+        }
+        adxl   = getModeFlag(modeConfig, HAS_SENS_VAL_1);
+        useMic = getModeFlag(modeConfig, HAS_SENS_VAL_2);
+
+        // 4) Aplicar patrón y refrescar UI YA
+        colorHandler.setCurrentFile(path);
+        colorHandler.setPatternBotonera(cmode, ledManager);
+        drawCurrentElement();
     };
 
     // 1) Ignorar click residual (hasta soltar)
@@ -184,7 +234,7 @@ void handleEncoder() noexcept
     if (!displayOn) {
         if ((encoder.getCount() != lastEncoderValue) || isButtonPressed()) {
             display_wakeup();
-            encoderIgnoreUntil     = millis() + kIgnoreAfterWakeMs;  // Ignorar durante 500 ms
+            encoderIgnoreUntil     = millis() + kIgnoreAfterWakeMs;
             lastDisplayInteraction = millis();
             lastEncoderValue       = encoder.getCount();
         }
@@ -199,8 +249,10 @@ void handleEncoder() noexcept
                 inCognitiveMenu    = false;
                 clicked            = true;
                 ignoreEncoderClick = true;
-                std::vector<byte> target = { DEFAULT_BOTONERA };
-                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, target, COG_ACT_OFF));
+                // Enviar comando COG_ACT_OFF a la propia BOTONERA (destino tipo 0xDB, NS=00000)
+                send_frame(frameMaker_SEND_COMMAND(
+                    DEFAULT_BOTONERA, TARGET_TYPE_BOTONERA, ZERO_NS, COG_ACT_OFF
+                ));
                 drawCurrentElement();
             }
         } else {
@@ -219,7 +271,6 @@ void handleEncoder() noexcept
     if (confirmEnableDadoActive) { handleConfirmEnableDadoMenu(); return; }
     if (extraElementsMenuActive) { handleExtraElementsMenu(); return; }
 
-
     // 5) Menú selección de bancos
     if (bankSelectionActive) {
         handleBankSelectionMenu(bankList, selectedBanks);
@@ -232,12 +283,10 @@ void handleEncoder() noexcept
         return;
     }
 
-    // 7) Mientras esté bloqueado, solo marcamos tiempo para desbloquear al soltar
+    // 7) Mientras esté bloqueado, solo marcar tiempo para desbloquear al soltar
     bool lockedMain = isInMainMenu() && systemLocked;
     if (lockedMain && isButtonPressed()) {
-        if (buttonPressStart == 0) {
-            buttonPressStart = millis();
-        }
+        if (buttonPressStart == 0) buttonPressStart = millis();
         return;
     }
 
@@ -283,8 +332,8 @@ void handleEncoder() noexcept
         if (!inModesScreen && elementFiles.size() > 1) {
             // Cambio de elemento
             currentIndex = (currentIndex + direction + elementFiles.size()) % elementFiles.size();
-            lastFocusChangeTime      = millis();  // Marca el tiempo del cambio de foco
-            lastQueriedElementIndex  = -1;        // Aún no se ha consultado este nuevo elemento
+            lastFocusChangeTime      = millis();
+            lastQueriedElementIndex  = -1;
 
             String currentFile = elementFiles[currentIndex];
             static String lastElementFile = "";
@@ -297,7 +346,7 @@ void handleEncoder() noexcept
                 lastElementFile = currentFile;
             }
 
-            // Extraer configuración del modo actual del elemento
+            // Extraer configuración del modo actual para flags (igual que antes)
             int  realModeIndex = 0;
             byte modeConfig[2] = {0};
 
@@ -308,7 +357,7 @@ void handleEncoder() noexcept
                 else if (currentFile == "Fichas")      opt = &fichasOption;
                 else if (currentFile == "Comunicador") opt = &comunicadorOption;
                 else if (currentFile == "Apagar")      opt = &apagarSala;
-                else if (currentFile == "Dado")        opt = &dadoOption;  
+                else if (currentFile == "Dado")        opt = &dadoOption;
 
                 realModeIndex = opt->currentMode;
                 memcpy(modeConfig, opt->mode[realModeIndex].config, 2);
@@ -327,15 +376,22 @@ void handleEncoder() noexcept
             adxl   = getModeFlag(modeConfig, HAS_SENS_VAL_1);
             useMic = getModeFlag(modeConfig, HAS_SENS_VAL_2);
 
+            if (isSpecialFile(currentFile)) {
+                // Para RAM: Ambientes, Fichas, Comunicador, Apagar, Dado
+                colorHandler.setCurrentFile(currentFile);
+                colorHandler.setPatternBotonera(realModeIndex, ledManager);
+            }
+
             // Redibujo del elemento actual
             drawCurrentElement();
 
-            // Consulta de flags del elemento si tiene relé
-            const uint8_t id = getCurrentElementID();
-            if (RelayStateManager::hasRelay(id)) {
+            // Consulta de flags del elemento si tiene relé (vía NS)
+            const TARGETNS ns = getCurrentElementNS();
+            if (RelayStateManager::hasRelay(ns)) {
                 send_frame(frameMaker_REQ_ELEM_SECTOR(
                     DEFAULT_BOTONERA,
-                    id,
+                    TARGET_TYPE_DEVICE,
+                    ns,
                     (byte) currentLanguage,
                     ELEM_CURRENT_FLAGS_SECTOR
                 ));
@@ -357,61 +413,100 @@ void handleEncoder() noexcept
         }
     }
 
-    // 9.5) Envío diferido de consulta de modo tras 100 ms de foco
+    // 9.5) Envío diferido de consulta de MODO tras 100 ms de foco (vía NS)
     if ((millis() - lastFocusChangeTime > kFocusQueryDelayMs) &&
         lastQueriedElementIndex != currentIndex)
     {
         String currentFile = elementFiles[currentIndex];
 
-        uint8_t idToQuery     = 0;
-        bool    shouldQuery   = false;
+        TARGETNS nsToQuery{0,0,0,0,0};
+        bool     shouldQuery = false;
 
         if (!isSpecialFile(currentFile)) {
-            // ===== Caso elementos en SPIFFS (como ya hacías) =====
-            fs::File f = SPIFFS.open(currentFile, "r");
-            if (f) {
-                f.seek(OFFSET_ID, SeekSet);
-                f.read(&pendingQueryID, 1);
-                f.close();
-                idToQuery   = pendingQueryID;
-                shouldQuery = true;
-            }
+            nsToQuery   = getCurrentElementNS();   // SPIFFS
+            shouldQuery = true;
         } else if (currentFile == "Dado") {
             Serial1.write(0xDA);
-            delay(300);
-            idToQuery   = getCurrentElementID();
+            delay(300UL);
+            nsToQuery   = getCurrentElementNS();   // Dado en RAM
             shouldQuery = true;
         }
 
         if (shouldQuery) {
+            pendingQueryNS = nsToQuery;   // ← el NS al que preguntas el CMODE
+            awaitingResponse = true;
+
             send_frame(frameMaker_REQ_ELEM_SECTOR(
                 DEFAULT_BOTONERA,
-                idToQuery,
+                TARGET_TYPE_DEVICE,
+                nsToQuery,
                 (byte) currentLanguage,
                 ELEM_CMODE_SECTOR
             ));
 
-            // Misma maquinaria de espera que ya tenías
             lastModeQueryTime       = millis();
             pendingQueryIndex       = currentIndex;
             awaitingResponse        = true;
             lastQueriedElementIndex = currentIndex;
             frameReceived           = false;
+
+            // (Cambio de variable global a NS)
+            pendingQueryNS = nsToQuery; // <<< ver cambios de cabecera más abajo
         }
     }
 
-
-    // ⏳ Timeout de 500 ms para detectar si el elemento no respondió
+    // === Timeout de respuesta de CMODE (500 ms) ===
     if (awaitingResponse && (millis() - lastModeQueryTime > kResponseTimeoutMs)) {
-        if (!frameReceived && pendingQueryIndex >= 0 &&
-            pendingQueryIndex < (int)elementFiles.size())
-        {
-            selectedStates[pendingQueryIndex] = false;
-            DEBUG__________printf("⚠️ Elemento %s no respondió en 500 ms → NO SELECCIONADO\n",
-                                  elementFiles[pendingQueryIndex].c_str());
+        if (pendingQueryIndex >= 0 && pendingQueryIndex < (int)elementFiles.size()) {
+            const String &path = elementFiles[pendingQueryIndex];
+
+            // 1) Forzar NO SELECCIONADO en la lista visible
+            if ((size_t)pendingQueryIndex < selectedStates.size()) {
+                selectedStates[pendingQueryIndex] = false;
+            }
+
+            // 2) Persistir CMODE = 0
+            if (isSpiffsPath(path)) {
+                fs::File f = SPIFFS.open(path, "r+");
+                if (f) {
+                    if (f.seek(OFFSET_CURRENTMODE, SeekSet)) {
+                        const byte zero = 0;
+                        (void)f.write(&zero, 1);
+                    } else {
+                        DEBUG__________ln("⚠️ Timeout: no se pudo posicionar en OFFSET_CURRENTMODE para escribir 0.");
+                    }
+                    f.close();
+                } else {
+                    DEBUG__________printf("⚠️ Timeout: no se pudo abrir %s para forzar CMODE=0.\n", path.c_str());
+                }
+            } else {
+                // Elementos en RAM: reflejar CMODE=0 en su struct
+                if      (path == "Ambientes")   ambientesOption.currentMode   = 0;
+                else if (path == "Fichas")      fichasOption.currentMode      = 0;
+                else if (path == "Apagar")      apagarSala.currentMode        = 0;
+                else if (path == "Comunicador") comunicadorOption.currentMode = 0;
+                else if (path == "Dado")        dadoOption.currentMode        = 0;
+            }
+
+            // 3) Si es el elemento enfocado, apagar patrón y refrescar YA
+            if (pendingQueryIndex == currentIndex) {
+                // CMODE=0 => pattern apagado; flags de sensores a 0 por coherencia
+                adxl   = false;
+                useMic = false;
+
+                colorHandler.setCurrentFile(path);
+                colorHandler.setPatternBotonera(0, ledManager); // apaga LEDs (Mode 0 - 0x0000)
+                drawCurrentElement();                           // quita el resaltado/etiqueta de modo
+            }
+
+            DEBUG__________printf("⚠️ Elemento %s no respondió en %lu ms → NO SELECCIONADO\n",
+                                path.c_str(), (unsigned long)kResponseTimeoutMs);
         }
+
+        // 4) Cerrar la espera (no tocar frameReceived: lo gobierna onUartReceive)
         awaitingResponse = false;
     }
+
 
     // 10) Lectura del botón mantenido (solo si no está bloqueado)
     if (!lockedMain && isButtonPressed()) {
@@ -420,14 +515,14 @@ void handleEncoder() noexcept
         } else {
             const unsigned long held = millis() - buttonPressStart;
 
-            // Pulsación larga: imprimir detalles al pasar 6000 ms (en menú principal)
+            // Pulsación larga: imprimir detalles al pasar 6000 ms
             if (isInMainMenu() && !isLongPress && held >= kDetailsLongPressMs) {
                 printElementDetails();
-                isLongPress = true;  // Evitar re-entrada
-                return;              // Salir inmediatamente, sin esperar a soltar
+                isLongPress = true;
+                return;
             }
 
-            // Pulsación larga en menú de modos (2 s): alternar modo alternativo
+            // Pulsación larga en modos (2 s): alternar modo alternativo
             if (inModesScreen && !isLongPress && held >= kAltModeLongPressMs) {
                 if (currentModeIndex > 0 && currentModeIndex < totalModes - 1) {
                     const int adjustedIndex = currentModeIndex - 1;
@@ -435,7 +530,6 @@ void handleEncoder() noexcept
                     uint8_t modeConfig[2] = {0};
                     bool canToggle = false;
 
-                    // Obtener configuración del modo
                     if (currFile == "Ambientes" || currFile == "Fichas") {
                         INFO_PACK_T* option = (currFile == "Ambientes") ? &ambientesOption : &fichasOption;
                         int count = 0;
@@ -476,7 +570,6 @@ void handleEncoder() noexcept
                         }
                     }
 
-                    // Alternar estado alternativo y persistir
                     if (canToggle &&
                         adjustedIndex >= 0 &&
                         currentAlternateStates.size() > (size_t)adjustedIndex)
@@ -484,7 +577,7 @@ void handleEncoder() noexcept
                         currentAlternateStates[adjustedIndex] = !currentAlternateStates[adjustedIndex];
                         elementAlternateStates[currFile] = currentAlternateStates;
 
-                        if (!isSpecialFile(currFile) && currFile != "Comunicador") { // Persistir solo en archivos de elementos
+                        if (!isSpecialFile(currFile) && currFile != "Comunicador") {
                             fs::File f = SPIFFS.open(currFile, "r+");
                             if (f) {
                                 const int OFFSET_ALTERNATE_STATES = OFFSET_CURRENTMODE + 1;
@@ -508,7 +601,7 @@ void handleEncoder() noexcept
 
     // 11) Al soltar el botón (siempre)
     if (!isButtonPressed()) {
-        // 11.0) Si estaba bloqueado y soltaste entre 500 ms y 5000 ms → desbloquear
+        // 11.0) Desbloqueo (500–5000 ms)
         if (lockedMain && buttonPressStart > 0) {
             const unsigned long pressDuration = millis() - buttonPressStart;
             if (pressDuration >= kUnlockMinMs && pressDuration <= kUnlockMaxMs) {
@@ -520,7 +613,7 @@ void handleEncoder() noexcept
             }
         }
 
-        // 11.1) Si sigue bloqueado (no entró en 11.0), ignorar suelta corta
+        // 11.1) Si sigue bloqueado, limpiar y salir
         if (lockedMain) {
             buttonPressStart = 0;
             isLongPress      = false;
@@ -532,20 +625,14 @@ void handleEncoder() noexcept
 #ifdef DEBUG
             DEBUG__________ln("DEBUG: Duración suelta: " + String(pressDuration) + " ms");
 #endif
-            // 11.2) Si ya procesamos un long-press (por detalles o alternar modo), no re-procesar
             if (isLongPress && !systemLocked) {
                 buttonPressStart = 0;
                 isLongPress      = false;
                 return;
             }
 
-            // 11.3) Solo en menú principal y desbloqueado:
-            //       500–5000 ms → BLOQUEAR
-            //       <500 ms → acción corta (Apagar / Comunicador / abrir modos)
-            //       ≥6000 ms → detalles (respaldo si no se llamó en sección 10)
             if (isInMainMenu()) {
                 if (pressDuration >= kUnlockMinMs && pressDuration <= kUnlockMaxMs) {
-                    // — BLOQUEAR —
                     systemLocked     = true;
                     drawCurrentElement();
                     buttonPressStart = 0;
@@ -553,20 +640,18 @@ void handleEncoder() noexcept
                     return;
                 }
                 else if (pressDuration < kShortPressMaxMs) {
-                    // — Pulsación corta —
                     String currentFile = elementFiles[currentIndex];
 
                     if (currentFile == "Apagar") {
-                        // Apagar sala: deseleccionar todo + comandos de apagado
-                        for (size_t i = 0; i < selectedStates.size(); i++) {
-                            selectedStates[i] = false;
-                        }
-                        std::vector<byte> id = { 0xFF };
+                        // BLACKOUT para todos: targetType=BROADCAST, NS=00000
+                        for (size_t i = 0; i < selectedStates.size(); i++) selectedStates[i] = false;
                         if (isDadoEnabled()){
-                          Serial1.write(0xDA);
-                          delay(300UL);
+                            Serial1.write(0xDA);
+                            delay(300UL);
                         }
-                        send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, id, BLACKOUT));
+                        send_frame(frameMaker_SEND_COMMAND(
+                            DEFAULT_BOTONERA, TARGET_TYPE_BCAST, ZERO_NS, BLACKOUT
+                        ));
                         setAllElementsToBasicMode();
                         doitPlayer.stop_file();
                         showMessageWithLoading(getTranslation("APAGANDO_SALA"), 4000);
@@ -577,35 +662,34 @@ void handleEncoder() noexcept
                         return;
                     }
                     else if (currentFile == "Comunicador") {
-                        // Toggle masivo de selección + broadcast START/BLACKOUT
+                        // Resetea el ciclo del relé y el foco del comunicador
                         relayStep = -1;
                         idsSPIFFS.clear();
-                        communicatorActiveID = 0xFF;
 
-                        // Usamos el propio estado del Comunicador como intención (encender/apagar en masa)
+                        // Ahora el comunicador apunta a BROADCAST por defecto
+                        uint8_t communicatorTargetType = BROADCAST;   // 0xFF
+                        communicatorActiveNS   = NS_ZERO;     // {0,0,0,0,0}
+
+                        // Intención: encender si no estaba seleccionado; apagar si lo estaba
                         const bool turningOn = (currentIndex < (int)selectedStates.size())
-                                               ? !selectedStates[currentIndex]
-                                               : true;
+                                            ? !static_cast<bool>(selectedStates[currentIndex])
+                                            : true;
 
                         auto isSelectableElement = [&](const String& name) {
+                            // Igual que antes: no aplicar a Ambientes / Fichas / Apagar
                             return !(name == "Ambientes" || name == "Fichas" || name == "Apagar");
                         };
 
-                        // Aplica la selección solo a los elementos “reales”
+                        // Marca selección masiva en la UI
                         for (size_t i = 0; i < elementFiles.size(); ++i) {
-                            if (isSelectableElement(elementFiles[i])) {
-                                selectedStates[i] = turningOn;   // true al “encender todos”, false al “apagar todos”
-                            } else {
-                                selectedStates[i] = false;       // Asegura los especiales a false
-                            }
+                            selectedStates[i] = isSelectableElement(elementFiles[i]) ? (turningOn ? 1 : 0) : 0;
                         }
 
+                        // Enviar START/BLACKOUT en broadcast con el nuevo formato (targetType + NS_ZERO)
                         if (turningOn) {
-                            // START_CMD a todos (broadcast)
-                            send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, { 0xFF }, START_CMD));
+                            send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, START_CMD));
                         } else {
-                            // BLACKOUT a todos (broadcast) + feedback
-                            send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, { 0xFF }, BLACKOUT));
+                            send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, BLACKOUT));
                             showMessageWithLoading(getTranslation("APAGANDO_ELEMENTOS"), 4000);
                         }
 
@@ -615,7 +699,7 @@ void handleEncoder() noexcept
                         return;
                     }
                     else {
-                        // No es “Apagar” ni “Comunicador”: abrir submenú de modos
+                        // Abrir submenú de modos
                         inModesScreen    = true;
                         currentModeIndex = 0;
                         drawModesScreen();
@@ -625,7 +709,6 @@ void handleEncoder() noexcept
                     }
                 }
                 else if (pressDuration >= kDetailsLongPressMs) {
-                    // — Detalles (respaldo si no se disparó en sección 10) —
                     printElementDetails();
                     buttonPressStart = 0;
                     isLongPress      = false;
@@ -633,18 +716,15 @@ void handleEncoder() noexcept
                 }
             }
 
-            // 11.4) Lógica residual:
-            //       - Si no estamos en modos: procesar “Apagar” o entrar a modos en pulsación corta.
-            //       - Si estamos en modos y fue pulsación corta: seleccionar modo.
+            // 11.4) Lógica residual
             String currentFile = elementFiles[currentIndex];
             if (!inModesScreen) {
                 if (currentFile == "Apagar") {
-                    // Ruta de seguridad (normalmente ya se habría retornado arriba).
-                    for (size_t i = 0; i < selectedStates.size(); i++) {
-                        selectedStates[i] = false;
-                    }
-                    std::vector<byte> id = { 0xFF };
-                    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, id, BLACKOUT));
+                    // Ruta de seguridad
+                    for (size_t i = 0; i < selectedStates.size(); i++) selectedStates[i] = false;
+                    send_frame(frameMaker_SEND_COMMAND(
+                        DEFAULT_BOTONERA, TARGET_TYPE_BCAST, ZERO_NS, BLACKOUT
+                    ));
                     setAllElementsToBasicMode();
                     doitPlayer.stop_file();
                     showMessageWithLoading(getTranslation("APAGANDO_SALA"), 4000);
@@ -655,7 +735,6 @@ void handleEncoder() noexcept
                     return;
                 }
                 else if (pressDuration < kShortPressMaxMs) {
-                    // Si no es “Apagar” y acabamos aquí: abrir modos (salvo “Comunicador”)
                     if (currentFile != "Comunicador") {
                         inModesScreen    = true;
                         currentModeIndex = 0;
@@ -663,13 +742,24 @@ void handleEncoder() noexcept
                     }
                 }
             } else {
-                // En menú de modos, pulsación corta: seleccionar modo actual
                 if (!isLongPress && pressDuration < kShortPressMaxMs) {
-                    handleModeSelection(elementFiles[currentIndex]);
+                            // === Aplicado inmediato del modo seleccionado ===
+                const String path = elementFiles[currentIndex];
+                int realMode = -1;
+                if (currentModeIndex >= 0 && currentModeIndex < 17) {
+                    realMode = globalVisibleModesMap[currentModeIndex]; // modo real (0..15)
+                }
+                if (realMode >= 0) {
+                    applyModeImmediate(path, (uint8_t)realMode);
+                }
+
+                // Enviar al dispositivo (mantén tu lógica actual)
+                handleModeSelection(elementFiles[currentIndex]);
                 }
             }
         }
-        // Reset de estado de pulsación (siempre al soltar)
+
+        // Reset de estado (siempre al soltar)
         buttonPressStart = 0;
         isLongPress      = false;
     }
@@ -710,36 +800,21 @@ bool modeAlternateActive = false;
  */
 void handleModeSelection(const String& currentFile) noexcept
 {
-    // -------------------------
-    // Constantes de estructura
-    // -------------------------
     constexpr int  kMaxModesPerFile    = 16;
-    constexpr int  kModeNameLen        = 24;     // bytes leídos del nombre en fichero
-    constexpr int  kModeConfigOffset   = 216;    // desplazamiento de 2 bytes de config dentro de cada modo
-    constexpr byte kBroadcastId        = 0xFF;
+    constexpr int  kModeNameLen        = 32;     // Ahora name ocupa 32
+    constexpr int  kModeConfigOffset   = 216;
     constexpr unsigned long kInterCmdDelayMs = 300UL;
 
-    // -------------------------
-    // Validaciones defensivas
-    // -------------------------
     if (elementFiles.empty()) return;
-    if (static_cast<size_t>(currentIndex) >= elementFiles.size()) {
-#ifdef DEBUG
-        DEBUG__________printf("⚠️ handleModeSelection: currentIndex fuera de rango (%d). Abortando.\n", currentIndex);
-#endif
-        return;
-    }
+    if ((size_t)currentIndex >= elementFiles.size()) return;
 
-    // Accesos seguros a selectedStates[currentIndex]
     auto hasSelectedIndex = [&]() -> bool {
-        return static_cast<size_t>(currentIndex) < selectedStates.size();
+        return (size_t)currentIndex < selectedStates.size();
     };
 
-    // ---------------------------------------------
-    // 1) Opción "Regresar" (valor -2 en el mapa)
-    // ---------------------------------------------
+    // 1) Opción "Regresar"
     bool isRegresar = false;
-    if (static_cast<size_t>(currentModeIndex) < sizeof(globalVisibleModesMap) / sizeof(globalVisibleModesMap[0])) {
+    if ((size_t)currentModeIndex < sizeof(globalVisibleModesMap)/sizeof(globalVisibleModesMap[0])) {
         isRegresar = (globalVisibleModesMap[currentModeIndex] == -2);
     }
     if (isRegresar) {
@@ -748,14 +823,9 @@ void handleModeSelection(const String& currentFile) noexcept
         return;
     }
 
-    // ------------------------------------------------
     // 2) Opción índice visible 0: Encender / Apagar
-    // ------------------------------------------------
     if (currentModeIndex == 0) {
         if (!hasSelectedIndex()) {
-#ifdef DEBUG
-            DEBUG__________printf("⚠️ selectedStates no cubre currentIndex (%d). Abortando toggle.\n", currentIndex);
-#endif
             inModesScreen = false;
             drawCurrentElement();
             return;
@@ -766,65 +836,77 @@ void handleModeSelection(const String& currentFile) noexcept
 
         if (currentFile == "Ambientes") {
             if (selectedStates[currentIndex]) {
-                // Encender todos por broadcast
-                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{kBroadcastId}, START_CMD));
+                // Broadcast START
+                TARGETNS bcast = {0,0,0,0,0};
+                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xFF, bcast, START_CMD));
             } else {
-                // Apagar todos por broadcast + limpiar estados
-                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{kBroadcastId}, BLACKOUT));
-                for (size_t i = 0; i < selectedStates.size(); ++i) {
-                    selectedStates[i] = false;
-                }
+                // Broadcast BLACKOUT
+                TARGETNS bcast = {0,0,0,0,0};
+                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xFF, bcast, BLACKOUT));
+                for (auto &s : selectedStates) s = false;
                 setAllElementsToBasicMode();
-                doitPlayer.stop_file(); // (evitar doble llamada redundante)
+                doitPlayer.stop_file();
             }
         }
         else if (currentFile == "Dado") {
-            const byte id = DEFAULT_DICE;
-            const byte basicModeIndex = 1;
-
-            if (isDadoEnabled()){
+            const uint8_t basicModeIndex = 1;
+            if (isDadoEnabled()) {
                 Serial1.write(0xDA);
                 delay(kInterCmdDelayMs);
-           }
-
+            }
+            TARGETNS dadoNS = {0};
+            memcpy(&dadoNS, dadoOption.serialNum, 5);
 
             if (selectedStates[currentIndex]) {
-                // Encender → forzar BASICO (1) en UI y en el dispositivo
                 dadoOption.currentMode = basicModeIndex;
-                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{id}, START_CMD));
+                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xDD, dadoNS, START_CMD));
                 delay(kInterCmdDelayMs);
-                send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, std::vector<byte>{id}, basicModeIndex));
+                send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, 0xDD, dadoNS, basicModeIndex));
             } else {
-                // Apagar → mantener BASICO como “modo por defecto” local
-                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{id}, BLACKOUT));
+                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xDD, dadoNS, BLACKOUT));
                 dadoOption.currentMode = basicModeIndex;
             }
-
             inModesScreen = false;
             drawCurrentElement();
             return;
         }
-
-
         else if (currentFile != "Fichas" && currentFile != "Apagar") {
-            // Elemento normal: envío START/BLACKOUT y mantenimiento de fichero de estado
             fs::File f = SPIFFS.open(currentFile, "r+");
             if (f) {
-                const byte id = getCurrentElementID();
+                TARGETNS elemNS = getCurrentElementNS();
 
                 if (selectedStates[currentIndex]) {
-                    // Encender elemento puntual
-                    send_frame(frameMaker_SEND_COMMAND(
-                        DEFAULT_BOTONERA, std::vector<byte>{id}, START_CMD
-                    ));
-                } else {
-                    // Apagar elemento puntual
-                    send_frame(frameMaker_SEND_COMMAND(
-                        DEFAULT_BOTONERA, std::vector<byte>{id}, BLACKOUT
-                    ));
+                    // ENCENDER
+                    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xDD, elemNS, START_CMD));
 
-                    // 1) Restablecer modo básico + 2) limpiar estados alternativos (16 bytes)
-                    byte basicMode = DEFAULT_BASIC_MODE;
+                    byte basicMode = DEFAULT_BASIC_MODE; // normalmente 1
+                    f.seek(OFFSET_CURRENTMODE, SeekSet);
+                    f.write(&basicMode, 1);
+
+                    // === APLICADO INMEDIATO (ENCENDER → patrón del modo básico) ===
+                    // Leemos los 2 bytes de config del modo básico para ajustar flags y mapear LEDs ya
+                    {
+                        byte cfg[2] = {0};
+                        const size_t cfgOffset =
+                            (size_t)OFFSET_MODES +
+                            (size_t)basicMode * (size_t)SIZE_MODE +
+                            (size_t)kModeConfigOffset; // 216
+
+                        if (f.seek(cfgOffset, SeekSet)) {
+                            (void)f.read(cfg, 2);  // usamos el mismo 'f' abierto en r+
+                        }
+                        adxl   = getModeFlag(cfg, HAS_SENS_VAL_1);
+                        useMic = getModeFlag(cfg, HAS_SENS_VAL_2);
+                    }
+
+                    colorHandler.setCurrentFile(currentFile);
+                    colorHandler.setPatternBotonera(basicMode, ledManager);
+                    // ==============================================================
+                } else {
+                    // APAGAR
+                    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xDD, elemNS, BLACKOUT));
+
+                    byte basicMode = DEFAULT_BASIC_MODE; // tu lógica actual persiste básico aquí
                     f.seek(OFFSET_CURRENTMODE, SeekSet);
                     f.write(&basicMode, 1);
 
@@ -832,18 +914,24 @@ void handleModeSelection(const String& currentFile) noexcept
                     byte zeros[kMaxModesPerFile] = {0};
                     f.seek(OFFSET_ALTERNATE_STATES, SeekSet);
                     f.write(zeros, sizeof(zeros));
-
-                    // 3) Limpiar en RAM los flags alternativos de este elemento
-                    auto &vec = elementAlternateStates[currentFile];
-                    vec.assign(vec.size(), false);
-
-                    // 4) Feedback + estado UI
+                    elementAlternateStates[currentFile].assign(
+                        elementAlternateStates[currentFile].size(), false
+                    );
                     setAllElementsToBasicMode();
                     showMessageWithLoading(getTranslation("APAGANDO_ELEMENTO"), 2000);
                     selectedStates[currentIndex] = false;
+
+                    // === APLICADO INMEDIATO (APAGAR → patrón 0) ===
+                    adxl   = false;
+                    useMic = false;
+                    colorHandler.setCurrentFile(currentFile);
+                    colorHandler.setPatternBotonera(0, ledManager);
+                    // ===============================================
                 }
+
                 f.close();
             }
+
         }
 
         inModesScreen = false;
@@ -851,22 +939,19 @@ void handleModeSelection(const String& currentFile) noexcept
         return;
     }
 
-    // ---------------------------------------------------------
-    // 3) Selección de modo (índices visibles > 0, no "Regresar")
-    // ---------------------------------------------------------
-    const int adjustedVisibleIndex = currentModeIndex - 1; // mapa visible → real
+    // 3) Selección de modo
+    const int adjustedVisibleIndex = currentModeIndex - 1;
     String  modeName;
     uint8_t modeConfig[2] = {0};
     int     realModeIndex = 0;
 
     if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Dado") {
-        // Lista en memoria (INFO_PACK_T)
         INFO_PACK_T* option =
-        (currentFile == "Ambientes") ? &ambientesOption :
-        (currentFile == "Fichas")    ? &fichasOption    :
-                                       &dadoOption;  
+            (currentFile == "Ambientes") ? &ambientesOption :
+            (currentFile == "Fichas")    ? &fichasOption    :
+                                           &dadoOption;
         int count = 0;
-        for (int i = 0; i < kMaxModesPerFile; ++i) {
+        for (int i = 0; i < kMaxModesPerFile; i++) {
             if (strlen((char*)option->mode[i].name) > 0 &&
                 checkMostSignificantBit(option->mode[i].config)) {
                 if (count == adjustedVisibleIndex) {
@@ -881,129 +966,86 @@ void handleModeSelection(const String& currentFile) noexcept
         option->currentMode = realModeIndex;
     }
     else if (currentFile != "Apagar") {
-        // Lista persistida en fichero
         fs::File f = SPIFFS.open(currentFile, "r+");
         if (f) {
             int count = 0;
-            for (int i = 0; i < kMaxModesPerFile; ++i) {
-                char modeBuf[kModeNameLen + 1] = {0};
-                byte tempConfig[2] = {0};
+            for (int i = 0; i < kMaxModesPerFile; i++) {
+                char buf[kModeNameLen+1] = {0};
+                byte tempCfg[2] = {0};
                 f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet);
-                f.read((uint8_t*)modeBuf, kModeNameLen);
+                f.read((uint8_t*)buf, kModeNameLen);
                 f.seek(OFFSET_MODES + i * SIZE_MODE + kModeConfigOffset, SeekSet);
-                f.read(tempConfig, 2);
-                if (strlen(modeBuf) > 0 && checkMostSignificantBit(tempConfig)) {
+                f.read(tempCfg, 2);
+                if (strlen(buf) > 0 && checkMostSignificantBit(tempCfg)) {
                     if (count == adjustedVisibleIndex) {
                         realModeIndex = i;
-                        modeName = String(modeBuf);
-                        memcpy(modeConfig, tempConfig, 2);
+                        modeName = String(buf);
+                        memcpy(modeConfig, tempCfg, 2);
                         break;
                     }
                     ++count;
                 }
             }
-            // Guardar el modo real seleccionado
             f.seek(OFFSET_CURRENTMODE, SeekSet);
             f.write((uint8_t*)&realModeIndex, 1);
             f.close();
         }
     }
 
-    // Actualizar flags de sensores del modo elegido
     adxl   = getModeFlag(modeConfig, HAS_SENS_VAL_1);
     useMic = getModeFlag(modeConfig, HAS_SENS_VAL_2);
 
-#ifdef DEBUG
-    DEBUG__________ln("🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻");
-    DEBUG__________ln("DEBUG: Mode Name (procesado): " + modeName);
-    DEBUG__________ln(String("DEBUG: adxl status: ")   + (adxl   ? "true" : "false"));
-    DEBUG__________ln(String("DEBUG: useMic status: ") + (useMic ? "true" : "false"));
-    DEBUG__________ln("🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻");
-#endif
-
-    // -----------------------------------------
-    // 4) Confirmación normal de selección
-    // -----------------------------------------
     bool wasAlreadySelected = hasSelectedIndex() ? selectedStates[currentIndex] : false;
     if (!wasAlreadySelected && hasSelectedIndex()) {
         selectedStates[currentIndex] = true;
     }
 
     if (currentFile == "Ambientes" || currentFile == "Fichas") {
-        // Enviar a "id 0" según protocolo del proyecto
-        send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{0x00}, START_CMD));
+        TARGETNS bcast = {0,0,0,0,0};
+        send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xFF, bcast, START_CMD));
         delay(kInterCmdDelayMs);
-        send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, std::vector<byte>{0x00}, realModeIndex));
-
-        // Mapeo de tokens para "Fichas"
+        send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, 0xFF, bcast, realModeIndex));
         if (currentFile == "Fichas") {
-            TOKEN_MODE_ tokenMode;
-            switch (realModeIndex) {
-                case 0: tokenMode = TOKEN_BASIC_MODE;   bankSelectionActive = false; break;
-                case 1: tokenMode = TOKEN_PARTNER_MODE; bankSelectionActive = false; break;
-                case 2: tokenMode = TOKEN_GUESS_MODE;   bankSelectionActive = true;  break;
-                default: tokenMode = TOKEN_BASIC_MODE;  bankSelectionActive = false; break;
-            }
-            token.set_mode(tokenMode);
+            TOKEN_MODE_ tmode = (realModeIndex == 1) ? TOKEN_PARTNER_MODE :
+                                (realModeIndex == 2) ? TOKEN_GUESS_MODE   :
+                                                       TOKEN_BASIC_MODE;
+            token.set_mode(tmode);
+            bankSelectionActive = (realModeIndex == 2);
         }
     }
-    else if (currentFile == "Dado") {   // Dado residente en RAM con ID propio
-        const byte id = DEFAULT_DICE;
-
-        if (!wasAlreadySelected) {
-            // Si el Dado está habilitado y estaba apagado, “despiértalo” por serial antes del START
-            if (isDadoEnabled()) {
-                Serial1.write(0xDA);
-                delay(kInterCmdDelayMs);
-            }
-            // Ahora sí, arráncalo
-            send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{id}, START_CMD));
+    else if (currentFile == "Dado") {
+        TARGETNS dadoNS = {0};
+        memcpy(&dadoNS, dadoOption.serialNum, 5);
+        if (!wasAlreadySelected && isDadoEnabled()) {
+            Serial1.write(0xDA);
+            delay(kInterCmdDelayMs);
+            send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xDD, dadoNS, START_CMD));
             delay(kInterCmdDelayMs);
         }
-
-        // Fijar el modo seleccionado
-        send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, std::vector<byte>{id}, realModeIndex));
-        // (Dado no usa modo alternativo, así que no enviamos ALTERNATE_MODE_*)
+        send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, 0xDD, dadoNS, realModeIndex));
     }
     else if (currentFile != "Apagar") {
-        // Elemento normal
-        byte modeConfigTemp[2] = {0};
-        memcpy(modeConfigTemp, modeConfig, 2);
-
-        const byte id = getCurrentElementID();
-
+        TARGETNS elemNS = getCurrentElementNS();
         if (!wasAlreadySelected) {
-            send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{id}, START_CMD));
+            send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xDD, elemNS, START_CMD));
             delay(kInterCmdDelayMs);
         }
-
-        send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, std::vector<byte>{id}, realModeIndex));
-        delay(kInterCmdDelayMs);
-
-        // Si el modo soporta alternativo, activar según estado persistido en RAM
-        if (getModeFlag(modeConfigTemp, HAS_ALTERNATIVE_MODE)) {
-            if (currentAlternateStates.size() > static_cast<size_t>(adjustedVisibleIndex) &&
-                currentAlternateStates[adjustedVisibleIndex])
-            {
-                modeAlternateActive = true;
-                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{id}, ALTERNATE_MODE_ON));
-                delay(kInterCmdDelayMs);
+        send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, 0xDD, elemNS, realModeIndex));
+        if (getModeFlag(modeConfig, HAS_ALTERNATIVE_MODE) &&
+            currentAlternateStates.size() > (size_t)adjustedVisibleIndex)
+        {
+            if (currentAlternateStates[adjustedVisibleIndex]) {
+                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xDD, elemNS, ALTERNATE_MODE_ON));
             } else {
-                modeAlternateActive = false;
-                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, std::vector<byte>{id}, ALTERNATE_MODE_OFF));
-                delay(kInterCmdDelayMs);
+                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xDD, elemNS, ALTERNATE_MODE_OFF));
             }
         }
     }
 
-    // -----------------------------------------
-    // 5) Salida de pantalla de modos / Banks
-    // -----------------------------------------
     if (!bankSelectionActive) {
         inModesScreen = false;
         drawCurrentElement();
     } else {
-        // En modo "adivinar", se pasa a selección de bancos
         inModesScreen = false;
         drawBankSelectionMenu(bankList, selectedBanks, bankMenuCurrentSelection, bankMenuWindowOffset);
     }
@@ -1115,12 +1157,9 @@ std::vector<bool> initializeAlternateStates(const String &currentFile) noexcept
 void toggleElementSelection(const String& currentFile) noexcept
 {
     // -------------------------
-    // Constantes y utilidades
+    // Utilidad
     // -------------------------
-    constexpr byte kBroadcastId = 0xFF;
-
     const auto isElementFromSPIFFS = [&](const String& name) -> bool {
-        // Mantiene la lógica original basada en startsWith
         return !name.startsWith("Ambientes") &&
                !name.startsWith("Fichas")    &&
                !name.startsWith("Apagar");
@@ -1129,10 +1168,10 @@ void toggleElementSelection(const String& currentFile) noexcept
     // -------------------------
     // Validaciones defensivas
     // -------------------------
-    if (static_cast<size_t>(currentIndex) >= selectedStates.size()) {
-#ifdef DEBUG
-        DEBUG__________printf("⚠️ toggleElementSelection: currentIndex fuera de rango (%d)\n", currentIndex);
-#endif
+    if ((size_t)currentIndex >= selectedStates.size()) {
+    #ifdef DEBUG
+            DEBUG__________printf("⚠️ toggleElementSelection: currentIndex fuera de rango (%d)\n", currentIndex);
+    #endif
         return;
     }
 
@@ -1142,53 +1181,28 @@ void toggleElementSelection(const String& currentFile) noexcept
     selectedStates[currentIndex] = !selectedStates[currentIndex];
 
     // -------------------------
-    // 2) Resolver ID del elemento
+    // 2) Si se deselecciona y no es "Apagar", reiniciar alternativos
     // -------------------------
-    std::vector<byte> elementID;
-    elementID.reserve(1);
-
-    const bool fromSPIFFS = isElementFromSPIFFS(currentFile);
-    if (fromSPIFFS) {
-        fs::File f = SPIFFS.open(currentFile, "r+");
-        if (f) {
-            byte id = 0;
-            f.seek(OFFSET_ID, SeekSet);
-            f.read(&id, 1);
-            elementID.push_back(id);
-            f.close();
-        } else {
-            DEBUG__________ln("Error al leer la ID del archivo.");
-            elementID.push_back(0);
-        }
-    } else {
-        elementID.push_back(0); // ID 0 para elementos especiales (amb/fichas)
-    }
-
-    // ---------------------------------------------------------
-    // 3) Si se deselecciona y no es "Apagar", reiniciar alternativos
-    // ---------------------------------------------------------
-    if (!selectedStates[currentIndex] && !currentFile.startsWith("Apagar")) {
+    if (!selectedStates[currentIndex] && currentFile != "Apagar") {
         std::vector<bool> newStates = initializeAlternateStates(currentFile);
         elementAlternateStates[currentFile] = newStates;
         currentAlternateStates = newStates;
     }
 
     // ----------------------------------------
-    // 4) Caso especial: botón "Apagar" (global)
+    // 3) Caso especial: botón "Apagar" (global)
     // ----------------------------------------
     if (currentFile == "Apagar") {
-        // Deseleccionar todos
         for (size_t i = 0; i < selectedStates.size(); ++i) {
             selectedStates[i] = false;
         }
-        // Reinicializar estados alternativos de todos los elementos
         for (auto &entry : elementAlternateStates) {
             entry.second = initializeAlternateStates(entry.first);
         }
 
-        // Envío broadcast BLACKOUT
-        std::vector<byte> bcID{ kBroadcastId };
-        send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, bcID, BLACKOUT));
+        // Broadcast BLACKOUT
+        TARGETNS bcast = {0,0,0,0,0};
+        send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xFF, bcast, BLACKOUT));
 
         setAllElementsToBasicMode();
         showMessageWithLoading(getTranslation("APAGANDO_SALA"), 4000);
@@ -1200,41 +1214,46 @@ void toggleElementSelection(const String& currentFile) noexcept
     }
 
     // ------------------------------------------------
-    // 5) Elementos de SPIFFS: envío START/BLACKOUT + FS
+    // 4) Elementos de SPIFFS: envío START/BLACKOUT + FS
     // ------------------------------------------------
-    if (fromSPIFFS) {
-        const byte command = selectedStates[currentIndex] ? START_CMD : BLACKOUT;
+    if (isElementFromSPIFFS(currentFile)) {
+        const uint8_t command = selectedStates[currentIndex] ? START_CMD : BLACKOUT;
 
-#ifdef DEBUG
-        DEBUG__________printf("Enviando comando %s a la ID %d\n",
-                              command == START_CMD ? "START_CMD" : "BLACKOUT",
-                              elementID[0]);
-#endif
-        send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, elementID, command));
-
-        if (command == BLACKOUT) {
-            showMessageWithLoading(getTranslation("APAGANDO_ELEMENTO"), 2000);
-        }
-
-        // Forzar modo básico en fichero (OFFSET_CURRENTMODE)
+        TARGETNS elemNS{};
         fs::File f = SPIFFS.open(currentFile, "r+");
         if (f) {
-            byte basicMode = DEFAULT_BASIC_MODE;  // modo básico
-            f.seek(OFFSET_CURRENTMODE, SeekSet);
-            f.write(&basicMode, 1);
+            // Leer serialNum[5] desde el fichero en lugar de ID
+            f.seek(OFFSET_SERIALNUM, SeekSet);
+            f.read(reinterpret_cast<uint8_t*>(&elemNS), sizeof(TARGETNS));
             f.close();
 
-#ifdef DEBUG
-            DEBUG__________printf("Modo actualizado a básico en SPIFFS para el elemento %s\n",
-                                  currentFile.c_str());
-#endif
+            send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xDD, elemNS, command));
+
+        #ifdef DEBUG
+                    DEBUG__________printf("Enviando comando %s al elemento NS %02X%02X%02X%02X%02X\n",
+                                        command == START_CMD ? "START_CMD" : "BLACKOUT",
+                                        elemNS.mac01, elemNS.mac02, elemNS.mac03,
+                                        elemNS.mac04, elemNS.mac05);
+        #endif
+            if (command == BLACKOUT) {
+                showMessageWithLoading(getTranslation("APAGANDO_ELEMENTO"), 2000);
+            }
+
+            // Forzar modo básico en fichero
+            f = SPIFFS.open(currentFile, "r+");
+            if (f) {
+                byte basicMode = DEFAULT_BASIC_MODE;
+                f.seek(OFFSET_CURRENTMODE, SeekSet);
+                f.write(&basicMode, 1);
+                f.close();
+            }
         } else {
-            DEBUG__________ln("Error al abrir el archivo para actualizar el modo.");
+            DEBUG__________ln("Error al abrir archivo SPIFFS para NS.");
         }
     }
 
     // -------------------------
-    // 6) Redibujar UI
+    // 5) Redibujar UI
     // -------------------------
     drawCurrentElement();
 }
@@ -1790,8 +1809,8 @@ void handleBankSelectionMenu(std::vector<byte>& bankList, std::vector<bool>& sel
     }
 }
 
-const int numFormatOptions = 7;
-const int formatOptions[numFormatOptions] = {0, 1, 2, 3, 4, 5, 6};
+const int numFormatOptions = 6;
+const int formatOptions[numFormatOptions] = {0, 1, 2, 3, 4, 5};
 bool confirmRestoreMenuActive = false;
 int confirmRestoreSelection = 0;  // 0 = Sí, 1 = No
 bool confirmRestoreMenuElementActive = false;
@@ -1822,36 +1841,21 @@ int32_t formatMenuLastValue = 0;
  */
 void handleFormatMenu()
 {
-    // -----------------------------
-    // Constantes (evita números mágicos)
-    // -----------------------------
     constexpr unsigned long kShortPressMaxMs = 1000UL;
 
-    // -----------------------------
-    // Aliases a globales (como en el original)
-    // -----------------------------
     int&     currentIndex = formatMenuCurrentIndex;
     int32_t& lastValue    = formatMenuLastValue;
 
-    // -----------------------------
-    // Lectura del encoder y protección de primera entrada
-    // -----------------------------
     const int32_t newEncoderValue = encoder.getCount();
 
-    // Protección inicial: si no tenemos referencia previa, toma la cuenta actual.
-    // (Mejor que comparar con 0, que puede ser un valor legítimo del encoder)
     static bool firstEntry = true;
     if (firstEntry) {
         lastValue  = newEncoderValue;
         firstEntry = false;
     } else if (lastValue == 0 && newEncoderValue != 0) {
-        // Conserva tu “protección inicial” por compatibilidad, pero con matiz
         lastValue = newEncoderValue;
     }
 
-    // -----------------------------
-    // Navegación por giro del encoder
-    // -----------------------------
     if (newEncoderValue != lastValue) {
         const int dir = (newEncoderValue > lastValue) ? 1 : -1;
         lastValue     = newEncoderValue;
@@ -1859,24 +1863,19 @@ void handleFormatMenu()
         const int proposedIndex = currentIndex + dir;
         if (proposedIndex >= 0 && proposedIndex < numFormatOptions) {
             currentIndex        = proposedIndex;
-            // Defensiva: asegurar índice válido antes de indexar
             if (currentIndex >= 0 && currentIndex < numFormatOptions) {
                 formatMenuSelection = formatOptions[currentIndex];
             }
         }
     }
 
-    // -----------------------------
-    // Pulsador del encoder: detección de pulsación corta
-    // -----------------------------
     if (digitalRead(ENC_BUTTON) == LOW) {
         if (buttonPressStart == 0) {
             buttonPressStart = millis();
         }
-        return; // mantener pulsado no ejecuta acción aquí
+        return;
     }
 
-    // Al soltar, si fue una pulsación corta, ejecutar acción
     if (buttonPressStart > 0 && (millis() - buttonPressStart) < kShortPressMaxMs) {
         switch (formatMenuSelection) {
             case 0: { // Escanear sala
@@ -1907,25 +1906,24 @@ void handleFormatMenu()
                 }
             } break;
 
-            case 2: { // Formatear SPIFFS (confirmación global)
+            case 2: { // Formatear SPIFFS
                 confirmRestoreMenuActive = true;
                 confirmRestoreSelection  = 0;
                 formatSubMenuActive      = false;
                 drawConfirmRestoreMenu(confirmRestoreSelection);
             } break;
 
-            case 3: { // Mostrar ID
-#ifdef DEBUG
-                DEBUG__________ln("[🆔] Mostrando ID");
-#endif
-                // Broadcast para mostrar IDs en dispositivos
-                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, { BROADCAST }, SHOW_ID_CMD));
-                formatSubMenuActive = true;
-                showMessageWithLoading(getTranslation("SHOW_ID"), 3000);
-                // Se mantiene en el submenú; redibujado no forzado
-            } break;
+//             case 3: { // Mostrar NS (antes ID)
+// #ifdef DEBUG
+//                 DEBUG__________ln("[🆔] Mostrando Serial Numbers");
+// #endif
+//                 TARGETNS bcast = {0,0,0,0,0};
+//                 send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, BROADCAST, bcast, SHOW_ID_CMD));
+//                 formatSubMenuActive = true;
+//                 showMessageWithLoading(getTranslation("SHOW_ID"), 3000);
+//             } break;
 
-            case 4: { // Restaurar elementos (confirmación por elemento)
+            case 3: { // Restaurar elementos
 #ifdef DEBUG
                 DEBUG__________ln("Restaurando elementos");
 #endif
@@ -1935,37 +1933,27 @@ void handleFormatMenu()
                 drawConfirmRestoreElementMenu(confirmRestoreElementSelection);
             } break;
 
-            case 5: { // ← NUEVO: Elementos Adicionales
+            case 4: { // Elementos Adicionales
 #ifdef DEBUG
                 DEBUG__________ln("[➕] Elementos Adicionales");
 #endif
                 extraElementsMenuActive   = true;
                 extraElementsMenuSelection= 0;
-                formatSubMenuActive       = false;   // cerramos este submenú
-                //drawExtraElementsMenu(extraElementsMenuSelection);
+                formatSubMenuActive       = false;
             } break;
 
-            case 6: { // Volver
-            // Evitar que el mismo click confirme de nuevo algo en Ajustes
+            case 5: { // Volver
                 ignoreEncoderClick = true;
-
-                // (Opcional) asegurar suelta completa si quieres ser extra conservador
-                // while (digitalRead(ENC_BUTTON) == LOW) { delay(1); }
-
                 formatSubMenuActive = false;
                 hiddenMenuActive    = true;
                 drawHiddenMenu(0);
-                // No podemos tocar las estáticas de handleHiddenMenuNavigation desde aquí,
-                // pero ignoreEncoderClick ya evita el re-disparo inmediato.
             } break;
 
             default:
-                // Índice/acción no definida: no hacer nada
                 break;
         }
     }
 
-    // Reset de temporización de pulsador (siempre al soltar)
     buttonPressStart = 0;
 }
 
@@ -2122,11 +2110,13 @@ void handleConfirmRestoreElementMenu() {
                     // Opción "Sí": ejecutar secuencia de restauración (bloqueante por diseño).
                     DEBUG__________ln("[⚠️] Restaurando elementos...");
                     showMessageWithLoading("Restaurando", 2000);
-                    send_frame(frameMaker_SET_ELEM_ID(DEFAULT_BOTONERA, {BROADCAST}, DEFAULT_DEVICE));
+                    
+                    TARGETNS bcast = {0,0,0,0,0};
+                    send_frame(frameMaker_SET_ELEM_ID(DEFAULT_BOTONERA, 0xFF, bcast, DEFAULT_DEVICE));
                     delay(kDelaySetElemMs);
-                    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, {BROADCAST}, SHOW_ID_CMD));
+                    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xFF, bcast, SHOW_ID_CMD));
                     delay(kDelayShowIdMs);
-                    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, {BROADCAST}, BLACKOUT));
+                    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xFF, bcast, BLACKOUT));
                     delay(kDelayBlackoutMs);
                 }
 

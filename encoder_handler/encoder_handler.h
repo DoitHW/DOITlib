@@ -80,7 +80,7 @@ int getTotalModesForFile(const String &file);
 void printElementDetails();
 // Variables externas requeridas
 extern std::vector<String> elementFiles;
-extern std::vector<bool> selectedStates;
+extern std::vector<char> selectedStates;
 extern int currentIndex;
 extern int totalModes;
 extern int currentModeIndex;
@@ -133,7 +133,7 @@ extern int lastQueriedElementIndex;
 
 extern unsigned long lastModeQueryTime;
 extern int pendingQueryIndex;
-extern uint8_t pendingQueryID;
+extern TARGETNS pendingQueryNS;
 extern bool awaitingResponse;
 
 extern int formatMenuCurrentIndex;

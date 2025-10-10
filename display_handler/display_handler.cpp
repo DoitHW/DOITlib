@@ -2274,18 +2274,19 @@ void drawFormatMenu(int selection)
 
     const int scrollBarWidth  = 6;
     const int visibleOptions  = 4;
-    const int totalOptions    = 7;
-
+    //const int totalOptions    = 6;
+    
+    
     const char* options[] = {
         getTranslation("UPDATE_SALA"),
         getTranslation("DELETE_ELEMENT"),
         getTranslation("FORMATEAR"),
-        getTranslation("SHOW_ID"),
+        //getTranslation("SHOW_ID"),
         getTranslation("RESTORE_ELEM"),
         getTranslation("ELEMENTOS_ADICIONALES"),
         getTranslation("VOLVER")
     };
-
+    const int totalOptions = sizeof(options) / sizeof(options[0]);
     const int cardHeight  = CARD_HEIGHT;
     const int cardMargin  = CARD_MARGIN;
     const int stepY       = cardHeight + cardMargin;
@@ -3415,7 +3416,7 @@ void drawLoadingModalFrame(const char* message, int frameCount) {
     uiSprite.fillSprite(BACKGROUND_COLOR);
 
     // === TEXTO MULTILÍNEA AJUSTADO (estilo mostrarTextoAjustado) ===
-    uiSprite.setFreeFont(&FreeSansBold9pt7b);
+    uiSprite.setFreeFont(&FreeSansBold12pt7b);
     uiSprite.setTextSize(1);
     uiSprite.setTextColor(TFT_WHITE, BACKGROUND_COLOR);
     uiSprite.setTextDatum(MC_DATUM);
@@ -3464,17 +3465,17 @@ void drawLoadingModalFrame(const char* message, int frameCount) {
         y += lineHeight;
     }
 
-    // === ANIMACIÓN DE PUNTOS GIRANDO ===
-    int centerX = uiSprite.width() / 2;
-    int centerY = uiSprite.height() - 50;
-    int radius  = 10;
+    // // === ANIMACIÓN DE PUNTOS GIRANDO ===
+    // int centerX = uiSprite.width() / 2;
+    // int centerY = uiSprite.height() - 50;
+    // int radius  = 10;
 
-    for (int i = 0; i < 8; i++) {
-        float angle = frameCount * 0.2 + i * PI / 4;
-        int x = centerX + radius * cos(angle);
-        int y = centerY + radius * sin(angle);
-        uiSprite.fillCircle(x, y, 2, TEXT_COLOR);
-    }
+    // for (int i = 0; i < 8; i++) {
+    //     float angle = frameCount * 0.2 + i * PI / 4;
+    //     int x = centerX + radius * cos(angle);
+    //     int y = centerY + radius * sin(angle);
+    //     uiSprite.fillCircle(x, y, 2, TEXT_COLOR);
+    // }
 
     uiSprite.pushSprite(0, 0);
 }

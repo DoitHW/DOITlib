@@ -162,6 +162,7 @@ class COLORHANDLER_ {
         void setCurrentFile(const String& file) { currentFile = file; } 
         bool color_mix_handler(int color1, int color2, byte *resultado);
         void mapCognitiveLEDs();
+        CRGB colorFromIndex(uint8_t idx) const;
 
     private:
     String currentFile;

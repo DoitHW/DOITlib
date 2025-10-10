@@ -231,39 +231,31 @@ void loadElementsFromSPIFFS() {
 
 }
 
-byte getCurrentElementID() {
-    byte elementID = BROADCAST;  
+TARGETNS getCurrentElementNS() {
+    // Valor por defecto para “no aplica” o “sin NS”
+    TARGETNS ns = NS_ZERO;
+
+    if (elementFiles.empty() || currentIndex < 0 ||
+        (size_t)currentIndex >= elementFiles.size()) {
+        return ns;
+    }
+
     const String& currentFile = elementFiles[currentIndex];
 
-    // --- Elementos residentes en RAM (no abrir SPIFFS) ---
+    // Elementos “en RAM” o UI-puros → no tienen NS: devuelven NS_ZERO
+    // - Ambientes / Fichas / Apagar (UI/acciones globales)
+    // - Comunicador (targetType 0xDB, NS = 0)
+    // - Dado        (targetType 0xDA, NS = 0)
     if (currentFile == "Ambientes"   ||
         currentFile == "Fichas"      ||
         currentFile == "Apagar"      ||
         currentFile == "Comunicador" ||
-        currentFile == "Dado")
-    {
-        INFO_PACK_T* option = nullptr;
-        if      (currentFile == "Ambientes")   option = &ambientesOption;
-        else if (currentFile == "Fichas")      option = &fichasOption;
-        else if (currentFile == "Apagar")      option = &apagarSala;
-        else if (currentFile == "Comunicador") option = &comunicadorOption; 
-        else /* Dado */                        option = &dadoOption;
-
-        return option ? option->ID : BROADCAST;
+        currentFile == "Dado") {
+        return NS_ZERO;
     }
 
-    // --- Cualquier otro: leer ID desde SPIFFS ---
-    fs::File f = SPIFFS.open(currentFile, "r");
-    if (f) {
-        f.seek(OFFSET_ID, SeekSet);
-        f.read(&elementID, 1);
-        f.close();
-    } else {
-        #ifdef DEBUG
-        DEBUG__________printf("❌ Error abriendo el archivo para leer ID: %s\n", currentFile.c_str());
-        #endif
-    }
-    return elementID;
+    // Resto de elementos “reales” en SPIFFS → leer su NS del archivo
+    return getNSFromFile(currentFile);
 }
 
 bool isCurrentElementSelected() {
@@ -605,6 +597,122 @@ void setDadoEnabled(bool enabled) {
     cfg.dadoEnabled = enabled;
     saveExtraElementsConfig(cfg);
 }
+
+static inline String normalizePath_(const String& name) {
+    if (name.length() == 0) return String();
+    if (name[0] == '/') return name;
+    return "/" + name;
+}
+
+bool tryGetNSFromFile(const String& fileName, TARGETNS& outNS)
+{
+    outNS = NS_ZERO;  // valor por defecto en caso de fallo
+
+    // Normaliza ruta (admite "ElementoX" o "/ElementoX")
+    const String path = normalizePath_(fileName);
+
+    // Abre en lectura
+    fs::File f = SPIFFS.open(path, "r");
+    if (!f) {
+    #ifdef DEBUG
+        DEBUG__________printf("❌ tryGetNSFromFile: no se pudo abrir '%s'\n", path.c_str());
+    #endif
+        return false;
+    }
+
+    // Comprobación defensiva de tamaño (opcional pero recomendado)
+    const size_t kNeeded = (size_t)OFFSET_SERIAL + 5u;
+    if ((size_t)f.size() < kNeeded) {
+    #ifdef DEBUG
+        DEBUG__________printf("❌ tryGetNSFromFile: archivo demasiado pequeño (%u < %u) '%s'\n",
+                              (unsigned)f.size(), (unsigned)kNeeded, path.c_str());
+    #endif
+        f.close();
+        return false;
+    }
+
+    // Posición segura y lectura de los 5 bytes
+    if (!f.seek(OFFSET_SERIAL, SeekSet)) {
+    #ifdef DEBUG
+        DEBUG__________printf("❌ tryGetNSFromFile: seek(OFFSET_SERIAL=%u) falló en '%s'\n",
+                              (unsigned)OFFSET_SERIAL, path.c_str());
+    #endif
+        f.close();
+        return false;
+    }
+
+    uint8_t buf[5] = {0,0,0,0,0};
+    int readBytes = f.read(buf, 5);
+    f.close();
+
+    if (readBytes != 5) {
+    #ifdef DEBUG
+        DEBUG__________printf("❌ tryGetNSFromFile: sólo se leyeron %d/5 bytes en '%s'\n",
+                              readBytes, path.c_str());
+    #endif
+        return false;
+    }
+
+    // Copia segura al struct TARGETNS
+    outNS.mac01 = buf[0];
+    outNS.mac02 = buf[1];
+    outNS.mac03 = buf[2];
+    outNS.mac04 = buf[3];
+    outNS.mac05 = buf[4];
+
+    return true;
+}
+
+TARGETNS getNSFromFile(const String& fileName)
+{
+    TARGETNS ns = NS_ZERO;
+    (void)tryGetNSFromFile(fileName, ns);
+    return ns;
+}
+
+static inline bool isElementFile_(const String& path) {
+  return path.startsWith("/element_") && path.endsWith(".bin") && path.indexOf("_icon") < 0;
+}
+
+String getFilePathByNS(const TARGETNS& ns) {
+    if (nsEqualsZero(ns)) return String();  // no tiene sentido buscar NS_ZERO
+
+    for (const String& file : elementFiles) {
+        if (!isElementFile_(file)) continue;
+        TARGETNS tmp = NS_ZERO;
+        if (tryGetNSFromFile(file, tmp) && nsEquals(tmp, ns)) {
+            return file;
+        }
+    }
+    return String();  // no encontrado
+}
+
+bool nsExistsInSPIFFS(const TARGETNS& ns) {
+    if (nsEqualsZero(ns)) return false;
+
+    fs::File root = SPIFFS.open("/");
+    if (!root || !root.isDirectory()) return false;
+
+    fs::File f = root.openNextFile();
+    while (f) {
+        String name = f.name();
+        if (!name.startsWith("/")) name = "/" + name;
+        if (isElementFile_(name)) {
+            TARGETNS tmp = NS_ZERO;
+            if (tryGetNSFromFile(name, tmp) && nsEquals(tmp, ns)) {
+                f.close();
+                root.close();
+                return true;
+            }
+        }
+        f.close();
+        f = root.openNextFile();
+    }
+    root.close();
+    return false;
+}
+
+
 
 
 
