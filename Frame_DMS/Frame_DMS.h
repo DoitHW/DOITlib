@@ -131,8 +131,11 @@ enum BTN_FX : uint8_t {
     AURORA_FX,           // Aurora boreal
     STROBE,              // Estroboscópico
     COLOR_WIPE,          // Barrido de color
-    THEATER_CHASE        // Persecución teatral
+    THEATER_CHASE,        // Persecución teatral
+    RELAY_FX
 };
+
+static constexpr uint8_t BTN_RGB_DIRECT = 0x80;  
 
 // Estructura individual de botón (corresponde a un LED físico)
 struct BUTTON {

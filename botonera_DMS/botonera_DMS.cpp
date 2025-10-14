@@ -776,165 +776,161 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
             }
             break;
         }
+        
         case F_SET_BUTTONS_EXTMAP: {
             const auto &d = LEF.data;
-            if (d.size() != (size_t)(9 * 8)) break;
 
-            // --- leer PRIMER bloque ---
-            const uint8_t ledIdx0     = d[0];
-            const uint8_t flags0      = d[1];           // ← disparador de patrón global
-            const uint8_t numColor0   = d[2];           // ← ID del patrón global
-            uint8_t       r0          = d[3];
-            uint8_t       g0          = d[4];
-            uint8_t       b0          = d[5];
-            const uint8_t brightness0 = d[6];
-            const uint8_t fx0         = d[7];
+            // Esperamos 55 bytes exactos: 1 + 9*6
+            if (d.size() != (size_t)(1 + 9 * 6)) break;
 
-            // Si el primer flag es 0xFF o 0x80 ⇒ MODO PATRÓN GLOBAL
-            if (flags0 == 0xFF || flags0 == 0x80) {
+            auto colorFrom = [&](uint8_t numColor, uint8_t r, uint8_t g, uint8_t b) -> CRGB {
+                if (numColor == BTN_RGB_DIRECT) return CRGB(r, g, b);
+                return colorHandler.colorFromIndex(numColor); // tu paleta
+            };
+
+            // --- Leer PADFX ---
+            const uint8_t PADFX = d[0];
+
+            // --- Parsear botones ---
+            struct DecodedBtn { bool active; CRGB base; uint8_t fx; };
+            DecodedBtn btn[9]{};
+
+            size_t off = 1;
+            for (int i = 0; i < 9; ++i) {
+                const uint8_t active   = d[off + 0];
+                const uint8_t numColor = d[off + 1];
+                const uint8_t r        = d[off + 2];
+                const uint8_t g        = d[off + 3];
+                const uint8_t b        = d[off + 4];
+                const uint8_t fx       = d[off + 5];
+                off += 6;
+
+                btn[i].active = (active != 0);
+                btn[i].base   = colorFrom(numColor, r, g, b);
+                btn[i].fx     = fx;
+            }
+
+            // =======================
+            //  A) EFECTO GLOBAL
+            // =======================
+            if (PADFX != (uint8_t)BTN_FX::NO_FX) {
                 ledManager.clearEffects();
 
-                // Color base para el patrón global (puedes ignorarlo si el patrón no lo usa)
-                CRGB base(r0, g0, b0);
-                if (brightness0 < 255) {
-                    base.r = (uint16_t(base.r) * brightness0) >> 8;
-                    base.g = (uint16_t(base.g) * brightness0) >> 8;
-                    base.b = (uint16_t(base.b) * brightness0) >> 8;
+                // Color base: primero activo (RGB directo si está)
+                CRGB base = CRGB::White;
+                bool found = false;
+                for (int i = 0; i < 9 && !found; ++i) {
+                    if (!btn[i].active) continue;
+                    base = btn[i].base;
+                    found = true;
                 }
+                if (!found) base = CRGB::White;
 
-                // Velocidad por paso (ms). Si viene 0, usa 60 ms por defecto.
-                unsigned int stepMs = (brightness0 == 0) ? 60u : (unsigned int)brightness0;
-
-                // stepMs = brightness0 (si 0 → default interno)
-                auto clampMs = [&](unsigned def, unsigned minMs = 12u) -> unsigned {
-                    // Nunca más lento que 'def' (fluido). Permitimos más rápido, pero no por debajo de minMs.
-                    if (stepMs == 0)       return def;               // usa default suave
-                    if (stepMs > def)      return def;               // evita “lag”
-                    return (stepMs < minMs) ? minMs : stepMs;        // evita saturar CPU
+                // Defaults “suaves”
+                auto addWaveAll = [&](unsigned ms) {
+                    for (int i = 0; i < colorHandler.numLeds; ++i)
+                        ledManager.addEffect(new WaveEffect(colorHandler, i, base, ms));
+                    fill_solid(colorHandler.leds, colorHandler.numLeds, base);
                 };
 
-                // === Selección de patrón global por numColor0 ===
-                // base = CRGB(r0,g0,b0) SIEMPRE en global.
-                switch (numColor0) {
-                    default:
-                    case 0: { // SOLID
+                // Mapea PADFX -> efectos globales
+                switch (static_cast<BTN_FX>(PADFX)) {
+                    case BTN_FX::SOLID: {
                         fill_solid(colorHandler.leds, colorHandler.numLeds, base);
                         break;
                     }
-
-                    case 1: { // PATH CHASE 8→6→4→2→0→1→3→5→7 (1 “paso” por tick)
-                        static const uint8_t kPath[9] = { 8,6,4,2,0,1,3,5,7 };
-                        fill_solid(colorHandler.leds, colorHandler.numLeds, CRGB::Black);
-                        unsigned ms = clampMs(60, 12);
-                        ledManager.addEffect(new PathChaseEffect(colorHandler, kPath, 9, base, ms));
-                        break;
-                    }
-
-                    case 2: { // RAINBOW SOFT (fase por LED) — FPS constantes
-                        unsigned ms = clampMs(20, 12);
-                        for (int i = 0; i < colorHandler.numLeds; ++i) {
-                            // el “speed” lógico lo emulamos con fase distinta por LED; FPS se mantiene
-                            ledManager.addEffect(new RainbowLoopEffect(colorHandler, i, uint8_t(i * 21), ms));
-                        }
-                        break;
-                    }
-
-                    case 3: { // BREATHING (onda lenta) — intencionalmente más lento
-                        unsigned ms = (stepMs ? stepMs : 80);
+                    case BTN_FX::SLOW_WAVE:   addWaveAll(80);  break;
+                    case BTN_FX::FAST_WAVE:   addWaveAll(20);  break;
+                    case BTN_FX::RAINBOWLOOP: {
+                        unsigned ms = 20;
                         for (int i = 0; i < colorHandler.numLeds; ++i)
-                            ledManager.addEffect(new WaveEffect(colorHandler, i, base, ms));
-                        fill_solid(colorHandler.leds, colorHandler.numLeds, base);
+                            ledManager.addEffect(new RainbowLoopEffect(colorHandler, i, uint8_t(i * 21), ms));
                         break;
                     }
-
-                    case 4: { // FIRE GLOBAL (flicker cálido)
-                        unsigned ms = clampMs(25, 12);
-                        ledManager.addEffect(new FireGlobalEffect(colorHandler, ms));
-                        break;
-                    }
-
-                    case 5: { // SPARKLE GLOBAL (destellos sobre base)
-                        unsigned ms   = clampMs(16, 8);
-                        uint8_t dens  = (ms <= 8) ? 80 : (ms >= 200 ? 8 : uint8_t(200 / ms)); // densidad ≈ inversa
+                    case BTN_FX::BUBBLES_FX: {
+                        // Si no tienes “global bubbles”, usa brillo base y destellos
+                        unsigned ms = 30; uint8_t dens = 28;
                         ledManager.addEffect(new SparkleGlobalEffect(colorHandler, base, ms, dens, /*fade*/40));
                         fill_solid(colorHandler.leds, colorHandler.numLeds, base);
                         break;
                     }
-
-                    case 6: { // COMET GLOBAL (ruta con estela)
-                        static const uint8_t kPath[9] = { 8,6,4,2,0,1,3,5,7 };
-                        unsigned ms = clampMs(18, 10);
+                    case BTN_FX::BREATHING:   addWaveAll(80);  break;
+                    case BTN_FX::FIRE: {
+                        unsigned ms = 25;
+                        ledManager.addEffect(new FireGlobalEffect(colorHandler, ms));
+                        break;
+                    }
+                    case BTN_FX::SPARKLE: {
+                        unsigned ms = 16; uint8_t dens = 64;
+                        ledManager.addEffect(new SparkleGlobalEffect(colorHandler, base, ms, dens, /*fade*/40));
+                        fill_solid(colorHandler.leds, colorHandler.numLeds, base);
+                        break;
+                    }
+                    case BTN_FX::COMET: {
+                        static const uint8_t kPath[9] = {8,6,4,2,0,1,3,5,7};
+                        unsigned ms = 18;
                         ledManager.addEffect(new CometTrailEffect(colorHandler, kPath, 9, base, ms, /*decay*/100));
                         break;
                     }
-
-                    case 7: { // THEATER CHASE GLOBAL
-                        unsigned ms = clampMs(20, 12);
-                        ledManager.addEffect(new TheaterChaseGlobalEffect(colorHandler, base, ms, /*spacing*/3));
+                    case BTN_FX::PLASMA: {
+                        unsigned ms = 16;
+                        ledManager.addEffect(new PlasmaNoiseEffect(colorHandler, base, ms));
                         break;
                     }
-
-                    case 8: { // COLOR WIPE GLOBAL (orden configurable)
-                        static const uint8_t kOrder[9] = { 8,6,4,2,0,1,3,5,7 };
-                        unsigned ms = clampMs(30, 12);
+                    case BTN_FX::HEARTBEAT: {
+                        for (int i = 0; i < colorHandler.numLeds; ++i)
+                            ledManager.addEffect(new HeartbeatEffect(colorHandler, i, base, /*ms*/28));
+                        fill_solid(colorHandler.leds, colorHandler.numLeds, base);
+                        break;
+                    }
+                    case BTN_FX::AURORA_FX: {
+                        unsigned ms = 30;
+                        ledManager.addEffect(new AuroraGlobalEffect(colorHandler, base, ms));
+                        break;
+                    }
+                    case BTN_FX::STROBE: {
+                        unsigned ms = 8;
+                        ledManager.addEffect(new StrobeGlobalEffect(colorHandler, base, ms, /*flashes*/3, /*gapMs*/120));
+                        break;
+                    }
+                    case BTN_FX::COLOR_WIPE: {
+                        static const uint8_t kOrder[9] = {8,6,4,2,0,1,3,5,7};
+                        unsigned ms = 30;
                         fill_solid(colorHandler.leds, colorHandler.numLeds, CRGB::Black);
                         ledManager.addEffect(new ColorWipeGlobalEffect(colorHandler, kOrder, 9, base, ms));
                         break;
                     }
-
-                    case 9: { // AURORA GLOBAL (gradiente frío móvil)
-                        unsigned ms = clampMs(30, 12);
-                        ledManager.addEffect(new AuroraGlobalEffect(colorHandler, base, ms));
+                    case BTN_FX::THEATER_CHASE: {
+                        unsigned ms = 20;
+                        ledManager.addEffect(new TheaterChaseGlobalEffect(colorHandler, base, ms, /*spacing*/3));
                         break;
                     }
-
-                    case 10: { // PLASMA NOISE
-                        unsigned ms = clampMs(16, 8);
-                        ledManager.addEffect(new PlasmaNoiseEffect(colorHandler, base, ms));
+                    default:
+                        // Desconocido => sólido
+                        fill_solid(colorHandler.leds, colorHandler.numLeds, base);
                         break;
-                    }
-
-                    case 11: { // STROBE GLOBAL (ráfagas)
-                        unsigned ms = clampMs(8, 6);
-                        ledManager.addEffect(new StrobeGlobalEffect(colorHandler, base, ms, /*flashes*/3, /*gapMs*/120));
-                        break;
-                    }
                 }
-
 
                 FastLED.show();
-                break; // no procesamos bloques por-LED en este frame
+                break; // no procesamos por-LED
             }
 
-            // =========== MODO NORMAL (por-LED) ===========
-            ledManager.clearEffects(); // el mapa nuevo manda
+            // =======================
+            //  B) EFECTOS POR LED
+            // =======================
+            ledManager.clearEffects();
 
-            size_t off = 0;
-            for (int i = 0; i < 9; ++i) {
-                const uint8_t ledIdx     = d[off + 0];
-                const uint8_t flags      = d[off + 1];
-                const bool    useRGB     = flags & BTN_FLAG_RGB;
-                const uint8_t numColor   = d[off + 2];
-                uint8_t       r          = d[off + 3];
-                uint8_t       g          = d[off + 4];
-                uint8_t       b          = d[off + 5];
-                const uint8_t brightness = d[off + 6];
-                const uint8_t fx         = d[off + 7];
-                off += 8;
-
-                if (!colorHandler.leds || ledIdx >= colorHandler.numLeds) continue;
-
-                // color base (de paleta o RGB)
-                CRGB base = useRGB ? CRGB(r,g,b) : colorHandler.colorFromIndex(numColor);
-                if (brightness < 255) {
-                    base.r = (uint16_t(base.r) * brightness) >> 8;
-                    base.g = (uint16_t(base.g) * brightness) >> 8;
-                    base.b = (uint16_t(base.b) * brightness) >> 8;
+            for (int ledIdx = 0; ledIdx < 9 && ledIdx < colorHandler.numLeds; ++ledIdx) {
+                if (!btn[ledIdx].active) {
+                    colorHandler.leds[ledIdx] = CRGB::Black;
+                    continue;
                 }
 
-                // --- switch fx por-LED (el tuyo completo) ---
-                switch (static_cast<BTN_FX>(fx)) {
-                    default:
+                const CRGB     base = btn[ledIdx].base;
+                const BTN_FX   fx   = static_cast<BTN_FX>(btn[ledIdx].fx);
+
+                switch (fx) {
+                    case BTN_FX::NO_FX:      // trata NO_FX como sólido
                     case BTN_FX::SOLID:
                         colorHandler.leds[ledIdx] = base;
                         break;
@@ -950,7 +946,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
                         break;
 
                     case BTN_FX::RAINBOWLOOP:
-                        ledManager.addEffect(new RainbowLoopEffect(colorHandler, ledIdx, /*startHue*/0, /*ms*/20));
+                        ledManager.addEffect(new RainbowLoopEffect(colorHandler, ledIdx, /*startHue*/uint8_t(ledIdx*21), /*ms*/20));
                         break;
 
                     case BTN_FX::BUBBLES_FX:
@@ -1014,6 +1010,8 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
             FastLED.show();
             break;
         }
+
+
         case F_REQ_ELEM_SECTOR: {
             DEBUG__________ln("ℹ️ Recibido un F_REQ_ELEM_SECTOR");
             if (LEF.data.empty()) {

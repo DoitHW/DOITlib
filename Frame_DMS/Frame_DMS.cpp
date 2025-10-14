@@ -847,87 +847,87 @@ static constexpr uint8_t kBtnIdToLedIdx[10] = {
   1     // 9 → LED1 (BLANCO)
 };
 
-static inline void putByLedIndex(COLORPAD_BTNMAP& m, const BUTTON& b){
-  if (b.led_indx > 8) return;
-  switch (b.led_indx){
-    case 0: m.Button_00 = b; break;
-    case 1: m.Button_01 = b; break;
-    case 2: m.Button_02 = b; break;
-    case 3: m.Button_03 = b; break;
-    case 4: m.Button_04 = b; break;
-    case 5: m.Button_05 = b; break;
-    case 6: m.Button_06 = b; break;
-    case 7: m.Button_07 = b; break;
-    case 8: m.Button_08 = b; break;
-  }
+
+// Coloca cada BUTTON en Button_00..08 según el LED físico
+static inline void putByLedIndex(COLORPAD_BTNMAP& m, uint8_t ledIndex, const BUTTON& b) {
+    switch (ledIndex) {
+        case 0: m.Button_00 = b; break;
+        case 1: m.Button_01 = b; break;
+        case 2: m.Button_02 = b; break;
+        case 3: m.Button_03 = b; break;
+        case 4: m.Button_04 = b; break;
+        case 5: m.Button_05 = b; break;
+        case 6: m.Button_06 = b; break;
+        case 7: m.Button_07 = b; break;
+        case 8: m.Button_08 = b; break;
+        default: break;
+    }
 }
 
-void buildColorpadFromBtnIds(
+// Construye el COLORPAD_BTNMAP desde 9 “botones lógicos” (1..9)
+void buildColorpadFromBtnIdsV2(
     const BUTTON& b1, const BUTTON& b2, const BUTTON& b3,
     const BUTTON& b4, const BUTTON& b5, const BUTTON& b6,
     const BUTTON& b7, const BUTTON& b8, const BUTTON& b9,
     COLORPAD_BTNMAP& outMap
 ){
-  // Copiamos y forzamos led_indx según tu mapeo por id
-  BUTTON v[9] = { b1,b2,b3,b4,b5,b6,b7,b8,b9 };
-  for (uint8_t id=1; id<=9; ++id){
-    BUTTON bi = v[id-1];
-    bi.led_indx = kBtnIdToLedIdx[id];  // ← aquí se aplica tu mapeo fijo botón→LED
-    putByLedIndex(outMap, bi);         // lo situamos en Button_00..08 por LED
-  }
+    const BUTTON v[9] = { b1,b2,b3,b4,b5,b6,b7,b8,b9 };
+    for (uint8_t id = 1; id <= 9; ++id) {
+        BUTTON bi = v[id-1];
+        const uint8_t ledIndex = kBtnIdToLedIdx[id];
+        if (ledIndex <= 8) putByLedIndex(outMap, ledIndex, bi);
+    }
 }
 
+// === Reemplaza COMPLETO tu frameMaker_SET_BUTTONS_EXTMAP antiguo ===
 FRAME_T frameMaker_SET_BUTTONS_EXTMAP(
     uint8_t               originType,   // p.ej. DC (Consola)
     uint8_t               targetType,   // p.ej. DB (Botonera)
     const TARGETNS&       destNS,       // 00:00:00:00:00 = broadcast
-    const COLORPAD_BTNMAP &map          // 9 leds con led_indx 0..8
+    const COLORPAD_BTNMAP &map
 ){
     FRAME_T f{};
 
+    // ----- DATA: 1 (PADFX) + 9*6 (active,numColor,r,g,b,fx) = 55 (0x37) -----
+    const uint16_t dlen = 1u + (9u * 6u); // 0x37
+    f.data.clear();
+    f.data.resize(dlen);
+
+    // Serialización en orden fijo 0..8
     const BUTTON btns[9] = {
         map.Button_00, map.Button_01, map.Button_02,
         map.Button_03, map.Button_04, map.Button_05,
         map.Button_06, map.Button_07, map.Button_08
     };
 
-    // ===== DATA: 9 × 8 = 72 (0x48) =====
-    const uint16_t dlen = 9u * 8u;     // 0x48
-    f.data.clear();
-    f.data.resize(dlen);
-
     size_t off = 0;
+    f.data[off++] = static_cast<uint8_t>(map.PADFX);
+
     for (int i = 0; i < 9; ++i) {
         const BUTTON &b = btns[i];
-
-        uint8_t flags = 0;
-        if (b.rgbFlag) flags |= BTN_FLAG_RGB;
-
-        f.data[off++] = b.led_indx;                 // 0..8
-        f.data[off++] = flags;                      // bit0=rgbFlag
-        f.data[off++] = b.numColor;                 // si rgbFlag=0
+        f.data[off++] = (b.active ? 1 : 0);
+        f.data[off++] = b.numColor;
         f.data[off++] = b.r;
         f.data[off++] = b.g;
         f.data[off++] = b.b;
-        f.data[off++] = b.brightness;               // 0..255
-        f.data[off++] = static_cast<uint8_t>(b.fx); // enum BTN_FX
+        f.data[off++] = static_cast<uint8_t>(b.fx);
     }
 
-    // ===== Cabecera y longitudes coherentes =====
-    const uint16_t len = 12 + dlen;   // ORIGIN..CHECKSUM+END (84 = 0x54)
+    // ----- Cabecera NS (tu formato NS-only) -----
+    const uint16_t len = 12 + dlen;    // “ORIGIN..CHECKSUM+END” como ya hacías
 
-    f.start           = NEW_START;                // 0xE1
-    f.frameLengthMsb  = (len >> 8) & 0xFF;        // 0x00
-    f.frameLengthLsb  =  len       & 0xFF;        // 0x54
-    f.origin          = originType;               // DC
-    f.targetType      = targetType;               // DB
-    f.targetNS        = destNS;                   // 5 bytes
-    f.function        = F_SET_BUTTONS_EXTMAP;     // 0xC7
-    f.dataLengthMsb   = 0x00;
-    f.dataLengthLsb   = 0x48;                     // 72
+    f.start           = NEW_START;
+    f.frameLengthMsb  = (len >> 8) & 0xFF;
+    f.frameLengthLsb  =  len       & 0xFF;
+    f.origin          = originType;
+    f.targetType      = targetType;
+    f.targetNS        = destNS;           // 5 bytes NS
+    f.function        = F_SET_BUTTONS_EXTMAP;
+    f.dataLengthMsb   = (dlen >> 8) & 0xFF;
+    f.dataLengthLsb   =  dlen       & 0xFF;
 
-    f.checksum        = checksum_calc(f);         // (incluye START y END; excluye solo el propio checksum)
-    f.end             = NEW_END;                  // 0xBB
+    f.checksum        = checksum_calc(f);
+    f.end             = NEW_END;
     return f;
 }
 

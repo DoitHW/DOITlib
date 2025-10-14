@@ -19,18 +19,18 @@ struct SectorMsg {
 };
 
 // Protocolo (botón 1..9) → índice físico de LED (0..8)
-static constexpr uint8_t kBtnIdToLedIdx[10] = {
-  0xFF, // [0] no usado
-  8,    // 1 → LED8 (AZUL)
-  6,    // 2 → LED6 (VERDE)
-  4,    // 3 → LED4 (AMARILLO)
-  2,    // 4 → LED2 (ROJO)
-  0,    // 5 → LED0 (RELE)
-  7,    // 6 → LED7 (VIOLETA)
-  5,    // 7 → LED5 (NARANJA)
-  3,    // 8 → LED3 (CELESTE)
-  1     // 9 → LED1 (BLANCO)
-};
+// static constexpr uint8_t kBtnIdToLedIdx[10] = {
+//   0xFF, // [0] no usado
+//   8,    // 1 → LED8 (AZUL)
+//   6,    // 2 → LED6 (VERDE)
+//   4,    // 3 → LED4 (AMARILLO)
+//   2,    // 4 → LED2 (ROJO)
+//   0,    // 5 → LED0 (RELE)
+//   7,    // 6 → LED7 (VIOLETA)
+//   5,    // 7 → LED5 (NARANJA)
+//   3,    // 8 → LED3 (CELESTE)
+//   1     // 9 → LED1 (BLANCO)
+// };
 
 class BOTONERA_ : public ELEMENT_{
 
