@@ -138,7 +138,8 @@ void PulsadoresHandler::procesarPulsadores() {
     TARGETNS targetNS   = NS_ZERO;
 
     String currentFile = elementFiles[currentIndex];
-
+    const bool respMode = PulsadoresHandler::isResponseRouteActive();
+    
     /*───────────────────────────
       1) MODO COGNITIVO (Consola)
     ───────────────────────────*/
@@ -186,7 +187,7 @@ void PulsadoresHandler::procesarPulsadores() {
     if (currentFile == "Apagar") return;
 
     // Ignorar pulsaciones si es elemento normal no seleccionado
-    if (currentFile != "Ambientes" && currentFile != "Fichas" &&
+    if (!respMode && currentFile != "Ambientes" && currentFile != "Fichas" &&
         !selectedStates[currentIndex]) return;
 
     const bool isFichas = (currentFile == "Fichas");
@@ -221,9 +222,13 @@ void PulsadoresHandler::procesarPulsadores() {
             }
         } else {
             targetType = DEFAULT_DEVICE;
-            targetNS   = getCurrentElementNS();;
+            targetNS   = getCurrentElementNS();
         }
-    }
+        }else if (respMode) {
+        // Placeholders: processButtonEvent enviará F_SEND_RESPONSE con la ruta memorizada
+        targetType = BROADCAST;
+        targetNS   = NS_ZERO;
+        }
 
 
     /*───────────────────────────
@@ -292,23 +297,30 @@ void PulsadoresHandler::procesarPulsadores() {
             if (color == BLUE)  blueButtonState   |= currentPressed;
 
             if (!lastState[i][j] && currentPressed) {
-                if (isFichas) {
-                    if (color == RELAY)      relayButtonPressed = true;
-                    else if (color == BLUE)  blueButtonPressed  = true;
-                } else {
-                    processButtonEvent(i, j, BUTTON_PRESSED, hasPulse, hasPassive, hasRelay,
-                                       targetType, targetNS);
-                }
+            if (respMode) {
+                // En modo respuesta, siempre disparamos evento (flags no se usan en la rama 1-bis)
+                processButtonEvent(i, j, BUTTON_PRESSED, /*hasPulse*/false, /*hasPassive*/false, /*hasRelay*/false,
+                                targetType, targetNS);
+            } else if (isFichas) {
+                if (color == RELAY)      relayButtonPressed = true;
+                else if (color == BLUE)  blueButtonPressed  = true;
+            } else {
+                processButtonEvent(i, j, BUTTON_PRESSED, hasPulse, hasPassive, hasRelay,
+                                targetType, targetNS);
             }
-            if (lastState[i][j] && !currentPressed) {
-                if (isFichas) {
-                    if (color == RELAY)      relayButtonPressed = false;
-                    else if (color == BLUE)  blueButtonPressed  = false;
-                } else {
-                    processButtonEvent(i, j, BUTTON_RELEASED, hasPulse, hasPassive, hasRelay,
-                                       targetType, targetNS);
-                }
+        }
+        if (lastState[i][j] && !currentPressed) {
+            if (respMode) {
+                processButtonEvent(i, j, BUTTON_RELEASED, /*hasPulse*/false, /*hasPassive*/false, /*hasRelay*/false,
+                                targetType, targetNS);
+            } else if (isFichas) {
+                if (color == RELAY)      relayButtonPressed = false;
+                else if (color == BLUE)  blueButtonPressed  = false;
+            } else {
+                processButtonEvent(i, j, BUTTON_RELEASED, hasPulse, hasPassive, hasRelay,
+                                targetType, targetNS);
             }
+        }
             lastState[i][j] = currentPressed;
         }
         digitalWrite(filas[i], HIGH);
@@ -320,7 +332,7 @@ void PulsadoresHandler::procesarPulsadores() {
     /*───────────────────────────
       7) Envío de color (modes con HAS_PULSE)
     ───────────────────────────*/
-    if (!inModesScreen && hasPulse && !isFichas) {
+    if (!respMode && !inModesScreen && hasPulse && !isFichas) {
         if (hasAdvanced) {
             int  count   = 0;
             byte color1  = BLACK;
@@ -435,6 +447,42 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
     if (currentFile == "Fichas")
         return;
 
+    /* ─────────────────────────────────────────────────────────────
+    * 1 bis) MODO RESPUESTA (activado tras F_SET_BUTTONS_EXTMAP)
+    *       - Si está activo: cualquier botón PRESSED envía F_SEND_RESPONSE
+    *         al origen que configuró (DC→NS_ZERO, DD→su NS) y SALIMOS.
+    *       - Se asume que el escaneo ya filtró .active; por robustez, revalidamos.
+    * ───────────────────────────────────────────────────────────── */
+    if (event == BUTTON_PRESSED && PulsadoresHandler::isResponseRouteActive()) {
+
+        // Mapeo color lógico → índice LED 0..8 (ya lo usas en el proyecto)
+        int ledIdx = colorToLedIdx(buttonColor);
+        if (ledIdx < 0) return;
+
+        if (!PulsadoresHandler::isButtonEnabled((uint8_t)ledIdx)) {
+            return; // deshabilitado por .active → no responde
+        }
+
+        // ledIdx (0..8) → buttonId (1..9), inversa de tu tabla canónica
+        auto ledIdxToButtonId = [](uint8_t idx) -> uint8_t {
+            static const uint8_t kMap[9] = { 5, 9, 4, 8, 3, 7, 2, 6, 1 };
+            return (idx < 9) ? kMap[idx] : 0;
+        };
+        const uint8_t response = ledIdxToButtonId((uint8_t)ledIdx);
+        if (response == 0) return; // fuera de rango
+
+        // Construir y enviar RESPUESTA al “origen que configuró”
+        FRAME_T fr = frameMaker_SEND_RESPONSE(
+            DEFAULT_BOTONERA,
+            s_respTargetType,   // (static en PulsadoresHandler)
+            s_respTargetNS,     // (NS_ZERO si DC, NS origen si DD)
+            response
+        );
+        send_frame(fr);
+
+        return; // ← importante: no sigas con la lógica antigua (color/patrones/relé)
+    }
+    
     // ─────────────────────────────────────────────────────────────
     // 2) COMUNICADOR · elemento sólo-relé → filtra botones
     // ─────────────────────────────────────────────────────────────
@@ -792,3 +840,25 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
         return;
     }
 }
+
+// Pulsadores_handler.cpp
+bool     PulsadoresHandler::s_responseModeEnabled = false;
+uint8_t  PulsadoresHandler::s_respTargetType = 0;
+TARGETNS PulsadoresHandler::s_respTargetNS   = {0,0,0,0,0};
+
+void PulsadoresHandler::setResponseRoute(uint8_t targetType, const TARGETNS& targetNS){
+    s_respTargetType     = targetType;
+    s_respTargetNS       = targetNS;
+    s_responseModeEnabled = true;
+}
+
+void PulsadoresHandler::clearResponseRoute(){
+    s_responseModeEnabled = false;
+    s_respTargetType      = 0;
+    s_respTargetNS        = TARGETNS{0,0,0,0,0};
+}
+
+bool PulsadoresHandler::isResponseRouteActive(){
+    return s_responseModeEnabled;
+}
+

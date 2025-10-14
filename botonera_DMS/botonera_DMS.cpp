@@ -843,7 +843,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
             //  A) EFECTO GLOBAL
             // =======================
             if (PADFX != (uint8_t)BTN_FX::NO_FX) {
-                
+
                 bool allOff[9] = {false,false,false,false,false,false,false,false,false};
                 PulsadoresHandler::setButtonActiveMask(allOff);
                 ledManager.clearEffects();
@@ -1044,6 +1044,17 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
                 }
             }
 
+            // 1) Determinar el destino al que contestaremos:
+            //    - Si el ORIGEN del frame es DC (consola): NS = 00:00:00:00:00
+            //    - Si el ORIGEN es DD (dispositivo): usar su NS (el del origen)
+            uint8_t originType = LEF.origin;           // el tipo que envió la trama
+            //TARGETNS originNS  = LEF.originNS;         // NS del que la envió (si es DC lo ignoraremos)
+            TARGETNS respNS;
+            if (originType == DEFAULT_CONSOLE || originType == DEFAULT_BOTONERA) {
+                respNS = TARGETNS{0,0,0,0,0};
+            } 
+            // 2) Habilitar el “modo respuesta” en los pulsadores
+            PulsadoresHandler::setResponseRoute(originType, respNS);
             FastLED.show();
             break;
         }

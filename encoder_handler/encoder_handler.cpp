@@ -330,6 +330,7 @@ void handleEncoder() noexcept
         lastEncoderValue        = newEncoderValue;
 
         if (!inModesScreen && elementFiles.size() > 1) {
+            PulsadoresHandler::clearResponseRoute();
             // Cambio de elemento
             currentIndex = (currentIndex + direction + elementFiles.size()) % elementFiles.size();
             lastFocusChangeTime      = millis();

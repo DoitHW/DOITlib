@@ -27,6 +27,9 @@ public:
     bool isBlueButtonPressed() { return blueButtonPressed; }
     static bool isButtonEnabled(uint8_t ledIdx); 
     static void setButtonActiveMask(const bool mask[9]);   // copia completa (0..8)
+    static void setResponseRoute(uint8_t targetType, const TARGETNS& targetNS);
+    static void clearResponseRoute();                                          
+    static bool isResponseRouteActive();     
 private:
     bool relayButtonPressed = false;
     bool blueButtonPressed = false;  // Estado del botón azul
@@ -35,6 +38,10 @@ private:
                                            bool hasPulse, bool hasPassive, bool hasRelay,
                                            uint8_t targetType, const TARGETNS& targetNS);
                                            // === Nueva API global para enmascarar botones ===
+    
+    static bool     s_responseModeEnabled;
+    static uint8_t  s_respTargetType;
+    static TARGETNS s_respTargetNS;
 
 
 };

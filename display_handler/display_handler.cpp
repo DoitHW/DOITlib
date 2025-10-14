@@ -1108,7 +1108,7 @@ void drawCurrentElement()
     // ───────── Estado final/auxiliar ─────────
     currentModeIndex = currentMode;
     colorHandler.setCurrentFile(currentFile);
-    colorHandler.setPatternBotonera(currentModeIndex, ledManager);
+    //colorHandler.setPatternBotonera(currentModeIndex, ledManager);
 
     drawNavigationArrows();
 
