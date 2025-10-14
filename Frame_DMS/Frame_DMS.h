@@ -116,10 +116,11 @@ struct ICON_PACK_T{
 };
 
 enum BTN_FX : uint8_t {
-    SOLID = 0,           // Color fijo
+    NO_FX = 0,
+    SOLID,               // Color fijo
     SLOW_WAVE,           // Onda lenta (fade in/out)
     FAST_WAVE,           // Onda rápida
-    RAINBOWLOOP,        // Arcoíris cíclico
+    RAINBOWLOOP,         // Arcoíris cíclico
     BUBBLES_FX,          // Burbujas mejoradas
     BREATHING,           // Respiración suave
     FIRE,                // Efecto fuego
@@ -127,7 +128,7 @@ enum BTN_FX : uint8_t {
     COMET,               // Cometa con estela
     PLASMA,              // Plasma dinámico
     HEARTBEAT,           // Latido de corazón
-    AURORA_FX,              // Aurora boreal
+    AURORA_FX,           // Aurora boreal
     STROBE,              // Estroboscópico
     COLOR_WIPE,          // Barrido de color
     THEATER_CHASE        // Persecución teatral
@@ -135,18 +136,16 @@ enum BTN_FX : uint8_t {
 
 // Estructura individual de botón (corresponde a un LED físico)
 struct BUTTON {
-    uint8_t  led_indx;     // Índice 0..8 del LED en la botonera
-    uint8_t  numColor;     // Índice en paleta (si rgbFlag == false)
-    bool     rgbFlag;      // true = usar r,g,b; false = usar numColor
-    uint8_t  r;            // Valor rojo (0..255)
-    uint8_t  g;            // Valor verde (0..255)
-    uint8_t  b;            // Valor azul (0..255)
-    uint8_t  brightness;   // Brillo individual del botón (0..255)
-    BTN_FX   fx;           // Efecto visual asignado al botón
+    // 0..8 en la tira
+    bool     active;
+    uint8_t  numColor;
+    uint8_t  r, g, b;
+    BTN_FX   fx;
 };
 
 // Estructura que agrupa los 9 botones de la botonera
 struct COLORPAD_BTNMAP {
+    BTN_FX PADFX;
     BUTTON Button_00;   // LED índice 0 (pulsador RELE)
     BUTTON Button_01;   // LED índice 1 (BLANCO)
     BUTTON Button_02;   // LED índice 2 (ROJO)

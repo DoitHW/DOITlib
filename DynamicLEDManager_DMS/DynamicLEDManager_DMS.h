@@ -176,5 +176,100 @@ private:
     COLORHANDLER_&              colorHandler;
 };
 
+// Efecto: “persecución por ruta” (global sencillo)
+// Si quieres, ponlo al final del .h junto al resto de clases.
+class PathChaseEffect : public DynamicEffect {
+public:
+    // 'order' es un puntero a una lista de índices físicos de LED (0..8).
+    // 'len' longitud de la lista. 'stepMs' intervalo entre pasos.
+    PathChaseEffect(COLORHANDLER_& h, const uint8_t* order, uint8_t len,
+                    CRGB color, unsigned int stepMs)
+    : DynamicEffect(h, /*index*/-1, stepMs),
+      seq(order), seqLen(len), col(color), pos(0) {}
+
+    void update() override;
+
+private:
+    const uint8_t* seq;
+    uint8_t        seqLen;
+    CRGB           col;
+    uint8_t        pos;
+};
+
+// --- Global: cometa con estela (ruta configurable) ---
+class CometTrailEffect : public DynamicEffect {
+public:
+    CometTrailEffect(COLORHANDLER_& h, const uint8_t* order, uint8_t len,
+                     CRGB color, unsigned int stepMs, uint8_t decay);
+    void update() override;
+private:
+    const uint8_t* seq; uint8_t seqLen; CRGB col; uint8_t pos; uint8_t fade; // 0..255
+};
+
+// --- Global: theater chase ---
+class TheaterChaseGlobalEffect : public DynamicEffect {
+public:
+    TheaterChaseGlobalEffect(COLORHANDLER_& h, CRGB color, unsigned int stepMs, uint8_t spacing);
+    void update() override;
+private:
+    CRGB col; uint8_t off; uint8_t sp; // offset y espaciado
+};
+
+// --- Global: color wipe (orden configurable) ---
+class ColorWipeGlobalEffect : public DynamicEffect {
+public:
+    ColorWipeGlobalEffect(COLORHANDLER_& h, const uint8_t* order, uint8_t len,
+                          CRGB color, unsigned int stepMs);
+    void update() override;
+private:
+    const uint8_t* seq; uint8_t seqLen; CRGB col; int8_t pos;
+};
+
+// --- Global: strobe ---
+class StrobeGlobalEffect : public DynamicEffect {
+public:
+    StrobeGlobalEffect(COLORHANDLER_& h, CRGB color, unsigned int updateMs, uint8_t flashes, unsigned int gapMs);
+    void update() override;
+private:
+    CRGB col; uint8_t burst; uint8_t count; unsigned int gap; bool onPhase;
+};
+
+// --- Global: sparkle ---
+class SparkleGlobalEffect : public DynamicEffect {
+public:
+    SparkleGlobalEffect(COLORHANDLER_& h, CRGB base, unsigned int tickMs, uint8_t density, uint8_t fade);
+    void update() override;
+private:
+    CRGB baseCol; uint8_t dens; uint8_t fadeAmt;
+};
+
+// --- Global: fire (flicker cálido) ---
+class FireGlobalEffect : public DynamicEffect {
+public:
+    FireGlobalEffect(COLORHANDLER_& h, unsigned int tickMs);
+    void update() override;
+private:
+    uint8_t t;
+};
+
+// --- Global: aurora (gradiente frío en movimiento) ---
+class AuroraGlobalEffect : public DynamicEffect {
+public:
+    AuroraGlobalEffect(COLORHANDLER_& h, CRGB tint, unsigned int tickMs);
+    void update() override;
+private:
+    uint8_t hue; CRGB tintCol;
+};
+
+// --- Global: plasma noise ---
+class PlasmaNoiseEffect : public DynamicEffect {
+public:
+    PlasmaNoiseEffect(COLORHANDLER_& h, CRGB tint, unsigned int tickMs);
+    void update() override;
+private:
+    uint16_t z; CRGB tintCol;
+};
+
+
 // Declaración externa del manager (si ya la usas en otros módulos)
 extern DynamicLEDManager ledManager;

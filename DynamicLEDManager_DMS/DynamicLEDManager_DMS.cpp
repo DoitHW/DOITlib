@@ -419,6 +419,192 @@ void DynamicLEDManager::update() {
     }
 }
 
-// Nota: la definición del objeto global 'ledManager' debe estar
-// en un .cpp único de tu proyecto (no aquí) si ya lo estás usando.
-// Aquí solo lo declaramos vía 'extern' en el .h.
+void PathChaseEffect::update() {
+    unsigned long now = millis();
+    if (now - lastUpdate < interval) return;
+    lastUpdate = now;
+
+    if (!colorHandler.leds || colorHandler.numLeds == 0 || !seq || seqLen == 0)
+        return;
+
+    // Apaga todo y enciende el LED de la posición actual de la ruta
+    fill_solid(colorHandler.leds, colorHandler.numLeds, CRGB::Black);
+
+    uint8_t idx = seq[pos % seqLen];
+    if (idx < colorHandler.numLeds) {
+        colorHandler.leds[idx] = col;
+    }
+
+    pos = (pos + 1) % seqLen;
+}
+
+
+/* ========== CometTrailEffect ========== */
+CometTrailEffect::CometTrailEffect(COLORHANDLER_& h, const uint8_t* order, uint8_t len,
+                                   CRGB color, unsigned int stepMs, uint8_t decay)
+: DynamicEffect(h, -1, stepMs), seq(order), seqLen(len), col(color), pos(0), fade(decay) {}
+
+void CometTrailEffect::update() {
+    unsigned long now = millis();
+    if (now - lastUpdate < interval) return;
+    lastUpdate = now;
+
+    if (!colorHandler.leds || !seq || seqLen == 0) return;
+
+    // Estela: desvanecer todo
+    fadeToBlackBy(colorHandler.leds, colorHandler.numLeds, fade);
+
+    // Cabeza del cometa
+    uint8_t idx = seq[pos % seqLen];
+    if (idx < colorHandler.numLeds) {
+        // sumamos color para intensificar sobre la estela
+        colorHandler.leds[idx] += col;
+    }
+    pos = (pos + 1) % seqLen;
+}
+
+/* ========== TheaterChaseGlobalEffect ========== */
+TheaterChaseGlobalEffect::TheaterChaseGlobalEffect(COLORHANDLER_& h, CRGB color, unsigned int stepMs, uint8_t spacing)
+: DynamicEffect(h, -1, stepMs), col(color), off(0), sp(max<uint8_t>(1, spacing)) {}
+
+void TheaterChaseGlobalEffect::update() {
+    unsigned long now = millis();
+    if (now - lastUpdate < interval) return;
+    lastUpdate = now;
+
+    fill_solid(colorHandler.leds, colorHandler.numLeds, CRGB::Black);
+    for (int i = off; i < colorHandler.numLeds; i += sp) {
+        colorHandler.leds[i] = col;
+    }
+    off = (off + 1) % sp;
+}
+
+/* ========== ColorWipeGlobalEffect ========== */
+ColorWipeGlobalEffect::ColorWipeGlobalEffect(COLORHANDLER_& h, const uint8_t* order, uint8_t len,
+                                             CRGB color, unsigned int stepMs)
+: DynamicEffect(h, -1, stepMs), seq(order), seqLen(len), col(color), pos(-1) {}
+
+void ColorWipeGlobalEffect::update() {
+    unsigned long now = millis();
+    if (now - lastUpdate < interval) return;
+    lastUpdate = now;
+
+    if (!colorHandler.leds || !seq || seqLen == 0) return;
+
+    pos = (pos + 1) % (seqLen + 1); // incluye estado todo apagado
+    fill_solid(colorHandler.leds, colorHandler.numLeds, CRGB::Black);
+    for (int i = 0; i < pos && i < seqLen; ++i) {
+        uint8_t idx = seq[i];
+        if (idx < colorHandler.numLeds) colorHandler.leds[idx] = col;
+    }
+}
+
+/* ========== StrobeGlobalEffect ========== */
+StrobeGlobalEffect::StrobeGlobalEffect(COLORHANDLER_& h, CRGB color, unsigned int updateMs, uint8_t flashes, unsigned int gapMs)
+: DynamicEffect(h, -1, updateMs), col(color), burst(flashes), count(0), gap(gapMs), onPhase(true) {}
+
+void StrobeGlobalEffect::update() {
+    unsigned long now = millis();
+    if (onPhase) {
+        if (now - lastUpdate < interval) return;
+        lastUpdate = now;
+        fill_solid(colorHandler.leds, colorHandler.numLeds, col);
+        onPhase = false;
+        count++;
+    } else {
+        if (now - lastUpdate < interval) return;
+        lastUpdate = now;
+        fill_solid(colorHandler.leds, colorHandler.numLeds, CRGB::Black);
+        onPhase = true;
+        if (count >= burst) {
+            // pausa entre ráfagas
+            lastUpdate = now + (gap - interval); // crude delay comp
+            count = 0;
+        }
+    }
+}
+
+/* ========== SparkleGlobalEffect ========== */
+SparkleGlobalEffect::SparkleGlobalEffect(COLORHANDLER_& h, CRGB base, unsigned int tickMs, uint8_t density, uint8_t fade)
+: DynamicEffect(h, -1, tickMs), baseCol(base), dens(density), fadeAmt(fade) {}
+
+void SparkleGlobalEffect::update() {
+    unsigned long now = millis();
+    if (now - lastUpdate < interval) return;
+    lastUpdate = now;
+
+    if (!colorHandler.leds) return;
+
+    // Atenúa todo un poco
+    nscale8_video(colorHandler.leds, colorHandler.numLeds, 255 - fadeAmt);
+
+    // Añade destellos aleatorios
+    uint8_t tries = dens / 8 + 1;
+    while (tries--) {
+        if (random8() < dens) {
+            int idx = random8() % colorHandler.numLeds;
+            colorHandler.leds[idx] = CRGB::White;
+            colorHandler.leds[idx] += baseCol; // tinte
+        }
+    }
+}
+
+/* ========== FireGlobalEffect ========== */
+FireGlobalEffect::FireGlobalEffect(COLORHANDLER_& h, unsigned int tickMs)
+: DynamicEffect(h, -1, tickMs), t(0) {}
+
+void FireGlobalEffect::update() {
+    unsigned long now = millis();
+    if (now - lastUpdate < interval) return;
+    lastUpdate = now;
+
+    for (int i = 0; i < colorHandler.numLeds; ++i) {
+        uint8_t heat = qadd8(random8(160, 255), (i % 2) ? 20 : 0); // base cálida con vibración
+        // Mapeo simple a color fuego (rojo-ámbar)
+        CRGB c = CHSV( map(heat,160,255, 0,25), 255, heat );
+        colorHandler.leds[i] = c;
+    }
+}
+
+/* ========== AuroraGlobalEffect ========== */
+AuroraGlobalEffect::AuroraGlobalEffect(COLORHANDLER_& h, CRGB tint, unsigned int tickMs)
+: DynamicEffect(h, -1, tickMs), hue(96), tintCol(tint) {}
+
+void AuroraGlobalEffect::update() {
+    unsigned long now = millis();
+    if (now - lastUpdate < interval) return;
+    lastUpdate = now;
+
+    hue += 1;
+    for (int i = 0; i < colorHandler.numLeds; ++i) {
+        uint8_t h = hue + i * 7;
+        CRGB c = CHSV(h, 180, 200);
+        // mezclar con tinte
+        c.r = qadd8(c.r, (tintCol.r >> 1));
+        c.g = qadd8(c.g, (tintCol.g >> 1));
+        c.b = qadd8(c.b, (tintCol.b >> 1));
+        colorHandler.leds[i] = c;
+    }
+}
+
+/* ========== PlasmaNoiseEffect ========== */
+PlasmaNoiseEffect::PlasmaNoiseEffect(COLORHANDLER_& h, CRGB tint, unsigned int tickMs)
+: DynamicEffect(h, -1, tickMs), z(0), tintCol(tint) {}
+
+void PlasmaNoiseEffect::update() {
+    unsigned long now = millis();
+    if (now - lastUpdate < interval) return;
+    lastUpdate = now;
+
+    z += 8; // “tiempo” del ruido
+    for (int i = 0; i < colorHandler.numLeds; ++i) {
+        uint8_t n = inoise8(i * 32, z);      // 0..255
+        CRGB c = CHSV( n, 200, 220 );
+        // ligero tinte
+        c.r = qadd8(c.r, tintCol.r >> 2);
+        c.g = qadd8(c.g, tintCol.g >> 2);
+        c.b = qadd8(c.b, tintCol.b >> 2);
+        colorHandler.leds[i] = c;
+    }
+}
+

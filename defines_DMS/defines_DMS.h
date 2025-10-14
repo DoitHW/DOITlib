@@ -145,7 +145,8 @@ constexpr byte DEFAULT_PAD          = 0xD9;
 #define F_SET_BUTTONS_INDEXED_RGB 0xC5
 #define L_SET_BUTTONS_INDEXED_RGB 0x04
 #define F_SET_BUTTONS_EXTMAP      0xC7
-#define BTN_FLAG_RGB              0x01 
+#define BTN_FLAG_RGB              0x01
+#define BTN_FLAG_GLOBAL           0x80
 #define F_SEND_SENSOR_VALUE_1     0xCA
 #define L_SEND_SENSOR_VALUE_1     0x0C
 #define F_SEND_SENSOR_VALUE_2     0xCB

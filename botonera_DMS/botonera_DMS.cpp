@@ -776,19 +776,138 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
             }
             break;
         }
-
         case F_SET_BUTTONS_EXTMAP: {
             const auto &d = LEF.data;
+            if (d.size() != (size_t)(9 * 8)) break;
 
-            // Sin versión: deben llegar EXACTAMENTE 72 bytes
-            if (d.size() != (size_t)(9 * 8)) {
-                DEBUG__________("C7 DLEN inesperado: "); DEBUG__________ln(d.size());
-                break;
+            // --- leer PRIMER bloque ---
+            const uint8_t ledIdx0     = d[0];
+            const uint8_t flags0      = d[1];           // ← disparador de patrón global
+            const uint8_t numColor0   = d[2];           // ← ID del patrón global
+            uint8_t       r0          = d[3];
+            uint8_t       g0          = d[4];
+            uint8_t       b0          = d[5];
+            const uint8_t brightness0 = d[6];
+            const uint8_t fx0         = d[7];
+
+            // Si el primer flag es 0xFF o 0x80 ⇒ MODO PATRÓN GLOBAL
+            if (flags0 == 0xFF || flags0 == 0x80) {
+                ledManager.clearEffects();
+
+                // Color base para el patrón global (puedes ignorarlo si el patrón no lo usa)
+                CRGB base(r0, g0, b0);
+                if (brightness0 < 255) {
+                    base.r = (uint16_t(base.r) * brightness0) >> 8;
+                    base.g = (uint16_t(base.g) * brightness0) >> 8;
+                    base.b = (uint16_t(base.b) * brightness0) >> 8;
+                }
+
+                // Velocidad por paso (ms). Si viene 0, usa 60 ms por defecto.
+                unsigned int stepMs = (brightness0 == 0) ? 60u : (unsigned int)brightness0;
+
+                // stepMs = brightness0 (si 0 → default interno)
+                auto clampMs = [&](unsigned def, unsigned minMs = 12u) -> unsigned {
+                    // Nunca más lento que 'def' (fluido). Permitimos más rápido, pero no por debajo de minMs.
+                    if (stepMs == 0)       return def;               // usa default suave
+                    if (stepMs > def)      return def;               // evita “lag”
+                    return (stepMs < minMs) ? minMs : stepMs;        // evita saturar CPU
+                };
+
+                // === Selección de patrón global por numColor0 ===
+                // base = CRGB(r0,g0,b0) SIEMPRE en global.
+                switch (numColor0) {
+                    default:
+                    case 0: { // SOLID
+                        fill_solid(colorHandler.leds, colorHandler.numLeds, base);
+                        break;
+                    }
+
+                    case 1: { // PATH CHASE 8→6→4→2→0→1→3→5→7 (1 “paso” por tick)
+                        static const uint8_t kPath[9] = { 8,6,4,2,0,1,3,5,7 };
+                        fill_solid(colorHandler.leds, colorHandler.numLeds, CRGB::Black);
+                        unsigned ms = clampMs(60, 12);
+                        ledManager.addEffect(new PathChaseEffect(colorHandler, kPath, 9, base, ms));
+                        break;
+                    }
+
+                    case 2: { // RAINBOW SOFT (fase por LED) — FPS constantes
+                        unsigned ms = clampMs(20, 12);
+                        for (int i = 0; i < colorHandler.numLeds; ++i) {
+                            // el “speed” lógico lo emulamos con fase distinta por LED; FPS se mantiene
+                            ledManager.addEffect(new RainbowLoopEffect(colorHandler, i, uint8_t(i * 21), ms));
+                        }
+                        break;
+                    }
+
+                    case 3: { // BREATHING (onda lenta) — intencionalmente más lento
+                        unsigned ms = (stepMs ? stepMs : 80);
+                        for (int i = 0; i < colorHandler.numLeds; ++i)
+                            ledManager.addEffect(new WaveEffect(colorHandler, i, base, ms));
+                        fill_solid(colorHandler.leds, colorHandler.numLeds, base);
+                        break;
+                    }
+
+                    case 4: { // FIRE GLOBAL (flicker cálido)
+                        unsigned ms = clampMs(25, 12);
+                        ledManager.addEffect(new FireGlobalEffect(colorHandler, ms));
+                        break;
+                    }
+
+                    case 5: { // SPARKLE GLOBAL (destellos sobre base)
+                        unsigned ms   = clampMs(16, 8);
+                        uint8_t dens  = (ms <= 8) ? 80 : (ms >= 200 ? 8 : uint8_t(200 / ms)); // densidad ≈ inversa
+                        ledManager.addEffect(new SparkleGlobalEffect(colorHandler, base, ms, dens, /*fade*/40));
+                        fill_solid(colorHandler.leds, colorHandler.numLeds, base);
+                        break;
+                    }
+
+                    case 6: { // COMET GLOBAL (ruta con estela)
+                        static const uint8_t kPath[9] = { 8,6,4,2,0,1,3,5,7 };
+                        unsigned ms = clampMs(18, 10);
+                        ledManager.addEffect(new CometTrailEffect(colorHandler, kPath, 9, base, ms, /*decay*/100));
+                        break;
+                    }
+
+                    case 7: { // THEATER CHASE GLOBAL
+                        unsigned ms = clampMs(20, 12);
+                        ledManager.addEffect(new TheaterChaseGlobalEffect(colorHandler, base, ms, /*spacing*/3));
+                        break;
+                    }
+
+                    case 8: { // COLOR WIPE GLOBAL (orden configurable)
+                        static const uint8_t kOrder[9] = { 8,6,4,2,0,1,3,5,7 };
+                        unsigned ms = clampMs(30, 12);
+                        fill_solid(colorHandler.leds, colorHandler.numLeds, CRGB::Black);
+                        ledManager.addEffect(new ColorWipeGlobalEffect(colorHandler, kOrder, 9, base, ms));
+                        break;
+                    }
+
+                    case 9: { // AURORA GLOBAL (gradiente frío móvil)
+                        unsigned ms = clampMs(30, 12);
+                        ledManager.addEffect(new AuroraGlobalEffect(colorHandler, base, ms));
+                        break;
+                    }
+
+                    case 10: { // PLASMA NOISE
+                        unsigned ms = clampMs(16, 8);
+                        ledManager.addEffect(new PlasmaNoiseEffect(colorHandler, base, ms));
+                        break;
+                    }
+
+                    case 11: { // STROBE GLOBAL (ráfagas)
+                        unsigned ms = clampMs(8, 6);
+                        ledManager.addEffect(new StrobeGlobalEffect(colorHandler, base, ms, /*flashes*/3, /*gapMs*/120));
+                        break;
+                    }
+                }
+
+
+                FastLED.show();
+                break; // no procesamos bloques por-LED en este frame
             }
 
-            // Si este mapa debe sustituir cualquier efecto previo:
-            // justo al entrar al case:
-            ledManager.clearEffects();   // evitamos que efectos antiguos pisen el nuevo mapa
+            // =========== MODO NORMAL (por-LED) ===========
+            ledManager.clearEffects(); // el mapa nuevo manda
 
             size_t off = 0;
             for (int i = 0; i < 9; ++i) {
@@ -813,113 +932,88 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
                     base.b = (uint16_t(base.b) * brightness) >> 8;
                 }
 
+                // --- switch fx por-LED (el tuyo completo) ---
                 switch (static_cast<BTN_FX>(fx)) {
                     default:
                     case BTN_FX::SOLID:
-                        // Color fijo
                         colorHandler.leds[ledIdx] = base;
                         break;
 
                     case BTN_FX::SLOW_WAVE:
-                        // Onda lenta color↔negro
                         ledManager.addEffect(new WaveEffect(colorHandler, ledIdx, base, /*ms*/60));
                         colorHandler.leds[ledIdx] = base;
                         break;
 
                     case BTN_FX::FAST_WAVE:
-                        // Onda rápida color↔negro
                         ledManager.addEffect(new WaveEffect(colorHandler, ledIdx, base, /*ms*/20));
                         colorHandler.leds[ledIdx] = base;
                         break;
 
                     case BTN_FX::RAINBOWLOOP:
-                        // Arcoíris por LED (HSV); ignora 'base'
                         ledManager.addEffect(new RainbowLoopEffect(colorHandler, ledIdx, /*startHue*/0, /*ms*/20));
                         break;
 
                     case BTN_FX::BUBBLES_FX:
-                        // Burbujeo local sobre color base
                         ledManager.addEffect(new BubblesEffect(colorHandler, ledIdx, base, /*tick*/40, /*dens*/28));
                         colorHandler.leds[ledIdx] = base;
                         break;
 
                     case BTN_FX::BREATHING:
-                        // Respiración suave = onda más lenta
                         ledManager.addEffect(new WaveEffect(colorHandler, ledIdx, base, /*ms*/80));
                         colorHandler.leds[ledIdx] = base;
                         break;
 
                     case BTN_FX::FIRE: {
-                        // Fuego aprox: base cálida + chispas densas y rápidas
-                        CRGB warm = base;
-                        warm.g = qadd8(warm.g, warm.r >> 2); // +ámbar
-                        warm.b >>= 2;                        // -azul
+                        CRGB warm = base; warm.g = qadd8(warm.g, warm.r >> 2); warm.b >>= 2;
                         ledManager.addEffect(new BubblesEffect(colorHandler, ledIdx, warm, /*tick*/25, /*dens*/50));
                         colorHandler.leds[ledIdx] = warm;
                         break;
                     }
 
                     case BTN_FX::SPARKLE: {
-                        // Destellos: chispas claras y frecuentes
-                        CRGB spark = base;
-                        spark.r = qadd8(spark.r, 100);
-                        spark.g = qadd8(spark.g, 100);
-                        spark.b = qadd8(spark.b, 100);
+                        CRGB spark = base; spark.r=qadd8(spark.r,100); spark.g=qadd8(spark.g,100); spark.b=qadd8(spark.b,100);
                         ledManager.addEffect(new BubblesEffect(colorHandler, ledIdx, spark, /*tick*/16, /*dens*/64));
                         colorHandler.leds[ledIdx] = spark;
                         break;
                     }
 
                     case BTN_FX::COMET:
-                        // Cometa aprox local (el cometa real es de tira completa):
-                        // usamos ColorWipeEffect en modo “pixel viajero local”.
                         ledManager.addEffect(new ColorWipeEffect(colorHandler, ledIdx, base, /*ms*/18, /*fill*/false));
                         colorHandler.leds[ledIdx] = base;
                         break;
 
                     case BTN_FX::PLASMA:
-                        // Plasma aprox: arcoíris rápido con fase según LED
-                        ledManager.addEffect(new RainbowLoopEffect(colorHandler, ledIdx,
-                                                                /*startHue*/uint8_t(ledIdx * 21), /*ms*/12));
+                        ledManager.addEffect(new RainbowLoopEffect(colorHandler, ledIdx, uint8_t(ledIdx*21), /*ms*/12));
                         break;
 
                     case BTN_FX::HEARTBEAT:
-                        // Latido de corazón (clase específica)
                         ledManager.addEffect(new HeartbeatEffect(colorHandler, ledIdx, base, /*ms*/28));
                         colorHandler.leds[ledIdx] = base;
                         break;
 
                     case BTN_FX::AURORA_FX:
-                        // Aurora boreal (clase específica); mezcla base con un tono frío
                         ledManager.addEffect(new AuroraEffect(colorHandler, ledIdx, base, CRGB::Cyan, /*ms*/35));
                         break;
 
                     case BTN_FX::STROBE:
-                        // Estroboscópico (clase específica)
-                        // updateMs: 12 (→ flash corto ~20ms por seguridad interna); flashes: 3 por ráfaga
                         ledManager.addEffect(new StrobeEffect(colorHandler, ledIdx, base, /*updateMs*/12, /*flashes*/3));
-                        // No fijamos color base aquí: el efecto enciende/apaga.
                         break;
 
                     case BTN_FX::COLOR_WIPE:
-                        // Barrido aprox local (si quieres barrido global usa ledIndex=-1 y un solo addEffect)
                         ledManager.addEffect(new ColorWipeEffect(colorHandler, ledIdx, base, /*ms*/40, /*fill*/true));
                         colorHandler.leds[ledIdx] = base;
                         break;
 
                     case BTN_FX::THEATER_CHASE:
-                        // Persecución teatral aprox local
                         ledManager.addEffect(new TheaterChaseEffect(colorHandler, ledIdx, base, /*ms*/35, /*spacing*/3));
                         colorHandler.leds[ledIdx] = base;
                         break;
                 }
-
             }
-            FastLED.show();
 
+            FastLED.show();
             break;
         }
-
         case F_REQ_ELEM_SECTOR: {
             DEBUG__________ln("ℹ️ Recibido un F_REQ_ELEM_SECTOR");
             if (LEF.data.empty()) {
