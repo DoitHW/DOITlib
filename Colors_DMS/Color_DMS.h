@@ -166,6 +166,9 @@ class COLORHANDLER_ {
 
     private:
     String currentFile;
+    static inline bool isBlack(const CRGB& c) { return c.r==0 && c.g==0 && c.b==0; }
+    void setAllButtonsActive(bool val);
+    void syncButtonsWithLEDs();  
 
 };
 

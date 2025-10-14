@@ -38,6 +38,23 @@ byte pulsadorColor[FILAS][COLUMNAS] = {
 };
 #endif
 
+// Mapear color lógico a LED index físico [0..8]. Devuelve -1 si no aplica (p.ej. BLACK/relleno)
+static inline int colorToLedIdx(byte color) {
+    switch (color) {
+        case RELAY:       return 0;
+        case WHITE:       return 1;
+        case RED:         return 2;
+        case LIGHT_BLUE:  return 3; // CELESTE
+        case YELLOW:      return 4;
+        case ORANGE:      return 5;
+        case GREEN:       return 6;
+        case VIOLET:      return 7;
+        case BLUE:        return 8;
+        default:          return -1; // BLACK / relleno u otros no mapeados
+    }
+}
+
+
 // Constructor
 PulsadoresHandler::PulsadoresHandler() {}
 
@@ -52,6 +69,16 @@ void PulsadoresHandler::begin() {
     }
     
 }
+// ===== Estado global de habilitación por LED (0..8) =====
+static bool g_btnEnabled[9] = { true,true,true,true,true,true,true,true,true };
+
+bool PulsadoresHandler::isButtonEnabled(uint8_t ledIdx) {
+    return (ledIdx < 9) ? g_btnEnabled[ledIdx] : true;
+}
+
+void PulsadoresHandler::setButtonActiveMask(const bool mask[9]) {
+    for (int i = 0; i < 9; ++i) g_btnEnabled[i] = mask[i];
+}
 
 void PulsadoresHandler::limpiarEstados() {
     for (int i = 0; i < FILAS; i++) {
@@ -63,20 +90,43 @@ void PulsadoresHandler::limpiarEstados() {
 
 bool PulsadoresHandler::isButtonPressed(byte color) {
     for (int i = 0; i < FILAS; i++) {
-        digitalWrite(filas[i], LOW); // Activamos la fila
-        delayMicroseconds(1); // Pequeña pausa para asegurar estabilidad en la lectura
-        
+        digitalWrite(filas[i], LOW);
+        delayMicroseconds(1);
         for (int j = 0; j < COLUMNAS; j++) {
-            if (pulsadorColor[i][j] == color && digitalRead(columnas[j]) == LOW) {
-                digitalWrite(filas[i], HIGH); // Restauramos la fila antes de salir
-                return true; // Se encontró el botón presionado
+            if (pulsadorColor[i][j] != color) continue;
+
+            const int ledIdx = colorToLedIdx(color);
+            if (ledIdx >= 0 && !PulsadoresHandler::isButtonEnabled(ledIdx)) {
+                continue; // inhabilitado → ignorar como si NO estuviera pulsado
+            }
+
+            if (digitalRead(columnas[j]) == LOW) {
+                digitalWrite(filas[i], HIGH);
+                return true;
             }
         }
-        
-        digitalWrite(filas[i], HIGH); // Restauramos la fila antes de continuar
+        digitalWrite(filas[i], HIGH);
     }
-    return false; // Ningún botón con ese color está presionado
+    return false; // ← faltaba: si no se encontró pulsado, devolver false
 }
+
+
+// bool PulsadoresHandler::isButtonPressed(byte color) {
+//     for (int i = 0; i < FILAS; i++) {
+//         digitalWrite(filas[i], LOW); // Activamos la fila
+//         delayMicroseconds(1); // Pequeña pausa para asegurar estabilidad en la lectura
+        
+//         for (int j = 0; j < COLUMNAS; j++) {
+//             if (pulsadorColor[i][j] == color && digitalRead(columnas[j]) == LOW) {
+//                 digitalWrite(filas[i], HIGH); // Restauramos la fila antes de salir
+//                 return true; // Se encontró el botón presionado
+//             }
+//         }
+        
+//         digitalWrite(filas[i], HIGH); // Restauramos la fila antes de continuar
+//     }
+//     return false; // Ningún botón con ese color está presionado
+// }
 
 void PulsadoresHandler::procesarPulsadores() {
     
@@ -107,6 +157,10 @@ void PulsadoresHandler::procesarPulsadores() {
 
                 bool currentPressed = (digitalRead(columnas[j]) == LOW);
 
+                // Filtrado por máscara 'active'
+                int ledIdxGate = colorToLedIdx(color);
+                if (ledIdxGate >= 0 && !isButtonEnabled(ledIdxGate)) currentPressed = false;
+      
                 // Objetivo: CONSOLA
                 targetType = DEFAULT_CONSOLE; // 0xDC
                 targetNS   = NS_ZERO;         // NS cero para no-dispositivo
@@ -222,6 +276,12 @@ void PulsadoresHandler::procesarPulsadores() {
         for (int j = 0; j < COLUMNAS; j++) {
             bool currentPressed = (digitalRead(columnas[j]) == LOW);
             byte color         = pulsadorColor[i][j];
+
+            // === Filtrado por máscara 'active' ===
+            int ledIdxGate = colorToLedIdx(color);
+            if (ledIdxGate >= 0 && !isButtonEnabled(ledIdxGate)) {
+                currentPressed = false; // se trata como NO pulsado → no hay eventos ni tramas
+            }
 
             if (color != RELAY) {
                 if (!lastState[i][j] && currentPressed)      pressTime[i][j] = millis();

@@ -10,6 +10,7 @@
 #include <RelayManager_DMS/RelayStateManager.h>
 #include <Translations_handler/translations.h>
 #include <display_handler/display_handler.h>
+#include <Pulsadores_handler/Pulsadores_handler.h>
 #include <deque>
 
 #define MIN_VALID_ELEMENT_SIZE (OFFSET_ID + 1) // Se espera que el archivo tenga al menos OFFSET_ID+1 bytes
@@ -205,6 +206,12 @@ static String sectorName(uint8_t s) {
     }
     return "SECTOR_DESCONOCIDO";
 }
+
+// ===== Estado global de habilitación por LED (0..8) =====
+
+
+
+
 
 void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
     DEBUG__________ln("\n==== 📨 Trama Recibida 📨 ====");
@@ -778,14 +785,30 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
         }
         
         case F_SET_BUTTONS_EXTMAP: {
+
             const auto &d = LEF.data;
 
             // Esperamos 55 bytes exactos: 1 + 9*6
             if (d.size() != (size_t)(1 + 9 * 6)) break;
 
+            // auto colorFrom = [&](uint8_t numColor, uint8_t r, uint8_t g, uint8_t b) -> CRGB {
+            //     if (numColor == BTN_RGB_DIRECT) return CRGB(r, g, b);
+            //     return colorHandler.colorFromIndex(numColor); // tu paleta
+            // };
+
             auto colorFrom = [&](uint8_t numColor, uint8_t r, uint8_t g, uint8_t b) -> CRGB {
-                if (numColor == BTN_RGB_DIRECT) return CRGB(r, g, b);
-                return colorHandler.colorFromIndex(numColor); // tu paleta
+                if (numColor == BTN_RGB_DIRECT)
+                    return CRGB(r, g, b);
+
+                if (numColor < 36) {
+                    unsigned int hexColor = listaColores[numColor];
+                    uint8_t red   = (hexColor >> 16) & 0xFF;
+                    uint8_t green = (hexColor >> 8)  & 0xFF;
+                    uint8_t blue  = hexColor & 0xFF;
+                    return CRGB(red, green, blue);
+                }
+
+                return CRGB(0, 0, 0); // Color por defecto (negro)
             };
 
             // --- Leer PADFX ---
@@ -810,10 +833,19 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
                 btn[i].fx     = fx;
             }
 
+            // --- Actualiza la máscara de habilitados segun 'active' recibido ---
+            bool mask[9];
+            for (int i = 0; i < 9; ++i) mask[i] = btn[i].active;
+            PulsadoresHandler::setButtonActiveMask(mask);
+
+
             // =======================
             //  A) EFECTO GLOBAL
             // =======================
             if (PADFX != (uint8_t)BTN_FX::NO_FX) {
+                
+                bool allOff[9] = {false,false,false,false,false,false,false,false,false};
+                PulsadoresHandler::setButtonActiveMask(allOff);
                 ledManager.clearEffects();
 
                 // Color base: primero activo (RGB directo si está)
@@ -905,6 +937,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
                         ledManager.addEffect(new TheaterChaseGlobalEffect(colorHandler, base, ms, /*spacing*/3));
                         break;
                     }
+        
                     default:
                         // Desconocido => sólido
                         fill_solid(colorHandler.leds, colorHandler.numLeds, base);
@@ -921,10 +954,6 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
             ledManager.clearEffects();
 
             for (int ledIdx = 0; ledIdx < 9 && ledIdx < colorHandler.numLeds; ++ledIdx) {
-                if (!btn[ledIdx].active) {
-                    colorHandler.leds[ledIdx] = CRGB::Black;
-                    continue;
-                }
 
                 const CRGB     base = btn[ledIdx].base;
                 const BTN_FX   fx   = static_cast<BTN_FX>(btn[ledIdx].fx);
@@ -1004,6 +1033,14 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
                         ledManager.addEffect(new TheaterChaseEffect(colorHandler, ledIdx, base, /*ms*/35, /*spacing*/3));
                         colorHandler.leds[ledIdx] = base;
                         break;
+
+                    case BTN_FX::RELAY_FX: {
+                        if (ledIdx == 0) {
+                            ledManager.addEffect(new FadeEffect(colorHandler, 0, CRGB::Blue, CRGB::Cyan, 50));
+                            if (colorHandler.numLeds > 8) colorHandler.leds[8] = CRGB::Blue;
+                        }
+                        break;
+                    }
                 }
             }
 
@@ -1899,7 +1936,7 @@ bool inCognitiveMenu = false;
 void BOTONERA_::activateCognitiveMode() {
     inCognitiveMenu = true;
     drawCognitiveMenu();
-    colorHandler.mapCognitiveLEDs(); // función que veremos abajo
+    //colorHandler.mapCognitiveLEDs(); // función que veremos abajo
 }
 
 void BOTONERA_::deactivateCognitiveMode() {
@@ -2091,193 +2128,7 @@ void BOTONERA_::escanearSala()
     DEBUG__________ln("=== ✅ FIN ESCANEO DE SALA (NS) ===");
 }
 
-
-// void BOTONERA_::escanearSala()
-// {
-//     // ===== Estado inicial UI =====
-//     formatSubMenuActive = false;
-//     hiddenMenuActive    = false;
-//     loadElementsFromSPIFFS();
-
-//     // ===== Helpers =====
-//     auto nsToStr = [](const TARGETNS& ns) {
-//         char b[16];
-//         snprintf(b, sizeof(b), "%02X:%02X:%02X:%02X:%02X", ns.mac01, ns.mac02, ns.mac03, ns.mac04, ns.mac05);
-//         return String(b);
-//     };
-//     auto serialExists = [&](const TARGETNS& ns) {
-//         byte raw[5] = { ns.mac01, ns.mac02, ns.mac03, ns.mac04, ns.mac05 };
-//         return serialExistsInSPIFFS(raw);
-//     };
-
-//     // ===== Parámetros del escaneo =====
-//     constexpr unsigned long kDiscoveryWindowMs = 20000UL; // 10 s para recoger SERIAL (ajusta a gusto)
-//     constexpr unsigned long kSectorTimeoutMs   = 2000UL;   // t/o por sector
-//     constexpr int           kRetriesPerSector  = 10;       // reintentos por (NS, sector)
-//     constexpr unsigned long kInterReqDelayMs   = 35UL;    // pausa entre peticiones
-
-//     // ===== Activar escaneo (inbox ON en RX_main_handler) =====
-//     rxSectorInbox.clear();
-//     scanInProgress = true;
-
-//     // ===== Fase 1: Descubrimiento por broadcast (Sleep+Wake) =====
-//     DEBUG__________ln("=== 🚀 ESCANEO DE SALA (NS) — Descubrimiento ===");
-//     tft.fillScreen(TFT_BLACK);
-//     int frameCountAnim = 0;
-//     drawLoadingModalFrame(getTranslation("SEARCHING"), frameCountAnim);
-
-//     const TARGETNS ZERO_NS = {0,0,0,0,0};
-//     send_frame(frameMaker_SEND_COMMAND(
-//         DEFAULT_BOTONERA,          // origin (0xDB)
-//         BROADCAST,                 // targetType (0xFF)
-//         ZERO_NS,                   // targetNS = 00:00:00:00:00
-//         SLEEP_SERIAL_WAKEUP_CMD    // comando de descubrimiento
-//     ));
-
-//     std::vector<TARGETNS> discovered;
-//     const uint32_t tEnd = millis() + kDiscoveryWindowMs;
-//     uint32_t lastAnim = millis();
-
-//     while ((int32_t)(tEnd - millis()) > 0) {
-//         if (millis() - lastAnim >= 33) {
-//             //drawLoadingModalFrame(getTranslation("SEARCHING"), frameCountAnim++);
-//             uint32_t s = (millis() - (tEnd - kDiscoveryWindowMs)) / 1000U;
-//             if (s > (kDiscoveryWindowMs/1000U)) s = (kDiscoveryWindowMs/1000U);
-//             actualizarBarraProgreso2((int)s, (int)(kDiscoveryWindowMs/1000U), getTranslation("SEARCHING"));
-//             lastAnim = millis();
-//         }
-
-//         // Leemos exclusivamente de la INBOX los sectores 0x03 (Serial/NS), de cualquiera
-//         std::vector<uint8_t> payload;
-//         if (esperar_respuesta(ELEM_SERIAL_SECTOR, /*any*/ nullptr, payload, 60)) {
-//             if (payload.size() >= 5) {
-//                 TARGETNS ns{ payload[0], payload[1], payload[2], payload[3], payload[4] };
-//                 bool dup = false;
-//                 for (auto& d : discovered) {
-//                     if (d.mac01==ns.mac01 && d.mac02==ns.mac02 && d.mac03==ns.mac03 &&
-//                         d.mac04==ns.mac04 && d.mac05==ns.mac05) { dup = true; break; }
-//                 }
-//                 if (!dup) {
-//                     DEBUG__________printf("🆕 Descubierto NS=%s\n", nsToStr(ns).c_str());
-//                     discovered.push_back(ns);
-//                 }
-//             }
-//         } else {
-//             delay(5);
-//         }
-//     }
-
-//     DEBUG__________printf("⏱️ Fin descubrimiento: %u dispositivos.\n", (unsigned)discovered.size());
-
-//     // ===== Fase 2: Descarga por NS (unicast) =====
-//     bool huboAltas = false;
-
-//     // Lista de sectores a pedir en orden lógico completo
-//     std::vector<int> sectores;
-//     sectores.reserve(3 + 16*3 + ICON_ROWS);
-
-//     sectores.push_back(ELEM_NAME_SECTOR);
-//     sectores.push_back(ELEM_DESC_SECTOR);
-//     sectores.push_back(ELEM_CMODE_SECTOR);
-
-//     // Añadir los 16 modos: NAME, DESC, FLAG (i = 0..15)
-//     for (int i = 0; i < 16; ++i) {
-//         sectores.push_back(ELEM_MODE_0_NAME_SECTOR + i * 3);
-//         sectores.push_back(ELEM_MODE_0_DESC_SECTOR + i * 3);
-//         sectores.push_back(ELEM_MODE_0_FLAG_SECTOR + i * 3);
-//     }
-
-//     // Por último, las 64 filas del icono
-//     for (int r = 0; r < ICON_ROWS; ++r) {
-//         sectores.push_back(ELEM_ICON_ROW_0_SECTOR + r);
-//     }
-
-//     drawLoadingModalFrame(getTranslation("UPDATING"), frameCountAnim);
-
-//     for (const auto& ns : discovered) {
-//         if (serialExists(ns)) {
-//             DEBUG__________printf("✔ Ya existe en SPIFFS: %s (omitido)\n", nsToStr(ns).c_str());
-//             continue;
-//         }
-
-//         // Una sola instancia reutilizable (stack o estática fuera del bucle)
-//         INFO_PACK_T info;  // si prefieres estática: static INFO_PACK_T info;
-
-//         // Dentro del bucle por cada ns descubierto…
-//         memset(&info, 0, sizeof(info));
-//         info.ID = 0xFF;
-//         info.serialNum[0]=ns.mac01; info.serialNum[1]=ns.mac02; info.serialNum[2]=ns.mac03;
-//         info.serialNum[3]=ns.mac04; info.serialNum[4]=ns.mac05;
-
-//         bool fallos = false;
-//         uint32_t lastAnim2 = millis();
-
-//         for (size_t i=0; i<sectores.size(); ++i) {
-//             const int sector = sectores[i];
-
-//             if (millis() - lastAnim2 >= 33) {
-//                 //drawLoadingModalFrame(getTranslation("UPDATING"), frameCountAnim++);
-//                 actualizarBarraProgreso2((int)(i+1), (int)sectores.size(), getTranslation("UPDATING"));
-//                 lastAnim2 = millis();
-//             }
-
-//             bool ok = false;
-//             for (int attempt = 0; attempt <= kRetriesPerSector && !ok; ++attempt) {
-
-//                 // Unicast por NS — firma EXACTA que usas:
-//                 send_frame(frameMaker_REQ_ELEM_SECTOR(
-//                     DEFAULT_BOTONERA,            // origin (0xDB)
-//                     DEFAULT_DEVICE,              // targetType (0xDD → elemento)
-//                     ns,                          // TARGETNS (MAC 5 bytes)
-//                     (byte)currentLanguage,       // idioma
-//                     (byte)sector                 // sector
-//                 ));
-
-//                 std::vector<uint8_t> payload;
-//                 const uint8_t* nsPtr = reinterpret_cast<const uint8_t*>(&ns);
-//                 if (esperar_respuesta((uint8_t)sector, nsPtr, payload, kSectorTimeoutMs)) {
-//                     if (!procesar_sector_NS(sector, &info, ns, payload.data(), payload.size())) {
-//                     DEBUG__________printf("⚠️ Sector 0x%02X recibido pero no procesado (NS %s)\n",
-//                                         sector, nsToStr(ns).c_str());
-//                 }
-//                     ok = true;
-//                 } else {
-//                     DEBUG__________printf("⏱️ Timeout 0x%02X (NS %s) reint=%d\n",
-//                                           sector, nsToStr(ns).c_str(), attempt+1);
-//                 }
-//                 delay(kInterReqDelayMs);
-//             }
-
-//             if (!ok) { fallos = true; break; }
-//         }
-
-//         if (fallos) {
-//             DEBUG__________printf("❌ Error descargando sectores para NS %s (se omite alta)\n", nsToStr(ns).c_str());
-//             continue;
-//         }
-
-//         if (guardar_elemento(&info)) {
-//             DEBUG__________printf("✅ Guardado en SPIFFS (NS %s)\n", nsToStr(ns).c_str());
-//             huboAltas = true;
-//         } else {
-//             DEBUG__________printf("❌ Error guardando (NS %s)\n", nsToStr(ns).c_str());
-//         }
-//     }
-
-//     scanInProgress = false; // <- MUY importante: volver a flujo normal
-
-//     if (huboAltas) {
-//         loadElementsFromSPIFFS();
-//         DEBUG__________ln("🔄 SPIFFS recargado tras altas.");
-//     }
-
-//     mostrarMensajeTemporal(2, 3000);
-//     DEBUG__________ln("=== ✅ FIN ESCANEO DE SALA (NS) ===");
-// }
-
-
 // Función para mostrar texto multilínea ajustado al ancho máximo sin romper palabras
-
 void BOTONERA_::iniciarEscaneoElemento(const char* mensajeInicial) {
     tft.fillScreen(TFT_BLACK);      // limpia TODO (solo aquí)
     //dibujarMarco(TFT_WHITE);        // marco fijo

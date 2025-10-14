@@ -12,6 +12,8 @@
 #include <microphone_DMS/microphone_DMS.h>
 #include <play_DMS/play_DMS.h>
 #include <RelayManager_DMS/RelayStateManager.h>
+#include <Pulsadores_handler/Pulsadores_handler.h>
+
 //testing MARC 2
 //testing 2 3 4
 //testing 3
@@ -95,8 +97,6 @@ bool COLORHANDLER_::color_mix_handler(int color1, int color2, byte *resultado) {
     }
 }
 
-
-
 COLORHANDLER_::COLORHANDLER_() : leds(nullptr), numLeds(0){}
 
 void COLORHANDLER_::begin(int numLeds) {
@@ -170,10 +170,25 @@ void COLORHANDLER_::welcomeEffect() {
 }
 #endif
 
+
+void COLORHANDLER_::setAllButtonsActive(bool val) {
+    bool mask[9];
+    for (int i = 0; i < 9; ++i) mask[i] = val;
+    PulsadoresHandler::setButtonActiveMask(mask);
+}
+
+void COLORHANDLER_::syncButtonsWithLEDs() {
+    bool mask[9] = {false,false,false,false,false,false,false,false,false};
+    const int n = min(9, this->numLeds);
+    for (int i = 0; i < n; ++i) {
+        mask[i] = !isBlack(this->leds[i]);
+    }
+    PulsadoresHandler::setButtonActiveMask(mask);
+}
+
 void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager) {
   ledManager.clearEffects(); // Limpiar efectos dinámicos previos
   /*────────────────  COMUNICADOR · elemento sólo-relé  ────────────────*/
-    /*────────────────  COMUNICADOR · elemento sólo-relé  ────────────────*/
   if (currentFile == "Comunicador") {
       extern TARGETNS communicatorActiveNS;   // NS del dispositivo activo
       if (memcmp(&communicatorActiveNS, &NS_ZERO, sizeof(TARGETNS)) != 0) {
@@ -188,6 +203,7 @@ void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager)
                   ledManager.clearEffects();
                   ledManager.addEffect(new FadeEffect(*this, 0, CRGB::Blue, CRGB::Cyan, 50));
                   leds[8] = CRGB::Blue;
+                  this->syncButtonsWithLEDs();
                   FastLED.show();
                   return;
               }
@@ -225,7 +241,7 @@ void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager)
           ledManager.addEffect(new FadeEffect(*this, 0, CRGB::Blue, CRGB::Cyan, 50));
           leds[8] = CRGB::White;
       }
-
+      this->syncButtonsWithLEDs();
       FastLED.show();
       return;
   }
@@ -284,7 +300,8 @@ void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager)
   } else {
       leds[0] = CRGB::Black;
   }
-
+  
+  this->syncButtonsWithLEDs();
   FastLED.show();
 }
 
@@ -303,18 +320,19 @@ void COLORHANDLER_::mapCognitiveLEDs() {
 
 CRGB COLORHANDLER_::colorFromIndex(uint8_t idx) const {
   switch (idx) {
-    case 0:  return CRGB(0,0,0);       // Negro / off
-    case 1:  return CRGB(255,0,0);     // Rojo
-    case 2:  return CRGB(0,255,0);     // Verde
-    case 3:  return CRGB(255,255,0);   // Amarillo
-    case 4:  return CRGB(255,255,255); // Blanco
-    case 5:  return CRGB(0,0,255);     // Azul  (← tu “05”)
-    case 6:  return CRGB(128,0,255);   // Violeta
-    case 7:  return CRGB(255,128,0);   // Naranja
-    case 8:  return CRGB(0,255,255);   // Celeste/cyan
-    default: return CRGB(0,0,0);
+    case 0:  return CRGB(255, 255, 170); // Blanco cálido
+    case 1:  return CRGB(255, 155, 0);   // Amarillo
+    case 2:  return CRGB(255, 89, 0);    // Naranja
+    case 3:  return CRGB(255, 0, 0);     // Rojo
+    case 4:  return CRGB(255, 0, 210);   // Violeta
+    case 5:  return CRGB(0, 0, 255);     // Azul
+    case 6:  return CRGB(0, 255, 200);   // Celeste verdoso
+    case 7:  return CRGB(0, 255, 0);     // Verde
+    case 8:  return CRGB(0, 0, 0);       // Negro / apagado
+    default: return CRGB(0, 0, 0);
   }
 }
+
 
 
 
