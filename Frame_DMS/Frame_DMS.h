@@ -132,7 +132,10 @@ enum BTN_FX : uint8_t {
     STROBE,              // Estroboscópico
     COLOR_WIPE,          // Barrido de color
     THEATER_CHASE,        // Persecución teatral
-    RELAY_FX
+    RELAY_FX,
+    LOADING,
+    LOADING_CIRCULAR,
+    LOADING_LINEAL
 };
 
 static constexpr uint8_t BTN_RGB_DIRECT = 0x80;  

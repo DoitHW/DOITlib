@@ -190,7 +190,7 @@ void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager)
   ledManager.clearEffects(); // Limpiar efectos dinámicos previos
   /*────────────────  COMUNICADOR · elemento sólo-relé  ────────────────*/
   if (currentFile == "Comunicador") {
-      extern TARGETNS communicatorActiveNS;   // NS del dispositivo activo
+      TARGETNS communicatorActiveNS;   // NS del dispositivo activo
       if (memcmp(&communicatorActiveNS, &NS_ZERO, sizeof(TARGETNS)) != 0) {
           uint8_t cfg[2] = {0};
           if (RelayStateManager::getModeConfigForNS(communicatorActiveNS, cfg)) {

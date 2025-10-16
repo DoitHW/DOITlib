@@ -849,14 +849,25 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
                 ledManager.clearEffects();
 
                 // Color base: primero activo (RGB directo si está)
+                // CRGB base = CRGB::White;
+                // bool found = false;
+                // for (int i = 0; i < 9 && !found; ++i) {
+                //     if (!btn[i].active) continue;
+                //     base = btn[i].base;
+                //     found = true;
+                // }
+                // if (!found) base = CRGB::White;
+
                 CRGB base = CRGB::White;
                 bool found = false;
-                for (int i = 0; i < 9 && !found; ++i) {
-                    if (!btn[i].active) continue;
-                    base = btn[i].base;
-                    found = true;
+                for (int i = 0; i < 9; ++i) {
+                    const CRGB c = btn[i].base;
+                    if (c.r || c.g || c.b) { // primer color distinto de negro
+                        base = c;
+                        found = true;
+                        break;
+                    }
                 }
-                if (!found) base = CRGB::White;
 
                 // Defaults “suaves”
                 auto addWaveAll = [&](unsigned ms) {
@@ -871,60 +882,78 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
                         fill_solid(colorHandler.leds, colorHandler.numLeds, base);
                         break;
                     }
-                    case BTN_FX::SLOW_WAVE:   addWaveAll(80);  break;
-                    case BTN_FX::FAST_WAVE:   addWaveAll(20);  break;
+
+                    case BTN_FX::SLOW_WAVE: addWaveAll(80); break;
+                    case BTN_FX::FAST_WAVE: addWaveAll(20); break;
+
                     case BTN_FX::RAINBOWLOOP: {
                         unsigned ms = 20;
                         for (int i = 0; i < colorHandler.numLeds; ++i)
                             ledManager.addEffect(new RainbowLoopEffect(colorHandler, i, uint8_t(i * 21), ms));
                         break;
                     }
+
                     case BTN_FX::BUBBLES_FX: {
-                        // Si no tienes “global bubbles”, usa brillo base y destellos
-                        unsigned ms = 30; uint8_t dens = 28;
-                        ledManager.addEffect(new SparkleGlobalEffect(colorHandler, base, ms, dens, /*fade*/40));
+                        // Nuevo efecto global específico de "burbujas" (no Sparkle)
+                        unsigned ms = 30; uint8_t dens = 28; uint8_t fade = 40;
+                        ledManager.addEffect(new BubblesGlobalEffect(colorHandler, base, ms, dens, fade));
+                        // Base como “llenado” suave para que se vea ambiente
                         fill_solid(colorHandler.leds, colorHandler.numLeds, base);
                         break;
                     }
-                    case BTN_FX::BREATHING:   addWaveAll(80);  break;
+
+                    case BTN_FX::BREATHING: {
+                        // Breathing distinto de Wave: fundidos base <-> negro
+                        for (int i = 0; i < colorHandler.numLeds; ++i)
+                            ledManager.addEffect(new FadeEffect(colorHandler, i, base, CRGB::Black, /*period*/80));
+                        break;
+                    }
+
                     case BTN_FX::FIRE: {
                         unsigned ms = 25;
                         ledManager.addEffect(new FireGlobalEffect(colorHandler, ms));
                         break;
                     }
+
                     case BTN_FX::SPARKLE: {
-                        unsigned ms = 16; uint8_t dens = 64;
-                        ledManager.addEffect(new SparkleGlobalEffect(colorHandler, base, ms, dens, /*fade*/40));
+                        unsigned ms = 16; uint8_t dens = 64; uint8_t fade = 40;
+                        ledManager.addEffect(new SparkleGlobalEffect(colorHandler, base, ms, dens, fade));
                         fill_solid(colorHandler.leds, colorHandler.numLeds, base);
                         break;
                     }
+
                     case BTN_FX::COMET: {
                         static const uint8_t kPath[9] = {8,6,4,2,0,1,3,5,7};
                         unsigned ms = 18;
                         ledManager.addEffect(new CometTrailEffect(colorHandler, kPath, 9, base, ms, /*decay*/100));
                         break;
                     }
+
                     case BTN_FX::PLASMA: {
                         unsigned ms = 16;
                         ledManager.addEffect(new PlasmaNoiseEffect(colorHandler, base, ms));
                         break;
                     }
+
                     case BTN_FX::HEARTBEAT: {
                         for (int i = 0; i < colorHandler.numLeds; ++i)
                             ledManager.addEffect(new HeartbeatEffect(colorHandler, i, base, /*ms*/28));
                         fill_solid(colorHandler.leds, colorHandler.numLeds, base);
                         break;
                     }
+
                     case BTN_FX::AURORA_FX: {
                         unsigned ms = 30;
                         ledManager.addEffect(new AuroraGlobalEffect(colorHandler, base, ms));
                         break;
                     }
+
                     case BTN_FX::STROBE: {
                         unsigned ms = 8;
                         ledManager.addEffect(new StrobeGlobalEffect(colorHandler, base, ms, /*flashes*/3, /*gapMs*/120));
                         break;
                     }
+
                     case BTN_FX::COLOR_WIPE: {
                         static const uint8_t kOrder[9] = {8,6,4,2,0,1,3,5,7};
                         unsigned ms = 30;
@@ -932,12 +961,41 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
                         ledManager.addEffect(new ColorWipeGlobalEffect(colorHandler, kOrder, 9, base, ms));
                         break;
                     }
+
                     case BTN_FX::THEATER_CHASE: {
                         unsigned ms = 20;
                         ledManager.addEffect(new TheaterChaseGlobalEffect(colorHandler, base, ms, /*spacing*/3));
                         break;
                     }
-        
+
+                    case BTN_FX::LOADING: {
+                    // Punto que recorre de izq -> dcha cíclicamente con pequeña cola
+                    // Velocidad sugerida: ~40 ms/step (ajustable)
+                    const unsigned periodMs = 40;
+                    const uint8_t  trailLen = 2;   // nº de LEDs de “cola”
+                    const uint8_t  baseDim  = 16;  // brillo ambiente del fondo (0=negro)
+
+                    ledManager.addEffect(new LoadingGlobalEffect(colorHandler, base, periodMs, trailLen, baseDim));
+                    break;
+                    }
+
+                    case BTN_FX::LOADING_CIRCULAR: {
+                        constexpr uint8_t PATH_CIRCULAR[9] = { 8, 6, 4, 2, 0, 1, 3, 5, 7 };
+                        Serial.println("LOADING_CIRCULAR");
+                        unsigned periodMs = 100;
+                        LoadingEffect::configurePath(PATH_CIRCULAR, sizeof(PATH_CIRCULAR));
+                        ledManager.addEffect(new LoadingEffect(colorHandler, base, periodMs));
+                        break;
+                    }
+
+                    case BTN_FX::LOADING_LINEAL: {
+                        constexpr uint8_t PATH_LINEAL[9]   = { 8, 6, 4, 2, 0, 7, 5, 3, 1 };
+                        Serial.println("LOADING_LINEAL");
+                        unsigned periodMs = 100;
+                        LoadingEffect::configurePath(PATH_LINEAL, sizeof(PATH_LINEAL));
+                        ledManager.addEffect(new LoadingEffect(colorHandler, base, periodMs));
+                        break;
+                    }
                     default:
                         // Desconocido => sólido
                         fill_solid(colorHandler.leds, colorHandler.numLeds, base);
@@ -959,80 +1017,91 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
                 const BTN_FX   fx   = static_cast<BTN_FX>(btn[ledIdx].fx);
 
                 switch (fx) {
-                    case BTN_FX::NO_FX:      // trata NO_FX como sólido
-                    case BTN_FX::SOLID:
+                    case BTN_FX::NO_FX:
+                    case BTN_FX::SOLID: {
                         colorHandler.leds[ledIdx] = base;
                         break;
+                    }
 
-                    case BTN_FX::SLOW_WAVE:
+                    case BTN_FX::SLOW_WAVE: {
                         ledManager.addEffect(new WaveEffect(colorHandler, ledIdx, base, /*ms*/60));
-                        colorHandler.leds[ledIdx] = base;
                         break;
+                    }
 
-                    case BTN_FX::FAST_WAVE:
+                    case BTN_FX::FAST_WAVE: {
                         ledManager.addEffect(new WaveEffect(colorHandler, ledIdx, base, /*ms*/20));
-                        colorHandler.leds[ledIdx] = base;
                         break;
+                    }
 
-                    case BTN_FX::RAINBOWLOOP:
+                    case BTN_FX::RAINBOWLOOP: {
                         ledManager.addEffect(new RainbowLoopEffect(colorHandler, ledIdx, /*startHue*/uint8_t(ledIdx*21), /*ms*/20));
                         break;
+                    }
 
-                    case BTN_FX::BUBBLES_FX:
+                    case BTN_FX::BUBBLES_FX: {
+                        // Burbujas por LED (chisporroteo suave local)
                         ledManager.addEffect(new BubblesEffect(colorHandler, ledIdx, base, /*tick*/40, /*dens*/28));
-                        colorHandler.leds[ledIdx] = base;
                         break;
+                    }
 
-                    case BTN_FX::BREATHING:
-                        ledManager.addEffect(new WaveEffect(colorHandler, ledIdx, base, /*ms*/80));
-                        colorHandler.leds[ledIdx] = base;
+                    case BTN_FX::BREATHING: {
+                        // Breathing local con fundido al negro (diferente de Wave)
+                        ledManager.addEffect(new FadeEffect(colorHandler, ledIdx, base, CRGB::Black, /*period*/80));
                         break;
+                    }
 
                     case BTN_FX::FIRE: {
-                        CRGB warm = base; warm.g = qadd8(warm.g, warm.r >> 2); warm.b >>= 2;
-                        ledManager.addEffect(new BubblesEffect(colorHandler, ledIdx, warm, /*tick*/25, /*dens*/50));
-                        colorHandler.leds[ledIdx] = warm;
+                        // Nuevo: vela realista por LED (no Bubbles)
+                        CRGB warm = base; 
+                        warm.g = qadd8(warm.g, warm.r >> 2); 
+                        warm.b >>= 2;
+                        ledManager.addEffect(new CandleFlickerEffect(colorHandler, ledIdx, warm, /*tick*/22));
                         break;
                     }
 
                     case BTN_FX::SPARKLE: {
-                        CRGB spark = base; spark.r=qadd8(spark.r,100); spark.g=qadd8(spark.g,100); spark.b=qadd8(spark.b,100);
-                        ledManager.addEffect(new BubblesEffect(colorHandler, ledIdx, spark, /*tick*/16, /*dens*/64));
-                        colorHandler.leds[ledIdx] = spark;
+                        // Nuevo: chispa local sobre el pixel (no Bubbles)
+                        ledManager.addEffect(new SparkleLocalEffect(colorHandler, ledIdx, base, /*tick*/16));
                         break;
                     }
 
-                    case BTN_FX::COMET:
-                        ledManager.addEffect(new ColorWipeEffect(colorHandler, ledIdx, base, /*ms*/18, /*fill*/false));
-                        colorHandler.leds[ledIdx] = base;
+                    case BTN_FX::COMET: {
+                        // Nuevo: “paso de cometa” local (pulso con decaimiento)
+                        ledManager.addEffect(new CometLocalEffect(colorHandler, ledIdx, base, /*period*/18, /*decay*/100));
                         break;
+                    }
 
-                    case BTN_FX::PLASMA:
-                        ledManager.addEffect(new RainbowLoopEffect(colorHandler, ledIdx, uint8_t(ledIdx*21), /*ms*/12));
+                    case BTN_FX::PLASMA: {
+                        // Nuevo: ruido local con tinte base
+                        ledManager.addEffect(new PlasmaLocalEffect(colorHandler, ledIdx, base, /*tick*/12));
                         break;
+                    }
 
-                    case BTN_FX::HEARTBEAT:
+                    case BTN_FX::HEARTBEAT: {
                         ledManager.addEffect(new HeartbeatEffect(colorHandler, ledIdx, base, /*ms*/28));
-                        colorHandler.leds[ledIdx] = base;
                         break;
+                    }
 
-                    case BTN_FX::AURORA_FX:
+                    case BTN_FX::AURORA_FX: {
                         ledManager.addEffect(new AuroraEffect(colorHandler, ledIdx, base, CRGB::Cyan, /*ms*/35));
                         break;
+                    }
 
-                    case BTN_FX::STROBE:
+                    case BTN_FX::STROBE: {
                         ledManager.addEffect(new StrobeEffect(colorHandler, ledIdx, base, /*updateMs*/12, /*flashes*/3));
                         break;
+                    }
 
-                    case BTN_FX::COLOR_WIPE:
+                    case BTN_FX::COLOR_WIPE: {
+                        // “relleno” del pixel con rampa
                         ledManager.addEffect(new ColorWipeEffect(colorHandler, ledIdx, base, /*ms*/40, /*fill*/true));
-                        colorHandler.leds[ledIdx] = base;
                         break;
+                    }
 
-                    case BTN_FX::THEATER_CHASE:
+                    case BTN_FX::THEATER_CHASE: {
                         ledManager.addEffect(new TheaterChaseEffect(colorHandler, ledIdx, base, /*ms*/35, /*spacing*/3));
-                        colorHandler.leds[ledIdx] = base;
                         break;
+                    }
 
                     case BTN_FX::RELAY_FX: {
                         if (ledIdx == 0) {
@@ -1048,7 +1117,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
             //    - Si el ORIGEN del frame es DC (consola): NS = 00:00:00:00:00
             //    - Si el ORIGEN es DD (dispositivo): usar su NS (el del origen)
             uint8_t originType = LEF.origin;           // el tipo que envió la trama
-            //TARGETNS originNS  = LEF.originNS;         // NS del que la envió (si es DC lo ignoraremos)
+            //TARGETNS originNS  = LEF.originNS;       // NS del que la envió (si es DC lo ignoraremos)
             TARGETNS respNS;
             if (originType == DEFAULT_CONSOLE || originType == DEFAULT_BOTONERA) {
                 respNS = TARGETNS{0,0,0,0,0};

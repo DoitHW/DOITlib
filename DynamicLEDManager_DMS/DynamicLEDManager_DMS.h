@@ -270,6 +270,93 @@ private:
     uint16_t z; CRGB tintCol;
 };
 
+class CandleFlickerEffect : public DynamicEffect {
+public:
+    CandleFlickerEffect(COLORHANDLER_& h, int index, CRGB warm, unsigned int tickMs)
+    : DynamicEffect(h, index, tickMs), base(warm), phase(0) {}
+    void update() override;
+private:
+    CRGB base;
+    uint8_t phase;
+};
+
+class SparkleLocalEffect : public DynamicEffect {
+public:
+    SparkleLocalEffect(COLORHANDLER_& h, int index, CRGB tint, unsigned int tickMs)
+    : DynamicEffect(h, index, tickMs), base(tint), hold(0) {}
+    void update() override;
+private:
+    CRGB base;
+    uint8_t hold; // frames a mantener el destello
+};
+
+class CometLocalEffect : public DynamicEffect {
+public:
+    CometLocalEffect(COLORHANDLER_& h, int index, CRGB head, unsigned int periodMs, uint8_t decay)
+    : DynamicEffect(h, index, periodMs), headColor(head), t(0), decayPct(decay) {}
+    void update() override;
+private:
+    CRGB headColor;
+    uint8_t t;        // fase 0..255
+    uint8_t decayPct; // decaimiento del pulso
+};
+
+class PlasmaLocalEffect : public DynamicEffect {
+public:
+    PlasmaLocalEffect(COLORHANDLER_& h, int index, CRGB tint, unsigned int tickMs)
+    : DynamicEffect(h, index, tickMs), base(tint), t(0) {}
+    void update() override;
+private:
+    CRGB base;
+    uint8_t t;
+};
+
+class BubblesGlobalEffect : public DynamicEffect {
+public:
+    BubblesGlobalEffect(COLORHANDLER_& h, CRGB tint, unsigned int tickMs, uint8_t density, uint8_t fade)
+    : DynamicEffect(h, -1, tickMs), base(tint), dens(density), fadeAmt(fade) {}
+    void update() override;
+private:
+    CRGB base;
+    uint8_t dens;
+    uint8_t fadeAmt;
+};
+
+class LoadingGlobalEffect : public DynamicEffect {
+public:
+    LoadingGlobalEffect(COLORHANDLER_& h, CRGB tint, unsigned int tickMs, uint8_t trail, uint8_t baseDim)
+    : DynamicEffect(h, -1, tickMs), base(tint), pos(0), trailLen(trail), ambientDim(baseDim) {}
+
+    void update() override;
+
+private:
+    CRGB base;           // color del punto/cola
+    int  pos;            // posición actual del “cabeza”
+    uint8_t trailLen;    // longitud de cola
+    uint8_t ambientDim;  // intensidad ambiente de fondo (0..255)
+};
+
+class LoadingEffect : public DynamicEffect {
+public:
+    LoadingEffect(COLORHANDLER_& h, CRGB tint, unsigned int tickMs)
+    : DynamicEffect(h, -1, tickMs), base(tint), step(0), prevLogical(255) {}
+
+    void update() override;
+
+    // Configura el path global (válido para la única instancia activa)
+    static void configurePath(const uint8_t* path, uint8_t len);
+
+private:
+    CRGB base;
+    uint8_t step;
+    uint8_t prevLogical; // último LED encendido (para apagar solo ese)
+
+    // Path global y su longitud (compartidos por la única instancia activa)
+    static uint8_t kPath[16];   // capacidad máxima (ajústala a tus necesidades)
+    static uint8_t kPathLen;    // longitud efectiva del path
+};
+
+
 
 // Declaración externa del manager (si ya la usas en otros módulos)
 extern DynamicLEDManager ledManager;

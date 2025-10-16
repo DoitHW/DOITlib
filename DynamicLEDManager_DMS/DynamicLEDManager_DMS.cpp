@@ -608,3 +608,185 @@ void PlasmaNoiseEffect::update() {
     }
 }
 
+void CandleFlickerEffect::update() {
+    unsigned long now = millis();
+    if (now - lastUpdate < interval) return;
+    lastUpdate = now;
+
+    phase += random8(18, 36);                 // jitter de fase
+    uint8_t jitter = qadd8(sin8(phase), random8(0, 80));
+    uint8_t level  = ease8InOutCubic(jitter); // 0..255 suavizado
+
+    CRGB out = base;
+    out.nscale8(140 + (level >> 1));          // 140..255 brillo
+    if (ledIndex >= 0 && colorHandler.leds && ledIndex < colorHandler.numLeds) {
+        colorHandler.leds[ledIndex] = out;
+    }
+}
+
+void SparkleLocalEffect::update() {
+    unsigned long now = millis();
+    if (now - lastUpdate < interval) return;
+    lastUpdate = now;
+
+    if (ledIndex < 0 || !colorHandler.leds || ledIndex >= colorHandler.numLeds) return;
+
+    CRGB out = base;
+    if (hold) {
+        // mantener destello
+        out = CRGB::White; 
+        hold--;
+    } else if (random8() < 18) { // probabilidad de chispa
+        out = CRGB::White;
+        hold = 2;                // 2 ticks de brillo
+    }
+    colorHandler.leds[ledIndex] = out;
+}
+
+void CometLocalEffect::update() {
+    unsigned long now = millis();
+    if (now - lastUpdate < interval) return;
+    lastUpdate = now;
+
+    if (ledIndex < 0 || !colorHandler.leds || ledIndex >= colorHandler.numLeds) return;
+
+    t += 10; // avanza fase
+    // Pulso asimétrico (cabeza pasa y decae)
+    uint8_t head = triwave8(t);              // 0..255
+    uint8_t tail = scale8(head, 255 - decayPct);
+    CRGB out = headColor;
+    out.nscale8(qadd8(32, head));            // 32..255
+
+    // “cola” simulada bajando a negro
+    out.fadeToBlackBy(255 - tail);
+    colorHandler.leds[ledIndex] = out;
+}
+
+void PlasmaLocalEffect::update() {
+    unsigned long now = millis();
+    if (now - lastUpdate < interval) return;
+    lastUpdate = now;
+
+    if (ledIndex < 0 || !colorHandler.leds || ledIndex >= colorHandler.numLeds) return;
+
+    t += 7;
+    uint8_t n = inoise8(t*3, ledIndex*37);
+    // Modula saturación/valor sobre el tinte base
+    CHSV hsv = rgb2hsv_approximate(base);
+    hsv.s = qadd8(hsv.s, n>>2);
+    hsv.v = qadd8(hsv.v, n>>1);
+    colorHandler.leds[ledIndex] = hsv;
+}
+
+void BubblesGlobalEffect::update() {
+    unsigned long now = millis();
+    if (now - lastUpdate < interval) return;
+    lastUpdate = now;
+
+    if (!colorHandler.leds || colorHandler.numLeds <= 0) return;
+
+    // Decae toda la tira hacia el color base
+    for (int i = 0; i < colorHandler.numLeds; ++i) {
+        // mezcla suave hacia base y un pequeño fade
+        colorHandler.leds[i].nscale8(255 - fadeAmt);
+        CRGB scaled = base;
+        scaled.nscale8(32);  // atenúa el color base
+        colorHandler.leds[i] += scaled;
+        // “ambiente” del tinte
+    }
+
+    // Genera burbujas (píxeles que suben rápido y se disipan)
+    for (uint8_t k = 0; k < dens; ++k) {
+        int p = random16(colorHandler.numLeds);
+        colorHandler.leds[p] += CRGB(40, 40, 40); // destello
+        // leve “pop” adicional
+        if (random8() < 32) {
+            colorHandler.leds[p] += CRGB(30, 30, 30);
+        }
+    }
+
+    FastLED.show();
+}
+
+void LoadingGlobalEffect::update() {
+    unsigned long now = millis();
+    if (now - lastUpdate < interval) return;
+    lastUpdate = now;
+
+    if (!colorHandler.leds || colorHandler.numLeds <= 0) return;
+
+    const int N = colorHandler.numLeds;
+
+    // 1) Fondo ambiente tenue (mezcla al “base” muy atenuado)
+    for (int i = 0; i < N; ++i) {
+        // Baja brillo actual ligeramente para evitar “fantasmas”
+        colorHandler.leds[i].nscale8(240);  // fade suave del frame anterior
+
+        // añade un “ambiente” basado en base
+        if (ambientDim > 0) {
+            CRGB amb = base;
+            amb.nscale8(ambientDim);        // ambiente bajo (p.e. 16/255)
+            colorHandler.leds[i] += amb;
+        }
+    }
+
+    // 2) Cabeza del “loading”
+    int head = pos % N;
+    colorHandler.leds[head] = base;  // cabeza al color pleno
+
+    // 3) Cola decreciente (pos-1, pos-2, ...), wrap en los extremos
+    uint8_t level = 180; // brillo inicial de la primera cola
+    for (uint8_t t = 1; t <= trailLen; ++t) {
+        int p = head + t;
+        if (p >= N) p -= N;
+        CRGB c = base;
+        c.nscale8(level);              // atenuación por segmento de cola
+        colorHandler.leds[p] = c;
+        // cae exponencialmente la cola
+        level = scale8(level, 150);    // ~60% del anterior
+    }
+
+    // 4) Avanza la posición (izq -> dcha, cíclico)
+    pos--;
+    if (pos < 0 ) pos = N - 1;
+}
+
+uint8_t LoadingEffect::kPath[16] = {0};
+uint8_t LoadingEffect::kPathLen  = 0;
+
+void LoadingEffect::configurePath(const uint8_t* path, uint8_t len) {
+    if (!path || len == 0) {
+        kPathLen = 0;
+        return;
+    }
+    if (len > sizeof(kPath)) len = sizeof(kPath);
+    for (uint8_t i = 0; i < len; ++i) kPath[i] = path[i];
+    kPathLen = len;
+}
+
+void LoadingEffect::update() {
+    const unsigned long now = millis();
+    if (now - lastUpdate < interval) return;
+    lastUpdate = now;
+
+    if (!colorHandler.leds || colorHandler.numLeds <= 0 || kPathLen == 0) return;
+
+    const int N = colorHandler.numLeds;
+
+    // 1) Apaga solo el LED anterior si era válido
+    if (prevLogical != 255 && prevLogical < N) {
+        colorHandler.leds[prevLogical] = CRGB::Black;
+    }
+
+    // 2) Enciende el LED actual según el path
+    const uint8_t logical = kPath[step % kPathLen];
+    if (logical < N) {
+        colorHandler.leds[logical] = base;
+        prevLogical = logical;
+    } else {
+        prevLogical = 255; // índice fuera de rango
+    }
+
+    // 3) Avanza paso
+    step = (step + 1) % kPathLen;
+}
