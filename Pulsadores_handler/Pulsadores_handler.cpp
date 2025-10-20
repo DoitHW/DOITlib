@@ -110,24 +110,6 @@ bool PulsadoresHandler::isButtonPressed(byte color) {
     return false; // ← faltaba: si no se encontró pulsado, devolver false
 }
 
-
-// bool PulsadoresHandler::isButtonPressed(byte color) {
-//     for (int i = 0; i < FILAS; i++) {
-//         digitalWrite(filas[i], LOW); // Activamos la fila
-//         delayMicroseconds(1); // Pequeña pausa para asegurar estabilidad en la lectura
-        
-//         for (int j = 0; j < COLUMNAS; j++) {
-//             if (pulsadorColor[i][j] == color && digitalRead(columnas[j]) == LOW) {
-//                 digitalWrite(filas[i], HIGH); // Restauramos la fila antes de salir
-//                 return true; // Se encontró el botón presionado
-//             }
-//         }
-        
-//         digitalWrite(filas[i], HIGH); // Restauramos la fila antes de continuar
-//     }
-//     return false; // Ningún botón con ese color está presionado
-// }
-
 void PulsadoresHandler::procesarPulsadores() {
     
     auto isNSZero = [](const TARGETNS& ns) -> bool {
@@ -135,15 +117,16 @@ void PulsadoresHandler::procesarPulsadores() {
     };
     // Target por defecto: BROADCAST
     uint8_t  targetType = 0xFF;   // BROADCAST
-    TARGETNS targetNS   = NS_ZERO;
+    TARGETNS targetNS   = getOwnNS();
 
     String currentFile = elementFiles[currentIndex];
     const bool respMode = PulsadoresHandler::isResponseRouteActive();
-    
+    const bool noInputGlobal = PulsadoresHandler::isGlobalFxNoInput();
+
     /*───────────────────────────
       1) MODO COGNITIVO (Consola)
     ───────────────────────────*/
-    if (inCognitiveMenu) {
+    if (inCognitiveMenu && !respMode && !noInputGlobal) {
         static bool lastState[FILAS][COLUMNAS] = { { false } };
 
         for (int i = 0; i < FILAS; i++) {
@@ -166,7 +149,7 @@ void PulsadoresHandler::procesarPulsadores() {
                         (communicatorActiveNS.mac01==0 && communicatorActiveNS.mac02==0 &&
                         communicatorActiveNS.mac03==0 && communicatorActiveNS.mac04==0 &&
                         communicatorActiveNS.mac05==0);
-                    // En modo respuesta o en Comunicador→broadcast no bloqueamos el evento
+                   
                     if (!(respMode || communicatorBroadcast)) {
                         currentPressed = false;
                     }
@@ -175,7 +158,7 @@ void PulsadoresHandler::procesarPulsadores() {
       
                 // Objetivo: CONSOLA
                 targetType = DEFAULT_CONSOLE; // 0xDC
-                targetNS   = NS_ZERO;         // NS cero para no-dispositivo
+                targetNS   = getOwnNS();      
 
                 if (!lastState[i][j] && currentPressed) {
                     processButtonEvent(i, j, BUTTON_PRESSED, /*hasPulse*/true, /*hasPassive*/false, /*hasRelay*/true,
@@ -209,8 +192,8 @@ void PulsadoresHandler::procesarPulsadores() {
     ───────────────────────────*/
     if (respMode) {
         // En modo respuesta el destino lo fija processButtonEvent(F_SEND_RESPONSE)
-        targetType = BROADCAST;
-        targetNS   = NS_ZERO;
+        targetType = PulsadoresHandler::getResponseTargetType();
+        targetNS   = getOwnNS();
     } else if (!isFichas) {
         if (currentFile == "Ambientes") {
             bool ambientesSeleccionado = false;
@@ -237,8 +220,6 @@ void PulsadoresHandler::procesarPulsadores() {
             targetNS   = getCurrentElementNS();
         }
     } // (si isFichas, el target se resuelve en su flujo propio)
-
-
 
     /*───────────────────────────
     4) Flags del modo actual (del TARGET real)
@@ -330,7 +311,10 @@ void PulsadoresHandler::procesarPulsadores() {
         for (int j = 0; j < COLUMNAS; j++) {
             bool currentPressed = (digitalRead(columnas[j]) == LOW);
             byte color         = pulsadorColor[i][j];
-
+            
+            if (noInputGlobal) {                                          // <-- Nueva línea
+                currentPressed = false;                                   // <-- Nueva línea
+            } 
             // === Filtrado por máscara 'active' ===
             int ledIdxGate = colorToLedIdx(color);
             if (ledIdxGate >= 0 && !isButtonEnabled(ledIdxGate)) {
@@ -356,6 +340,8 @@ void PulsadoresHandler::procesarPulsadores() {
 
             if (!lastState[i][j] && currentPressed) {
             if (respMode) {
+                targetType = PulsadoresHandler::getResponseTargetType(); // <-- Nueva línea
+                targetNS   = getOwnNS();     
                 // En modo respuesta, siempre disparamos evento (flags no se usan en la rama 1-bis)
                 processButtonEvent(i, j, BUTTON_PRESSED, /*hasPulse*/false, /*hasPassive*/false, /*hasRelay*/false,
                                 targetType, targetNS);
@@ -369,6 +355,8 @@ void PulsadoresHandler::procesarPulsadores() {
         }
         if (lastState[i][j] && !currentPressed) {
             if (respMode) {
+                targetType = PulsadoresHandler::getResponseTargetType();   // <-- Nueva línea
+                targetNS   = getOwnNS();  
                 processButtonEvent(i, j, BUTTON_RELEASED, /*hasPulse*/false, /*hasPassive*/false, /*hasRelay*/false,
                                 targetType, targetNS);
             } else if (isFichas) {
@@ -491,18 +479,19 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
     };
 
     // ──────────────────────────────────────
-    // 0) Menú Cognitivo → siempre a CONSOLA
+    // 0) Menú Cognitivo → PRIORIDAD EXTMAP (respMode)
     // ──────────────────────────────────────
-    if (inCognitiveMenu) {
+    if (inCognitiveMenu && !PulsadoresHandler::isResponseRouteActive()) { 
         if (event == BUTTON_PRESSED) {
             if (buttonColor != RELAY) {
-                send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, DEFAULT_CONSOLE, NS_ZERO, buttonColor));
+                send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, DEFAULT_CONSOLE, getOwnNS(), buttonColor));
             }
         } else if (event == BUTTON_RELEASED && buttonColor == RELAY) {
-            send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, DEFAULT_CONSOLE, NS_ZERO, 0x01));
+            send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, DEFAULT_CONSOLE, getOwnNS(), 0x01));
         }
         return;
     }
+
 
     // 1) Fichas no se procesan aquí
     if (currentFile == "Fichas")
@@ -523,14 +512,10 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
         const uint8_t response = ledIdxToButtonId((uint8_t)ledIdx);
         if (response == 0) return;
 
-        FRAME_T fr = frameMaker_SEND_RESPONSE(
-            DEFAULT_BOTONERA,
-            s_respTargetType,
-            s_respTargetNS,
-            response
-        );
-        send_frame(fr);
-        return; // ← no continuar con la lógica estándar
+        send_frame(frameMaker_SEND_RESPONSE(DEFAULT_BOTONERA, s_respTargetType, getOwnNS(), response));
+
+    return; // ← no continuar con la lógica estándar
+
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -1432,3 +1417,20 @@ bool PulsadoresHandler::isResponseRouteActive(){
     return s_responseModeEnabled;
 }
 
+uint8_t PulsadoresHandler::getResponseTargetType() {      
+    return s_respTargetType;                              
+}                             
+
+TARGETNS PulsadoresHandler::getResponseTargetNS() {       
+    return s_respTargetNS;                                
+} 
+
+bool PulsadoresHandler::s_globalFxNoInput = false;          // <-- Nueva línea
+
+void PulsadoresHandler::setGlobalFxNoInput(bool enable) {   // <-- Nueva línea
+    s_globalFxNoInput = enable;                              // <-- Nueva línea
+}                                                            // <-- Nueva línea
+
+bool PulsadoresHandler::isGlobalFxNoInput() {               // <-- Nueva línea
+    return s_globalFxNoInput;                                // <-- Nueva línea
+}                                                            // <-- Nueva línea

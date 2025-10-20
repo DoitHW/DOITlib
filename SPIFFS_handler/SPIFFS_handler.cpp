@@ -712,6 +712,18 @@ bool nsExistsInSPIFFS(const TARGETNS& ns) {
     return false;
 }
 
+// --- NS/MAC propia de la BOTONERA ---
+static TARGETNS s_ownNS = {0,0,0,0,0};               
+
+TARGETNS getOwnNS() {                                  
+    return s_ownNS;                                  
+}                                                      
+
+void setOwnNS(const TARGETNS& ns) {                    
+    s_ownNS = ns;                                      
+}                                                      
+
+
 
 
 

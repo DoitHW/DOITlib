@@ -846,6 +846,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
 
                 bool allOff[9] = {false,false,false,false,false,false,false,false,false};
                 PulsadoresHandler::setButtonActiveMask(allOff);
+                PulsadoresHandler::setGlobalFxNoInput(true);
                 ledManager.clearEffects();
 
                 // Color base: primero activo (RGB directo si está)
@@ -1010,7 +1011,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
             //  B) EFECTOS POR LED
             // =======================
             ledManager.clearEffects();
-
+            PulsadoresHandler::setGlobalFxNoInput(false); 
             for (int ledIdx = 0; ledIdx < 9 && ledIdx < colorHandler.numLeds; ++ledIdx) {
 
                 const CRGB     base = btn[ledIdx].base;
@@ -1116,14 +1117,16 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
             // 1) Determinar el destino al que contestaremos:
             //    - Si el ORIGEN del frame es DC (consola): NS = 00:00:00:00:00
             //    - Si el ORIGEN es DD (dispositivo): usar su NS (el del origen)
-            uint8_t originType = LEF.origin;           // el tipo que envió la trama
-            //TARGETNS originNS  = LEF.originNS;       // NS del que la envió (si es DC lo ignoraremos)
-            TARGETNS respNS;
-            if (originType == DEFAULT_CONSOLE || originType == DEFAULT_BOTONERA) {
-                respNS = TARGETNS{0,0,0,0,0};
-            } 
-            // 2) Habilitar el “modo respuesta” en los pulsadores
-            PulsadoresHandler::setResponseRoute(originType, respNS);
+            // uint8_t originType = LEF.origin;           // el tipo que envió la trama
+            // //TARGETNS originNS  = LEF.originNS;       // NS del que la envió (si es DC lo ignoraremos)
+            // TARGETNS respNS;
+            // if (originType == DEFAULT_CONSOLE || originType == DEFAULT_BOTONERA) {
+            //     respNS = TARGETNS{0,0,0,0,0};
+            // } 
+            // // 2) Habilitar el “modo respuesta” en los pulsadores
+            // PulsadoresHandler::setResponseRoute(originType, respNS);
+            uint8_t originType = LEF.origin;                                  // <-- Nueva línea
+            PulsadoresHandler::setResponseRoute(originType, getOwnNS());
             FastLED.show();
             break;
         }
@@ -1399,20 +1402,20 @@ void BOTONERA_::sectorIn_handler(const std::vector<byte>& data,
     switch (sector) {
 
         case ELEM_ROOM_NS_PACK: {
-            DEBUG__________ln("RECIBIDO UN ELEM_ROOM_NS_PACK");
-            // Construye payload de 192B → 32*(NS[5]+conf[1])
-            std::array<uint8_t, 32 * 6> payload{};
-            buildRoomNsPack32(payload);
+            // DEBUG__________ln("RECIBIDO UN ELEM_ROOM_NS_PACK");
+            // // Construye payload de 192B → 32*(NS[5]+conf[1])
+            // std::array<uint8_t, 32 * 6> payload{};
+            // buildRoomNsPack32(payload);
 
-            // Respuesta: dirigimos por NS al que ha hecho la petición.
-            // targetType debe ser direccionamiento por NS → DEFAULT_DEVICE (0xDD)
-            send_frame(frameMaker_RETURN_ELEM_SECTOR(
-                DEFAULT_BOTONERA,                 // originin (esta BOTONERA)
-                originType,                       // targetType = 0xDD (por NS)
-                originNS,                         // targetNS (del requester)
-                payload.data(),                   // 192 bytes
-                ELEM_ROOM_NS_PACK                 // sector
-            ));
+            // // Respuesta: dirigimos por NS al que ha hecho la petición.
+            // // targetType debe ser direccionamiento por NS → DEFAULT_DEVICE (0xDD)
+            // send_frame(frameMaker_RETURN_ELEM_SECTOR(
+            //     DEFAULT_BOTONERA,                 // originin (esta BOTONERA)
+            //     originType,                       // targetType = 0xDD (por NS)
+            //     originNS,                         // targetNS (del requester)
+            //     payload.data(),                   // 192 bytes
+            //     ELEM_ROOM_NS_PACK                 // sector
+            // ));
             break;
         }
 

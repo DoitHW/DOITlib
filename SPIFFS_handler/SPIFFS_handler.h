@@ -78,6 +78,10 @@ Language loadLanguageFromSPIFFS();
 void saveSoundSettingsToSPIFFS();
 void loadSoundSettingsFromSPIFFS();
 
+// --- NS/MAC propia de la BOTONERA ---
+TARGETNS getOwnNS();                    
+void     setOwnNS(const TARGETNS& ns); 
+
 // ===== Elementos Adicionales (persistencia) =====
 struct ExtraElementsConfig {
     bool dadoEnabled;
@@ -102,6 +106,7 @@ TARGETNS getNSFromFile(const String& fileName);
 String   getFilePathByNS(const TARGETNS& ns);       // NUEVA: busca el fichero por NS
 bool     nsExistsInSPIFFS(const TARGETNS& ns);      // NUEVA: true si existe el NS
 TARGETNS getCurrentElementNS();   
+
 
 
 // Elemento fijo en RAM

@@ -29,7 +29,11 @@ public:
     static void setButtonActiveMask(const bool mask[9]);   // copia completa (0..8)
     static void setResponseRoute(uint8_t targetType, const TARGETNS& targetNS);
     static void clearResponseRoute();                                          
-    static bool isResponseRouteActive();     
+    static bool isResponseRouteActive();    
+    static uint8_t  getResponseTargetType();  
+    static TARGETNS getResponseTargetNS();
+    static void setGlobalFxNoInput(bool enable);  
+    static bool isGlobalFxNoInput(); 
 private:
     bool relayButtonPressed = false;
     bool blueButtonPressed = false;  // Estado del botón azul
@@ -42,6 +46,7 @@ private:
     static bool     s_responseModeEnabled;
     static uint8_t  s_respTargetType;
     static TARGETNS s_respTargetNS;
+    static bool     s_globalFxNoInput;  
 
 
 };
