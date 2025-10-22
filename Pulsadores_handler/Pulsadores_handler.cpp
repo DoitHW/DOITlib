@@ -110,6 +110,24 @@ bool PulsadoresHandler::isButtonPressed(byte color) {
     return false; // ← faltaba: si no se encontró pulsado, devolver false
 }
 
+
+// bool PulsadoresHandler::isButtonPressed(byte color) {
+//     for (int i = 0; i < FILAS; i++) {
+//         digitalWrite(filas[i], LOW); // Activamos la fila
+//         delayMicroseconds(1); // Pequeña pausa para asegurar estabilidad en la lectura
+        
+//         for (int j = 0; j < COLUMNAS; j++) {
+//             if (pulsadorColor[i][j] == color && digitalRead(columnas[j]) == LOW) {
+//                 digitalWrite(filas[i], HIGH); // Restauramos la fila antes de salir
+//                 return true; // Se encontró el botón presionado
+//             }
+//         }
+        
+//         digitalWrite(filas[i], HIGH); // Restauramos la fila antes de continuar
+//     }
+//     return false; // Ningún botón con ese color está presionado
+// }
+
 void PulsadoresHandler::procesarPulsadores() {
     
     auto isNSZero = [](const TARGETNS& ns) -> bool {
@@ -117,7 +135,7 @@ void PulsadoresHandler::procesarPulsadores() {
     };
     // Target por defecto: BROADCAST
     uint8_t  targetType = 0xFF;   // BROADCAST
-    TARGETNS targetNS   = getOwnNS();
+    TARGETNS targetNS   = getOwnNS();;
 
     String currentFile = elementFiles[currentIndex];
     const bool respMode = PulsadoresHandler::isResponseRouteActive();
@@ -149,7 +167,7 @@ void PulsadoresHandler::procesarPulsadores() {
                         (communicatorActiveNS.mac01==0 && communicatorActiveNS.mac02==0 &&
                         communicatorActiveNS.mac03==0 && communicatorActiveNS.mac04==0 &&
                         communicatorActiveNS.mac05==0);
-                   
+                    // En modo respuesta o en Comunicador→broadcast no bloqueamos el evento
                     if (!(respMode || communicatorBroadcast)) {
                         currentPressed = false;
                     }
@@ -158,7 +176,7 @@ void PulsadoresHandler::procesarPulsadores() {
       
                 // Objetivo: CONSOLA
                 targetType = DEFAULT_CONSOLE; // 0xDC
-                targetNS   = getOwnNS();      
+                targetNS   = NS_ZERO;         // NS cero para no-dispositivo
 
                 if (!lastState[i][j] && currentPressed) {
                     processButtonEvent(i, j, BUTTON_PRESSED, /*hasPulse*/true, /*hasPassive*/false, /*hasRelay*/true,
@@ -220,6 +238,8 @@ void PulsadoresHandler::procesarPulsadores() {
             targetNS   = getCurrentElementNS();
         }
     } // (si isFichas, el target se resuelve en su flujo propio)
+
+
 
     /*───────────────────────────
     4) Flags del modo actual (del TARGET real)

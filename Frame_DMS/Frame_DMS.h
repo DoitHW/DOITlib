@@ -21,22 +21,35 @@ extern int lastReceivedTime;
 
 void IRAM_ATTR onUartInterrupt();
 
-struct LAST_ENTRY_FRAME_T{
-
-    byte origin;
-    byte function;
-    std::vector<byte> data;
-    LAST_ENTRY_FRAME_T() : origin(0), function(0), data() {}
-};
-
 struct TARGETNS { byte mac01, mac02, mac03, mac04, mac05; };
 constexpr TARGETNS NS_ZERO = {0,0,0,0,0};   // para 0xDB, 0xDC, 0xFF...
+
+struct LAST_ENTRY_FRAME_T{
+
+    byte      room;
+    byte      origin;
+    TARGETNS  originNS;
+    byte      targetType;
+    TARGETNS  targetNS;
+    byte      function;
+    std::vector<byte> data;
+    LAST_ENTRY_FRAME_T()
+        : room(0),
+          origin(0),
+          originNS{0,0,0,0,0},
+          targetType(0),
+          targetNS{0,0,0,0,0},
+          function(0),
+          data() {}
+};
 
 struct FRAME_T{
   byte start;
   byte frameLengthMsb;
   byte frameLengthLsb;
+  byte room;        // identificador de sala
   byte origin;       // 0xDB botonera, 0xDC consola, ...
+  TARGETNS originNS; // 5 bytes de serie del emisor
   byte targetType;   // 0xDD dispositivo, 0xFF broadcast, ...
   TARGETNS targetNS; // 5 bytes de serie del objetivo
   byte function;
@@ -167,6 +180,10 @@ LAST_ENTRY_FRAME_T extract_info_from_frameIn (const std::vector<uint8_t> &frame)
 byte checksum_calc                           (const FRAME_T &framein);
 void send_frame                              (const FRAME_T &framein);
 void sendRawFrame                            (const std::vector<byte>& rawData);
+void setLocalNS                              (const TARGETNS& ns);
+const TARGETNS& getLocalNS                   ();
+void setLocalRoom                            (uint8_t room);
+uint8_t getLocalRoom                         ();
 
 void  get_sector_data(byte *sector_data, byte lang, byte sector);
 

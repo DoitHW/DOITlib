@@ -3,6 +3,58 @@
 
 #include <Arduino.h>
 
+#pragma once
+
+// --- Reset y estilos básicos ---
+#define COLOR_RESET          "\033[0m"
+#define COLOR_BOLD           "\033[1m"
+#define COLOR_DIM            "\033[2m"
+#define COLOR_UNDERLINE      "\033[4m"
+#define COLOR_BLINK          "\033[5m"
+#define COLOR_REVERSE        "\033[7m"
+#define COLOR_HIDDEN         "\033[8m"
+
+// --- Colores de texto estándar ---
+#define COLOR_BLACK          "\033[30m"
+#define COLOR_RED            "\033[31m"
+#define COLOR_GREEN          "\033[32m"
+#define COLOR_YELLOW         "\033[33m"
+#define COLOR_BLUE           "\033[34m"
+#define COLOR_MAGENTA        "\033[35m"
+#define COLOR_CYAN           "\033[36m"
+#define COLOR_WHITE          "\033[37m"
+
+// --- Colores de texto intensos (brillantes) ---
+#define COLOR_BRIGHT_BLACK   "\033[90m"
+#define COLOR_BRIGHT_RED     "\033[91m"
+#define COLOR_BRIGHT_GREEN   "\033[92m"
+#define COLOR_BRIGHT_YELLOW  "\033[93m"
+#define COLOR_BRIGHT_BLUE    "\033[94m"
+#define COLOR_BRIGHT_MAGENTA "\033[95m"
+#define COLOR_BRIGHT_CYAN    "\033[96m"
+#define COLOR_BRIGHT_WHITE   "\033[97m"
+
+// --- Colores de fondo estándar ---
+#define BG_BLACK             "\033[40m"
+#define BG_RED               "\033[41m"
+#define BG_GREEN             "\033[42m"
+#define BG_YELLOW            "\033[43m"
+#define BG_BLUE              "\033[44m"
+#define BG_MAGENTA           "\033[45m"
+#define BG_CYAN              "\033[46m"
+#define BG_WHITE             "\033[47m"
+
+// --- Colores de fondo intensos ---
+#define BG_BRIGHT_BLACK      "\033[100m"
+#define BG_BRIGHT_RED        "\033[101m"
+#define BG_BRIGHT_GREEN      "\033[102m"
+#define BG_BRIGHT_YELLOW     "\033[103m"
+#define BG_BRIGHT_BLUE       "\033[104m"
+#define BG_BRIGHT_MAGENTA    "\033[105m"
+#define BG_BRIGHT_CYAN       "\033[106m"
+#define BG_BRIGHT_WHITE      "\033[107m"
+
+
 //DELFINES GLOBALES
 #define BOTONERA_OLD           // -> BOTONERA_OLD / BOTONERA_NEW
 #define NOELEM
@@ -20,6 +72,8 @@ constexpr byte DEFAULT_VOICE_RECON  = 0xD5;
 constexpr byte DEFAULT_COLOR_MAT    = 0xD6;
 constexpr byte DEFAULT_SELECTOR_MAT = 0xD7;
 constexpr byte DEFAULT_JOYSTICK     = 0xD8;
+constexpr byte DEFAULT_ROOM         = 0x01;
+constexpr byte ROOM_BROADCAST       = 0xFF;
 constexpr byte DEFAULT_PAD          = 0xD9;
 
 #define AP_ELEM_IP                    200, 200, 200, 1
@@ -190,7 +244,7 @@ constexpr byte DEFAULT_PAD          = 0xD9;
 // NO AGREGAR RES sense consultar a los dioses del Olimpo
 #define MAX_BYTES_PER_INTERRUPT 0xFF
 #define MAX_FRAME_LENGTH        0xFFFF
-#define MIN_FRAME_LENGTH        0x05
+#define MIN_FRAME_LENGTH        0x15    // Trama mínima: START + LEN + encabezado (origin..checksum) + END
 #define MAX_BUFFER_SIZE         0xFF
 #define MAX_ALLOWED_TARGETS     0xFF
 #define MAX_VALID_DEVICE_ID     0xFF
@@ -222,7 +276,7 @@ constexpr byte DEFAULT_PAD          = 0xD9;
 #define NARANJA                  0x02 //0xFF4500 //0xFF7F00
 #define ROSA_OSCURO              0x20 //0xFF1493 //0xFF4FD1
 #define VERDE_OLIVA              0x12 //0x758A00 //0x808000 //0x7F7F80
-#define VERDE_LIMA               0x14 //0x7FFF64 //0x7FFF64
+#define VERDE_LIMA               0x15 //0x7FFF64 //0x7FFF64
 #define VERDE_AMARILLO           0x0E //0xFFDF00 //0x7FFF00
 #define MAGENTA                  0x22 //0xD9017A //0xFF0081
 #define MORADO                   0x1D //0x9400d3 //0x9F00C5 //0x9B26B6 //0x800080
@@ -297,7 +351,7 @@ constexpr byte DEFAULT_PAD          = 0xD9;
 #define ELEM_MODE_7_NAME    0x11
 #define ELEM_MODE_7_DESC    0x12
 #define ELEM_MODE_8_NAME    0x13
-#define ELEM_MODE_8_DESC    0x14
+#define ELEM_MODE_8_DESC    0x15
 #define ELEM_MODE_9_NAME    0x15
 #define ELEM_MODE_9_DESC    0x16
 #define ELEM_MODE_10_NAME   0x17

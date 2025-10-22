@@ -109,6 +109,13 @@ static inline bool isSpiffsPath(const String& s) {
     return s.length() > 0 && s[0] == '/';
 }
 
+// encoder_handler.cpp (ámbito de archivo)
+static inline bool isSpecialFile(const String& name) noexcept {
+    return (name == "Ambientes" || name == "Fichas" ||
+            name == "Comunicador" || name == "Apagar" || name == "Dado");
+}
+
+
 /**
  * @brief Gestiona el encoder rotativo y su pulsador para navegación de menús y acciones.
  *
@@ -169,9 +176,7 @@ void handleEncoder() noexcept
     }
 
     auto isButtonPressed = []() -> bool { return digitalRead(ENC_BUTTON) == LOW; };
-    auto isSpecialFile = [](const String& name) -> bool {
-        return (name == "Ambientes" || name == "Fichas" || name == "Comunicador" || name == "Apagar" || name == "Dado");
-    };
+    
     
     // === Helper: aplicado inmediato de CMODE en UI + SPIFFS ===
     auto applyModeImmediate = [&](const String& path, uint8_t cmode) {
@@ -880,6 +885,16 @@ void handleModeSelection(const String& currentFile) noexcept
                     // ENCENDER
                     send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xDD, elemNS, START_CMD));
 
+                    // === Abrir espera de CMODE tras enviar START_CMD ===
+                    if (!isSpecialFile(currentFile) && !awaitingResponse) {                    // Evita RAM (Ambientes/Fichas/Apagar/Comunicador/Dado)
+               
+                        pendingQueryIndex = currentIndex;                // recuerda qué elemento esperamos
+                        pendingQueryNS    = elemNS;                          // a quién esperamos CMODE
+                        lastModeQueryTime = millis();                    // arranca cronómetro
+                        awaitingResponse  = true;                        // habilita timeout de 500 ms (ya implementado)
+                        // (opcional) frameReceived = false;             // si quieres arrancar "limpio"
+                    }
+
                     byte basicMode = DEFAULT_BASIC_MODE; // normalmente 1
                     f.seek(OFFSET_CURRENTMODE, SeekSet);
                     f.write(&basicMode, 1);
@@ -1029,6 +1044,14 @@ void handleModeSelection(const String& currentFile) noexcept
         TARGETNS elemNS = getCurrentElementNS();
         if (!wasAlreadySelected) {
             send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xDD, elemNS, START_CMD));
+
+            if (!isSpecialFile(currentFile) && !awaitingResponse) {
+                pendingQueryIndex = currentIndex;
+                pendingQueryNS    = elemNS;
+                lastModeQueryTime = millis();
+                awaitingResponse  = true;
+            }
+
             delay(kInterCmdDelayMs);
         }
         send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, 0xDD, elemNS, realModeIndex));

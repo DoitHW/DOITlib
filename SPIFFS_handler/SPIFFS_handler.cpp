@@ -721,6 +721,7 @@ TARGETNS getOwnNS() {
 
 void setOwnNS(const TARGETNS& ns) {                    
     s_ownNS = ns;                                      
+    setLocalNS(ns);
 }                                                      
 
 

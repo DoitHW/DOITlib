@@ -1,4 +1,4 @@
-#include <defines_DMS/defines_DMS.h>
+﻿#include <defines_DMS/defines_DMS.h>
 #include <Frame_DMS/Frame_DMS.h>
 #include <Element_DMS/Element_DMS.h>
 #include <icons_64x64_DMS/icons_64x64_DMS.h>
@@ -22,6 +22,26 @@ int lastReceivedTime = 0;
 
 volatile bool uartInterruptTriggered= false;
 extern uint16_t SERIAL_NUM;
+constexpr uint16_t FRAME_HEADER_BASE_LEN = 18;   // bytes desde room hasta checksum (sin datos)
+constexpr uint16_t FRAME_MIN_TOTAL_BYTES = 21;   // trama mÃ­nima completa (sin datos)
+static TARGETNS s_localNS = {0,0,0,0,0};
+static uint8_t  s_localRoom = DEFAULT_ROOM;
+
+void setLocalNS(const TARGETNS& ns) {
+    s_localNS = ns;
+}
+
+const TARGETNS& getLocalNS() {
+    return s_localNS;
+}
+
+void setLocalRoom(uint8_t room) {
+    s_localRoom = room;
+}
+
+uint8_t getLocalRoom() {
+    return s_localRoom;
+}
 
 void IRAM_ATTR onUartInterrupt() {
     static enum {
@@ -52,7 +72,7 @@ void IRAM_ATTR onUartInterrupt() {
             continue;
         }
 
-        // Protección de tamaño de buffer/longitud esperada
+        // ProtecciÃ³n de tamaÃ±o de buffer/longitud esperada
         if ((uartBuffer.size() > 0xFF) || (expectedFrameLength > 0xFF)) {
             receiveState = WAITING_START;
             uartBuffer.clear();
@@ -95,14 +115,14 @@ void IRAM_ATTR onUartInterrupt() {
                 totalFrameLength = expectedFrameLength + 3; // + start + 2 bytes de len
 
                 if (totalFrameLength < MIN_FRAME_LENGTH) {
-                    // Longitud inválida → reset
+                    // Longitud invÃ¡lida â†’ reset
                     receiveState = WAITING_START;
                     uartBuffer.clear();
                     return;
                 }
 
                 receiveState = RECEIVING_FRAME;
-                receivedBytes = 3; // ya hemos leído start + 2 len
+                receivedBytes = 3; // ya hemos leÃ­do start + 2 len
                 break;
             }
 
@@ -110,65 +130,65 @@ void IRAM_ATTR onUartInterrupt() {
                 uartBuffer.push_back(receivedByte);
                 receivedBytes++;
 
-                // Sumamos TODO menos el byte de checksum (penúltimo)
+                // Sumamos TODO menos el byte de checksum (penÃºltimo)
                 if (receivedBytes != totalFrameLength - 1) {
                     calculatedChecksum += receivedByte;
                 } else {
-                    receivedChecksum = receivedByte; // penúltimo byte
+                    receivedChecksum = receivedByte; // penÃºltimo byte
                 }
                 while (calculatedChecksum > 0xFF)
                     calculatedChecksum = (calculatedChecksum & 0xFF) + (calculatedChecksum >> 8);
 
-                // ¿Hemos cerrado la trama?
+                // Â¿Hemos cerrado la trama?
                 if (receivedBytes == totalFrameLength) {
-                    // Último byte debe ser NEW_END
+                    // Ãšltimo byte debe ser NEW_END
                     if (receivedByte == NEW_END) {
                         if (calculatedChecksum == receivedChecksum) {
                             // ========= NUEVO BLOQUE DE DESTINATARIO =========
-                            // Con el nuevo layout:
-                            // [4]  targetType
-                            // [5..9] targetNS (5 bytes)
-                            bool isTarget  = false;
-                            bool isBCFrame = false;
+                            // Con el layout actual:
+                            // [10] targetType
+                            // [11..15] targetNS (5 bytes)
+                            bool acceptFrame = false;
+                            bool isBCFrame   = false;
+                            printTargetID.clear();
 
-                            if (uartBuffer.size() >= 10) {
-                                const uint8_t targetType = uartBuffer[4];
+                            if (uartBuffer.size() >= FRAME_MIN_TOTAL_BYTES) {
+                                const uint8_t frameRoom  = uartBuffer[3];
+                                const uint8_t localRoom  = getLocalRoom();
+                                const bool    roomMatches = (frameRoom == ROOM_BROADCAST) || (frameRoom == localRoom);
+                                const uint8_t targetType  = uartBuffer[10];
 
-                                // Opcional: guardar NS para depuración (reutilizamos printTargetID)
-                                printTargetID.clear();
-                                if (uartBuffer.size() >= 10) {
-                                    // Guardamos los 5 bytes de NS en el vector de depuración
+                                if (roomMatches) {
                                     for (int i = 0; i < 5; ++i) {
-                                        printTargetID.push_back(uartBuffer[5 + i]);
+                                        printTargetID.push_back(uartBuffer[11 + i]);
                                     }
-                                }
 
-                                // Reglas de targeting para la BOTONERA:
-                                // - Broadcast → siempre nos aplica
-                                // - TargetType BOTONERA (0xDB) → nos aplica
-                                // - Otros tipos → no nos aplica (p.ej., 0xDD va a dispositivos)
-                                if (targetType == BROADCAST) {
-                                    isTarget  = true;
-                                    isBCFrame = true;
-                                } else if (targetType == DEFAULT_BOTONERA) {
-                                    isTarget = true;
+                                    // Reglas de targeting para la BOTONERA:
+                                    // - Broadcast -> siempre nos aplica (dentro de la misma sala o broadcast de sala)
+                                    // - TargetType BOTONERA (0xDB) -> nos aplica
+                                    if (targetType == BROADCAST) {
+                                        acceptFrame = true;
+                                        isBCFrame   = true;
+                                    } else if (targetType == DEFAULT_BOTONERA) {
+                                        acceptFrame = true;
+                                    }
                                 }
                             }
 
-                            // Marcar recepción válida si somos el destino
-                            // if (isTarget) {
-                            //     frameReceived = true;
-                            //     if (isBCFrame) BCframe = true;
-                            // }
-                            frameReceived = true;
-                            BCframe = (uartBuffer.size() >= 5 && uartBuffer[4] == BROADCAST);
+                            if (acceptFrame) {
+                                frameReceived = true;
+                                BCframe       = isBCFrame;
+                            } else {
+                                frameReceived = false;
+                                BCframe       = false;
+                            }
                             // ========= FIN BLOQUE DESTINATARIO =========
 
                         } else {
-                            // checksum inválido → ignorar
+                            // checksum invÃ¡lido â†’ ignorar
                         }
                     } else {
-                        // END inválido → ignorar
+                        // END invÃ¡lido â†’ ignorar
                     }
 
                     // Reset para la siguiente trama
@@ -176,7 +196,7 @@ void IRAM_ATTR onUartInterrupt() {
                     return;
                 }
 
-                // Protección adicional de buffer
+                // ProtecciÃ³n adicional de buffer
                 if (uartBuffer.size() >= MAX_BUFFER_SIZE) {
                     receiveState = WAITING_START;
                     uartBuffer.clear();
@@ -200,7 +220,13 @@ byte checksum_calc(const FRAME_T &f) {
     sum += f.start;
     sum += f.frameLengthMsb;
     sum += f.frameLengthLsb;
+    sum += f.room;
     sum += f.origin;
+    sum += f.originNS.mac01;
+    sum += f.originNS.mac02;
+    sum += f.originNS.mac03;
+    sum += f.originNS.mac04;
+    sum += f.originNS.mac05;
     sum += f.targetType;
     sum += f.targetNS.mac01;
     sum += f.targetNS.mac02;
@@ -221,41 +247,61 @@ byte checksum_calc(const FRAME_T &f) {
 // [0]   start (NEW_START)
 // [1]   frameLengthMsb
 // [2]   frameLengthLsb
-// [3]   origin
-// [4]   targetType
-// [5..9]targetNS (5 bytes)
-// [10]  function
-// [11]  dataLengthMsb
-// [12]  dataLengthLsb
-// [13..(13+dataLen-1)] data
-// [13+dataLen]   checksum
-// [14+dataLen]   end (NEW_END)
-
+// [3]   room
+// [4]   origin
+// [5..9]originNS (5 bytes)
+// [10]  targetType
+// [11..15]targetNS (5 bytes)
+// [16]  function
+// [17]  dataLengthMsb
+// [18]  dataLengthLsb
+// [19..(19+dataLen-1)] data
+// [19+dataLen]   checksum
+// [20+dataLen]   end (NEW_END)
 LAST_ENTRY_FRAME_T extract_info_from_frameIn(const std::vector<uint8_t> &frame) {
     LAST_ENTRY_FRAME_T result = {};
 
-    // Formato nuevo mínimo:
-    // 0:START, 1:lenMSB, 2:lenLSB, 3:origin,
-    // 4:targetType, 5..9:targetNS(5),
-    // 10:function, 11..12:dataLen, 13..(13+N-1):data, (13+N):checksum, (14+N):END
-    // Mínimo total sin data: 15 bytes
-    if (frame.size() < 15) return result;
+    // Formato mÃ­nimo:
+    // 0:START, 1:lenMSB, 2:lenLSB,
+    // 3:room, 4:origin, 5..9:originNS(5),
+    // 10:targetType, 11..15:targetNS(5),
+    // 16:function, 17..18:dataLen, 19.. data, checksum, end.
+    //     // Mínimo total sin data: 21 bytes
+    if (frame.size() < FRAME_MIN_TOTAL_BYTES) return result;
 
-    const size_t IDX_ORIGIN      = 3;
-    const size_t IDX_FUNCTION    = 10;
-    const size_t IDX_DLEN_MSB    = 11;
-    const size_t IDX_DLEN_LSB    = 12;
-    const size_t IDX_DATA_START  = 13;
+    const size_t IDX_ROOM          = 3;
+    const size_t IDX_ORIGIN        = 4;
+    const size_t IDX_ORIGIN_NS     = 5;
+    const size_t IDX_TARGET_TYPE   = 10;
+    const size_t IDX_TARGET_NS     = 11;
+    const size_t IDX_FUNCTION      = 16;
+    const size_t IDX_DLEN_MSB      = 17;
+    const size_t IDX_DLEN_LSB      = 18;
+    const size_t IDX_DATA_START    = 19;
 
-    // Asignar campos básicos
-    result.origin   = frame[IDX_ORIGIN];
-    result.function = frame[IDX_FUNCTION];
+    result.room      = frame[IDX_ROOM];
+    result.origin    = frame[IDX_ORIGIN];
+    result.originNS  = {
+        frame[IDX_ORIGIN_NS + 0],
+        frame[IDX_ORIGIN_NS + 1],
+        frame[IDX_ORIGIN_NS + 2],
+        frame[IDX_ORIGIN_NS + 3],
+        frame[IDX_ORIGIN_NS + 4]
+    };
+    result.targetType = frame[IDX_TARGET_TYPE];
+    result.targetNS   = {
+        frame[IDX_TARGET_NS + 0],
+        frame[IDX_TARGET_NS + 1],
+        frame[IDX_TARGET_NS + 2],
+        frame[IDX_TARGET_NS + 3],
+        frame[IDX_TARGET_NS + 4]
+    };
+    result.function  = frame[IDX_FUNCTION];
 
-    // Longitud de data
     uint16_t dataLength = (static_cast<uint16_t>(frame[IDX_DLEN_MSB]) << 8) |
                            static_cast<uint16_t>(frame[IDX_DLEN_LSB]);
 
-    // Comprobar límites antes de copiar
+    // Comprobar lÃ­mites antes de copiar
     if (IDX_DATA_START + dataLength <= frame.size()) {
         result.data.clear();
         result.data.reserve(dataLength);
@@ -267,96 +313,141 @@ LAST_ENTRY_FRAME_T extract_info_from_frameIn(const std::vector<uint8_t> &frame) 
     return result;
 }
 
-void send_frame(const FRAME_T &f){
-  int i = 0;
-  byte dTime = 5;
+void send_frame(const FRAME_T &f) {
+  int  i      = 0;
+  byte dTime  = 5;
 
   #ifdef DEBUG
-  DEBUG__________ln(" #### Trama enviada ####");
+    DEBUG__________ln(String(COLOR_BRIGHT_WHITE) + " #### Trama enviada ####" + COLOR_RESET);
   #endif
 
-  Serial1.write(f.start);           delay(dTime);
+  // START
+  Serial1.write(f.start); delay(dTime);
   #ifdef DEBUG
-  DEBUG__________ln("[" + String(++i) + "] START = " + String(f.start, HEX));
+    DEBUG__________ln(String(COLOR_BRIGHT_GREEN) + "[" + String(++i) + "] START = " + String(f.start, HEX) + COLOR_RESET);
   #endif
 
-  Serial1.write(f.frameLengthMsb);  delay(dTime);
+  // Frame Length MSB
+  Serial1.write(f.frameLengthMsb); delay(dTime);
   #ifdef DEBUG
-  DEBUG__________ln("[" + String(++i) + "] Frame Length Msb = " + String(f.frameLengthMsb, HEX));
+    DEBUG__________ln(String(COLOR_DIM) + "[" + String(++i) + "] Frame Length Msb = " + String(f.frameLengthMsb, HEX) + COLOR_RESET);
   #endif
 
-  Serial1.write(f.frameLengthLsb);  delay(dTime);
+  // Frame Length LSB
+  Serial1.write(f.frameLengthLsb); delay(dTime);
   #ifdef DEBUG
-  DEBUG__________ln("[" + String(++i) + "] Frame Length Lsb = " + String(f.frameLengthLsb, HEX));
+    DEBUG__________ln(String(COLOR_DIM) + "[" + String(++i) + "] Frame Length Lsb = " + String(f.frameLengthLsb, HEX) + COLOR_RESET);
   #endif
 
-  Serial1.write(f.origin);          delay(dTime);
+  // ROOM
+  Serial1.write(f.room); delay(dTime);
   #ifdef DEBUG
-  DEBUG__________ln("[" + String(++i) + "] Origin = " + String(f.origin, HEX));
+    DEBUG__________ln(String(COLOR_BRIGHT_RED) + "[" + String(++i) + "] Room = " + String(f.room, HEX) + COLOR_RESET);
   #endif
 
-  Serial1.write(f.targetType);      delay(dTime);
+  // ORIGIN (byte)
+  Serial1.write(f.origin); delay(dTime);
   #ifdef DEBUG
-  DEBUG__________ln("[" + String(++i) + "] Target Type = " + String(f.targetType, HEX));
+    DEBUG__________ln(String(COLOR_BRIGHT_YELLOW) + "[" + String(++i) + "] Origin = " + String(f.origin, HEX) + COLOR_RESET);
   #endif
 
-  Serial1.write(f.targetNS.mac01);  delay(dTime);
+  // ORIGIN MAC[0..4]
+  Serial1.write(f.originNS.mac01); delay(dTime);
   #ifdef DEBUG
-  DEBUG__________ln("[" + String(++i) + "] MAC[0] = " + String(f.targetNS.mac01, HEX));
+    DEBUG__________ln(String(COLOR_BRIGHT_MAGENTA) + "[" + String(++i) + "] Origin MAC[0] = " + String(f.originNS.mac01, HEX) + COLOR_RESET);
   #endif
 
-  Serial1.write(f.targetNS.mac02);  delay(dTime);
+  Serial1.write(f.originNS.mac02); delay(dTime);
   #ifdef DEBUG
-  DEBUG__________ln("[" + String(++i) + "] MAC[1] = " + String(f.targetNS.mac02, HEX));
+    DEBUG__________ln(String(COLOR_BRIGHT_MAGENTA) + "[" + String(++i) + "] Origin MAC[1] = " + String(f.originNS.mac02, HEX) + COLOR_RESET);
   #endif
 
-  Serial1.write(f.targetNS.mac03);  delay(dTime);
+  Serial1.write(f.originNS.mac03); delay(dTime);
   #ifdef DEBUG
-  DEBUG__________ln("[" + String(++i) + "] MAC[2] = " + String(f.targetNS.mac03, HEX));
+    DEBUG__________ln(String(COLOR_BRIGHT_MAGENTA) + "[" + String(++i) + "] Origin MAC[2] = " + String(f.originNS.mac03, HEX) + COLOR_RESET);
   #endif
 
-  Serial1.write(f.targetNS.mac04);  delay(dTime);
+  Serial1.write(f.originNS.mac04); delay(dTime);
   #ifdef DEBUG
-  DEBUG__________ln("[" + String(++i) + "] MAC[3] = " + String(f.targetNS.mac04, HEX));
+    DEBUG__________ln(String(COLOR_BRIGHT_MAGENTA) + "[" + String(++i) + "] Origin MAC[3] = " + String(f.originNS.mac04, HEX) + COLOR_RESET);
   #endif
 
-  Serial1.write(f.targetNS.mac05);  delay(dTime);
+  Serial1.write(f.originNS.mac05); delay(dTime);
   #ifdef DEBUG
-  DEBUG__________ln("[" + String(++i) + "] MAC[4] = " + String(f.targetNS.mac05, HEX));
+    DEBUG__________ln(String(COLOR_BRIGHT_MAGENTA) + "[" + String(++i) + "] Origin MAC[4] = " + String(f.originNS.mac05, HEX) + COLOR_RESET);
   #endif
 
-  Serial1.write(f.function);        delay(dTime);
+  // TARGET TYPE
+  Serial1.write(f.targetType); delay(dTime);
   #ifdef DEBUG
-  DEBUG__________ln("[" + String(++i) + "] Function = " + String(f.function, HEX));
+    DEBUG__________ln(String(COLOR_BRIGHT_CYAN) + "[" + String(++i) + "] Target Type = " + String(f.targetType, HEX) + COLOR_RESET);
   #endif
 
-  Serial1.write(f.dataLengthMsb);   delay(dTime);
+  // TARGET MAC[0..4]
+  Serial1.write(f.targetNS.mac01); delay(dTime);
   #ifdef DEBUG
-  DEBUG__________ln("[" + String(++i) + "] Data Length Msb = " + String(f.dataLengthMsb, HEX));
+    DEBUG__________ln(String(COLOR_BRIGHT_BLUE) + "[" + String(++i) + "] MAC[0] = " + String(f.targetNS.mac01, HEX) + COLOR_RESET);
   #endif
 
-  Serial1.write(f.dataLengthLsb);   delay(dTime);
+  Serial1.write(f.targetNS.mac02); delay(dTime);
   #ifdef DEBUG
-  DEBUG__________ln("[" + String(++i) + "] Data Length Lsb = " + String(f.dataLengthLsb, HEX));
+    DEBUG__________ln(String(COLOR_BRIGHT_BLUE) + "[" + String(++i) + "] MAC[1] = " + String(f.targetNS.mac02, HEX) + COLOR_RESET);
   #endif
 
-  int dataIndex = 0;
-  for (byte b: f.data){
-    Serial1.write(b); delay(dTime);
-    #ifdef DEBUG
-    DEBUG__________ln("[" + String(++i) + "] Data[" + String(dataIndex++) + "] = " + String(b, HEX));
-    #endif
+  Serial1.write(f.targetNS.mac03); delay(dTime);
+  #ifdef DEBUG
+    DEBUG__________ln(String(COLOR_BRIGHT_BLUE) + "[" + String(++i) + "] MAC[2] = " + String(f.targetNS.mac03, HEX) + COLOR_RESET);
+  #endif
+
+  Serial1.write(f.targetNS.mac04); delay(dTime);
+  #ifdef DEBUG
+    DEBUG__________ln(String(COLOR_BRIGHT_BLUE) + "[" + String(++i) + "] MAC[3] = " + String(f.targetNS.mac04, HEX) + COLOR_RESET);
+  #endif
+
+  Serial1.write(f.targetNS.mac05); delay(dTime);
+  #ifdef DEBUG
+    DEBUG__________ln(String(COLOR_BRIGHT_BLUE) + "[" + String(++i) + "] MAC[4] = " + String(f.targetNS.mac05, HEX) + COLOR_RESET);
+  #endif
+
+  // FUNCTION
+  Serial1.write(f.function); delay(dTime);
+  #ifdef DEBUG
+    DEBUG__________ln(String(COLOR_BRIGHT_GREEN) + "[" + String(++i) + "] Function = " + String(f.function, HEX) + COLOR_RESET);
+  #endif
+
+  // DATA LENGTH MSB/LSB
+  Serial1.write(f.dataLengthMsb); delay(dTime);
+  #ifdef DEBUG
+    DEBUG__________ln(String(COLOR_DIM) + "[" + String(++i) + "] Data Length Msb = " + String(f.dataLengthMsb, HEX) + COLOR_RESET);
+  #endif
+
+  Serial1.write(f.dataLengthLsb); delay(dTime);
+  #ifdef DEBUG
+    DEBUG__________ln(String(COLOR_DIM) + "[" + String(++i) + "] Data Length Lsb = " + String(f.dataLengthLsb, HEX) + COLOR_RESET);
+  #endif
+
+  // DATA[i]
+  {
+    int dataIndex = 0;
+    for (byte b : f.data) {
+      Serial1.write(b); delay(dTime);
+      #ifdef DEBUG
+        DEBUG__________ln(String(COLOR_DIM) + "[" + String(++i) + "] Data[" + String(dataIndex++) + "] = " + String(b, HEX) + COLOR_RESET);
+      #endif
+    }
   }
 
-  Serial1.write(f.checksum);        delay(dTime);
+  // CHECKSUM
+  Serial1.write(f.checksum); delay(dTime);
   #ifdef DEBUG
-  DEBUG__________ln("[" + String(++i) + "] Checksum = " + String(f.checksum, HEX));
+    DEBUG__________ln(String(COLOR_BRIGHT_MAGENTA) + "[" + String(++i) + "] Checksum = " + String(f.checksum, HEX) + COLOR_RESET);
   #endif
 
-  Serial1.write(f.end);             delay(dTime);
+  // END
+  Serial1.write(f.end); delay(dTime);
   #ifdef DEBUG
-  DEBUG__________ln("[" + String(++i) + "] End = " + String(f.end, HEX));
-  DEBUG__________ln("======================================");
+    DEBUG__________ln(String(COLOR_BRIGHT_GREEN) + "[" + String(++i) + "] End = " + String(f.end, HEX) + COLOR_RESET);
+    DEBUG__________ln(String(COLOR_BRIGHT_WHITE) + "======================================" + COLOR_RESET);
   #endif
 }
 
@@ -369,12 +460,14 @@ void send_frame(const FRAME_T &f){
 FRAME_T frameMaker_REQ_ELEM_SECTOR(byte originin, byte targetType, TARGETNS targetNS, byte idiomain, byte sectorin){
     FRAME_T f{};
     constexpr uint16_t DL = L_REQ_ELEM_SECTOR;             // = 0x02 (idioma, sector)
-    const uint16_t frameLength = 12 + DL;
+    const uint16_t frameLength = FRAME_HEADER_BASE_LEN + DL;
 
     f.start           = NEW_START;
     f.frameLengthLsb  = frameLength & 0xFF;
     f.frameLengthMsb  = (frameLength >> 8) & 0xFF;
+    f.room           = getLocalRoom();
     f.origin          = originin;
+    f.originNS        = getLocalNS();
     f.targetType      = targetType;
     f.targetNS        = targetNS;
     f.function        = F_REQ_ELEM_SECTOR;
@@ -391,12 +484,14 @@ FRAME_T frameMaker_REQ_ELEM_SECTOR(byte originin, byte targetType, TARGETNS targ
 FRAME_T frameMaker_SET_ELEM_ID(byte originin, byte targetType, TARGETNS targetNS, byte IDin){
     FRAME_T f{};
     constexpr uint16_t DL = L_SET_ELEM_ID;            // = 1
-    const uint16_t frameLength = 12 + DL;
+    const uint16_t frameLength = FRAME_HEADER_BASE_LEN + DL;
 
     f.start          = NEW_START;
     f.frameLengthLsb = frameLength & 0xFF;
     f.frameLengthMsb = (frameLength >> 8) & 0xFF;
-    f.origin         = originin;
+    f.room           = getLocalRoom();
+    f.origin          = originin;
+    f.originNS       = getLocalNS();
     f.targetType     = targetType;
     f.targetNS       = targetNS;
     f.function       = F_SET_ELEM_ID;
@@ -412,12 +507,14 @@ FRAME_T frameMaker_SET_ELEM_ID(byte originin, byte targetType, TARGETNS targetNS
 FRAME_T frameMaker_SET_ELEM_MODE(byte originin, byte targetType, TARGETNS targetNS, byte modein){
     FRAME_T f{};
     constexpr uint16_t DL = L_SET_ELEM_MODE;          // = 1
-    const uint16_t frameLength = 12 + DL;
+    const uint16_t frameLength = FRAME_HEADER_BASE_LEN + DL;
 
     f.start          = NEW_START;
     f.frameLengthLsb = frameLength & 0xFF;
     f.frameLengthMsb = (frameLength >> 8) & 0xFF;
-    f.origin         = originin;
+    f.room           = getLocalRoom();
+    f.origin          = originin;
+    f.originNS       = getLocalNS();
     f.targetType     = targetType;
     f.targetNS       = targetNS;
     f.function       = F_SET_ELEM_MODE;
@@ -433,12 +530,14 @@ FRAME_T frameMaker_SET_ELEM_MODE(byte originin, byte targetType, TARGETNS target
 FRAME_T frameMaker_SET_ELEM_DEAF(byte originin, byte targetType, TARGETNS targetNS, byte timein){
     FRAME_T f{};
     constexpr uint16_t DL = L_SET_ELEM_DEAF;          // = 1
-    const uint16_t frameLength = 12 + DL;
+    const uint16_t frameLength = FRAME_HEADER_BASE_LEN + DL;
 
     f.start          = NEW_START;
     f.frameLengthLsb = frameLength & 0xFF;
     f.frameLengthMsb = (frameLength >> 8) & 0xFF;
-    f.origin         = originin;
+    f.room           = getLocalRoom();
+    f.origin          = originin;
+    f.originNS       = getLocalNS();
     f.targetType     = targetType;
     f.targetNS       = targetNS;
     f.function       = F_SET_ELEM_DEAF;
@@ -454,12 +553,14 @@ FRAME_T frameMaker_SET_ELEM_DEAF(byte originin, byte targetType, TARGETNS target
 FRAME_T frameMaker_SEND_COLOR(byte originin, byte targetType, TARGETNS targetNS, byte colorin){
     FRAME_T f{};
     constexpr uint16_t DL = L_SEND_COLOR;             // = 1
-    const uint16_t frameLength = 12 + DL;
+    const uint16_t frameLength = FRAME_HEADER_BASE_LEN + DL;
 
     f.start          = NEW_START;
     f.frameLengthLsb = frameLength & 0xFF;
     f.frameLengthMsb = (frameLength >> 8) & 0xFF;
-    f.origin         = originin;
+    f.room           = getLocalRoom();
+    f.origin          = originin;
+    f.originNS       = getLocalNS();
     f.targetType     = targetType;
     f.targetNS       = targetNS;
     f.function       = F_SEND_COLOR;
@@ -475,12 +576,14 @@ FRAME_T frameMaker_SEND_COLOR(byte originin, byte targetType, TARGETNS targetNS,
 FRAME_T frameMaker_SEND_RGB(byte originin, byte targetType, TARGETNS targetNS, COLOR_T colorin){
     FRAME_T f{};
     constexpr uint16_t DL = L_SEND_RGB;               // = 3
-    const uint16_t frameLength = 12 + DL;
+    const uint16_t frameLength = FRAME_HEADER_BASE_LEN + DL;
 
     f.start          = NEW_START;
     f.frameLengthLsb = frameLength & 0xFF;
     f.frameLengthMsb = (frameLength >> 8) & 0xFF;
-    f.origin         = originin;
+    f.room           = getLocalRoom();
+    f.origin          = originin;
+    f.originNS       = getLocalNS();
     f.targetType     = targetType;
     f.targetNS       = targetNS;
     f.function       = F_SEND_RGB;
@@ -498,12 +601,14 @@ FRAME_T frameMaker_SEND_RGB(byte originin, byte targetType, TARGETNS targetNS, C
 FRAME_T frameMaker_SEND_SENSOR_VALUE(byte originin, byte targetType, TARGETNS targetNS, SENSOR_DOUBLE_T s){
     FRAME_T f{};
     constexpr uint16_t DL = L_SEND_SENSOR_VALUE_1;    // = 12
-    const uint16_t frameLength = 12 + DL;
+    const uint16_t frameLength = FRAME_HEADER_BASE_LEN + DL;
 
     f.start          = NEW_START;
     f.frameLengthLsb = frameLength & 0xFF;
     f.frameLengthMsb = (frameLength >> 8) & 0xFF;
-    f.origin         = originin;
+    f.room           = getLocalRoom();
+    f.origin          = originin;
+    f.originNS       = getLocalNS();
     f.targetType     = targetType;
     f.targetNS       = targetNS;
     f.function       = F_SEND_SENSOR_VALUE_1;
@@ -521,12 +626,14 @@ FRAME_T frameMaker_SEND_SENSOR_VALUE(byte originin, byte targetType, TARGETNS ta
 FRAME_T frameMaker_SEND_SENSOR_VALUE_2(byte originin, byte targetType, TARGETNS targetNS, SENSOR_VALUE_T s){
     FRAME_T f{};
     constexpr uint16_t DL = L_SEND_SENSOR_VALUE_2;    // = 6
-    const uint16_t frameLength = 12 + DL;
+    const uint16_t frameLength = FRAME_HEADER_BASE_LEN + DL;
 
     f.start          = NEW_START;
     f.frameLengthLsb = frameLength & 0xFF;
     f.frameLengthMsb = (frameLength >> 8) & 0xFF;
-    f.origin         = originin;
+    f.room           = getLocalRoom();
+    f.origin          = originin;
+    f.originNS       = getLocalNS();
     f.targetType     = targetType;
     f.targetNS       = targetNS;
     f.function       = F_SEND_SENSOR_VALUE_2;
@@ -541,12 +648,14 @@ FRAME_T frameMaker_SEND_SENSOR_VALUE_2(byte originin, byte targetType, TARGETNS 
 FRAME_T frameMaker_SEND_FLAG_BYTE(byte originin, byte targetType, TARGETNS targetNS, byte flagin){
     FRAME_T f{};
     constexpr uint16_t DL = L_SEND_FLAG_BYTE;         // = 1
-    const uint16_t frameLength = 12 + DL;
+    const uint16_t frameLength = FRAME_HEADER_BASE_LEN + DL;
 
     f.start          = NEW_START;
     f.frameLengthLsb = frameLength & 0xFF;
     f.frameLengthMsb = (frameLength >> 8) & 0xFF;
-    f.origin         = originin;
+    f.room           = getLocalRoom();
+    f.origin          = originin;
+    f.originNS       = getLocalNS();
     f.targetType     = targetType;
     f.targetNS       = targetNS;
     f.function       = F_SEND_FLAG_BYTE;
@@ -562,12 +671,14 @@ FRAME_T frameMaker_SEND_FLAG_BYTE(byte originin, byte targetType, TARGETNS targe
 FRAME_T frameMaker_SEND_PATTERN_NUM(byte originin, byte targetType, TARGETNS targetNS, byte patternin){
     FRAME_T f{};
     constexpr uint16_t DL = L_SEND_PATTERN_NUM;       // = 1
-    const uint16_t frameLength = 12 + DL;
+    const uint16_t frameLength = FRAME_HEADER_BASE_LEN + DL;
 
     f.start          = NEW_START;
     f.frameLengthLsb = frameLength & 0xFF;
     f.frameLengthMsb = (frameLength >> 8) & 0xFF;
-    f.origin         = originin;
+    f.room           = getLocalRoom();
+    f.origin          = originin;
+    f.originNS       = getLocalNS();
     f.targetType     = targetType;
     f.targetNS       = targetNS;
     f.function       = F_SEND_PATTERN_NUM;
@@ -583,12 +694,14 @@ FRAME_T frameMaker_SEND_PATTERN_NUM(byte originin, byte targetType, TARGETNS tar
 FRAME_T frameMaker_SEND_FILE_NUM(byte originin, byte targetType, TARGETNS targetNS, byte bankin, byte filein){
     FRAME_T f{};
     constexpr uint16_t DL = L_SEND_FILE_NUM;          // = 2
-    const uint16_t frameLength = 12 + DL;
+    const uint16_t frameLength = FRAME_HEADER_BASE_LEN + DL;
 
     f.start          = NEW_START;
     f.frameLengthLsb = frameLength & 0xFF;
     f.frameLengthMsb = (frameLength >> 8) & 0xFF;
-    f.origin         = originin;
+    f.room           = getLocalRoom();
+    f.origin          = originin;
+    f.originNS       = getLocalNS();
     f.targetType     = targetType;
     f.targetNS       = targetNS;
     f.function       = F_SEND_FILE_NUM;
@@ -605,12 +718,14 @@ FRAME_T frameMaker_SEND_FILE_NUM(byte originin, byte targetType, TARGETNS target
 FRAME_T frameMaker_SEND_COMMAND(byte originin, byte targetType, TARGETNS targetNS, byte commandin){
     FRAME_T f{};
     constexpr uint16_t DL = L_SEND_COMMAND;           // = 1
-    const uint16_t frameLength = 12 + DL;
+    const uint16_t frameLength = FRAME_HEADER_BASE_LEN + DL;
 
     f.start          = NEW_START;
     f.frameLengthLsb = frameLength & 0xFF;
     f.frameLengthMsb = (frameLength >> 8) & 0xFF;
-    f.origin         = originin;
+    f.room           = getLocalRoom();
+    f.origin          = originin;
+    f.originNS       = getLocalNS();
     f.targetType     = targetType;
     f.targetNS       = targetNS;
     f.function       = F_SEND_COMMAND;
@@ -631,7 +746,9 @@ FRAME_T frameMaker_RETURN_ELEM_SECTOR (uint8_t originin,
 {
     FRAME_T frame{};
     frame.start    = NEW_START;
+    frame.room     = getLocalRoom();
     frame.origin   = originin;
+    frame.originNS = getLocalNS();
     frame.targetType = targetType;
     frame.targetNS   = targetNS;
     frame.function = F_RETURN_ELEM_SECTOR;
@@ -645,12 +762,12 @@ FRAME_T frameMaker_RETURN_ELEM_SECTOR (uint8_t originin,
         if (sector_data) {
             frame.data.insert(frame.data.end(), sector_data, sector_data + count);
         } else {
-            // Si no hay puntero válido, rellena con ceros
+            // Si no hay puntero vÃ¡lido, rellena con ceros
             frame.data.insert(frame.data.end(), count, 0x00);
         }
     };
 
-    // Selecciona longitud de payload por tipo de sector y añade bytes
+    // Selecciona longitud de payload por tipo de sector y aÃ±ade bytes
     switch (sectorin) {
         // 5 bytes
         case ELEM_SERIAL_SECTOR:
@@ -798,9 +915,9 @@ FRAME_T frameMaker_RETURN_ELEM_SECTOR (uint8_t originin,
             break;
     }
 
-    // Calcula longitudes (base 12 + dataLen)
+    // Calcula longitudes (base 18 + dataLen)
     const uint16_t dataLen = static_cast<uint16_t>(frame.data.size());
-    const uint16_t frameLength = static_cast<uint16_t>(12 + dataLen);
+    const uint16_t frameLength = static_cast<uint16_t>(FRAME_HEADER_BASE_LEN + dataLen);
 
     frame.frameLengthLsb = frameLength & 0xFF;
     frame.frameLengthMsb = (frameLength >> 8) & 0xFF;
@@ -815,12 +932,14 @@ FRAME_T frameMaker_RETURN_ELEM_SECTOR (uint8_t originin,
 FRAME_T frameMaker_SEND_RESPONSE(byte originin, byte targetType, TARGETNS targetNS, byte response){
     FRAME_T f{};
     constexpr uint16_t DL = L_SEND_RESPONSE;          // = 1
-    const uint16_t frameLength = 12 + DL;
+    const uint16_t frameLength = FRAME_HEADER_BASE_LEN + DL;
 
     f.start          = NEW_START;
     f.frameLengthLsb = frameLength & 0xFF;
     f.frameLengthMsb = (frameLength >> 8) & 0xFF;
-    f.origin         = originin;
+    f.room           = getLocalRoom();
+    f.origin          = originin;
+    f.originNS       = getLocalNS();
     f.targetType     = targetType;
     f.targetNS       = targetNS;
     f.function       = F_SEND_RESPONSE;
@@ -833,22 +952,22 @@ FRAME_T frameMaker_SEND_RESPONSE(byte originin, byte targetType, TARGETNS target
     return f;
 }
 
-// Mapeo canónico: botón (1..9) → índice LED físico (0..8)
+// Mapeo canÃ³nico: botÃ³n (1..9) â†’ Ã­ndice LED fÃ­sico (0..8)
 static constexpr uint8_t kBtnIdToLedIdx[10] = {
   0xFF, // [0] no usado
-  8,    // 1 → LED8 (AZUL)
-  6,    // 2 → LED6 (VERDE)
-  4,    // 3 → LED4 (AMARILLO)
-  2,    // 4 → LED2 (ROJO)
-  0,    // 5 → LED0 (RELE)
-  7,    // 6 → LED7 (VIOLETA)
-  5,    // 7 → LED5 (NARANJA)
-  3,    // 8 → LED3 (CELESTE)
-  1     // 9 → LED1 (BLANCO)
+  8,    // 1 â†’ LED8 (AZUL)
+  6,    // 2 â†’ LED6 (VERDE)
+  4,    // 3 â†’ LED4 (AMARILLO)
+  2,    // 4 â†’ LED2 (ROJO)
+  0,    // 5 â†’ LED0 (RELE)
+  7,    // 6 â†’ LED7 (VIOLETA)
+  5,    // 7 â†’ LED5 (NARANJA)
+  3,    // 8 â†’ LED3 (CELESTE)
+  1     // 9 â†’ LED1 (BLANCO)
 };
 
 
-// Coloca cada BUTTON en Button_00..08 según el LED físico
+// Coloca cada BUTTON en Button_00..08 segÃºn el LED fÃ­sico
 static inline void putByLedIndex(COLORPAD_BTNMAP& m, uint8_t ledIndex, const BUTTON& b) {
     switch (ledIndex) {
         case 0: m.Button_00 = b; break;
@@ -864,7 +983,7 @@ static inline void putByLedIndex(COLORPAD_BTNMAP& m, uint8_t ledIndex, const BUT
     }
 }
 
-// Construye el COLORPAD_BTNMAP desde 9 “botones lógicos” (1..9)
+// Construye el COLORPAD_BTNMAP desde 9 â€œbotones lÃ³gicosâ€ (1..9)
 void buildColorpadFromBtnIdsV2(
     const BUTTON& b1, const BUTTON& b2, const BUTTON& b3,
     const BUTTON& b4, const BUTTON& b5, const BUTTON& b6,
@@ -893,7 +1012,7 @@ FRAME_T frameMaker_SET_BUTTONS_EXTMAP(
     f.data.clear();
     f.data.resize(dlen);
 
-    // Serialización en orden fijo 0..8
+    // SerializaciÃ³n en orden fijo 0..8
     const BUTTON btns[9] = {
         map.Button_00, map.Button_01, map.Button_02,
         map.Button_03, map.Button_04, map.Button_05,
@@ -914,12 +1033,14 @@ FRAME_T frameMaker_SET_BUTTONS_EXTMAP(
     }
 
     // ----- Cabecera NS (tu formato NS-only) -----
-    const uint16_t len = 12 + dlen;    // “ORIGIN..CHECKSUM+END” como ya hacías
+    const uint16_t len = FRAME_HEADER_BASE_LEN + dlen;    // room..checksum+end
 
     f.start           = NEW_START;
     f.frameLengthMsb  = (len >> 8) & 0xFF;
     f.frameLengthLsb  =  len       & 0xFF;
+    f.room           = getLocalRoom();
     f.origin          = originType;
+    f.originNS        = getLocalNS();
     f.targetType      = targetType;
     f.targetNS        = destNS;           // 5 bytes NS
     f.function        = F_SET_BUTTONS_EXTMAP;
@@ -934,8 +1055,8 @@ FRAME_T frameMaker_SET_BUTTONS_EXTMAP(
 //////////////////////////////////////////////////////////////////////////////////////
 
 void sendRawFrame(const std::vector<byte>& raw) {
-    if (raw.size() < 13) {
-        DEBUG__________ln("❌ Trama demasiado corta para ser válida");
+    if (raw.size() < FRAME_MIN_TOTAL_BYTES) {
+        DEBUG__________ln("âŒ Trama demasiado corta para ser vÃ¡lida");
         return;
     }
 
@@ -945,7 +1066,13 @@ void sendRawFrame(const std::vector<byte>& raw) {
     f.start          = raw[i++];
     f.frameLengthMsb = raw[i++];
     f.frameLengthLsb = raw[i++];
+    f.room           = raw[i++];
     f.origin         = raw[i++];
+    f.originNS.mac01 = raw[i++];
+    f.originNS.mac02 = raw[i++];
+    f.originNS.mac03 = raw[i++];
+    f.originNS.mac04 = raw[i++];
+    f.originNS.mac05 = raw[i++];
     f.targetType     = raw[i++];
     f.targetNS.mac01 = raw[i++];
     f.targetNS.mac02 = raw[i++];
@@ -971,7 +1098,7 @@ constexpr uint8_t OLD_FUNC     = 0xCB;
 constexpr uint8_t OLD_DL       = 0x02;
 constexpr uint8_t OLD_ROOM     = 0x01;
 
-// Ajustes finos del checksum legacy (si tu firmware difiere, toca aquí)
+// Ajustes finos del checksum legacy (si tu firmware difiere, toca aquÃ­)
 constexpr bool     OLD_CHK_INCLUDE_START_END = true;   // incluye START y END en la suma
 constexpr uint8_t  OLD_CHK_EXTRA_ADDEND      = 0x01;   // +1 final (para que con COLOR=0x04 -> 0x4D)
 
