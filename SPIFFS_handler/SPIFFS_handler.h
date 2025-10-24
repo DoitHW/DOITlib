@@ -60,7 +60,7 @@ String generateUniqueFileName(const char* baseName);
 bool readElementData(fs::File& f, char* elementName, char* modeName, int& startX, int& startY);
 void loadElementsFromSPIFFS();
 void initializeDynamicOptions();
-byte getCurrentElementID();
+//byte getCurrentElementID();
 TARGETNS getCurrentElementNS();
 bool isCurrentElementSelected();
 bool checkMostSignificantBit(byte modeConfig[2]);

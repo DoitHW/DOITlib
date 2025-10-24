@@ -23,7 +23,7 @@ int lastReceivedTime = 0;
 volatile bool uartInterruptTriggered= false;
 extern uint16_t SERIAL_NUM;
 constexpr uint16_t FRAME_HEADER_BASE_LEN = 18;   // bytes desde room hasta checksum (sin datos)
-constexpr uint16_t FRAME_MIN_TOTAL_BYTES = 21;   // trama mÃ­nima completa (sin datos)
+constexpr uint16_t FRAME_MIN_TOTAL_BYTES = 21;   // trama mí­nima completa (sin datos)
 static TARGETNS s_localNS = {0,0,0,0,0};
 static uint8_t  s_localRoom = DEFAULT_ROOM;
 
@@ -72,7 +72,7 @@ void IRAM_ATTR onUartInterrupt() {
             continue;
         }
 
-        // ProtecciÃ³n de tamaÃ±o de buffer/longitud esperada
+        // Protección de tamaño de buffer/longitud esperada
         if ((uartBuffer.size() > 0xFF) || (expectedFrameLength > 0xFF)) {
             receiveState = WAITING_START;
             uartBuffer.clear();
@@ -115,14 +115,14 @@ void IRAM_ATTR onUartInterrupt() {
                 totalFrameLength = expectedFrameLength + 3; // + start + 2 bytes de len
 
                 if (totalFrameLength < MIN_FRAME_LENGTH) {
-                    // Longitud invÃ¡lida â†’ reset
+                    // Longitud inválida 
                     receiveState = WAITING_START;
                     uartBuffer.clear();
                     return;
                 }
 
                 receiveState = RECEIVING_FRAME;
-                receivedBytes = 3; // ya hemos leÃ­do start + 2 len
+                receivedBytes = 3; // ya hemos leí­do start + 2 len
                 break;
             }
 
@@ -130,18 +130,18 @@ void IRAM_ATTR onUartInterrupt() {
                 uartBuffer.push_back(receivedByte);
                 receivedBytes++;
 
-                // Sumamos TODO menos el byte de checksum (penÃºltimo)
+                // Sumamos TODO menos el byte de checksum (penúltimo)
                 if (receivedBytes != totalFrameLength - 1) {
                     calculatedChecksum += receivedByte;
                 } else {
-                    receivedChecksum = receivedByte; // penÃºltimo byte
+                    receivedChecksum = receivedByte; // penúltimo byte
                 }
                 while (calculatedChecksum > 0xFF)
                     calculatedChecksum = (calculatedChecksum & 0xFF) + (calculatedChecksum >> 8);
 
-                // Â¿Hemos cerrado la trama?
+                // ¿Hemos cerrado la trama?
                 if (receivedBytes == totalFrameLength) {
-                    // Ãšltimo byte debe ser NEW_END
+                    // Último byte debe ser NEW_END
                     if (receivedByte == NEW_END) {
                         if (calculatedChecksum == receivedChecksum) {
                             // ========= NUEVO BLOQUE DE DESTINATARIO =========
@@ -185,10 +185,10 @@ void IRAM_ATTR onUartInterrupt() {
                             // ========= FIN BLOQUE DESTINATARIO =========
 
                         } else {
-                            // checksum invÃ¡lido â†’ ignorar
+                            Serial.println("Checksum inválido. Ignorar");
                         }
                     } else {
-                        // END invÃ¡lido â†’ ignorar
+                        Serial1.println("Byte END inválido. Ignorar");
                     }
 
                     // Reset para la siguiente trama
@@ -196,7 +196,7 @@ void IRAM_ATTR onUartInterrupt() {
                     return;
                 }
 
-                // ProtecciÃ³n adicional de buffer
+                // Protección adicional de buffer
                 if (uartBuffer.size() >= MAX_BUFFER_SIZE) {
                     receiveState = WAITING_START;
                     uartBuffer.clear();
@@ -261,7 +261,7 @@ byte checksum_calc(const FRAME_T &f) {
 LAST_ENTRY_FRAME_T extract_info_from_frameIn(const std::vector<uint8_t> &frame) {
     LAST_ENTRY_FRAME_T result = {};
 
-    // Formato mÃ­nimo:
+    // Formato mí­nimo:
     // 0:START, 1:lenMSB, 2:lenLSB,
     // 3:room, 4:origin, 5..9:originNS(5),
     // 10:targetType, 11..15:targetNS(5),
@@ -301,7 +301,7 @@ LAST_ENTRY_FRAME_T extract_info_from_frameIn(const std::vector<uint8_t> &frame) 
     uint16_t dataLength = (static_cast<uint16_t>(frame[IDX_DLEN_MSB]) << 8) |
                            static_cast<uint16_t>(frame[IDX_DLEN_LSB]);
 
-    // Comprobar lÃ­mites antes de copiar
+    // Comprobar lí­mites antes de copiar
     if (IDX_DATA_START + dataLength <= frame.size()) {
         result.data.clear();
         result.data.reserve(dataLength);
@@ -762,12 +762,12 @@ FRAME_T frameMaker_RETURN_ELEM_SECTOR (uint8_t originin,
         if (sector_data) {
             frame.data.insert(frame.data.end(), sector_data, sector_data + count);
         } else {
-            // Si no hay puntero vÃ¡lido, rellena con ceros
+            // Si no hay puntero válido, rellena con ceros
             frame.data.insert(frame.data.end(), count, 0x00);
         }
     };
 
-    // Selecciona longitud de payload por tipo de sector y aÃ±ade bytes
+    // Selecciona longitud de payload por tipo de sector y añade bytes
     switch (sectorin) {
         // 5 bytes
         case ELEM_SERIAL_SECTOR:
@@ -952,22 +952,22 @@ FRAME_T frameMaker_SEND_RESPONSE(byte originin, byte targetType, TARGETNS target
     return f;
 }
 
-// Mapeo canÃ³nico: botÃ³n (1..9) â†’ Ã­ndice LED fÃ­sico (0..8)
+// Mapeo canónico: botón (1..9)  í­ndice LED fí­sico (0..8)
 static constexpr uint8_t kBtnIdToLedIdx[10] = {
   0xFF, // [0] no usado
-  8,    // 1 â†’ LED8 (AZUL)
-  6,    // 2 â†’ LED6 (VERDE)
-  4,    // 3 â†’ LED4 (AMARILLO)
-  2,    // 4 â†’ LED2 (ROJO)
-  0,    // 5 â†’ LED0 (RELE)
-  7,    // 6 â†’ LED7 (VIOLETA)
-  5,    // 7 â†’ LED5 (NARANJA)
-  3,    // 8 â†’ LED3 (CELESTE)
-  1     // 9 â†’ LED1 (BLANCO)
+  8,    // 1  LED8 (AZUL)
+  6,    // 2  LED6 (VERDE)
+  4,    // 3  LED4 (AMARILLO)
+  2,    // 4  LED2 (ROJO)
+  0,    // 5  LED0 (RELE)
+  7,    // 6  LED7 (VIOLETA)
+  5,    // 7  LED5 (NARANJA)
+  3,    // 8  LED3 (CELESTE)
+  1     // 9  LED1 (BLANCO)
 };
 
 
-// Coloca cada BUTTON en Button_00..08 segÃºn el LED fÃ­sico
+// Coloca cada BUTTON en Button_00..08 según el LED fí­sico
 static inline void putByLedIndex(COLORPAD_BTNMAP& m, uint8_t ledIndex, const BUTTON& b) {
     switch (ledIndex) {
         case 0: m.Button_00 = b; break;
@@ -983,7 +983,7 @@ static inline void putByLedIndex(COLORPAD_BTNMAP& m, uint8_t ledIndex, const BUT
     }
 }
 
-// Construye el COLORPAD_BTNMAP desde 9 â€œbotones lÃ³gicosâ€ (1..9)
+// Construye el COLORPAD_BTNMAP desde 9 â€œbotones lógicos (1..9)
 void buildColorpadFromBtnIdsV2(
     const BUTTON& b1, const BUTTON& b2, const BUTTON& b3,
     const BUTTON& b4, const BUTTON& b5, const BUTTON& b6,
@@ -1012,7 +1012,7 @@ FRAME_T frameMaker_SET_BUTTONS_EXTMAP(
     f.data.clear();
     f.data.resize(dlen);
 
-    // SerializaciÃ³n en orden fijo 0..8
+    // Serialización en orden fijo 0..8
     const BUTTON btns[9] = {
         map.Button_00, map.Button_01, map.Button_02,
         map.Button_03, map.Button_04, map.Button_05,
@@ -1056,7 +1056,7 @@ FRAME_T frameMaker_SET_BUTTONS_EXTMAP(
 
 void sendRawFrame(const std::vector<byte>& raw) {
     if (raw.size() < FRAME_MIN_TOTAL_BYTES) {
-        DEBUG__________ln("âŒ Trama demasiado corta para ser vÃ¡lida");
+        DEBUG__________ln("âŒ Trama demasiado corta para ser válida");
         return;
     }
 
@@ -1098,7 +1098,7 @@ constexpr uint8_t OLD_FUNC     = 0xCB;
 constexpr uint8_t OLD_DL       = 0x02;
 constexpr uint8_t OLD_ROOM     = 0x01;
 
-// Ajustes finos del checksum legacy (si tu firmware difiere, toca aquÃ­)
+// Ajustes finos del checksum legacy (si tu firmware difiere, toca aquí­)
 constexpr bool     OLD_CHK_INCLUDE_START_END = true;   // incluye START y END en la suma
 constexpr uint8_t  OLD_CHK_EXTRA_ADDEND      = 0x01;   // +1 final (para que con COLOR=0x04 -> 0x4D)
 

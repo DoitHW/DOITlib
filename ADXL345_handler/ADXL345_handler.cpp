@@ -64,28 +64,6 @@ SENSOR_VALUE_T ADXL345Handler::createSensorValue(long finalValue) {
     return sensorin;
 }
 
-// Función para enviar la trama
-void ADXL345Handler::sendSensorValue(const SENSOR_VALUE_T &sensorValue) {
-    std::vector<byte> targets;
-    
-    // Obtener la ID del elemento actualmente mostrado en pantalla
-    byte currentElementID = getCurrentElementID();
-    
-    if (currentElementID == 0xFF) {
-                                                                                        #ifdef DEBUG
-                                                                                            DEBUG__________ln("⚠️ Advertencia: No se pudo obtener la ID del elemento actual. No se enviará la trama.");                                                                            
-                                                                                        #endif
-        return;
-    }
-
-    // Usar la ID obtenida en lugar de 0xFF
-    targets.push_back(currentElementID);
-
-    //send_frame(frameMaker_SEND_SENSOR_VALUE(DEFAULT_BOTONERA, targets, sensorValue));
-   
-}
-
-
 
 // Verificar si el ADXL345 está inicializado
 bool ADXL345Handler::isInitialized() const {
@@ -196,12 +174,10 @@ void ADXL345Handler::readInclinations() {
             lastInclinationY = currY;
         }
     }
-
     // Actualizar referencia para siguiente comparación
     lastSampleX = currX;
     lastSampleY = currY;
 }
-
 
 SENSOR_DOUBLE_T ADXL345Handler::createSensorDoubleValue(long finalValueX, long finalValueY) {
     SENSOR_DOUBLE_T s;

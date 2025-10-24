@@ -13,7 +13,6 @@ class ADXL345Handler {
 public:
     ADXL345Handler();                  // Constructor
     void init();                      // Inicializar el acelerómetro
-    void sendSensorValue(const SENSOR_VALUE_T &sensorValue);
     long convertInclinationToValue(float inclination);
     SENSOR_VALUE_T createSensorValue(long finalValue);
     bool isInitialized() const;       // Verificar si está inicializado
