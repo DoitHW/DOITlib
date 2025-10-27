@@ -12,7 +12,6 @@
 
 
 extern bool BCframe;
-extern float varaux;
 extern CRGB* leds;
 extern byte numColorRec;
 

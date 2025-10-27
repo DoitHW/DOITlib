@@ -23,40 +23,40 @@ static inline bool nsEquals5(const uint8_t* a, const uint8_t* b) {
     return true;
 }
 
-static ELEM_UNIT_CONF deduceConfFromFile(fs::File &f) noexcept {
-    constexpr uint8_t kBasicModeIndex = 1; // Modo básico 1 (0-based)
+// static ELEM_UNIT_CONF deduceConfFromFile(fs::File &f) noexcept {
+//     constexpr uint8_t kBasicModeIndex = 1; // Modo básico 1 (0-based)
  
-    // Comprobación rápida de tamaño mínimo para alcanzar el bloque de flags
-    const size_t cfgOff = OFFSET_MODES + (SIZE_MODE * kBasicModeIndex) + (24 + 192); // al final de cada modo
-    if (f.size() < (cfgOff + 2)) return NO_ELEM;
+//     // Comprobación rápida de tamaño mínimo para alcanzar el bloque de flags
+//     const size_t cfgOff = OFFSET_MODES + (SIZE_MODE * kBasicModeIndex) + (24 + 192); // al final de cada modo
+//     if (f.size() < (cfgOff + 2)) return NO_ELEM;
 
-    uint8_t modeCfg[2] = {0, 0};
-    f.seek(cfgOff, SeekSet);
-    if (f.read(modeCfg, 2) != 2) return NO_ELEM;
+//     uint8_t modeCfg[2] = {0, 0};
+//     f.seek(cfgOff, SeekSet);
+//     if (f.read(modeCfg, 2) != 2) return NO_ELEM;
 
-    // Solo interesa COLOR básico y RELÉ según tu petición
-    const bool hasColor  = getModeFlag(modeCfg, HAS_BASIC_COLOR);
-    const bool hasAction = getModeFlag(modeCfg, HAS_RELAY);  // ajusta si usas HAS_RELAY_1/_2
+//     // Solo interesa COLOR básico y RELÉ según tu petición
+//     const bool hasColor  = getModeFlag(modeCfg, HAS_BASIC_COLOR);
+//     const bool hasAction = getModeFlag(modeCfg, HAS_RELAY);  // ajusta si usas HAS_RELAY_1/_2
 
-    if (hasColor && hasAction) return COLOR_ACTION;
-    if (hasColor)               return COLOR;
-    if (hasAction)              return ACTION;
-    return NO_ELEM;
-}
+//     if (hasColor && hasAction) return COLOR_ACTION;
+//     if (hasColor)               return COLOR;
+//     if (hasAction)              return ACTION;
+//     return NO_ELEM;
+// }
 
 // Devuelve la lista ordenada y filtrada de ficheros de elementos válidos en SPIFFS
-static std::vector<String> listElementFiles() {
-    std::vector<String> files;
-    File root = SPIFFS.open("/");
-    for (File f = root.openNextFile(); f; f = root.openNextFile()) {
-        const String name = f.name();
-        if (name.startsWith("/element_") && name.endsWith(".bin") && name.indexOf("_icon") < 0) {
-            files.push_back(name);
-        }
-    }
-    std::sort(files.begin(), files.end());
-    return files;
-}
+// static std::vector<String> listElementFiles() {
+//     std::vector<String> files;
+//     File root = SPIFFS.open("/");
+//     for (File f = root.openNextFile(); f; f = root.openNextFile()) {
+//         const String name = f.name();
+//         if (name.startsWith("/element_") && name.endsWith(".bin") && name.indexOf("_icon") < 0) {
+//             files.push_back(name);
+//         }
+//     }
+//     std::sort(files.begin(), files.end());
+//     return files;
+// }
 
 static inline uint8_t confFromModeCfg(const uint8_t modeCfg[2]) noexcept {
     const bool hasColor  = getModeFlag(const_cast<uint8_t*>(modeCfg), HAS_BASIC_COLOR);
@@ -92,7 +92,7 @@ static void buildRoomNsPack32(std::array<uint8_t, 32 * 6> &out) {
         // 2) Flags del modo básico
         uint8_t modeCfg[2] = {0,0};
         if (!getModeConfig(file, kBasicModeIndex, modeCfg)) {
-            // si falla la config, dejamos conf=NO_ELEM pero SÃ enviamos el NS para depurar
+            // si falla la config, dejamos conf=NO_ELEM pero Sí enviamos el NS para depurar
             // (opcional) continue; // si prefieres no enviar tampoco el NS en este caso
         }
 
@@ -119,7 +119,7 @@ BOTONERA_::BOTONERA_() : ELEMENT_() {
             set_type(TYPE_BOTONERA);
         }
 
-void BOTONERA_::botonera_begin(){}
+// void BOTONERA_::botonera_begin(){}
 
 static inline bool inRange(uint8_t x, uint8_t a, uint8_t b) { return x >= a && x <= b; }
 
@@ -174,7 +174,7 @@ static String sectorName(uint8_t s) {
         case ELEM_DESC_SECTOR:            return "ELEM_DESC_SECTOR";
         case ELEM_LOCATION_SECTOR:        return "ELEM_LOCATION_SECTOR";
         case ELEM_SERIAL_SECTOR:          return "ELEM_SERIAL_SECTOR";
-        case ELEM_ID_SECTOR:              return "ELEM_ID_SECTOR";
+        case ELEM_UNUSED_SECTOR:          return "ELEM_UNUSED_SECTOR";
         case ELEM_CMODE_SECTOR:           return "ELEM_CMODE_SECTOR";
         case ELEM_MOST_USED_MODE_SECTOR:    return "ELEM_MOST_USED_MODE_SECTOR";
         case ELEM_MOST_USED_COLOR_SECTOR:   return "ELEM_MOST_USED_COLOR_SECTOR";
@@ -208,7 +208,7 @@ static String sectorName(uint8_t s) {
 }
 
 // ===== Estado global de habilitación por LED (0..8) =====
-// ===== Utilidades de color (pueden ir en el .cpp arriba de la función) =====
+// ===== Utilidades de color =====
 static inline const char* fnColor(uint8_t fn) {
     if (fn >= 0xA0 && fn <= 0xAF) return COLOR_BRIGHT_YELLOW;   // REQ
     if (fn >= 0xB0 && fn <= 0xBF) return COLOR_BRIGHT_CYAN;     // SET
@@ -222,7 +222,7 @@ static inline const char* sectorColor(uint8_t sector) {
     // Ajusta a tus enums reales
     if (sector == ELEM_NAME_SECTOR || sector == ELEM_DESC_SECTOR || sector == ELEM_LOCATION_SECTOR) return COLOR_BRIGHT_WHITE;
     if (sector == ELEM_SERIAL_SECTOR)        return COLOR_BRIGHT_CYAN;
-    if (sector == ELEM_ID_SECTOR)            return COLOR_BRIGHT_YELLOW;
+    if (sector == ELEM_UNUSED_SECTOR)        return COLOR_BRIGHT_YELLOW;
     if (sector == ELEM_CMODE_SECTOR)         return COLOR_BRIGHT_YELLOW;
     if (sector == ELEM_FLAG_STATE_SECTOR || sector == ELEM_CURRENT_FLAGS_SECTOR || isModeFlag(sector)) return COLOR_BRIGHT_MAGENTA;
     if (isIconRow(sector))                   return COLOR_BRIGHT_BLUE;
@@ -333,7 +333,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
         case 0xC1: functionStr = "F_SEND_COLOR"; break;
         case 0xC2: functionStr = "F_SEND_RGB"; break;
         case 0xC3: functionStr = "F_SEND_BRIGHTNESS"; break;
-        case 0xC5: functionStr = "F_SEND_BRIGHTNESS"; break;
+        case 0xC5: functionStr = "F_SEND_RESPONSE"; break;
         case 0xCA: functionStr = "F_SEND_SENSOR_VALUE"; break;
         case 0xCB: functionStr = "F_SEND_SENSOR_VALUE_2"; break;
         case 0xCC: functionStr = "F_SEND_FILE_NUM"; break;
@@ -351,7 +351,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
 
     // Datos
     DPRINTF_COLOR(COLOR_DIM, "DataLen: %u bytes\n", (unsigned)LEF.data.size());
-    DPRINTLN_COLOR(COLOR_DIM, "Data:    ");
+    DPRINTF_COLOR(COLOR_DIM, "Data: ");
 
     if (LEF.data.empty()) {
         DPRINTLN_COLOR(COLOR_DIM, "No hay datos para esta función.");
@@ -409,7 +409,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
                 DPRINTF_COLOR(COLOR_BRIGHT_CYAN, "Serial DEC: %lu\n", (unsigned long)ser);
             }
 
-        } else if (sector == ELEM_ID_SECTOR) {
+        } else if (sector == ELEM_UNUSED_SECTOR) {
             if (pLen >= 1) DPRINTF_COLOR(COLOR_BRIGHT_YELLOW, "ID: %u (0x%02X)\n", LEF.data[pStart], LEF.data[pStart]);
             else           DPRINTLN_COLOR(COLOR_DIM, "ID sin payload.");
 
@@ -554,7 +554,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
                 DPRINTLN_COLOR(COLOR_DIM, "Trama SENSOR CB incompleta (esperados 6 bytes).");
             }
 
-        } else if (LEF.function == 0xC1) {
+        } else if (LEF.function == F_SEND_COLOR) {
             // Color básico
             String colorName;
             switch (LEF.data[0]) {
@@ -619,6 +619,26 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
                 DPRINTLN_COLOR(COLOR_DIM, "Trama FILE_NUM incompleta (esperados 2 bytes).");
             }
 
+        } else if (LEF.function == F_SEND_RESPONSE) {
+            if (inCognitiveMenu) DPRINTF_COLOR(COLOR_DIM, "Response recibido: %d\n", LEF.data[0]);
+            else{
+                DPRINTF_COLOR(COLOR_DIM, "Response recibido fuera de modo COG → interpretado como color ");
+
+                String colorName;
+                switch (LEF.data[0]) {
+                    case 0: colorName = "BLANCO";   break;
+                    case 1: colorName = "AMARILLO"; break;
+                    case 2: colorName = "NARANJA";  break;
+                    case 3: colorName = "ROJO";     break;
+                    case 4: colorName = "VIOLETA";  break;
+                    case 5: colorName = "AZUL";     break;
+                    case 6: colorName = "CELESTE";  break;
+                    case 7: colorName = "VERDE";    break;
+                    case 8: colorName = "NEGRO";    break;
+                    default: colorName = "DESCONOCIDO"; break;
+                }
+                DPRINTF_COLOR(COLOR_BRIGHT_GREEN, "→ %s (0x%02X)\n", colorName.c_str(), LEF.data[0]);
+            }
         } else if (LEF.function == F_SEND_COMMAND) {
             // Comandos
             if (!LEF.data.empty()) {
@@ -705,7 +725,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
  * @brief Despacha y atiende un frame RX de control para la botonera.
  *
  * Procesa el campo de función de @p LEF y ejecuta la acción correspondiente:
- * sincronización de sector, actualización de estado de relÃ©, reproducción de
+ * sincronización de sector, actualización de estado de relí©, reproducción de
  * sonidos y gestión de comandos (p. ej., modo cognitivo y respuestas WIN/FAIL).
  *
  * @param LEF Estructura de frame recibido. Se espera que contenga:
@@ -723,7 +743,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
  * @note Las dependencias externas (`RelayStateManager`, `doitPlayer`, `activateCognitiveMode`,
  * `deactivateCognitiveMode`, `printFrameInfo`, `sectorIn_handler`, etc.) deben estar disponibles.
  *
- * @warning Este manejador asume que `LEF.data` ofrece al menos 1â€“2 bytes según la función.
+ * @warning Este manejador asume que `LEF.data` ofrece al menos 12 bytes según la función.
  * Validar tamaño aguas arriba para evitar accesos fuera de rango.
  *
  * @see activateCognitiveMode, deactivateCognitiveMode, RelayStateManager::set, doitPlayer.play_file
@@ -780,7 +800,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
     #endif
 
     // Constantes
-    constexpr uint8_t kFlagsBit0Mask    = 0x01u; // Bit 0: estado del relÃ© remoto.
+    constexpr uint8_t kFlagsBit0Mask    = 0x01u; // Bit 0: estado del relí© remoto.
     constexpr uint8_t kIdx0             = 0u;
     constexpr uint8_t kIdx1             = 1u;
     constexpr uint8_t kLangStride       = 10u;
@@ -829,11 +849,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
             // Esperamos 55 bytes exactos: 1 + 9*6
             if (d.size() != (size_t)(1 + 9 * 6)) break;
 
-            // auto colorFrom = [&](uint8_t numColor, uint8_t r, uint8_t g, uint8_t b) -> CRGB {
-            //     if (numColor == BTN_RGB_DIRECT) return CRGB(r, g, b);
-            //     return colorHandler.colorFromIndex(numColor); // tu paleta
-            // };
-
+           
             auto colorFrom = [&](uint8_t numColor, uint8_t r, uint8_t g, uint8_t b) -> CRGB {
                 if (numColor == BTN_RGB_DIRECT)
                     return CRGB(r, g, b);
@@ -932,7 +948,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
                     }
 
                     case BTN_FX::BUBBLES_FX: {
-                        // Nuevo efecto global especÃ­fico de "burbujas" (no Sparkle)
+                        // Nuevo efecto global especí­fico de "burbujas" (no Sparkle)
                         unsigned ms = 30; uint8_t dens = 28; uint8_t fade = 40;
                         ledManager.addEffect(new BubblesGlobalEffect(colorHandler, base, ms, dens, fade));
                         // Base como rellenado suave para que se vea ambiente
@@ -1007,7 +1023,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
                     }
 
                     case BTN_FX::LOADING: {
-                    // Punto que recorre de izq -> dcha cÃ­clicamente con pequeña cola
+                    // Punto que recorre de izq -> dcha cí­clicamente con pequeña cola
                     // Velocidad sugerida: ~40 ms/step (ajustable)
                     const unsigned periodMs = 40;
                     const uint8_t  trailLen = 2;   // nº de LEDs de la cola
@@ -1160,9 +1176,9 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
             // if (originType == DEFAULT_CONSOLE || originType == DEFAULT_BOTONERA) {
             //     respNS = TARGETNS{0,0,0,0,0};
             // } 
-            // // 2) Habilitar el â€œmodo respuesta en los pulsadores
+            // // 2) Habilitar el modo respuesta en los pulsadores
             // PulsadoresHandler::setResponseRoute(originType, respNS);
-            uint8_t originType = LEF.origin;                                  // <-- Nueva lÃ­nea
+            uint8_t originType = LEF.origin;                                  // <-- Nueva lí­nea
             PulsadoresHandler::setResponseRoute(originType, getOwnNS());
             FastLED.show();
             break;
@@ -1183,7 +1199,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
                 extractSenderNS_fromSectorPayload(LEF.data, originNS);
             }
 
-            // ReenvÃ­a SOLO el sector en data[0] sectorIn_handler lo espera asÃ­.
+            // Reenví­a SOLO el sector en data[0] sectorIn_handler lo espera así­.
             std::vector<uint8_t> data1{ sectorRequested };
             DEBUG__________ln("sectorRequested: " + String(sectorRequested));
             DEBUG__________ln("originNS: " + String(originNS.mac01) + ":" + String(originNS.mac02) + ":" +
@@ -1216,14 +1232,13 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
 
             // NS estado de relé (sin fallback a ID)
             RelayStateManager::set(senderNS, flags_bit0);
-            DEBUG__________printf("RelÃ© [%02X:%02X:%02X:%02X:%02X] => %s\n",
+            DEBUG__________printf("Relí© [%02X:%02X:%02X:%02X:%02X] => %s\n",
                                   senderNS.mac01, senderNS.mac02, senderNS.mac03, senderNS.mac04, senderNS.mac05,
                                   flags_bit0 ? "ON" : "OFF");
             break;
         }
 
         case F_SEND_COLOR: {
-            // Sin cambios (no usa IDs)
             break;
         }
 
@@ -1249,6 +1264,11 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
             } else {
                 DEBUG__________ln("F_SEND_FILE_NUM con datos insuficientes.");
             }
+            break;
+        }
+
+        case F_SEND_RESPONSE: {
+            DEBUG__________ln("Recibido un RESPONSE");
             break;
         }
 
@@ -1324,7 +1344,7 @@ static inline bool isSpiffsPath(const String& s) {
  * cuando corresponde.
  *
  * @param data Trama recibida. Formato: data[0] = código de sector; según sector, se
- *             requiere data[1] (p.ej. modo/flags). Longitud mÃ­nima: 1 byte.
+ *             requiere data[1] (p.ej. modo/flags). Longitud mí­nima: 1 byte.
  * @param targetin Identificador del elemento remoto (ID origen del frame).
  *
  * @return void
@@ -1335,7 +1355,7 @@ static inline bool isSpiffsPath(const String& s) {
  *
  * @note En ELEM_CMODE_SECTOR: data[1] = modo actual; se persiste en OFFSET_CURRENTMODE,
  *       se actualizan flags de sensores y patrón de color del elemento actual.
- * @note En ELEM_CURRENT_FLAGS_SECTOR: data[1] usa el bit 0 como estado ON/OFF del relÃ©.
+ * @note En ELEM_CURRENT_FLAGS_SECTOR: data[1] usa el bit 0 como estado ON/OFF del relí©.
  *
  * @warning Este manejador accede a data[1] en algunos sectores. Si la trama no tiene
  *          al menos 2 bytes, se ignora el sector con traza de depuración.
@@ -1350,7 +1370,7 @@ void BOTONERA_::sectorIn_handler(const std::vector<byte>& data,
     // Validación inicial de trama
     // ----------------------------
     if (data.size() < 1) {
-        DEBUG__________ln("Error: sectorIn_handler ha recibido una trama vacÃ­a.");
+        DEBUG__________ln("Error: sectorIn_handler ha recibido una trama vací­a.");
         return;
     }
 
@@ -1426,20 +1446,20 @@ void BOTONERA_::sectorIn_handler(const std::vector<byte>& data,
     switch (sector) {
 
         case ELEM_ROOM_NS_PACK: {
-            // DEBUG__________ln("RECIBIDO UN ELEM_ROOM_NS_PACK");
-            // // Construye payload de 192B  32*(NS[5]+conf[1])
-            // std::array<uint8_t, 32 * 6> payload{};
-            // buildRoomNsPack32(payload);
+            DEBUG__________ln("RECIBIDO UN ELEM_ROOM_NS_PACK");
+            // Construye payload de 192B  32*(NS[5]+conf[1])
+            std::array<uint8_t, 32 * 6> payload{};
+            buildRoomNsPack32(payload);
 
-            // // Respuesta: dirigimos por NS al que ha hecho la petición.
-            // // targetType debe ser direccionamiento por NS  DEFAULT_DEVICE (0xDD)
-            // send_frame(frameMaker_RETURN_ELEM_SECTOR(
-            //     DEFAULT_BOTONERA,                 // originin (esta BOTONERA)
-            //     originType,                       // targetType = 0xDD (por NS)
-            //     originNS,                         // targetNS (del requester)
-            //     payload.data(),                   // 192 bytes
-            //     ELEM_ROOM_NS_PACK                 // sector
-            // ));
+            // Respuesta: dirigimos por NS al que ha hecho la petición.
+            // targetType debe ser direccionamiento por NS  DEFAULT_DEVICE (0xDD)
+            send_frame(frameMaker_RETURN_ELEM_SECTOR(
+                DEFAULT_BOTONERA,                 // originin (esta BOTONERA)
+                originType,                       // targetType = 0xDD (por NS)
+                originNS,                         // targetNS (del requester)
+                payload.data(),                   // 192 bytes
+                ELEM_ROOM_NS_PACK                 // sector
+            ));
             break;
         }
 
@@ -1461,10 +1481,10 @@ void BOTONERA_::sectorIn_handler(const std::vector<byte>& data,
             }
             const byte receivedMode = data[kCModeIdx];
 
-            // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            
             // Fallback: respuesta unicast por ID SIN NS (00:00:00:00:00)
             // durante foco/consulta directa. Usamos pendingQueryIndex.
-            // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            
             if (isZeroNS(originNS)) {
                 if (pendingQueryIndex >= 0 && pendingQueryIndex < (int)elementFiles.size()) {
                     const String currentFile = elementFiles[pendingQueryIndex];
@@ -1553,12 +1573,10 @@ void BOTONERA_::sectorIn_handler(const std::vector<byte>& data,
                 } else {
                     DEBUG__________ln("Respuesta sin NS pero pendingQueryIndex inválido; no se puede aplicar.");
                 }
-                // Si llegamos aquÃ­, dejamos continuar a la rama por NS real (por si aplica).
+                // Si llegamos aquí­, dejamos continuar a la rama por NS real (por si aplica).
             }
 
-            // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             // 0) Elementos en RAM por NS (no tocar SPIFFS)
-            // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             {
                 INFO_PACK_T* ramOpt = nullptr;
                 String       ramName;
@@ -1593,11 +1611,8 @@ void BOTONERA_::sectorIn_handler(const std::vector<byte>& data,
                     break; // RAM: no seguimos con SPIFFS
                 }
             }
-
-            // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            // 1) Elementos de SPIFFS (buscar por NS)
-            // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            // 1) Elementos de SPIFFS (buscar por NS) â€” robusto con fallback a pendingQueryNS
+    
+            // 1) Elementos de SPIFFS (buscar por NS)  robusto con fallback a pendingQueryNS
             auto isZeroNS = [](const TARGETNS& ns) {
                 return ns.mac01==0 && ns.mac02==0 && ns.mac03==0 && ns.mac04==0 && ns.mac05==0;
             };
@@ -1641,7 +1656,7 @@ void BOTONERA_::sectorIn_handler(const std::vector<byte>& data,
             // 3) Redibujar pantalla
             drawCurrentElement();
 
-            // 4) Actualizar estado de selección por NS (SÃ“LO SPIFFS)
+            // 4) Actualizar estado de selección por NS (Sí“LO SPIFFS)
             for (size_t i = 0; i < elementFiles.size(); ++i) {
                 const String &path = elementFiles[i];
                 if (!isSpiffsPath(path)) continue;
@@ -1665,7 +1680,7 @@ void BOTONERA_::sectorIn_handler(const std::vector<byte>& data,
                                             path.c_str(),
                                             selectedStates[i] ? "Seleccionado" : "No seleccionado");
                     } else {
-                        DEBUG__________ln("selectedStates desincronizado con elementFiles (Ã­ndice fuera de rango).");
+                        DEBUG__________ln("selectedStates desincronizado con elementFiles (í­ndice fuera de rango).");
                     }
 
                     if ((int)i == currentIndex) {
@@ -1679,7 +1694,7 @@ void BOTONERA_::sectorIn_handler(const std::vector<byte>& data,
             if ((size_t)currentIndex < elementFiles.size()) {
                 const String currentFile = elementFiles[currentIndex];
                 if (isSpiffsPath(currentFile)) {
-                    // Â¿El visible actual es el mismo NS?
+                    //¿El visible actual es el mismo NS?
                     bool sameNS = false;
                     {
                         fs::File f = SPIFFS.open(currentFile, "r");
@@ -1779,7 +1794,7 @@ bool BOTONERA_::guardar_elemento(INFO_PACK_T* infoPack) {
         success &= writeBytesChecked(file, (uint8_t*)infoPack->icono[y], ICON_COLUMNS * 2);
     }
 
-    // DespuÃ©s del icono
+    // Despuí©s del icono
     success &= writeBytesChecked(file, &infoPack->situacion, 1);
 
 
@@ -1806,12 +1821,12 @@ bool BOTONERA_::esperar_respuesta(uint8_t expectedSector,
 
     while ((int32_t)(deadline - millis()) > 0) {
 
-        // --- PUMP RX: procesar cualquier frame pendiente aquÃ­ mismo ---
+        // --- PUMP RX: procesar cualquier frame pendiente aquí­ mismo ---
         // (equivalente a lo que haces en el loop principal)
         while (frameReceived) {
             frameReceived = false;
             LAST_ENTRY_FRAME_T lef = extract_info_from_frameIn(uartBuffer);
-            // OJO: llamamos al handler aquÃ­ mismo.
+            // OJO: llamamos al handler aquí­ mismo.
             // Si scanInProgress==true y la función es F_RETURN_ELEM_SECTOR,
             // nuestro RX_main_handler encolará en rxSectorInbox y hará 'return'.
             this->RX_main_handler(lef);
@@ -1959,7 +1974,7 @@ void BOTONERA_::mostrarMensajeTemporal(int respuesta, int dTime) {
         colorTexto = TFT_GREEN;
         mensajePrincipal  = getTranslation("SUCCESS");
         mensajeSecundario = getTranslation("ROOM_UPDATED");
-    } else if (respuesta == 3) { // ERROR ESPECÃFICO
+    } else if (respuesta == 3) { // ERROR ESPECíFICO
         colorTexto = TFT_RED;
         mensajePrincipal = "ERROR";
         mensajeSecundario = "Fallo en la operación";
@@ -2043,7 +2058,7 @@ bool inCognitiveMenu = false;
 void BOTONERA_::activateCognitiveMode() {
     inCognitiveMenu = true;
     drawCognitiveMenu();
-    //colorHandler.mapCognitiveLEDs(); // función que veremos abajo
+    colorHandler.mapCognitiveLEDs(); // función que veremos abajo
 }
 
 void BOTONERA_::deactivateCognitiveMode() {
@@ -2160,7 +2175,7 @@ void BOTONERA_::escanearSala()
 
     for (const auto& ns : discovered) {
         if (serialExists(ns)) {
-            DEBUG__________printf("âœ” Ya existe en SPIFFS: %s (omitido)\n", nsToStr(ns).c_str());
+            DEBUG__________printf("Ya existe en SPIFFS: %s (omitido)\n", nsToStr(ns).c_str());
             continue;
         }
 
@@ -2184,7 +2199,7 @@ void BOTONERA_::escanearSala()
             bool ok = false;
             for (int attempt = 0; attempt <= kRetriesPerSector && !ok; ++attempt) {
 
-                // Unicast por NS â€” firma EXACTA que usas:
+                // Unicast por NS firma EXACTA que usas:
                 send_frame(frameMaker_REQ_ELEM_SECTOR(
                     DEFAULT_BOTONERA,            // origin (0xDB)
                     DEFAULT_DEVICE,              // targetType (0xDD  elemento)
@@ -2212,16 +2227,16 @@ void BOTONERA_::escanearSala()
         }
 
         if (fallos) {
-            DEBUG__________printf("âŒ Error descargando sectores para NS %s (se omite alta)\n", nsToStr(ns).c_str());
+            DEBUG__________printf("Error descargando sectores para NS %s (se omite alta)\n", nsToStr(ns).c_str());
             continue;
         }
 
         // SIN ID: guardar_elemento no debe persistir ningún campo de ID
         if (guardar_elemento(&info)) {
-            DEBUG__________printf("âœ… Guardado en SPIFFS (NS %s)\n", nsToStr(ns).c_str());
+            DEBUG__________printf(" Guardado en SPIFFS (NS %s)\n", nsToStr(ns).c_str());
             huboAltas = true;
         } else {
-            DEBUG__________printf("âŒ Error guardando (NS %s)\n", nsToStr(ns).c_str());
+            DEBUG__________printf("Error guardando (NS %s)\n", nsToStr(ns).c_str());
         }
     }
 
@@ -2236,19 +2251,19 @@ void BOTONERA_::escanearSala()
     DEBUG__________ln("=== FIN ESCANEO DE SALA (NS) ===");
 }
 
-// Función para mostrar texto multilÃ­nea ajustado al ancho máximo sin romper palabras
-void BOTONERA_::iniciarEscaneoElemento(const char* mensajeInicial) {
-    tft.fillScreen(TFT_BLACK);      // limpia TODO (solo aquÃ­)
-    //dibujarMarco(TFT_WHITE);        // marco fijo
+// Función para mostrar texto multilí­nea ajustado al ancho máximo sin romper palabras
+// void BOTONERA_::iniciarEscaneoElemento(const char* mensajeInicial) {
+//     tft.fillScreen(TFT_BLACK);      // limpia TODO (solo aquí­)
+//     //dibujarMarco(TFT_WHITE);        // marco fijo
 
-    // muestra MULTILÃNEA (nombre + ID)
-    mostrarTextoAjustado(tft,
-                         mensajeInicial,
-                         64,   // centro X
-                         30,   // Y inicial
-                         120); // ancho máximo de texto
-    delay(100);
-}
+//     // muestra MULTILíNEA (nombre + ID)
+//     mostrarTextoAjustado(tft,
+//                          mensajeInicial,
+//                          64,   // centro X
+//                          30,   // Y inicial
+//                          120); // ancho máximo de texto
+//     delay(100);
+// }
 
 
 void BOTONERA_::actualizarBarraProgreso2(int pasoActual,
@@ -2258,7 +2273,7 @@ void BOTONERA_::actualizarBarraProgreso2(int pasoActual,
     const int W = tft.width();    // 128
     const int H = tft.height();   // 128
 
-    // Ãrea de contenido (antes card); ya SIN marco
+    // írea de contenido (antes card); ya SIN marco
     const int cardW = 112;
     const int cardH = 96;
     const int cardX = (W - cardW) / 2; // 8
@@ -2284,7 +2299,7 @@ void BOTONERA_::actualizarBarraProgreso2(int pasoActual,
     const int contentW = cardW - 24;
 
     // Barra centrada verticalmente y MÁS ancha/gruesa
-    const int barH = 14;                                // â†‘ grosor (ajustable)
+    const int barH = 14;                                // grosor (ajustable)
     const int barX = contentX;                          // ocupa todo el ancho útil
     const int barW = contentW;
     const int barY = cardY + (cardH/2) - (barH/2);      // centrada vertical
@@ -2293,7 +2308,6 @@ void BOTONERA_::actualizarBarraProgreso2(int pasoActual,
     const int pctYOffset = 10;                          // separación (ajustable)
     const int pctY = barY + barH + pctYOffset;
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Estado animación / suavizado â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     static bool     s_init=false;
     static uint32_t s_lastMs=0;
     static float    s_progSmooth=0.0f;
@@ -2316,7 +2330,7 @@ void BOTONERA_::actualizarBarraProgreso2(int pasoActual,
     s_progSmooth = constrain(s_progSmooth, 0.0f, 1.0f);
     const int progW = (int)(barW * s_progSmooth + 0.5f);
 
-    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Dibujo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ===== DIBUJO =====
     uiSprite.fillSprite(BACKGROUND_COLOR);
 
     // Cabecera (opcional)
@@ -2337,7 +2351,7 @@ void BOTONERA_::actualizarBarraProgreso2(int pasoActual,
         uiSprite.setTextFont(2);       // fuente integrada 16 px alto
         uiSprite.setTextSize(1);
 
-        // âš ï¸ opcional: volver a medir para comprobar que ahora sÃ­ cabe
+        //opcional: volver a medir para comprobar que ahora sí­ cabe
     }
 
     uiSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
@@ -2376,26 +2390,26 @@ void BOTONERA_::actualizarBarraProgreso2(int pasoActual,
 
 // Busca el fichero de SPIFFS asociado a un elemento por su NS (5 bytes)
 
-String BOTONERA_::getFilePathBySerial(const TARGETNS& ns) {
-    // Recorremos la lista ya cargada por loadElementsFromSPIFFS()
-    for (const String& filePath : elementFiles) {
-        fs::File f = SPIFFS.open(filePath, "r");
-        if (!f) continue;
+// String BOTONERA_::getFilePathBySerial(const TARGETNS& ns) {
+//     // Recorremos la lista ya cargada por loadElementsFromSPIFFS()
+//     for (const String& filePath : elementFiles) {
+//         fs::File f = SPIFFS.open(filePath, "r");
+//         if (!f) continue;
 
-        // Verificación rápida de tamaño (usa tu MIN_VALID_ELEMENT_SIZE o uno ajustado)
-        if (f.size() < (size_t)(OFFSET_SERIAL + 5)) { f.close(); continue; }
+//         // Verificación rápida de tamaño (usa tu MIN_VALID_ELEMENT_SIZE o uno ajustado)
+//         if (f.size() < (size_t)(OFFSET_SERIAL + 5)) { f.close(); continue; }
 
-        byte serial[5];
-        if (f.seek(OFFSET_SERIAL, SeekSet) && f.read(serial, 5) == 5) {
-            if (memcmp(serial, &ns, 5) == 0) {
-                f.close();
-                return filePath; // Â¡Encontrado!
-            }
-        }
-        f.close();
-    }
-    return String(); // no encontrado
-}
+//         byte serial[5];
+//         if (f.seek(OFFSET_SERIAL, SeekSet) && f.read(serial, 5) == 5) {
+//             if (memcmp(serial, &ns, 5) == 0) {
+//                 f.close();
+//                 return filePath; //¡Encontrado!
+//             }
+//         }
+//         f.close();
+//     }
+//     return String(); // no encontrado
+// }
 
 bool BOTONERA_::procesar_sector_NS(int sector,
                                    INFO_PACK_T* info,
@@ -2464,7 +2478,7 @@ bool BOTONERA_::procesar_sector_NS(int sector,
             info->serialNum[4] = p[4];
             return true;
 
-        case ELEM_ID_SECTOR:
+        case ELEM_UNUSED_SECTOR:
             
             return true;
 
@@ -2500,7 +2514,7 @@ bool BOTONERA_::procesar_sector_NS(int sector,
                 }
                 return true;
             }
-            return true; // no crÃ­tico
+            return true; // no crí­tico
     }
 }
 

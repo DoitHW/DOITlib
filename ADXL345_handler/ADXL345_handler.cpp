@@ -9,7 +9,7 @@ ADXL345Handler adxl345Handler;
 
 // Constructor
 ADXL345Handler::ADXL345Handler() 
-    : accel(Adafruit_ADXL345_Unified(12345)), lastInclination(0.0), threshold(0.4), thresholdBinary(0.7), initialized(false) {}
+    : accel(Adafruit_ADXL345_Unified(12345)), /*lastInclination(0.0),*/ threshold(0.4), thresholdBinary(0.7), initialized(false) {}
 
 // Inicialización del ADXL345
 void ADXL345Handler::init()
@@ -53,27 +53,27 @@ long ADXL345Handler::convertInclinationToValue(float inclination) {
 }
 
 // Función para empaquetar el valor en SENSOR_VALUE_T
-SENSOR_VALUE_T ADXL345Handler::createSensorValue(long finalValue) {
-    SENSOR_VALUE_T sensorin;
-    sensorin.lsb_min = 0x00;
-    sensorin.msb_min = 0x00;
-    sensorin.msb_max = 0x07;
-    sensorin.lsb_max = 0xD0;
-    sensorin.msb_val = (byte)(finalValue >> 8);
-    sensorin.lsb_val = (byte)(finalValue & 0xFF);
-    return sensorin;
-}
+// SENSOR_VALUE_T ADXL345Handler::createSensorValue(long finalValue) {
+//     SENSOR_VALUE_T sensorin;
+//     sensorin.lsb_min = 0x00;
+//     sensorin.msb_min = 0x00;
+//     sensorin.msb_max = 0x07;
+//     sensorin.lsb_max = 0xD0;
+//     sensorin.msb_val = (byte)(finalValue >> 8);
+//     sensorin.lsb_val = (byte)(finalValue & 0xFF);
+//     return sensorin;
+// }
 
 
 // Verificar si el ADXL345 está inicializado
-bool ADXL345Handler::isInitialized() const {
-    return initialized;
-}
+// bool ADXL345Handler::isInitialized() const {
+//     return initialized;
+// }
 
 // Establecer un nuevo umbral
-void ADXL345Handler::setThreshold(float newThreshold) {
-    threshold = newThreshold;
-}
+// void ADXL345Handler::setThreshold(float newThreshold) {
+//     threshold = newThreshold;
+// }
 
 void ADXL345Handler::end()
 {
@@ -170,8 +170,8 @@ void ADXL345Handler::readInclinations() {
             long valY = convertInclinationToValue(currY);
             SENSOR_DOUBLE_T sensorVal = createSensorDoubleValue(valX, valY);
             sendSensorValueDouble(sensorVal);
-            lastInclinationX = currX;
-            lastInclinationY = currY;
+            //lastInclinationX = currX;
+            //lastInclinationY = currY;
         }
     }
     // Actualizar referencia para siguiente comparación
@@ -207,9 +207,9 @@ void ADXL345Handler::sendSensorValueDouble(const SENSOR_DOUBLE_T &sensorValue) {
     }
 
     if (!isValid) {
-#ifdef DEBUG
-        DEBUG__________ln("⚠️ No se pudo obtener el número de serie del elemento. Trama no enviada.");
-#endif
+        #ifdef DEBUG
+                DEBUG__________ln("⚠️ No se pudo obtener el número de serie del elemento. Trama no enviada.");
+        #endif
         return;
     }
 

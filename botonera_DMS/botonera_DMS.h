@@ -36,7 +36,7 @@ class BOTONERA_ : public ELEMENT_{
 
     public:
         BOTONERA_();
-        void botonera_begin();
+        //void botonera_begin();
         void RX_main_handler(LAST_ENTRY_FRAME_T LEF)override;
         void sectorIn_handler(const std::vector<byte>& data, const TARGETNS& originNS, uint8_t originType);
         bool serialExistsInSPIFFS(byte serialNum[5]);
@@ -47,15 +47,11 @@ class BOTONERA_ : public ELEMENT_{
         void printFrameInfo(LAST_ENTRY_FRAME_T LEF);
         void activateCognitiveMode();
         void deactivateCognitiveMode();
-        String getFilePathBySerial(const TARGETNS& ns);
+        //String getFilePathBySerial(const TARGETNS& ns);
         void escanearSala();
         bool procesar_sector_NS(int sector, INFO_PACK_T* info, const TARGETNS& ns, const uint8_t* data, size_t len);
-        void iniciarEscaneoElemento(const char* mensajeInicial);
+        //void iniciarEscaneoElemento(const char* mensajeInicial);
         void actualizarBarraProgreso2(int pasoActual, int pasosTotales, const char* etiqueta);
-
-    private:   
-        byte lastAssignedID = DEFAULT_DEVICE;
-        byte lastSerial[5] = {0};
 };
 
 extern BOTONERA_ *element;

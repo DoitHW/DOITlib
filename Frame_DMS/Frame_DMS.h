@@ -9,15 +9,15 @@
 #include <vector>
 #include <FastLED.h>
 
-extern volatile bool startFrameReceived;
-extern volatile bool frameInProgress;
+//extern volatile bool startFrameReceived;
+//extern volatile bool frameInProgress;
 extern volatile bool partialFrameReceived;
 extern volatile bool frameReceived;
-extern byte globalID;
+
 extern std::vector<byte> uartBuffer;
 
-extern volatile unsigned long last_received_time;
-extern int lastReceivedTime;
+//extern volatile unsigned long last_received_time;
+//extern int lastReceivedTime;
 
 void IRAM_ATTR onUartInterrupt();
 
@@ -69,11 +69,11 @@ enum ELEM_UNIT_CONF : uint8_t {
 };
 
 
-struct ELEM_UNIT{
+// struct ELEM_UNIT{
 
-    ELEM_UNIT_CONF conf;
-    TARGETNS ns;
-};
+//     ELEM_UNIT_CONF conf;
+//     TARGETNS ns;
+// };
 
 struct SENSOR_VALUE_T{
     byte msb_min;
@@ -124,9 +124,9 @@ struct INFO_PACK_T{
     byte situacion;
 };
 
-struct ICON_PACK_T{
-    uint16_t icono[ICON_ROWS][ICON_COLUMNS]; 
-};
+// struct ICON_PACK_T{
+//     uint16_t icono[ICON_ROWS][ICON_COLUMNS]; 
+// };
 
 enum BTN_FX : uint8_t {
     NO_FX = 0,
@@ -179,13 +179,13 @@ struct COLORPAD_BTNMAP {
 LAST_ENTRY_FRAME_T extract_info_from_frameIn (const std::vector<uint8_t> &frame);
 byte checksum_calc                           (const FRAME_T &framein);
 void send_frame                              (const FRAME_T &framein);
-void sendRawFrame                            (const std::vector<byte>& rawData);
+//void sendRawFrame                            (const std::vector<byte>& rawData);
 void setLocalNS                              (const TARGETNS& ns);
 const TARGETNS& getLocalNS                   ();
 void setLocalRoom                            (uint8_t room);
 uint8_t getLocalRoom                         ();
 
-void  get_sector_data(byte *sector_data, byte lang, byte sector);
+//void  get_sector_data(byte *sector_data, byte lang, byte sector);
 
 // === NUEVAS FIRMAS (todos con origin, targetType, TARGETNS) ===
 FRAME_T frameMaker_SET_ELEM_MODE        (byte originin, byte targetType, TARGETNS targetNS, byte modein);
@@ -210,12 +210,13 @@ FRAME_T frameMaker_SET_BUTTONS_EXTMAP(
     const TARGETNS&       destNS,       // 00:00:00:00:00 = broadcast
     const COLORPAD_BTNMAP &map          // 9 botones ya con led_indx 0..8
 );
-void buildColorpadFromBtnIds(
-    const BUTTON& b1, const BUTTON& b2, const BUTTON& b3,
-    const BUTTON& b4, const BUTTON& b5, const BUTTON& b6,
-    const BUTTON& b7, const BUTTON& b8, const BUTTON& b9,
-    COLORPAD_BTNMAP& outMap
-);
+
+// void buildColorpadFromBtnIds(
+//     const BUTTON& b1, const BUTTON& b2, const BUTTON& b3,
+//     const BUTTON& b4, const BUTTON& b5, const BUTTON& b6,
+//     const BUTTON& b7, const BUTTON& b8, const BUTTON& b9,
+//     COLORPAD_BTNMAP& outMap
+// );
 
 // Debug
 void send_old_color(uint8_t color);

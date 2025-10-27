@@ -40,18 +40,14 @@ void ELEMENT_::begin() {
     delay(100);    
 }
 
-byte ELEMENT_::get_currentMode(){
-   
-    return currentMode;
-}
 
 void ELEMENT_::set_type(byte typein){
     type= typein;
 }
 
-byte ELEMENT_::get_type(){
-    return type;
-}
+// byte ELEMENT_::get_type(){
+//     return type;
+// }
 
 void ELEMENT_::configurar_RF(int baudRate) {
     pinMode(RF_CONFIG_PIN, OUTPUT);

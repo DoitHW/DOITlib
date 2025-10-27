@@ -49,11 +49,11 @@ void drawModesScreen();
 void drawCurrentElement();
 
 void handleModeSelection(const String& currentFile) noexcept;
-void toggleElementSelection(const String& currentFile) noexcept;
+//void toggleElementSelection(const String& currentFile) noexcept;
 //void requestAndSyncElementMode();
 
 bool getModeFlag(const uint8_t modeConfig[2], MODE_CONFIGS flag) noexcept;
-void debugModeConfig(const uint8_t modeConfig[2]) noexcept;
+//void debugModeConfig(const uint8_t modeConfig[2]) noexcept;
 
 std::vector<bool> initializeAlternateStates(const String &currentFile) noexcept;
 
@@ -75,7 +75,7 @@ void handleConfirmRestoreElementMenu();
 
 bool isInMainMenu() ;
 
-int getTotalModesForFile(const String &file);
+//int getTotalModesForFile(const String &file);
 
 void printElementDetails();
 // Variables externas requeridas
@@ -85,14 +85,14 @@ extern int currentIndex;
 extern int totalModes;
 extern int currentModeIndex;
 extern bool inModesScreen;
-extern bool modeScreenEnteredByLongPress;
+//extern bool modeScreenEnteredByLongPress;
 extern bool isLongPress;
 extern bool hiddenMenuActive;
 extern unsigned long buttonPressStart;
 extern int globalVisibleModesMap[17];  // Declaración de la variable global
 extern bool ignoreInputs;
 extern ESP32Encoder encoder;
-extern bool modeAlternateActive;
+//extern bool modeAlternateActive;
 
 extern unsigned long lastDisplayInteraction; // Última vez que se interactuó con la pantalla
 extern bool displayOn;                    // Estado de la pantalla (encendida por defecto)

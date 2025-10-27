@@ -14,17 +14,13 @@
 #include <RelayManager_DMS/RelayStateManager.h>
 #include <Pulsadores_handler/Pulsadores_handler.h>
 
-//testing MARC 2
-//testing 2 3 4
-//testing 3
 
 #ifdef MIC
   extern MICROPHONE_ doitMic;
 #endif
 
-
 extern ELEMENT_ *element;
-bool colorReceived= false;
+
 
 bool COLORHANDLER_::color_mix_handler(int color1, int color2, byte *resultado) {
  
@@ -318,20 +314,6 @@ void COLORHANDLER_::mapCognitiveLEDs() {
   FastLED.show();
 }
 
-CRGB COLORHANDLER_::colorFromIndex(uint8_t idx) const {
-  switch (idx) {
-    case 0:  return CRGB(255, 255, 170); // Blanco cálido
-    case 1:  return CRGB(255, 155, 0);   // Amarillo
-    case 2:  return CRGB(255, 89, 0);    // Naranja
-    case 3:  return CRGB(255, 0, 0);     // Rojo
-    case 4:  return CRGB(255, 0, 210);   // Violeta
-    case 5:  return CRGB(0, 0, 255);     // Azul
-    case 6:  return CRGB(0, 255, 200);   // Celeste verdoso
-    case 7:  return CRGB(0, 255, 0);     // Verde
-    case 8:  return CRGB(0, 0, 0);       // Negro / apagado
-    default: return CRGB(0, 0, 0);
-  }
-}
 
 
 

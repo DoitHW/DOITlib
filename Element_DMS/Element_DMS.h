@@ -15,10 +15,6 @@
 #include <algorithm>
 #include <Colors_DMS/Color_DMS.h>
 
-extern byte globalID;
-extern bool colorReceived;
-
-
 class ELEMENT_ {
 
     public: 
@@ -26,10 +22,9 @@ class ELEMENT_ {
         void   configurar_RF(int baudRate);
 
         void      set_type(byte typein);
-        byte      get_type();
+        //byte      get_type();
 
         //void      set_mode(uint8_t mode);
-        byte      get_currentMode();
 
         void activarAP_OTA();
         void desactivarAP_OTA();
@@ -39,9 +34,7 @@ class ELEMENT_ {
         const char* OTA_PASSWORD= OTA_PASS;
 
     protected:
-        virtual void  RX_main_handler(LAST_ENTRY_FRAME_T LEF){}
-        byte     flag;
-        uint8_t  currentMode;  
+        virtual void  RX_main_handler(LAST_ENTRY_FRAME_T LEF){} 
         byte     type;
 };
 

@@ -18,87 +18,87 @@
 */
 
 
-extern float varaux;
 
 
-const unsigned int listaColoresPasivos[]=
-{
 
-    0xFF2300, // rojo_anaranjado_t
-    0xFF2500, // marron_oscuro_t
-    0xFF4005, // marron_t
-    0xFF4500, // naranja_t
-    0xFF7E00, // amarillo_anaranjado_t
-    0xFFDF00, // verde_amarillo_t
-    0x806600, // crema_t
-    0x66FF00, // verde_claro_t
-    0x7FA300, // verde_oliva_claro_t
-    0x758A00, // verde_oliva_t
-    0x7FA364, // verde_grisaceo_t
-    0x7FFF64, // verde_lima_t
-    0x98FF98, // verde_menta_t
-    0x50C878, // esmeralda_t
-    0x0DBA98, // verde_azulado_t
-    0x1F3438, // azul_verdoso_t
-    0x40E0D0, // turquesa_t
-    0x00FFFF, // cyan_t
-    0x5080FF, // celeste_claro_t
-    0x330099, // indigo_t
-    0x9400D3, // morado_t
-    0x8F00FF, // lila_t
-    0xFF00D2, // rosa_t
-    0xFF1493, // rosa_oscuro_t
-    0xE4007C, // rosa_fuerte_t
-    0xD9017A, // magenta_t
-    0xE73410  // salmon_t
-};
+// const unsigned int listaColoresPasivos[]=
+// {
+
+//     0xFF2300, // rojo_anaranjado_t
+//     0xFF2500, // marron_oscuro_t
+//     0xFF4005, // marron_t
+//     0xFF4500, // naranja_t
+//     0xFF7E00, // amarillo_anaranjado_t
+//     0xFFDF00, // verde_amarillo_t
+//     0x806600, // crema_t
+//     0x66FF00, // verde_claro_t
+//     0x7FA300, // verde_oliva_claro_t
+//     0x758A00, // verde_oliva_t
+//     0x7FA364, // verde_grisaceo_t
+//     0x7FFF64, // verde_lima_t
+//     0x98FF98, // verde_menta_t
+//     0x50C878, // esmeralda_t
+//     0x0DBA98, // verde_azulado_t
+//     0x1F3438, // azul_verdoso_t
+//     0x40E0D0, // turquesa_t
+//     0x00FFFF, // cyan_t
+//     0x5080FF, // celeste_claro_t
+//     0x330099, // indigo_t
+//     0x9400D3, // morado_t
+//     0x8F00FF, // lila_t
+//     0xFF00D2, // rosa_t
+//     0xFF1493, // rosa_oscuro_t
+//     0xE4007C, // rosa_fuerte_t
+//     0xD9017A, // magenta_t
+//     0xE73410  // salmon_t
+// };
 
 
-const unsigned int listaColoresPasivos_COPYRIGHT[]={
+// const unsigned int listaColoresPasivos_COPYRIGHT[]={
 
-    0x05F016, // DOIT
-    0x3A007C, // CADSBURY
-    0xDA1884, // ROSA BARBIE
-    0x00843D, // CORTE INGLES
-    0xF40009, // COCA-COLA
-    0x0033A0, // YVES KLEIN
-    0x582C83, // MILKA
-    0x81D8D0, // TIFFANYS BLUE
-    0xF2CA00  // CAT
-};
+//     0x05F016, // DOIT
+//     0x3A007C, // CADSBURY
+//     0xDA1884, // ROSA BARBIE
+//     0x00843D, // CORTE INGLES
+//     0xF40009, // COCA-COLA
+//     0x0033A0, // YVES KLEIN
+//     0x582C83, // MILKA
+//     0x81D8D0, // TIFFANYS BLUE
+//     0xF2CA00  // CAT
+// };
 
-const unsigned int listaColoresPasivos_3[]=
-{
+// const unsigned int listaColoresPasivos_3[]=
+// {
 
-0xFF0000, // pure_red
-0xFF1E1E, // bright_red
-0xFF4242, // coral_red
+// 0xFF0000, // pure_red
+// 0xFF1E1E, // bright_red
+// 0xFF4242, // coral_red
 
-0xFF6B00, // vivid_orange
-0xFF8C1A, // amber
+// 0xFF6B00, // vivid_orange
+// 0xFF8C1A, // amber
 
-0xFFD700, // golden_yellow
-0xFFEB3B, // bright_yellow
+// 0xFFD700, // golden_yellow
+// 0xFFEB3B, // bright_yellow
 
-0xB4D335, // lime_yellow
-0x7FBA00, // chartreuse
+// 0xB4D335, // lime_yellow
+// 0x7FBA00, // chartreuse
 
-0x00FF00, // pure_green
-0x00D364, // spring_green
-0x009B77, // forest_green
+// 0x00FF00, // pure_green
+// 0x00D364, // spring_green
+// 0x009B77, // forest_green
 
-0x00CED1, // turquoise
-0x20B2AA, // sea_green
+// 0x00CED1, // turquoise
+// 0x20B2AA, // sea_green
 
-0x0099FF, // sky_blue
-0x0066CC, // ocean_blue
-0x0033FF, // royal_blue
+// 0x0099FF, // sky_blue
+// 0x0066CC, // ocean_blue
+// 0x0033FF, // royal_blue
 
-0x6A0DAD, // purple
-0x8B00FF, // violet
+// 0x6A0DAD, // purple
+// 0x8B00FF, // violet
 
-0xFF00FF  // magenta
-};
+// 0xFF00FF  // magenta
+// };
 
 
 const unsigned int listaColores[36] = 
@@ -162,7 +162,7 @@ class COLORHANDLER_ {
         void setCurrentFile(const String& file) { currentFile = file; } 
         bool color_mix_handler(int color1, int color2, byte *resultado);
         void mapCognitiveLEDs();
-        CRGB colorFromIndex(uint8_t idx) const;
+        
 
     private:
     String currentFile;

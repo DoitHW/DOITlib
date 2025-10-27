@@ -54,11 +54,11 @@ public:
     bool leerMensajeNFC(String& mensaje);
 
     // Función de compatibilidad: lectura de página (no utilizada en la nueva lógica)
-    bool leerPagina(uint8_t pagina, uint8_t *buffer);
+    //bool leerPagina(uint8_t pagina, uint8_t *buffer);
 
     // Funciones para la lógica de la aplicación (se adaptan según se requiera)
     void set_mode(TOKEN_MODE_ modein) { tokenCurrentMode = modein; }
-    void set_reset_partner(bool state) { reset_partner = state; }
+    //void set_reset_partner(bool state) { reset_partner = state; }
     void token_handler(const TOKEN_DATA& token,
                            uint8_t          lang_in,
                            bool             genre_in,
@@ -75,9 +75,9 @@ public:
 
     // Función auxiliar para convertir dos caracteres ASCII hex a un byte
     byte asciiHexToByte(char high, char low);
-    byte hexToByte(const String &hex);
+    //byte hexToByte(const String &hex);
     // Función auxiliar para parsear la cadena del token y convertirla en TOKEN_DATA
-    TOKEN_DATA parseTokenString(const String &tokenStr);
+    //TOKEN_DATA parseTokenString(const String &tokenStr);
     // Variables públicas para facilitar el control en el loop
     String currentUID;
     String lastProcessedUID;
@@ -101,10 +101,7 @@ public:
 private:
     // Variables internas para controlar el estado
     
-    bool reset_partner = false;
-    unsigned long lastReadAttempt;
-    unsigned long readInterval;
-
+    //bool reset_partner = false;
     // Función auxiliar para decodificar el texto de un registro NDEF (tipo Text)
     String decodeNdefText(const byte* payload, int payloadLength);
 };

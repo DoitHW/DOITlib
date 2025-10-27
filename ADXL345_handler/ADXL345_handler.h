@@ -14,9 +14,9 @@ public:
     ADXL345Handler();                  // Constructor
     void init();                      // Inicializar el acelerómetro
     long convertInclinationToValue(float inclination);
-    SENSOR_VALUE_T createSensorValue(long finalValue);
-    bool isInitialized() const;       // Verificar si está inicializado
-    void setThreshold(float newThreshold);  // Configurar un nuevo umbral
+    //SENSOR_VALUE_T createSensorValue(long finalValue);
+    //bool isInitialized() const;       // Verificar si está inicializado
+    //void setThreshold(float newThreshold);  // Configurar un nuevo umbral
     void end();
     void readInclinations();
     SENSOR_DOUBLE_T createSensorDoubleValue(long finalValueX, long finalValueY);
@@ -24,13 +24,13 @@ public:
 
 private:
     Adafruit_ADXL345_Unified accel;
-    float lastInclination;  // Última inclinación leída
-    float lastInclinationX;
-    float lastInclinationY;
+    //float lastInclination;  // Última inclinación leída
+    //float lastInclinationX;
+    //float lastInclinationY;
     float threshold;        // Umbral de cambio significativo
     float thresholdBinary;  // Umbral para sensor binario
     bool initialized;       // Estado de inicialización
-    int errorCount;
+    //int errorCount;
     static const unsigned long movementSampleInterval = 50;  // muestreo rápido
     static const unsigned long inactivityTimeout     = 1000; // 1 s sin movimiento
 

@@ -674,43 +674,43 @@ static inline bool isElementFile_(const String& path) {
   return path.startsWith("/element_") && path.endsWith(".bin") && path.indexOf("_icon") < 0;
 }
 
-String getFilePathByNS(const TARGETNS& ns) {
-    if (nsEqualsZero(ns)) return String();  // no tiene sentido buscar NS_ZERO
+// String getFilePathByNS(const TARGETNS& ns) {
+//     if (nsEqualsZero(ns)) return String();  // no tiene sentido buscar NS_ZERO
 
-    for (const String& file : elementFiles) {
-        if (!isElementFile_(file)) continue;
-        TARGETNS tmp = NS_ZERO;
-        if (tryGetNSFromFile(file, tmp) && nsEquals(tmp, ns)) {
-            return file;
-        }
-    }
-    return String();  // no encontrado
-}
+//     for (const String& file : elementFiles) {
+//         if (!isElementFile_(file)) continue;
+//         TARGETNS tmp = NS_ZERO;
+//         if (tryGetNSFromFile(file, tmp) && nsEquals(tmp, ns)) {
+//             return file;
+//         }
+//     }
+//     return String();  // no encontrado
+// }
 
-bool nsExistsInSPIFFS(const TARGETNS& ns) {
-    if (nsEqualsZero(ns)) return false;
+// bool nsExistsInSPIFFS(const TARGETNS& ns) {
+//     if (nsEqualsZero(ns)) return false;
 
-    fs::File root = SPIFFS.open("/");
-    if (!root || !root.isDirectory()) return false;
+//     fs::File root = SPIFFS.open("/");
+//     if (!root || !root.isDirectory()) return false;
 
-    fs::File f = root.openNextFile();
-    while (f) {
-        String name = f.name();
-        if (!name.startsWith("/")) name = "/" + name;
-        if (isElementFile_(name)) {
-            TARGETNS tmp = NS_ZERO;
-            if (tryGetNSFromFile(name, tmp) && nsEquals(tmp, ns)) {
-                f.close();
-                root.close();
-                return true;
-            }
-        }
-        f.close();
-        f = root.openNextFile();
-    }
-    root.close();
-    return false;
-}
+//     fs::File f = root.openNextFile();
+//     while (f) {
+//         String name = f.name();
+//         if (!name.startsWith("/")) name = "/" + name;
+//         if (isElementFile_(name)) {
+//             TARGETNS tmp = NS_ZERO;
+//             if (tryGetNSFromFile(name, tmp) && nsEquals(tmp, ns)) {
+//                 f.close();
+//                 root.close();
+//                 return true;
+//             }
+//         }
+//         f.close();
+//         f = root.openNextFile();
+//     }
+//     root.close();
+//     return false;
+// }
 
 // --- NS/MAC propia de la BOTONERA ---
 static TARGETNS s_ownNS = {0,0,0,0,0};               

@@ -332,8 +332,8 @@ void PulsadoresHandler::procesarPulsadores() {
             bool currentPressed = (digitalRead(columnas[j]) == LOW);
             byte color         = pulsadorColor[i][j];
             
-            if (noInputGlobal) {                                          // <-- Nueva línea
-                currentPressed = false;                                   // <-- Nueva línea
+            if (noInputGlobal) {                                          
+                currentPressed = false;                                   
             } 
             // === Filtrado por máscara 'active' ===
             int ledIdxGate = colorToLedIdx(color);
@@ -360,7 +360,7 @@ void PulsadoresHandler::procesarPulsadores() {
 
             if (!lastState[i][j] && currentPressed) {
             if (respMode) {
-                targetType = PulsadoresHandler::getResponseTargetType(); // <-- Nueva línea
+                targetType = PulsadoresHandler::getResponseTargetType(); 
                 targetNS   = getOwnNS();     
                 // En modo respuesta, siempre disparamos evento (flags no se usan en la rama 1-bis)
                 processButtonEvent(i, j, BUTTON_PRESSED, /*hasPulse*/false, /*hasPassive*/false, /*hasRelay*/false,
@@ -375,7 +375,7 @@ void PulsadoresHandler::procesarPulsadores() {
         }
         if (lastState[i][j] && !currentPressed) {
             if (respMode) {
-                targetType = PulsadoresHandler::getResponseTargetType();   // <-- Nueva línea
+                targetType = PulsadoresHandler::getResponseTargetType();   
                 targetNS   = getOwnNS();  
                 processButtonEvent(i, j, BUTTON_RELEASED, /*hasPulse*/false, /*hasPassive*/false, /*hasRelay*/false,
                                 targetType, targetNS);
@@ -930,7 +930,6 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
 //     (targetNS.mac01==0 && targetNS.mac02==0 && targetNS.mac03==0 &&
 //      targetNS.mac04==0 && targetNS.mac05==0);
 
-
 //     static bool     lastWasComunicador = false;
 //     static uint8_t  lastLegacyColor    = 0xFF; // sentinel (ningún color válido)
 //     static bool     sameColorParity    = false;
@@ -1445,12 +1444,12 @@ TARGETNS PulsadoresHandler::getResponseTargetNS() {
     return s_respTargetNS;                                
 } 
 
-bool PulsadoresHandler::s_globalFxNoInput = false;          // <-- Nueva línea
+bool PulsadoresHandler::s_globalFxNoInput = false;          
 
-void PulsadoresHandler::setGlobalFxNoInput(bool enable) {   // <-- Nueva línea
-    s_globalFxNoInput = enable;                              // <-- Nueva línea
-}                                                            // <-- Nueva línea
+void PulsadoresHandler::setGlobalFxNoInput(bool enable) {   
+    s_globalFxNoInput = enable;                              
+}                                                            
 
-bool PulsadoresHandler::isGlobalFxNoInput() {               // <-- Nueva línea
-    return s_globalFxNoInput;                                // <-- Nueva línea
-}                                                            // <-- Nueva línea
+bool PulsadoresHandler::isGlobalFxNoInput() {               
+    return s_globalFxNoInput;                                
+}                                                            

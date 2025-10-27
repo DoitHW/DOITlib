@@ -86,31 +86,31 @@ static bool readNSFromFileOrRAM(const String& file, TARGETNS &out) {
     return false;
 }
 
-void RelayStateManager::initCapabilitiesNS(const std::vector<String>& files) {
-    relayCapByNS.clear();
+// void RelayStateManager::initCapabilitiesNS(const std::vector<String>& files) {
+//     relayCapByNS.clear();
 
-    for (const auto &file : files) {
-        TARGETNS ns{};
-        if (!readNSFromFileOrRAM(file, ns)) {
-            continue;
-        }
+//     for (const auto &file : files) {
+//         TARGETNS ns{};
+//         if (!readNSFromFileOrRAM(file, ns)) {
+//             continue;
+//         }
 
-        // No analizar especiales "no-elemento" (según tu lógica original)
-        if (file == "Ambientes" || file == "Fichas" || file == "Apagar") {
-            relayCapByNS[toKey(ns)] = false;
-            continue;
-        }
+//         // No analizar especiales "no-elemento" (según tu lógica original)
+//         if (file == "Ambientes" || file == "Fichas" || file == "Apagar") {
+//             relayCapByNS[toKey(ns)] = false;
+//             continue;
+//         }
 
-        bool anyRelay = false;
-        byte cfg[2] = {0};
-        for (int m = 0; m < 16; ++m) {
-            if (getModeConfig(file, m, cfg) && getModeFlag(cfg, HAS_RELAY)) {
-                anyRelay = true; break;
-            }
-        }
-        relayCapByNS[toKey(ns)] = anyRelay;
-    }
-}
+//         bool anyRelay = false;
+//         byte cfg[2] = {0};
+//         for (int m = 0; m < 16; ++m) {
+//             if (getModeConfig(file, m, cfg) && getModeFlag(cfg, HAS_RELAY)) {
+//                 anyRelay = true; break;
+//             }
+//         }
+//         relayCapByNS[toKey(ns)] = anyRelay;
+//     }
+// }
 
 bool RelayStateManager::hasRelay(const TARGETNS& ns) {
     auto it = relayCapByNS.find(toKey(ns));

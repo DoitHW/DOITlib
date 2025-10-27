@@ -31,7 +31,7 @@ extern boolean readerDisabled;         // Estas pueden definirse globalmente en 
 extern bool cardIsRead;
 extern TOKEN_ token;
 
-TOKEN_::TOKEN_() : lastReadAttempt(0), readInterval(200), genre(0), lang(static_cast<uint8_t>(currentLanguage)) {
+TOKEN_::TOKEN_() : genre(0), lang(static_cast<uint8_t>(currentLanguage)) {
     currentUID = "";
     lastProcessedUID = "";
 }
@@ -317,10 +317,10 @@ token.currentToken.familyName[24] = '\0'; // Asegurar string nulo-terminado
   return true;
 }
 
-bool TOKEN_::leerPagina(uint8_t pagina, uint8_t *buffer) {
-    // En la nueva lógica se utiliza la lectura completa de NDEF, por lo que esta función queda sin implementar.
-    return false;
-}
+// bool TOKEN_::leerPagina(uint8_t pagina, uint8_t *buffer) {
+//     // En la nueva lógica se utiliza la lectura completa de NDEF, por lo que esta función queda sin implementar.
+//     return false;
+// }
 
 void TOKEN_::proponer_token(byte guessbank) {
     lang = 0;
@@ -544,53 +544,53 @@ byte TOKEN_::asciiHexToByte(char high, char low) {
   return value;
 }
 
-byte TOKEN_::hexToByte(const String &hex) {
-  if (hex.length() < 2) return 0;
-  char high = hex.charAt(0);
-  char low  = hex.charAt(1);
+// byte TOKEN_::hexToByte(const String &hex) {
+//   if (hex.length() < 2) return 0;
+//   char high = hex.charAt(0);
+//   char low  = hex.charAt(1);
 
-  auto nibble = [](char c) -> byte {
-    if (c >= '0' && c <= '9') return c - '0';
-    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
-    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-    return 0;
-  };
+//   auto nibble = [](char c) -> byte {
+//     if (c >= '0' && c <= '9') return c - '0';
+//     if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+//     if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+//     return 0;
+//   };
 
-  return (nibble(high) << 4) | nibble(low);
-}
+//   return (nibble(high) << 4) | nibble(low);
+// }
 
 
-TOKEN_::TOKEN_DATA TOKEN_::parseTokenString(const String &tokenStr) {
-  TOKEN_DATA data = {}; // Inicializa en 0
+// TOKEN_::TOKEN_DATA TOKEN_::parseTokenString(const String &tokenStr) {
+//   TOKEN_DATA data = {}; // Inicializa en 0
 
-  // Se remueven los delimitadores '#' del inicio y fin
-  if(tokenStr.charAt(0) != '#' || tokenStr.charAt(tokenStr.length()-1) != '#') {
-    DEBUG__________ln("DEBUG: Token sin delimitadores válidos");
-    return data;
-  }
-  String content = tokenStr.substring(1, tokenStr.length()-1);
+//   // Se remueven los delimitadores '#' del inicio y fin
+//   if(tokenStr.charAt(0) != '#' || tokenStr.charAt(tokenStr.length()-1) != '#') {
+//     DEBUG__________ln("DEBUG: Token sin delimitadores válidos");
+//     return data;
+//   }
+//   String content = tokenStr.substring(1, tokenStr.length()-1);
 
-  // Ahora se espera que el contenido tenga 46 caracteres (23 bytes)
-  if(content.length() != 94) {
-    DEBUG__________("DEBUG: Longitud incorrecta del token: ");
-    DEBUG__________ln(content.length());
-    return data;
-  }
+//   // Ahora se espera que el contenido tenga 46 caracteres (23 bytes)
+//   if(content.length() != 94) {
+//     DEBUG__________("DEBUG: Longitud incorrecta del token: ");
+//     DEBUG__________ln(content.length());
+//     return data;
+//   }
   
-  data.cmd       = asciiHexToByte(content.charAt(0), content.charAt(1));
-  data.cmd2      = asciiHexToByte(content.charAt(2), content.charAt(3));
-  data.addr.bank = asciiHexToByte(content.charAt(4), content.charAt(5));
-  data.addr.file = asciiHexToByte(content.charAt(6), content.charAt(7));
-  data.color.r   = asciiHexToByte(content.charAt(8), content.charAt(9));
-  data.color.g   = asciiHexToByte(content.charAt(10), content.charAt(11));
-  data.color.b   = asciiHexToByte(content.charAt(12), content.charAt(13));
+//   data.cmd       = asciiHexToByte(content.charAt(0), content.charAt(1));
+//   data.cmd2      = asciiHexToByte(content.charAt(2), content.charAt(3));
+//   data.addr.bank = asciiHexToByte(content.charAt(4), content.charAt(5));
+//   data.addr.file = asciiHexToByte(content.charAt(6), content.charAt(7));
+//   data.color.r   = asciiHexToByte(content.charAt(8), content.charAt(9));
+//   data.color.g   = asciiHexToByte(content.charAt(10), content.charAt(11));
+//   data.color.b   = asciiHexToByte(content.charAt(12), content.charAt(13));
   
-  for (int i = 0; i < 8; i++) {
-    int idx = 14 + i * 4;
-    data.partner[i].bank = asciiHexToByte(content.charAt(idx), content.charAt(idx+1));
-    data.partner[i].file = asciiHexToByte(content.charAt(idx+2), content.charAt(idx+3));
-  }
-  return data;
-}
+//   for (int i = 0; i < 8; i++) {
+//     int idx = 14 + i * 4;
+//     data.partner[i].bank = asciiHexToByte(content.charAt(idx), content.charAt(idx+1));
+//     data.partner[i].file = asciiHexToByte(content.charAt(idx+2), content.charAt(idx+3));
+//   }
+//   return data;
+// }
 
 

@@ -188,7 +188,7 @@ constexpr byte DEFAULT_PAD          = 0xD9;
 #define L_SET_ELEM_DEAF       0x01
 
 
-#define F_SEND_RESPONSE           0xC0
+#define F_SEND_RESPONSE           0xC5
 #define L_SEND_RESPONSE           0x01
 #define F_SEND_COLOR              0xC1
 #define L_SEND_COLOR              0x01 
@@ -625,7 +625,7 @@ enum SECTOR_LIST{
   ELEM_DESC_SECTOR,
   ELEM_LOCATION_SECTOR,
   ELEM_SERIAL_SECTOR,
-  ELEM_ID_SECTOR,
+  ELEM_UNUSED_SECTOR,
   ELEM_CMODE_SECTOR,
   ELEM_MODE_0_NAME_SECTOR,
   ELEM_MODE_0_DESC_SECTOR,

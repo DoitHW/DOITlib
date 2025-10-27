@@ -19,7 +19,7 @@ bool hasRelay(const TARGETNS& ns);
 void clear();
 
 // Recalcular capacidades (leer ficheros y RAM) y mapear por NS
-void initCapabilitiesNS(const std::vector<String>& elementFiles);
+// void initCapabilitiesNS(const std::vector<String>& elementFiles);
 
 // Utilidades (si las necesitas en otras partes)
 bool getModeConfigForNS(const TARGETNS& ns, uint8_t modeCfg[2]);

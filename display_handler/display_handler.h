@@ -30,7 +30,7 @@ void drawBankSelectionMenu(const std::vector<byte>& bankList, const std::vector<
 void drawBrightnessMenu();
 void drawSunIcon(int16_t x, int16_t y, uint16_t color);
 void drawSoundMenu(int selection);
-void scrollTextTickerBounceSound(int selection);
+//void scrollTextTickerBounceSound(int selection);
 void drawFormatMenu(int selection);
 void drawDeleteElementMenu(int selection);
 void drawConfirmDelete(const String& fileName);
@@ -46,12 +46,11 @@ void mostrarTextoAjustado(TFT_eSPI& tft,
                                  uint16_t yInicio,
                                  uint16_t maxWidth);
 void setFontForCurrentLanguage();
-void scrollFileNameTickerBounce(const String& fileName);
+//void scrollFileNameTickerBounce(const String& fileName);
 
 void drawLoadingModalFrame(const char* message, int frameCount);
 void showWelcomeAnimation();
                                  
-extern bool isScrollingText;
 extern TFT_eSPI tft;
 extern TFT_eSprite uiSprite;
 extern bool nameScrollActive;
@@ -71,7 +70,7 @@ uint16_t colorWheel(uint8_t pos);
 
 extern int brightnessMenuIndex;
 
-void showMessageWithProgress(const char* message, unsigned long delayTime);
+//void showMessageWithProgress(const char* message, unsigned long delayTime);
 
 // Extra Elements menu
 void drawExtraElementsMenu(int selection);

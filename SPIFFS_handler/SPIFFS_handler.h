@@ -103,8 +103,8 @@ static inline bool nsEquals(const TARGETNS& a, const TARGETNS& b) {
 // ------------------ API centrada en NS ------------------
 bool     tryGetNSFromFile(const String& fileName, TARGETNS& outNS);
 TARGETNS getNSFromFile(const String& fileName);
-String   getFilePathByNS(const TARGETNS& ns);       // NUEVA: busca el fichero por NS
-bool     nsExistsInSPIFFS(const TARGETNS& ns);      // NUEVA: true si existe el NS
+//String   getFilePathByNS(const TARGETNS& ns);       // NUEVA: busca el fichero por NS
+//bool     nsExistsInSPIFFS(const TARGETNS& ns);      // NUEVA: true si existe el NS
 TARGETNS getCurrentElementNS();   
 
 

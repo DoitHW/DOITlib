@@ -8,19 +8,19 @@
 
 std::vector<uint8_t> printTargetID;
 extern LAST_ENTRY_FRAME_T            LEF;
-extern byte globalID;
+
 extern byte xManager;
-volatile bool startFrameReceived=    false;
-volatile bool frameInProgress=       false;
+//volatile bool startFrameReceived=    false;
+//volatile bool frameInProgress=       false;
 volatile bool partialFrameReceived=  false;
 volatile bool frameReceived=         false;
 
 std::vector<byte> uartBuffer;
 bool BCframe= false;
-volatile unsigned long last_received_time = 0;
-int lastReceivedTime = 0;
+//volatile unsigned long last_received_time = 0;
+//int lastReceivedTime = 0;
 
-volatile bool uartInterruptTriggered= false;
+//volatile bool uartInterruptTriggered= false;
 extern uint16_t SERIAL_NUM;
 constexpr uint16_t FRAME_HEADER_BASE_LEN = 18;   // bytes desde room hasta checksum (sin datos)
 constexpr uint16_t FRAME_MIN_TOTAL_BYTES = 21;   // trama mí­nima completa (sin datos)
@@ -65,7 +65,7 @@ void IRAM_ATTR onUartInterrupt() {
         byte receivedByte = Serial1.read();
         bytesProcessed++;
         DEBUG__________((" 0x"+String(receivedByte, HEX)).c_str());
-        lastReceivedTime = currentTime;
+        //lastReceivedTime = currentTime;
 
         // Filtro de START
         if (receiveState == WAITING_START && receivedByte != NEW_START) {
@@ -775,7 +775,7 @@ FRAME_T frameMaker_RETURN_ELEM_SECTOR (uint8_t originin,
             break;
 
         // 1 byte
-        case ELEM_ID_SECTOR:
+        case ELEM_UNUSED_SECTOR:
         case ELEM_CMODE_SECTOR:
         case ELEM_MOST_USED_MODE_SECTOR:
         case ELEM_MOST_USED_COLOR_SECTOR:
@@ -983,20 +983,20 @@ static inline void putByLedIndex(COLORPAD_BTNMAP& m, uint8_t ledIndex, const BUT
     }
 }
 
-// Construye el COLORPAD_BTNMAP desde 9 â€œbotones lógicos (1..9)
-void buildColorpadFromBtnIdsV2(
-    const BUTTON& b1, const BUTTON& b2, const BUTTON& b3,
-    const BUTTON& b4, const BUTTON& b5, const BUTTON& b6,
-    const BUTTON& b7, const BUTTON& b8, const BUTTON& b9,
-    COLORPAD_BTNMAP& outMap
-){
-    const BUTTON v[9] = { b1,b2,b3,b4,b5,b6,b7,b8,b9 };
-    for (uint8_t id = 1; id <= 9; ++id) {
-        BUTTON bi = v[id-1];
-        const uint8_t ledIndex = kBtnIdToLedIdx[id];
-        if (ledIndex <= 8) putByLedIndex(outMap, ledIndex, bi);
-    }
-}
+// Construye el COLORPAD_BTNMAP desde 9 botones lógicos (1..9)
+// void buildColorpadFromBtnIdsV2(
+//     const BUTTON& b1, const BUTTON& b2, const BUTTON& b3,
+//     const BUTTON& b4, const BUTTON& b5, const BUTTON& b6,
+//     const BUTTON& b7, const BUTTON& b8, const BUTTON& b9,
+//     COLORPAD_BTNMAP& outMap
+// ){
+//     const BUTTON v[9] = { b1,b2,b3,b4,b5,b6,b7,b8,b9 };
+//     for (uint8_t id = 1; id <= 9; ++id) {
+//         BUTTON bi = v[id-1];
+//         const uint8_t ledIndex = kBtnIdToLedIdx[id];
+//         if (ledIndex <= 8) putByLedIndex(outMap, ledIndex, bi);
+//     }
+// }
 
 // === Reemplaza COMPLETO tu frameMaker_SET_BUTTONS_EXTMAP antiguo ===
 FRAME_T frameMaker_SET_BUTTONS_EXTMAP(
@@ -1054,44 +1054,44 @@ FRAME_T frameMaker_SET_BUTTONS_EXTMAP(
 
 //////////////////////////////////////////////////////////////////////////////////////
 
-void sendRawFrame(const std::vector<byte>& raw) {
-    if (raw.size() < FRAME_MIN_TOTAL_BYTES) {
-        DEBUG__________ln("âŒ Trama demasiado corta para ser válida");
-        return;
-    }
+// void sendRawFrame(const std::vector<byte>& raw) {
+//     if (raw.size() < FRAME_MIN_TOTAL_BYTES) {
+//         DEBUG__________ln("Trama demasiado corta para ser válida");
+//         return;
+//     }
 
-    FRAME_T f{};
-    size_t i = 0;
+//     FRAME_T f{};
+//     size_t i = 0;
 
-    f.start          = raw[i++];
-    f.frameLengthMsb = raw[i++];
-    f.frameLengthLsb = raw[i++];
-    f.room           = raw[i++];
-    f.origin         = raw[i++];
-    f.originNS.mac01 = raw[i++];
-    f.originNS.mac02 = raw[i++];
-    f.originNS.mac03 = raw[i++];
-    f.originNS.mac04 = raw[i++];
-    f.originNS.mac05 = raw[i++];
-    f.targetType     = raw[i++];
-    f.targetNS.mac01 = raw[i++];
-    f.targetNS.mac02 = raw[i++];
-    f.targetNS.mac03 = raw[i++];
-    f.targetNS.mac04 = raw[i++];
-    f.targetNS.mac05 = raw[i++];
-    f.function       = raw[i++];
-    f.dataLengthMsb  = raw[i++];
-    f.dataLengthLsb  = raw[i++];
+//     f.start          = raw[i++];
+//     f.frameLengthMsb = raw[i++];
+//     f.frameLengthLsb = raw[i++];
+//     f.room           = raw[i++];
+//     f.origin         = raw[i++];
+//     f.originNS.mac01 = raw[i++];
+//     f.originNS.mac02 = raw[i++];
+//     f.originNS.mac03 = raw[i++];
+//     f.originNS.mac04 = raw[i++];
+//     f.originNS.mac05 = raw[i++];
+//     f.targetType     = raw[i++];
+//     f.targetNS.mac01 = raw[i++];
+//     f.targetNS.mac02 = raw[i++];
+//     f.targetNS.mac03 = raw[i++];
+//     f.targetNS.mac04 = raw[i++];
+//     f.targetNS.mac05 = raw[i++];
+//     f.function       = raw[i++];
+//     f.dataLengthMsb  = raw[i++];
+//     f.dataLengthLsb  = raw[i++];
 
-    int dataLen = (int(f.dataLengthMsb) << 8) | f.dataLengthLsb;
-    f.data.assign(raw.begin() + i, raw.begin() + i + dataLen);
-    i += dataLen;
+//     int dataLen = (int(f.dataLengthMsb) << 8) | f.dataLengthLsb;
+//     f.data.assign(raw.begin() + i, raw.begin() + i + dataLen);
+//     i += dataLen;
 
-    f.checksum = raw[i++];
-    f.end      = raw[i++];
+//     f.checksum = raw[i++];
+//     f.end      = raw[i++];
 
-    send_frame(f);
-}
+//     send_frame(f);
+// }
 
 constexpr uint8_t OLD_NODE     = 0x01;
 constexpr uint8_t OLD_FUNC     = 0xCB;

@@ -24,7 +24,6 @@ public:
     bool relayButtonIsPressed() const { return relayButtonPressed; }
     bool isButtonPressed(byte color);
     byte lastBasicColor = 0; // Inicialmente 0 (o BLACK)
-    bool isBlueButtonPressed() { return blueButtonPressed; }
     static bool isButtonEnabled(uint8_t ledIdx); 
     static void setButtonActiveMask(const bool mask[9]);   // copia completa (0..8)
     static void setResponseRoute(uint8_t targetType, const TARGETNS& targetNS);

@@ -2119,132 +2119,132 @@ void drawSoundMenu(int selection)
     uiSprite.pushSprite(0, 0);
 }
 
-/**
- * @brief Ticker de texto con rebote para la opción seleccionada del menú de sonido.
- * Desplaza horizontalmente (vaivén) el texto de la fila seleccionada cuando no cabe
- * en el ancho visible. 
- * @param selection Índice lógico de la fila (0..9).
- */
-void scrollTextTickerBounceSound(int selection)
-{
-    if (!soundMenuActive) return;
+// /**
+//  * @brief Ticker de texto con rebote para la opción seleccionada del menú de sonido.
+//  * Desplaza horizontalmente (vaivén) el texto de la fila seleccionada cuando no cabe
+//  * en el ancho visible. 
+//  * @param selection Índice lógico de la fila (0..9).
+//  */
+// void scrollTextTickerBounceSound(int selection)
+// {
+//     if (!soundMenuActive) return;
 
-    // ── Layout consistente con drawSoundMenu() ─────────────────────────
-    constexpr int kVisibleOptions      = 4;
-    constexpr int kScrollBarWidth      = 5;
-    constexpr int kScrollBarRightPad   = 3;
-    constexpr int kListLeftX           = 9;   // x de inicio del texto en la lista
-    constexpr int kTextPad             = 2;   // padding interno usado en el cálculo del ancho
-    constexpr int kListTopY            = 30;
-    constexpr int kFrameIntervalMs     = 10;  // ~100 FPS para el ticker
-    constexpr int kTotalOptions        = 10;
-    constexpr int kScrollMargin        = 10;  // margen extra al final del texto para el rebote
+//     // ── Layout consistente con drawSoundMenu() ─────────────────────────
+//     constexpr int kVisibleOptions      = 4;
+//     constexpr int kScrollBarWidth      = 5;
+//     constexpr int kScrollBarRightPad   = 3;
+//     constexpr int kListLeftX           = 9;   // x de inicio del texto en la lista
+//     constexpr int kTextPad             = 2;   // padding interno usado en el cálculo del ancho
+//     constexpr int kListTopY            = 30;
+//     constexpr int kFrameIntervalMs     = 10;  // ~100 FPS para el ticker
+//     constexpr int kTotalOptions        = 10;
+//     constexpr int kScrollMargin        = 10;  // margen extra al final del texto para el rebote
 
-    // Validación de índice
-    if (selection < 0 || selection >= kTotalOptions) return;
+//     // Validación de índice
+//     if (selection < 0 || selection >= kTotalOptions) return;
 
-    // Opciones (incluye separadores)
-    static constexpr const char* kSep = "---------";
-    const char* options[kTotalOptions] = {
-        getTranslation("MUJER"),
-        getTranslation("HOMBRE"),
-        kSep,
-        getTranslation("CON_NEG"),
-        getTranslation("SIN_NEG"),
-        kSep,
-        getTranslation("VOL_NORMAL"),
-        getTranslation("VOL_ATENUADO"),
-        kSep,
-        getTranslation("CONFIRMAR")
-    };
+//     // Opciones (incluye separadores)
+//     static constexpr const char* kSep = "---------";
+//     const char* options[kTotalOptions] = {
+//         getTranslation("MUJER"),
+//         getTranslation("HOMBRE"),
+//         kSep,
+//         getTranslation("CON_NEG"),
+//         getTranslation("SIN_NEG"),
+//         kSep,
+//         getTranslation("VOL_NORMAL"),
+//         getTranslation("VOL_ATENUADO"),
+//         kSep,
+//         getTranslation("CONFIRMAR")
+//     };
 
-    const char* labelC = options[selection];
-    // No hacer ticker sobre separadores
-    if (strcmp(labelC, kSep) == 0) return;
+//     const char* labelC = options[selection];
+//     // No hacer ticker sobre separadores
+//     if (strcmp(labelC, kSep) == 0) return;
 
-    // Texto a medir y mostrar (la fuente ya está configurada por drawSoundMenu)
-    const String text = String(labelC);
+//     // Texto a medir y mostrar (la fuente ya está configurada por drawSoundMenu)
+//     const String text = String(labelC);
 
-    // Anchos dinámicos según pantalla y barra
-    const int screenW   = tft.width();
-    const int scrollBarX= screenW - kScrollBarWidth - kScrollBarRightPad;
-    const int textAreaW = scrollBarX - kListLeftX - kTextPad;
-    const int textAreaH = CARD_HEIGHT - 2; // igual que en el menú (fondo resaltado)
+//     // Anchos dinámicos según pantalla y barra
+//     const int screenW   = tft.width();
+//     const int scrollBarX= screenW - kScrollBarWidth - kScrollBarRightPad;
+//     const int textAreaW = scrollBarX - kListLeftX - kTextPad;
+//     const int textAreaH = CARD_HEIGHT - 2; // igual que en el menú (fondo resaltado)
 
-    // Si el texto cabe, no se requiere ticker
-    const int fullTextWidth = uiSprite.textWidth(text);
-    if (fullTextWidth <= textAreaW) return;
+//     // Si el texto cabe, no se requiere ticker
+//     const int fullTextWidth = uiSprite.textWidth(text);
+//     if (fullTextWidth <= textAreaW) return;
 
-    // Ventana vertical (igual criterio que en drawSoundMenu)
-    const int startIndex = max(0, min(selection - (kVisibleOptions / 2),
-                                      kTotalOptions - kVisibleOptions));
-    const int cardIndex  = selection - startIndex;
-    if (cardIndex < 0 || cardIndex >= kVisibleOptions) return;
+//     // Ventana vertical (igual criterio que en drawSoundMenu)
+//     const int startIndex = max(0, min(selection - (kVisibleOptions / 2),
+//                                       kTotalOptions - kVisibleOptions));
+//     const int cardIndex  = selection - startIndex;
+//     if (cardIndex < 0 || cardIndex >= kVisibleOptions) return;
 
-    const int textAreaX = kListLeftX;
-    const int textAreaY = kListTopY + cardIndex * (CARD_HEIGHT + CARD_MARGIN);
+//     const int textAreaX = kListLeftX;
+//     const int textAreaY = kListTopY + cardIndex * (CARD_HEIGHT + CARD_MARGIN);
 
-    // Color lógico (coincidir con el menú)
-    const bool isLogicallySelected =
-        (selection == 0 && selectedVoiceGender == 0) ||
-        (selection == 1 && selectedVoiceGender == 1) ||
-        (selection == 3 && negativeResponse)         ||
-        (selection == 4 && !negativeResponse)        ||
-        (selection == 6 && selectedVolume == 0)      ||
-        (selection == 7 && selectedVolume == 1);
-    const uint16_t textColor = isLogicallySelected ? HIGHLIGHT_COLOR : TEXT_COLOR;
+//     // Color lógico (coincidir con el menú)
+//     const bool isLogicallySelected =
+//         (selection == 0 && selectedVoiceGender == 0) ||
+//         (selection == 1 && selectedVoiceGender == 1) ||
+//         (selection == 3 && negativeResponse)         ||
+//         (selection == 4 && !negativeResponse)        ||
+//         (selection == 6 && selectedVolume == 0)      ||
+//         (selection == 7 && selectedVolume == 1);
+//     const uint16_t textColor = isLogicallySelected ? HIGHLIGHT_COLOR : TEXT_COLOR;
 
-    // ── Estado del ticker por opción ───────────────────────────────────
-    static int  pixelOffsets[kTotalOptions]     = {0};
-    static int  scrollDirections[kTotalOptions] = {1,1,1,1,1,1,1,1,1,1};
-    static unsigned long lastFrameTime = 0;
+//     // ── Estado del ticker por opción ───────────────────────────────────
+//     static int  pixelOffsets[kTotalOptions]     = {0};
+//     static int  scrollDirections[kTotalOptions] = {1,1,1,1,1,1,1,1,1,1};
+//     static unsigned long lastFrameTime = 0;
 
-    const unsigned long now = millis();
-    if (now - lastFrameTime >= kFrameIntervalMs) {
-        int& off = pixelOffsets[selection];
-        int& dir = scrollDirections[selection];
+//     const unsigned long now = millis();
+//     if (now - lastFrameTime >= kFrameIntervalMs) {
+//         int& off = pixelOffsets[selection];
+//         int& dir = scrollDirections[selection];
 
-        off += dir;
+//         off += dir;
 
-        const int maxOffset = (fullTextWidth - textAreaW) + kScrollMargin;
-        if (off <= 0) {
-            off = 0;
-            dir = 1;
-        } else if (off >= maxOffset) {
-            off = maxOffset;
-            dir = -1;
-        }
+//         const int maxOffset = (fullTextWidth - textAreaW) + kScrollMargin;
+//         if (off <= 0) {
+//             off = 0;
+//             dir = 1;
+//         } else if (off >= maxOffset) {
+//             off = maxOffset;
+//             dir = -1;
+//         }
 
-        lastFrameTime = now;
-    }
+//         lastFrameTime = now;
+//     }
 
-    // ── Sprite estático para el ticker (evita crear/borrar por frame) ─
-    static TFT_eSprite ticker(&tft);
-    static int sW = 0, sH = 0;
+//     // ── Sprite estático para el ticker (evita crear/borrar por frame) ─
+//     static TFT_eSprite ticker(&tft);
+//     static int sW = 0, sH = 0;
 
-    if (!ticker.created() || sW != textAreaW || sH != textAreaH) {
-        if (ticker.created()) ticker.deleteSprite();
-        if (ticker.createSprite(textAreaW, textAreaH) == nullptr) {
-            // Sin memoria para el sprite auxiliar: salir silenciosamente
-            return;
-        }
-        sW = textAreaW; sH = textAreaH;
-    }
+//     if (!ticker.created() || sW != textAreaW || sH != textAreaH) {
+//         if (ticker.created()) ticker.deleteSprite();
+//         if (ticker.createSprite(textAreaW, textAreaH) == nullptr) {
+//             // Sin memoria para el sprite auxiliar: salir silenciosamente
+//             return;
+//         }
+//         sW = textAreaW; sH = textAreaH;
+//     }
 
-    // Fondo del resaltado y texto
-    ticker.fillSprite(CARD_COLOR);
-    ticker.setFreeFont(&FreeSans9pt7b);
-    ticker.setTextWrap(false);
-    ticker.setTextSize(1);
-    ticker.setTextDatum(TL_DATUM);
-    ticker.setTextColor(textColor, CARD_COLOR);
+//     // Fondo del resaltado y texto
+//     ticker.fillSprite(CARD_COLOR);
+//     ticker.setFreeFont(&FreeSans9pt7b);
+//     ticker.setTextWrap(false);
+//     ticker.setTextSize(1);
+//     ticker.setTextDatum(TL_DATUM);
+//     ticker.setTextColor(textColor, CARD_COLOR);
 
-    // Desplazar el texto hacia la izquierda (offset positivo)
-    ticker.drawString(text, -pixelOffsets[selection], 0);
+//     // Desplazar el texto hacia la izquierda (offset positivo)
+//     ticker.drawString(text, -pixelOffsets[selection], 0);
 
-    // Componer sobre el sprite principal (NO directamente a la TFT)
-    ticker.pushToSprite(&uiSprite, textAreaX, textAreaY);
-}
+//     // Componer sobre el sprite principal (NO directamente a la TFT)
+//     ticker.pushToSprite(&uiSprite, textAreaX, textAreaY);
+// }
 
 /**
  * @brief Dibuja el menú de “formato/control de sala” con scroll y ticker en la fila activa.
@@ -3307,110 +3307,110 @@ inline void setFontForCurrentLanguage() {
     }
 }
 
-/**
- * @brief Ticker horizontal con rebote y pausa para el nombre de fichero.
- *
- * Desplaza el texto en vaivén dentro de un área fija. Hace una pausa breve en
- * cada extremo y vuelve a moverse en sentido contrario. Dibuja únicamente el
- * “ticker” en una banda concreta de la pantalla, empujando el sprite auxiliar
- * directamente a la TFT (no al `uiSprite` principal).
- */
-void scrollFileNameTickerBounce(const String& fileName)
-{
-    // ── Parámetros de animación (se mantienen valores visuales) ──
-    constexpr unsigned long kFrameMs      = 20;   // ~50 FPS
-    constexpr unsigned long kPauseMs      = 500;  // 500 ms de pausa en extremos
-    constexpr int           kAreaH        = 22;   // alto del ticker
-    constexpr int           kAnchorY      = 47;   // centro vertical de referencia (mantener)
-    constexpr int           kAreaX        = 0;    // lado izquierdo del área
+// /**
+//  * @brief Ticker horizontal con rebote y pausa para el nombre de fichero.
+//  *
+//  * Desplaza el texto en vaivén dentro de un área fija. Hace una pausa breve en
+//  * cada extremo y vuelve a moverse en sentido contrario. Dibuja únicamente el
+//  * “ticker” en una banda concreta de la pantalla, empujando el sprite auxiliar
+//  * directamente a la TFT (no al `uiSprite` principal).
+//  */
+// void scrollFileNameTickerBounce(const String& fileName)
+// {
+//     // ── Parámetros de animación (se mantienen valores visuales) ──
+//     constexpr unsigned long kFrameMs      = 20;   // ~50 FPS
+//     constexpr unsigned long kPauseMs      = 500;  // 500 ms de pausa en extremos
+//     constexpr int           kAreaH        = 22;   // alto del ticker
+//     constexpr int           kAnchorY      = 47;   // centro vertical de referencia (mantener)
+//     constexpr int           kAreaX        = 0;    // lado izquierdo del área
 
-    // Área horizontal dinámica (sustituye el 128 mágico por el ancho real)
-    const int screenW  = tft.width();
-    const int areaW    = screenW;                 // ocupa todo el ancho visible
-    const int areaY    = kAnchorY - (kAreaH / 2); // banda vertical centrada sobre kAnchorY
+//     // Área horizontal dinámica (sustituye el 128 mágico por el ancho real)
+//     const int screenW  = tft.width();
+//     const int areaW    = screenW;                 // ocupa todo el ancho visible
+//     const int areaY    = kAnchorY - (kAreaH / 2); // banda vertical centrada sobre kAnchorY
 
-    // ── Estado persistente ──
-    static int            pixelOffset      = 0;
-    static int            scrollDirection  = 1;   // 1→izquierda (texto se mueve hacia -X), -1→derecha
-    static unsigned long  lastScrollTime   = 0;
-    static bool           inPause          = false;
-    static unsigned long  pauseStartTime   = 0;
-    static String         lastText;
+//     // ── Estado persistente ──
+//     static int            pixelOffset      = 0;
+//     static int            scrollDirection  = 1;   // 1→izquierda (texto se mueve hacia -X), -1→derecha
+//     static unsigned long  lastScrollTime   = 0;
+//     static bool           inPause          = false;
+//     static unsigned long  pauseStartTime   = 0;
+//     static String         lastText;
 
-    // Si cambia el texto, reini ciamos offset/pausa para evitar saltos
-    if (fileName != lastText) {
-        lastText        = fileName;
-        pixelOffset     = 0;
-        scrollDirection = 1;
-        inPause         = false;
-        lastScrollTime  = 0;
-        pauseStartTime  = 0;
-    }
+//     // Si cambia el texto, reini ciamos offset/pausa para evitar saltos
+//     if (fileName != lastText) {
+//         lastText        = fileName;
+//         pixelOffset     = 0;
+//         scrollDirection = 1;
+//         inPause         = false;
+//         lastScrollTime  = 0;
+//         pauseStartTime  = 0;
+//     }
 
-    // Medición con la misma fuente que usará el ticker
-    uiSprite.setFreeFont(&FreeSans9pt7b);
-    uiSprite.setTextWrap(false);
-    uiSprite.setTextSize(1);
+//     // Medición con la misma fuente que usará el ticker
+//     uiSprite.setFreeFont(&FreeSans9pt7b);
+//     uiSprite.setTextWrap(false);
+//     uiSprite.setTextSize(1);
 
-    const int fullTextWidth = uiSprite.textWidth(fileName);
-    if (fullTextWidth <= areaW || fullTextWidth <= 0) return; // no hace falta ticker
+//     const int fullTextWidth = uiSprite.textWidth(fileName);
+//     if (fullTextWidth <= areaW || fullTextWidth <= 0) return; // no hace falta ticker
 
-    const unsigned long now = millis();
+//     const unsigned long now = millis();
 
-    // Pausa en extremos
-    if (inPause) {
-        if ((now - pauseStartTime) < kPauseMs) {
-            return; // aún en pausa: no redibujamos (evita trabajo y parpadeo)
-        }
-        inPause = false; // fin de pausa, retomamos movimiento
-    }
+//     // Pausa en extremos
+//     if (inPause) {
+//         if ((now - pauseStartTime) < kPauseMs) {
+//             return; // aún en pausa: no redibujamos (evita trabajo y parpadeo)
+//         }
+//         inPause = false; // fin de pausa, retomamos movimiento
+//     }
 
-    // Avance temporal (cadencia fija)
-    if ((now - lastScrollTime) >= kFrameMs) {
-        pixelOffset += scrollDirection;
+//     // Avance temporal (cadencia fija)
+//     if ((now - lastScrollTime) >= kFrameMs) {
+//         pixelOffset += scrollDirection;
 
-        // Límites de desplazamiento
-        const int maxOffset = fullTextWidth - areaW; // ≥1, ya que fullTextWidth > areaW
-        if (pixelOffset <= 0) {
-            pixelOffset     = 0;
-            scrollDirection = +1;
-            inPause         = true;
-            pauseStartTime  = now;
-        } else if (pixelOffset >= maxOffset) {
-            pixelOffset     = maxOffset;
-            scrollDirection = -1;
-            inPause         = true;
-            pauseStartTime  = now;
-        }
+//         // Límites de desplazamiento
+//         const int maxOffset = fullTextWidth - areaW; // ≥1, ya que fullTextWidth > areaW
+//         if (pixelOffset <= 0) {
+//             pixelOffset     = 0;
+//             scrollDirection = +1;
+//             inPause         = true;
+//             pauseStartTime  = now;
+//         } else if (pixelOffset >= maxOffset) {
+//             pixelOffset     = maxOffset;
+//             scrollDirection = -1;
+//             inPause         = true;
+//             pauseStartTime  = now;
+//         }
 
-        lastScrollTime = now;
-    }
+//         lastScrollTime = now;
+//     }
 
-    // ── Sprite auxiliar del ticker (se crea/reutiliza según tamaño) ──
-    static TFT_eSprite ticker(&tft);
-    static int sprW = 0, sprH = 0;
+//     // ── Sprite auxiliar del ticker (se crea/reutiliza según tamaño) ──
+//     static TFT_eSprite ticker(&tft);
+//     static int sprW = 0, sprH = 0;
 
-    if (!ticker.created() || sprW != areaW || sprH != kAreaH) {
-        if (ticker.created()) ticker.deleteSprite();
-        if (ticker.createSprite(areaW, kAreaH) == nullptr) {
-            return; // sin RAM, salir silenciosamente
-        }
-        sprW = areaW; sprH = kAreaH;
-    }
+//     if (!ticker.created() || sprW != areaW || sprH != kAreaH) {
+//         if (ticker.created()) ticker.deleteSprite();
+//         if (ticker.createSprite(areaW, kAreaH) == nullptr) {
+//             return; // sin RAM, salir silenciosamente
+//         }
+//         sprW = areaW; sprH = kAreaH;
+//     }
 
-    // Preparar y dibujar texto desplazado
-    ticker.fillSprite(BACKGROUND_COLOR);
-    ticker.setFreeFont(&FreeSans9pt7b);
-    ticker.setTextWrap(false);
-    ticker.setTextSize(1);
-    ticker.setTextDatum(TL_DATUM);
-    ticker.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
+//     // Preparar y dibujar texto desplazado
+//     ticker.fillSprite(BACKGROUND_COLOR);
+//     ticker.setFreeFont(&FreeSans9pt7b);
+//     ticker.setTextWrap(false);
+//     ticker.setTextSize(1);
+//     ticker.setTextDatum(TL_DATUM);
+//     ticker.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
 
-    ticker.drawString(fileName, -pixelOffset, 0);
+//     ticker.drawString(fileName, -pixelOffset, 0);
 
-    // Componer directamente sobre la TFT (comportamiento original)
-    ticker.pushSprite(kAreaX, areaY);
-}
+//     // Componer directamente sobre la TFT (comportamiento original)
+//     ticker.pushSprite(kAreaX, areaY);
+// }
 
 void drawLoadingModalFrame(const char* message, int frameCount) {
     uiSprite.fillSprite(BACKGROUND_COLOR);
@@ -3480,207 +3480,207 @@ void drawLoadingModalFrame(const char* message, int frameCount) {
     uiSprite.pushSprite(0, 0);
 }
 
-/**
- * @brief Muestra un mensaje en una "card" con barra de progreso animada (barber-pole).
- * @param message Mensaje a mostrar (UTF-8). Si es `nullptr`, se muestra una línea vacía.
- * @param delayTime Duración total en milisegundos (bloqueante).
- * @note  Usa delay() (~30 FPS). Si se requiere no bloquear, migrar a bucle con millis().
- * @warning Mantiene estilos: BACKGROUND_COLOR, TEXT_COLOR, FreeSansBold9pt7b.
- */
-void showMessageWithProgress(const char* message, unsigned long delayTime) {
-    ignoreInputs = true;
+// /**
+//  * @brief Muestra un mensaje en una "card" con barra de progreso animada (barber-pole).
+//  * @param message Mensaje a mostrar (UTF-8). Si es `nullptr`, se muestra una línea vacía.
+//  * @param delayTime Duración total en milisegundos (bloqueante).
+//  * @note  Usa delay() (~30 FPS). Si se requiere no bloquear, migrar a bucle con millis().
+//  * @warning Mantiene estilos: BACKGROUND_COLOR, TEXT_COLOR, FreeSansBold9pt7b.
+//  */
+// void showMessageWithProgress(const char* message, unsigned long delayTime) {
+//     ignoreInputs = true;
 
-    const unsigned long startTime = millis();
-    unsigned long now = startTime;
-    int frameCount = 0;
+//     const unsigned long startTime = millis();
+//     unsigned long now = startTime;
+//     int frameCount = 0;
 
-    // Lienzo
-    const int W = tft.width();   // 128
-    const int H = tft.height();  // 128
-    uiSprite.setTextDatum(TL_DATUM);
-    uiSprite.setFreeFont(&FreeSansBold9pt7b);
-    uiSprite.setTextSize(1);
+//     // Lienzo
+//     const int W = tft.width();   // 128
+//     const int H = tft.height();  // 128
+//     uiSprite.setTextDatum(TL_DATUM);
+//     uiSprite.setFreeFont(&FreeSansBold9pt7b);
+//     uiSprite.setTextSize(1);
 
-    // Card centrada
-    const int cardW = 112;
-    const int cardH = 96;
-    const int cardX = (W - cardW) / 2; // 8
-    const int cardY = (H - cardH) / 2; // 16
+//     // Card centrada
+//     const int cardW = 112;
+//     const int cardH = 96;
+//     const int cardX = (W - cardW) / 2; // 8
+//     const int cardY = (H - cardH) / 2; // 16
 
-    // Tipografía
-    const int lineHeight = 20;
-    const int textX = cardX + 12;
-    const int textY = cardY + 14;
-    const int textMaxW = cardW - 24;
+//     // Tipografía
+//     const int lineHeight = 20;
+//     const int textX = cardX + 12;
+//     const int textY = cardY + 14;
+//     const int textMaxW = cardW - 24;
 
-    // Barra de progreso
-    const int barX = cardX + 12;
-    const int barW = cardW - 24;
-    const int barH = 12;
-    const int barY = cardY + cardH - 18; // margen inferior
+//     // Barra de progreso
+//     const int barX = cardX + 12;
+//     const int barW = cardW - 24;
+//     const int barH = 12;
+//     const int barY = cardY + cardH - 18; // margen inferior
 
-    // Bucle de animación
-    while ((now = millis()) - startTime < delayTime) {
-        uiSprite.fillSprite(BACKGROUND_COLOR);
+//     // Bucle de animación
+//     while ((now = millis()) - startTime < delayTime) {
+//         uiSprite.fillSprite(BACKGROUND_COLOR);
 
-        // —— Esquinas tipo “marcador” (toque moderno sin cambiar la paleta)
-        const int notch = 8;
-        // Esquina sup-izq
-        uiSprite.drawFastHLine(cardX, cardY, notch, TEXT_COLOR);
-        uiSprite.drawFastVLine(cardX, cardY, notch, TEXT_COLOR);
-        // sup-der
-        uiSprite.drawFastHLine(cardX + cardW - notch, cardY, notch, TEXT_COLOR);
-        uiSprite.drawFastVLine(cardX + cardW - notch + (notch-1), cardY, notch, TEXT_COLOR);
-        // inf-izq
-        uiSprite.drawFastHLine(cardX, cardY + cardH - 1, notch, TEXT_COLOR);
-        uiSprite.drawFastVLine(cardX, cardY + cardH - notch, notch, TEXT_COLOR);
-        // inf-der
-        uiSprite.drawFastHLine(cardX + cardW - notch, cardY + cardH - 1, notch, TEXT_COLOR);
-        uiSprite.drawFastVLine(cardX + cardW - 1, cardY + cardH - notch, notch, TEXT_COLOR);
+//         // —— Esquinas tipo “marcador” (toque moderno sin cambiar la paleta)
+//         const int notch = 8;
+//         // Esquina sup-izq
+//         uiSprite.drawFastHLine(cardX, cardY, notch, TEXT_COLOR);
+//         uiSprite.drawFastVLine(cardX, cardY, notch, TEXT_COLOR);
+//         // sup-der
+//         uiSprite.drawFastHLine(cardX + cardW - notch, cardY, notch, TEXT_COLOR);
+//         uiSprite.drawFastVLine(cardX + cardW - notch + (notch-1), cardY, notch, TEXT_COLOR);
+//         // inf-izq
+//         uiSprite.drawFastHLine(cardX, cardY + cardH - 1, notch, TEXT_COLOR);
+//         uiSprite.drawFastVLine(cardX, cardY + cardH - notch, notch, TEXT_COLOR);
+//         // inf-der
+//         uiSprite.drawFastHLine(cardX + cardW - notch, cardY + cardH - 1, notch, TEXT_COLOR);
+//         uiSprite.drawFastVLine(cardX + cardW - 1, cardY + cardH - notch, notch, TEXT_COLOR);
 
-        // Marco de la card
-        uiSprite.drawRoundRect(cardX, cardY, cardW, cardH, 8, TEXT_COLOR);
+//         // Marco de la card
+//         uiSprite.drawRoundRect(cardX, cardY, cardW, cardH, 8, TEXT_COLOR);
 
-        // —— Texto con word-wrap y recorte a 3 líneas (con “…” si se desborda)
-        String remaining = (message ? String(message) : String(""));
-        String currentLine = "";
-        int cursorY = textY;
-        int linesDrawn = 0;
-        while (remaining.length() > 0 && linesDrawn < 3) {
-            int spaceIdx = remaining.indexOf(' ');
-            int nlIdx    = remaining.indexOf('\n');
-            int cut = -1; bool forcedNL = false;
+//         // —— Texto con word-wrap y recorte a 3 líneas (con “…” si se desborda)
+//         String remaining = (message ? String(message) : String(""));
+//         String currentLine = "";
+//         int cursorY = textY;
+//         int linesDrawn = 0;
+//         while (remaining.length() > 0 && linesDrawn < 3) {
+//             int spaceIdx = remaining.indexOf(' ');
+//             int nlIdx    = remaining.indexOf('\n');
+//             int cut = -1; bool forcedNL = false;
 
-            // Elegir el separador más cercano (espacio o salto de línea)
-            if (spaceIdx == -1 && nlIdx == -1) {
-                cut = remaining.length();
-            } else if (spaceIdx == -1) {
-                cut = nlIdx; forcedNL = true;
-            } else if (nlIdx == -1) {
-                cut = spaceIdx;
-            } else {
-                cut = (spaceIdx < nlIdx) ? spaceIdx : nlIdx;
-                forcedNL = (nlIdx != -1 && nlIdx <= spaceIdx);
-            }
+//             // Elegir el separador más cercano (espacio o salto de línea)
+//             if (spaceIdx == -1 && nlIdx == -1) {
+//                 cut = remaining.length();
+//             } else if (spaceIdx == -1) {
+//                 cut = nlIdx; forcedNL = true;
+//             } else if (nlIdx == -1) {
+//                 cut = spaceIdx;
+//             } else {
+//                 cut = (spaceIdx < nlIdx) ? spaceIdx : nlIdx;
+//                 forcedNL = (nlIdx != -1 && nlIdx <= spaceIdx);
+//             }
 
-            String word = remaining.substring(0, cut);
-            String probe = currentLine + word + (forcedNL ? "" : " ");
+//             String word = remaining.substring(0, cut);
+//             String probe = currentLine + word + (forcedNL ? "" : " ");
 
-            if (uiSprite.textWidth(probe) <= textMaxW) {
-                currentLine = probe;
-                if (cut >= (int)remaining.length()) {
-                    // Última palabra del texto
-                    uiSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
-                    uiSprite.drawString(currentLine, textX, cursorY);
-                    linesDrawn++;
-                    break;
-                } else {
-                    remaining = remaining.substring(cut + 1);
-                    if (forcedNL) {
-                        uiSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
-                        uiSprite.drawString(currentLine, textX, cursorY);
-                        cursorY += lineHeight;
-                        currentLine = "";
-                        linesDrawn++;
-                    }
-                }
-            } else {
-                // Línea completa -> pintar y pasar a la siguiente
-                uiSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
-                uiSprite.drawString(currentLine, textX, cursorY);
-                cursorY += lineHeight;
-                currentLine = "";
-                linesDrawn++;
+//             if (uiSprite.textWidth(probe) <= textMaxW) {
+//                 currentLine = probe;
+//                 if (cut >= (int)remaining.length()) {
+//                     // Última palabra del texto
+//                     uiSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
+//                     uiSprite.drawString(currentLine, textX, cursorY);
+//                     linesDrawn++;
+//                     break;
+//                 } else {
+//                     remaining = remaining.substring(cut + 1);
+//                     if (forcedNL) {
+//                         uiSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
+//                         uiSprite.drawString(currentLine, textX, cursorY);
+//                         cursorY += lineHeight;
+//                         currentLine = "";
+//                         linesDrawn++;
+//                     }
+//                 }
+//             } else {
+//                 // Línea completa -> pintar y pasar a la siguiente
+//                 uiSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
+//                 uiSprite.drawString(currentLine, textX, cursorY);
+//                 cursorY += lineHeight;
+//                 currentLine = "";
+//                 linesDrawn++;
 
-                // Si ya vamos a rebasar 3 líneas, pintar "…"
-                if (linesDrawn >= 3) {
-                    uiSprite.drawString("...", textX + textMaxW - uiSprite.textWidth("..."), cursorY - lineHeight);
-                    break;
-                }
-                // no consumir la palabra, se reevalúa en la nueva línea
-            }
-            if (remaining.length() == 0 && currentLine.length() > 0 && linesDrawn < 3) {
-                uiSprite.drawString(currentLine, textX, cursorY);
-                linesDrawn++;
-            }
-        }
+//                 // Si ya vamos a rebasar 3 líneas, pintar "…"
+//                 if (linesDrawn >= 3) {
+//                     uiSprite.drawString("...", textX + textMaxW - uiSprite.textWidth("..."), cursorY - lineHeight);
+//                     break;
+//                 }
+//                 // no consumir la palabra, se reevalúa en la nueva línea
+//             }
+//             if (remaining.length() == 0 && currentLine.length() > 0 && linesDrawn < 3) {
+//                 uiSprite.drawString(currentLine, textX, cursorY);
+//                 linesDrawn++;
+//             }
+//         }
 
-        // Separador sutil bajo el texto
-        int sepY = textY + lineHeight * (linesDrawn == 0 ? 1 : linesDrawn) + 2;
-        if (sepY < barY - 14) {
-            uiSprite.drawFastHLine(cardX + 10, sepY, cardW - 20, TEXT_COLOR);
-        }
+//         // Separador sutil bajo el texto
+//         int sepY = textY + lineHeight * (linesDrawn == 0 ? 1 : linesDrawn) + 2;
+//         if (sepY < barY - 14) {
+//             uiSprite.drawFastHLine(cardX + 10, sepY, cardW - 20, TEXT_COLOR);
+//         }
 
-        // —— Icono ecualizador (3 barras animadas) a la izquierda de la barra
-        const int eqX = barX - 8;    // pegado a la barra
-        const int eqY = barY - 16;   // por encima
-        const int eqW = 5;           // ancho de cada barra
-        const int eqGap = 4;
-        for (int i = 0; i < 3; i++) {
-            int period = 40;
-            int wave   = abs(((frameCount + i * 8) % period) - period / 2);
-            int h      = map(wave, 0, period / 2, 16, 6); // respira entre 6 y 16 px
-            int bx     = eqX + i * (eqW + eqGap);
-            int by     = eqY + (16 - h);
-            uiSprite.fillRect(bx, by, eqW, h, TEXT_COLOR);
-            // pequeña línea base
-            uiSprite.drawFastHLine(eqX, eqY + 16, eqW * 3 + eqGap * 2, TEXT_COLOR);
-        }
+//         // —— Icono ecualizador (3 barras animadas) a la izquierda de la barra
+//         const int eqX = barX - 8;    // pegado a la barra
+//         const int eqY = barY - 16;   // por encima
+//         const int eqW = 5;           // ancho de cada barra
+//         const int eqGap = 4;
+//         for (int i = 0; i < 3; i++) {
+//             int period = 40;
+//             int wave   = abs(((frameCount + i * 8) % period) - period / 2);
+//             int h      = map(wave, 0, period / 2, 16, 6); // respira entre 6 y 16 px
+//             int bx     = eqX + i * (eqW + eqGap);
+//             int by     = eqY + (16 - h);
+//             uiSprite.fillRect(bx, by, eqW, h, TEXT_COLOR);
+//             // pequeña línea base
+//             uiSprite.drawFastHLine(eqX, eqY + 16, eqW * 3 + eqGap * 2, TEXT_COLOR);
+//         }
 
-        // —— Barra de progreso con animación barber-pole
-        float t = (delayTime == 0) ? 1.0f : (float)(now - startTime) / (float)delayTime;
-        if (t > 1.0f) t = 1.0f;
-        int progW = (int)(barW * t);
+//         // —— Barra de progreso con animación barber-pole
+//         float t = (delayTime == 0) ? 1.0f : (float)(now - startTime) / (float)delayTime;
+//         if (t > 1.0f) t = 1.0f;
+//         int progW = (int)(barW * t);
 
-        // Pista
-        uiSprite.drawRoundRect(barX - 1, barY - 1, barW + 2, barH + 2, 4, TEXT_COLOR);
-        // Relleno de progreso
-        if (progW > 0) {
-            uiSprite.fillRoundRect(barX, barY, progW, barH, 4, TEXT_COLOR);
+//         // Pista
+//         uiSprite.drawRoundRect(barX - 1, barY - 1, barW + 2, barH + 2, 4, TEXT_COLOR);
+//         // Relleno de progreso
+//         if (progW > 0) {
+//             uiSprite.fillRoundRect(barX, barY, progW, barH, 4, TEXT_COLOR);
 
-            // Rayas diagonales “barber-pole” recortadas al ancho de progreso
-            int stripeStep = 6;
-            int offset = frameCount % stripeStep;
-            for (int sx = -barH + offset; sx < progW; sx += stripeStep) {
-                // Línea diagonal dentro del área de progreso
-                int x1 = barX + sx;
-                int y1 = barY;
-                int x2 = barX + sx + barH;
-                int y2 = barY + barH - 1;
-                // recorte rudimentario a progW
-                if (x2 > barX + progW) {
-                    int dx = x2 - (barX + progW);
-                    x2 -= dx; y2 -= dx; // desplazar fin para no salir
-                }
-                if (x1 < barX) {
-                    int dx = barX - x1;
-                    x1 += dx; y1 += dx;
-                }
-                if (x1 <= x2) {
-                    uiSprite.drawLine(x1, y1, x2, y2, BACKGROUND_COLOR);
-                }
-            }
-        }
+//             // Rayas diagonales “barber-pole” recortadas al ancho de progreso
+//             int stripeStep = 6;
+//             int offset = frameCount % stripeStep;
+//             for (int sx = -barH + offset; sx < progW; sx += stripeStep) {
+//                 // Línea diagonal dentro del área de progreso
+//                 int x1 = barX + sx;
+//                 int y1 = barY;
+//                 int x2 = barX + sx + barH;
+//                 int y2 = barY + barH - 1;
+//                 // recorte rudimentario a progW
+//                 if (x2 > barX + progW) {
+//                     int dx = x2 - (barX + progW);
+//                     x2 -= dx; y2 -= dx; // desplazar fin para no salir
+//                 }
+//                 if (x1 < barX) {
+//                     int dx = barX - x1;
+//                     x1 += dx; y1 += dx;
+//                 }
+//                 if (x1 <= x2) {
+//                     uiSprite.drawLine(x1, y1, x2, y2, BACKGROUND_COLOR);
+//                 }
+//             }
+//         }
 
-        // Porcentaje a la derecha de la barra
-        char pct[8];
-        int percent = (int)(t * 100.0f + 0.5f);
-        snprintf(pct, sizeof(pct), "%d%%", percent);
-        int pctW = uiSprite.textWidth(pct);
-        int pctX = barX + barW - pctW;
-        int pctY = barY - 16;
-        uiSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
-        uiSprite.drawString(pct, pctX, pctY);
+//         // Porcentaje a la derecha de la barra
+//         char pct[8];
+//         int percent = (int)(t * 100.0f + 0.5f);
+//         snprintf(pct, sizeof(pct), "%d%%", percent);
+//         int pctW = uiSprite.textWidth(pct);
+//         int pctX = barX + barW - pctW;
+//         int pctY = barY - 16;
+//         uiSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
+//         uiSprite.drawString(pct, pctX, pctY);
 
-        // Empujar al TFT
-        uiSprite.pushSprite(0, 0);
+//         // Empujar al TFT
+//         uiSprite.pushSprite(0, 0);
 
-        frameCount++;
-        delay(33); // ~30 FPS
-    }
+//         frameCount++;
+//         delay(33); // ~30 FPS
+//     }
 
-    ignoreInputs = false;
-}
+//     ignoreInputs = false;
+// }
 
 bool extraElementsMenuActive = false;
 int  extraElementsMenuSelection = 0;

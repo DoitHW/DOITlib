@@ -12,7 +12,7 @@
 #include <token_DMS/token_DMS.h>
 #include <RelayManager_DMS/RelayStateManager.h>
 
-#define MODE_BACK -2
+
 // Variables globales para el manejo del encoder
 ESP32Encoder encoder;
 int32_t lastEncoderValue = 0;
@@ -23,8 +23,8 @@ bool inModesScreen = false;
 int currentModeIndex = 0;  // Índice del modo actual dentro del menú MODOS
 int totalModes = 0;    
 unsigned long buttonReleaseTime = 0;  // Track when button is released
-bool modeScreenEnteredByLongPress = false;  // Flag to track how modes screen was entered
-bool longPressDetected = false;
+//bool modeScreenEnteredByLongPress = false;  // Flag to track how modes screen was entered
+//bool longPressDetected = false;
 std::vector<String> elementFiles;
 std::vector<char> selectedStates;
 int globalVisibleModesMap[17] = {0};  // Definición e inicialización 
@@ -771,7 +771,7 @@ void handleEncoder() noexcept
     }
 }
 
-bool modeAlternateActive = false;
+//bool modeAlternateActive = false;
 
 // Función handleModeSelection modificada
 /**
@@ -1152,135 +1152,135 @@ std::vector<bool> initializeAlternateStates(const String &currentFile) noexcept
     return v;
 }
 
-/**
- * @brief Alterna la selección del elemento actual y envía los comandos asociados.
- *
- * Cambia el estado `selectedStates[currentIndex]` y:
- * - Para ficheros de SPIFFS: lee su ID (OFFSET_ID), envía START/BLACKOUT y
- *   fuerza el modo básico (OFFSET_CURRENTMODE = DEFAULT_BASIC_MODE).
- * - Para "Apagar": deselecciona todos, reinicia estados alternativos globales,
- *   envía BLACKOUT en broadcast (0xFF) y vuelve al índice 0.
- * - Para "Ambientes"/"Fichas": solo alterna selección local (sin I/O).
- *
- * Si el elemento queda deseleccionado (false) y no es "Apagar", reinicia su
- * vector de estados alternativos en RAM mediante `initializeAlternateStates()`.
- *
- * @param currentFile Nombre lógico del elemento (fichero en SPIFFS o
- *        etiquetas especiales: "Ambientes", "Fichas", "Apagar").
- * @return void
- *
- * @pre
- *  - `currentIndex` dentro de rango de `selectedStates` y `elementFiles`.
- *  - SPIFFS montado si `currentFile` pertenece al FS.
- *  - `initializeAlternateStates()`, `elementAlternateStates`, `currentAlternateStates`
- *    y `send_frame()/frameMaker_*` disponibles.
- *
- * @note ID broadcast 0xFF para "Apagar". Para elementos de SPIFFS, ID leído en `OFFSET_ID`.
- * @warning Realiza I/O bloqueante sobre SPIFFS y envíos de tramas; no invocar desde ISR.
- */
-void toggleElementSelection(const String& currentFile) noexcept
-{
-    // -------------------------
-    // Utilidad
-    // -------------------------
-    const auto isElementFromSPIFFS = [&](const String& name) -> bool {
-        return !name.startsWith("Ambientes") &&
-               !name.startsWith("Fichas")    &&
-               !name.startsWith("Apagar");
-    };
+// /**
+//  * @brief Alterna la selección del elemento actual y envía los comandos asociados.
+//  *
+//  * Cambia el estado `selectedStates[currentIndex]` y:
+//  * - Para ficheros de SPIFFS: lee su ID (OFFSET_ID), envía START/BLACKOUT y
+//  *   fuerza el modo básico (OFFSET_CURRENTMODE = DEFAULT_BASIC_MODE).
+//  * - Para "Apagar": deselecciona todos, reinicia estados alternativos globales,
+//  *   envía BLACKOUT en broadcast (0xFF) y vuelve al índice 0.
+//  * - Para "Ambientes"/"Fichas": solo alterna selección local (sin I/O).
+//  *
+//  * Si el elemento queda deseleccionado (false) y no es "Apagar", reinicia su
+//  * vector de estados alternativos en RAM mediante `initializeAlternateStates()`.
+//  *
+//  * @param currentFile Nombre lógico del elemento (fichero en SPIFFS o
+//  *        etiquetas especiales: "Ambientes", "Fichas", "Apagar").
+//  * @return void
+//  *
+//  * @pre
+//  *  - `currentIndex` dentro de rango de `selectedStates` y `elementFiles`.
+//  *  - SPIFFS montado si `currentFile` pertenece al FS.
+//  *  - `initializeAlternateStates()`, `elementAlternateStates`, `currentAlternateStates`
+//  *    y `send_frame()/frameMaker_*` disponibles.
+//  *
+//  * @note ID broadcast 0xFF para "Apagar". Para elementos de SPIFFS, ID leído en `OFFSET_ID`.
+//  * @warning Realiza I/O bloqueante sobre SPIFFS y envíos de tramas; no invocar desde ISR.
+//  */
+// void toggleElementSelection(const String& currentFile) noexcept
+// {
+//     // -------------------------
+//     // Utilidad
+//     // -------------------------
+//     const auto isElementFromSPIFFS = [&](const String& name) -> bool {
+//         return !name.startsWith("Ambientes") &&
+//                !name.startsWith("Fichas")    &&
+//                !name.startsWith("Apagar");
+//     };
 
-    // -------------------------
-    // Validaciones defensivas
-    // -------------------------
-    if ((size_t)currentIndex >= selectedStates.size()) {
-    #ifdef DEBUG
-            DEBUG__________printf("⚠️ toggleElementSelection: currentIndex fuera de rango (%d)\n", currentIndex);
-    #endif
-        return;
-    }
+//     // -------------------------
+//     // Validaciones defensivas
+//     // -------------------------
+//     if ((size_t)currentIndex >= selectedStates.size()) {
+//     #ifdef DEBUG
+//             DEBUG__________printf("⚠️ toggleElementSelection: currentIndex fuera de rango (%d)\n", currentIndex);
+//     #endif
+//         return;
+//     }
 
-    // -------------------------
-    // 1) Alternar selección local
-    // -------------------------
-    selectedStates[currentIndex] = !selectedStates[currentIndex];
+//     // -------------------------
+//     // 1) Alternar selección local
+//     // -------------------------
+//     selectedStates[currentIndex] = !selectedStates[currentIndex];
 
-    // -------------------------
-    // 2) Si se deselecciona y no es "Apagar", reiniciar alternativos
-    // -------------------------
-    if (!selectedStates[currentIndex] && currentFile != "Apagar") {
-        std::vector<bool> newStates = initializeAlternateStates(currentFile);
-        elementAlternateStates[currentFile] = newStates;
-        currentAlternateStates = newStates;
-    }
+//     // -------------------------
+//     // 2) Si se deselecciona y no es "Apagar", reiniciar alternativos
+//     // -------------------------
+//     if (!selectedStates[currentIndex] && currentFile != "Apagar") {
+//         std::vector<bool> newStates = initializeAlternateStates(currentFile);
+//         elementAlternateStates[currentFile] = newStates;
+//         currentAlternateStates = newStates;
+//     }
 
-    // ----------------------------------------
-    // 3) Caso especial: botón "Apagar" (global)
-    // ----------------------------------------
-    if (currentFile == "Apagar") {
-        for (size_t i = 0; i < selectedStates.size(); ++i) {
-            selectedStates[i] = false;
-        }
-        for (auto &entry : elementAlternateStates) {
-            entry.second = initializeAlternateStates(entry.first);
-        }
+//     // ----------------------------------------
+//     // 3) Caso especial: botón "Apagar" (global)
+//     // ----------------------------------------
+//     if (currentFile == "Apagar") {
+//         for (size_t i = 0; i < selectedStates.size(); ++i) {
+//             selectedStates[i] = false;
+//         }
+//         for (auto &entry : elementAlternateStates) {
+//             entry.second = initializeAlternateStates(entry.first);
+//         }
 
-        // Broadcast BLACKOUT
-        TARGETNS bcast = {0,0,0,0,0};
-        send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xFF, bcast, BLACKOUT));
+//         // Broadcast BLACKOUT
+//         TARGETNS bcast = {0,0,0,0,0};
+//         send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xFF, bcast, BLACKOUT));
 
-        setAllElementsToBasicMode();
-        showMessageWithLoading(getTranslation("APAGANDO_SALA"), 4000);
+//         setAllElementsToBasicMode();
+//         showMessageWithLoading(getTranslation("APAGANDO_SALA"), 4000);
 
-        currentIndex   = 0;
-        inModesScreen  = false;
-        drawCurrentElement();
-        return;
-    }
+//         currentIndex   = 0;
+//         inModesScreen  = false;
+//         drawCurrentElement();
+//         return;
+//     }
 
-    // ------------------------------------------------
-    // 4) Elementos de SPIFFS: envío START/BLACKOUT + FS
-    // ------------------------------------------------
-    if (isElementFromSPIFFS(currentFile)) {
-        const uint8_t command = selectedStates[currentIndex] ? START_CMD : BLACKOUT;
+//     // ------------------------------------------------
+//     // 4) Elementos de SPIFFS: envío START/BLACKOUT + FS
+//     // ------------------------------------------------
+//     if (isElementFromSPIFFS(currentFile)) {
+//         const uint8_t command = selectedStates[currentIndex] ? START_CMD : BLACKOUT;
 
-        TARGETNS elemNS{};
-        fs::File f = SPIFFS.open(currentFile, "r+");
-        if (f) {
-            // Leer serialNum[5] desde el fichero en lugar de ID
-            f.seek(OFFSET_SERIALNUM, SeekSet);
-            f.read(reinterpret_cast<uint8_t*>(&elemNS), sizeof(TARGETNS));
-            f.close();
+//         TARGETNS elemNS{};
+//         fs::File f = SPIFFS.open(currentFile, "r+");
+//         if (f) {
+//             // Leer serialNum[5] desde el fichero en lugar de ID
+//             f.seek(OFFSET_SERIALNUM, SeekSet);
+//             f.read(reinterpret_cast<uint8_t*>(&elemNS), sizeof(TARGETNS));
+//             f.close();
 
-            send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xDD, elemNS, command));
+//             send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xDD, elemNS, command));
 
-        #ifdef DEBUG
-                    DEBUG__________printf("Enviando comando %s al elemento NS %02X%02X%02X%02X%02X\n",
-                                        command == START_CMD ? "START_CMD" : "BLACKOUT",
-                                        elemNS.mac01, elemNS.mac02, elemNS.mac03,
-                                        elemNS.mac04, elemNS.mac05);
-        #endif
-            if (command == BLACKOUT) {
-                showMessageWithLoading(getTranslation("APAGANDO_ELEMENTO"), 2000);
-            }
+//         #ifdef DEBUG
+//                     DEBUG__________printf("Enviando comando %s al elemento NS %02X%02X%02X%02X%02X\n",
+//                                         command == START_CMD ? "START_CMD" : "BLACKOUT",
+//                                         elemNS.mac01, elemNS.mac02, elemNS.mac03,
+//                                         elemNS.mac04, elemNS.mac05);
+//         #endif
+//             if (command == BLACKOUT) {
+//                 showMessageWithLoading(getTranslation("APAGANDO_ELEMENTO"), 2000);
+//             }
 
-            // Forzar modo básico en fichero
-            f = SPIFFS.open(currentFile, "r+");
-            if (f) {
-                byte basicMode = DEFAULT_BASIC_MODE;
-                f.seek(OFFSET_CURRENTMODE, SeekSet);
-                f.write(&basicMode, 1);
-                f.close();
-            }
-        } else {
-            DEBUG__________ln("Error al abrir archivo SPIFFS para NS.");
-        }
-    }
+//             // Forzar modo básico en fichero
+//             f = SPIFFS.open(currentFile, "r+");
+//             if (f) {
+//                 byte basicMode = DEFAULT_BASIC_MODE;
+//                 f.seek(OFFSET_CURRENTMODE, SeekSet);
+//                 f.write(&basicMode, 1);
+//                 f.close();
+//             }
+//         } else {
+//             DEBUG__________ln("Error al abrir archivo SPIFFS para NS.");
+//         }
+//     }
 
-    // -------------------------
-    // 5) Redibujar UI
-    // -------------------------
-    drawCurrentElement();
-}
+//     // -------------------------
+//     // 5) Redibujar UI
+//     // -------------------------
+//     drawCurrentElement();
+// }
 
 // Variables globales para brillo
 int lastEncoderCount = 0;
@@ -1639,75 +1639,75 @@ bool getModeFlag(const uint8_t modeConfig[2], MODE_CONFIGS flag) noexcept
     return ((config >> static_cast<uint8_t>(flag)) & 0x1u) != 0u;
 }
 
-/**
- * @brief Vuelca por puerto serie el estado de cada flag de `modeConfig`.
- *
- * Interpreta `modeConfig` como valor de 16 bits en big-endian (MSB = modeConfig[0],
- * LSB = modeConfig[1]) y recorre los flags definidos por el enum `MODE_CONFIGS`
- * desde `HAS_BASIC_COLOR` hasta `MODE_EXIST`, imprimiendo si cada bit está activo.
- *
- * @param modeConfig Array de 2 bytes (MSB, LSB) con la configuración del modo.
- * @return void
- *
- * @pre `modeConfig` debe apuntar a 2 bytes válidos.
- * @note Imprime además el valor bruto (MSB/LSB y 0xFFFF).
- * @warning Función de depuración; realiza E/S por serie. No llamar desde ISR.
- * @see getModeFlag()
- */
-void debugModeConfig(const uint8_t modeConfig[2]) noexcept
-{
-    // Validación defensiva de puntero
-    if (!modeConfig) {
-        #ifdef DEBUG
-                DEBUG__________ln("===== Estado de modeConfig =====");
-                DEBUG__________ln("⚠️ modeConfig es nulo");
-        #endif
-        return;
-    }
+// /**
+//  * @brief Vuelca por puerto serie el estado de cada flag de `modeConfig`.
+//  *
+//  * Interpreta `modeConfig` como valor de 16 bits en big-endian (MSB = modeConfig[0],
+//  * LSB = modeConfig[1]) y recorre los flags definidos por el enum `MODE_CONFIGS`
+//  * desde `HAS_BASIC_COLOR` hasta `MODE_EXIST`, imprimiendo si cada bit está activo.
+//  *
+//  * @param modeConfig Array de 2 bytes (MSB, LSB) con la configuración del modo.
+//  * @return void
+//  *
+//  * @pre `modeConfig` debe apuntar a 2 bytes válidos.
+//  * @note Imprime además el valor bruto (MSB/LSB y 0xFFFF).
+//  * @warning Función de depuración; realiza E/S por serie. No llamar desde ISR.
+//  * @see getModeFlag()
+//  */
+// void debugModeConfig(const uint8_t modeConfig[2]) noexcept
+// {
+//     // Validación defensiva de puntero
+//     if (!modeConfig) {
+//         #ifdef DEBUG
+//                 DEBUG__________ln("===== Estado de modeConfig =====");
+//                 DEBUG__________ln("⚠️ modeConfig es nulo");
+//         #endif
+//         return;
+//     }
 
-    // Construcción del valor de 16 bits en big-endian
-    const uint16_t cfg =
-        (static_cast<uint16_t>(modeConfig[0]) << 8) |
-         static_cast<uint16_t>(modeConfig[1]);
+//     // Construcción del valor de 16 bits en big-endian
+//     const uint16_t cfg =
+//         (static_cast<uint16_t>(modeConfig[0]) << 8) |
+//          static_cast<uint16_t>(modeConfig[1]);
 
-    #ifdef DEBUG
-        DEBUG__________ln("===== Estado de modeConfig =====");
-        DEBUG__________printf("RAW: MSB=0x%02X LSB=0x%02X (0x%04X)\n",
-                            modeConfig[0], modeConfig[1], cfg);
-    #endif
+//     #ifdef DEBUG
+//         DEBUG__________ln("===== Estado de modeConfig =====");
+//         DEBUG__________printf("RAW: MSB=0x%02X LSB=0x%02X (0x%04X)\n",
+//                             modeConfig[0], modeConfig[1], cfg);
+//     #endif
 
-    // Rango del enum a iterar (asumimos contiguo entre ambos extremos)
-    constexpr int kStart = static_cast<int>(HAS_BASIC_COLOR);
-    constexpr int kEnd   = static_cast<int>(MODE_EXIST);
+//     // Rango del enum a iterar (asumimos contiguo entre ambos extremos)
+//     constexpr int kStart = static_cast<int>(HAS_BASIC_COLOR);
+//     constexpr int kEnd   = static_cast<int>(MODE_EXIST);
 
-    for (int i = kStart; i <= kEnd; ++i) {
-        const MODE_CONFIGS flag = static_cast<MODE_CONFIGS>(i);
-        const bool isActive     = getModeFlag(modeConfig, flag);
+//     for (int i = kStart; i <= kEnd; ++i) {
+//         const MODE_CONFIGS flag = static_cast<MODE_CONFIGS>(i);
+//         const bool isActive     = getModeFlag(modeConfig, flag);
 
-        // Etiqueta legible por flag (mantiene nombres del enum; evita etiquetas inconsistentes)
-        switch (flag) {
-            case HAS_BASIC_COLOR:       DEBUG__________("HAS_BASIC_COLOR"); break;
-            case HAS_PULSE:             DEBUG__________("HAS_PULSE"); break;
-            case HAS_ADVANCED_COLOR:    DEBUG__________("HAS_ADVANCED_COLOR"); break;
-            case HAS_RELAY:             DEBUG__________("HAS_RELAY"); break;
-            case HAS_RELAY_N1:          DEBUG__________("HAS_RELAY_N1"); break;
-            case HAS_RELAY_N2:          DEBUG__________("HAS_RELAY_N2"); break;
-            case NOP_1:                 DEBUG__________("NOP_1"); break;
-            case HAS_SENS_VAL_1:        DEBUG__________("HAS_SENS_VAL_1"); break;
-            case HAS_SENS_VAL_2:        DEBUG__________("HAS_SENS_VAL_2"); break;
-            case NOP_2:                 DEBUG__________("NOP_2"); break;
-            case HAS_PASSIVE:           DEBUG__________("HAS_PASSIVE"); break;
-            case HAS_BINARY_SENSORS:    DEBUG__________("HAS_BINARY_SENSORS"); break;
-            case HAS_BANK_FILE:         DEBUG__________("HAS_BANK_FILE"); break;
-            case HAS_PATTERNS:          DEBUG__________("HAS_PATTERNS"); break;
-            case HAS_ALTERNATIVE_MODE:  DEBUG__________("HAS_ALTERNATIVE_MODE"); break;
-            case MODE_EXIST:            DEBUG__________("MODE_EXIST"); break;
-            default:                    DEBUG__________("UNKNOWN_FLAG"); break;
-        }
-        DEBUG__________(" = ");
-        DEBUG__________ln(isActive ? "1" : "0");
-    }
-}
+//         // Etiqueta legible por flag (mantiene nombres del enum; evita etiquetas inconsistentes)
+//         switch (flag) {
+//             case HAS_BASIC_COLOR:       DEBUG__________("HAS_BASIC_COLOR"); break;
+//             case HAS_PULSE:             DEBUG__________("HAS_PULSE"); break;
+//             case HAS_ADVANCED_COLOR:    DEBUG__________("HAS_ADVANCED_COLOR"); break;
+//             case HAS_RELAY:             DEBUG__________("HAS_RELAY"); break;
+//             case HAS_RELAY_N1:          DEBUG__________("HAS_RELAY_N1"); break;
+//             case HAS_RELAY_N2:          DEBUG__________("HAS_RELAY_N2"); break;
+//             case NOP_1:                 DEBUG__________("NOP_1"); break;
+//             case HAS_SENS_VAL_1:        DEBUG__________("HAS_SENS_VAL_1"); break;
+//             case HAS_SENS_VAL_2:        DEBUG__________("HAS_SENS_VAL_2"); break;
+//             case NOP_2:                 DEBUG__________("NOP_2"); break;
+//             case HAS_PASSIVE:           DEBUG__________("HAS_PASSIVE"); break;
+//             case HAS_BINARY_SENSORS:    DEBUG__________("HAS_BINARY_SENSORS"); break;
+//             case HAS_BANK_FILE:         DEBUG__________("HAS_BANK_FILE"); break;
+//             case HAS_PATTERNS:          DEBUG__________("HAS_PATTERNS"); break;
+//             case HAS_ALTERNATIVE_MODE:  DEBUG__________("HAS_ALTERNATIVE_MODE"); break;
+//             case MODE_EXIST:            DEBUG__________("MODE_EXIST"); break;
+//             default:                    DEBUG__________("UNKNOWN_FLAG"); break;
+//         }
+//         DEBUG__________(" = ");
+//         DEBUG__________ln(isActive ? "1" : "0");
+//     }
+// }
 
 /**
  * @brief Gestiona el menú de selección de bancos con el encoder y su pulsador.
@@ -2484,104 +2484,104 @@ void printElementDetails() {
     showElemInfo(kDisplayTimeoutMs, serialStr, idStr);
 }
 
-/**
- * @brief Calcula cuántos modos "visibles" existen para un archivo o categoría.
- *
- * Para "Ambientes" y "Fichas" cuenta los modos del paquete en RAM cuyo nombre no está vacío
- * y cuyo bit más significativo en el campo de configuración está activo.
- * Para "Apagar" y "Comunicador" retorna 0.
- * Para otros archivos, lee 16 entradas desde SPIFFS: nombre (24 bytes) y configuración (2 bytes),
- * y cuenta las que cumplan las mismas condiciones.
- *
- * @param file Nombre lógico de la categoría ("Ambientes", "Fichas", "Apagar", "Comunicador")
- *             o ruta de archivo en SPIFFS.
- * @return Número de modos visibles en el rango [0..16].
- * @pre SPIFFS debe estar montado si `file` no es "Ambientes", "Fichas", "Apagar" o "Comunicador".
- * @note Disposición en archivo: nombre (24 bytes) en `OFFSET_MODES + i*SIZE_MODE`, y config (2 bytes)
- *       en `OFFSET_MODES + i*SIZE_MODE + 216`. Se asume orden little-endian para `config`.
- * @warning Si un `seek`/`read` falla al leer una entrada desde SPIFFS, esa entrada se ignora.
- * @see checkMostSignificantBit
- */
-int getTotalModesForFile(const String &file) {
-    // -------------------------------
-    // Constantes para legibilidad
-    // -------------------------------
-    constexpr int    kMaxModes             = 16;    // Total de slots
-    constexpr size_t kModeNameLen          = 24U;   // Bytes de nombre por modo
-    constexpr size_t kCfgBytes             = 2U;    // Tamaño del campo config en archivo
-    constexpr size_t kCfgOffsetWithinMode  = 216U;  // Offset del campo config dentro de cada modo
+// /**
+//  * @brief Calcula cuántos modos "visibles" existen para un archivo o categoría.
+//  *
+//  * Para "Ambientes" y "Fichas" cuenta los modos del paquete en RAM cuyo nombre no está vacío
+//  * y cuyo bit más significativo en el campo de configuración está activo.
+//  * Para "Apagar" y "Comunicador" retorna 0.
+//  * Para otros archivos, lee 16 entradas desde SPIFFS: nombre (24 bytes) y configuración (2 bytes),
+//  * y cuenta las que cumplan las mismas condiciones.
+//  *
+//  * @param file Nombre lógico de la categoría ("Ambientes", "Fichas", "Apagar", "Comunicador")
+//  *             o ruta de archivo en SPIFFS.
+//  * @return Número de modos visibles en el rango [0..16].
+//  * @pre SPIFFS debe estar montado si `file` no es "Ambientes", "Fichas", "Apagar" o "Comunicador".
+//  * @note Disposición en archivo: nombre (24 bytes) en `OFFSET_MODES + i*SIZE_MODE`, y config (2 bytes)
+//  *       en `OFFSET_MODES + i*SIZE_MODE + 216`. Se asume orden little-endian para `config`.
+//  * @warning Si un `seek`/`read` falla al leer una entrada desde SPIFFS, esa entrada se ignora.
+//  * @see checkMostSignificantBit
+//  */
+// int getTotalModesForFile(const String &file) {
+//     // -------------------------------
+//     // Constantes para legibilidad
+//     // -------------------------------
+//     constexpr int    kMaxModes             = 16;    // Total de slots
+//     constexpr size_t kModeNameLen          = 24U;   // Bytes de nombre por modo
+//     constexpr size_t kCfgBytes             = 2U;    // Tamaño del campo config en archivo
+//     constexpr size_t kCfgOffsetWithinMode  = 216U;  // Offset del campo config dentro de cada modo
 
-    // -------------------------------
-    // Casos en RAM: Ambientes / Fichas
-    // -------------------------------
-    if (file == "Ambientes" || file == "Fichas") {
-        INFO_PACK_T* opt = (file == "Ambientes") ? &ambientesOption : &fichasOption;
+//     // -------------------------------
+//     // Casos en RAM: Ambientes / Fichas
+//     // -------------------------------
+//     if (file == "Ambientes" || file == "Fichas") {
+//         INFO_PACK_T* opt = (file == "Ambientes") ? &ambientesOption : &fichasOption;
 
-        int count = 0;
-        for (int i = 0; i < kMaxModes; ++i) {
-            const char* name = reinterpret_cast<const char*>(opt->mode[i].name);
-            // Nombre no vacío y MSB de config activo => visible
-            if (name != nullptr &&
-                ::strlen(name) > 0 &&
-                checkMostSignificantBit(opt->mode[i].config)) {
-                ++count;
-            }
-        }
-        return count;
-    }
+//         int count = 0;
+//         for (int i = 0; i < kMaxModes; ++i) {
+//             const char* name = reinterpret_cast<const char*>(opt->mode[i].name);
+//             // Nombre no vacío y MSB de config activo => visible
+//             if (name != nullptr &&
+//                 ::strlen(name) > 0 &&
+//                 checkMostSignificantBit(opt->mode[i].config)) {
+//                 ++count;
+//             }
+//         }
+//         return count;
+//     }
 
-    // -------------------------------
-    // Casos sin modos visibles
-    // -------------------------------
-    if (file == "Apagar" || file == "Comunicador") {
-        return 0;
-    }
+//     // -------------------------------
+//     // Casos sin modos visibles
+//     // -------------------------------
+//     if (file == "Apagar" || file == "Comunicador") {
+//         return 0;
+//     }
 
-    // -------------------------------
-    // Lectura desde SPIFFS
-    // -------------------------------
-    fs::File f = SPIFFS.open(file, "r");
-    if (!f) {
-        return 0; // Comportamiento original
-    }
+//     // -------------------------------
+//     // Lectura desde SPIFFS
+//     // -------------------------------
+//     fs::File f = SPIFFS.open(file, "r");
+//     if (!f) {
+//         return 0; // Comportamiento original
+//     }
 
-    int  count = 0;
-    char modeName[kModeNameLen + 1] = {}; // +1 para terminador
-    byte cfgRaw[kCfgBytes] = {0, 0};
+//     int  count = 0;
+//     char modeName[kModeNameLen + 1] = {}; // +1 para terminador
+//     byte cfgRaw[kCfgBytes] = {0, 0};
 
-    for (int i = 0; i < kMaxModes; ++i) {
-        // Offset base de la entrada i
-        const size_t base = static_cast<size_t>(OFFSET_MODES) +
-                            static_cast<size_t>(i) * static_cast<size_t>(SIZE_MODE);
+//     for (int i = 0; i < kMaxModes; ++i) {
+//         // Offset base de la entrada i
+//         const size_t base = static_cast<size_t>(OFFSET_MODES) +
+//                             static_cast<size_t>(i) * static_cast<size_t>(SIZE_MODE);
 
-        // --- Leer nombre (24 bytes) ---
-        if (!f.seek(base, SeekSet)) {
-            continue; // Entrada inválida: se ignora
-        }
-        size_t n = f.read(reinterpret_cast<uint8_t*>(modeName), kModeNameLen);
-        if (n != kModeNameLen) {
-            continue; // Lectura incompleta: se ignora
-        }
-        modeName[kModeNameLen] = '\0'; // Asegurar terminación
+//         // --- Leer nombre (24 bytes) ---
+//         if (!f.seek(base, SeekSet)) {
+//             continue; // Entrada inválida: se ignora
+//         }
+//         size_t n = f.read(reinterpret_cast<uint8_t*>(modeName), kModeNameLen);
+//         if (n != kModeNameLen) {
+//             continue; // Lectura incompleta: se ignora
+//         }
+//         modeName[kModeNameLen] = '\0'; // Asegurar terminación
 
-        // --- Leer config (2 bytes tal cual) ---
-        if (!f.seek(base + kCfgOffsetWithinMode, SeekSet)) {
-            continue;
-        }
-        n = f.read(cfgRaw, kCfgBytes);
-        if (n != kCfgBytes) {
-            continue;
-        }
+//         // --- Leer config (2 bytes tal cual) ---
+//         if (!f.seek(base + kCfgOffsetWithinMode, SeekSet)) {
+//             continue;
+//         }
+//         n = f.read(cfgRaw, kCfgBytes);
+//         if (n != kCfgBytes) {
+//             continue;
+//         }
 
-        // --- Visibilidad: nombre no vacío + MSB activo ---
-        if (::strlen(modeName) > 0 && checkMostSignificantBit(cfgRaw)) {
-            ++count;
-        }
-    }
+//         // --- Visibilidad: nombre no vacío + MSB activo ---
+//         if (::strlen(modeName) > 0 && checkMostSignificantBit(cfgRaw)) {
+//             ++count;
+//         }
+//     }
 
-    f.close();
-    return count;
-}
+//     f.close();
+//     return count;
+// }
 
 void handleExtraElementsMenu() {
     static int32_t lastVal = encoder.getCount();
