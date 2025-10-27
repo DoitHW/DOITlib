@@ -558,15 +558,15 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
             // Color básico
             String colorName;
             switch (LEF.data[0]) {
-                case 0: colorName = "BLANCO";   break;
-                case 1: colorName = "AMARILLO"; break;
-                case 2: colorName = "NARANJA";  break;
-                case 3: colorName = "ROJO";     break;
-                case 4: colorName = "VIOLETA";  break;
-                case 5: colorName = "AZUL";     break;
-                case 6: colorName = "CELESTE";  break;
-                case 7: colorName = "VERDE";    break;
-                case 8: colorName = "NEGRO";    break;
+                case 0:  colorName = "BLANCO";   break;
+                case 1:  colorName = "AMARILLO"; break;
+                case 2:  colorName = "NARANJA";  break;
+                case 3:  colorName = "ROJO";     break;
+                case 4:  colorName = "VIOLETA";  break;
+                case 5:  colorName = "AZUL";     break;
+                case 6:  colorName = "CELESTE";  break;
+                case 7:  colorName = "VERDE";    break;
+                case 8:  colorName = "NEGRO";    break;
                 default: colorName = "COLOR DESCONOCIDO"; break;
             }
             DPRINTF_COLOR(COLOR_BRIGHT_GREEN, "%s (0x%02X)\n", colorName.c_str(), LEF.data[0]);

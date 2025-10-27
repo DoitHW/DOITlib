@@ -694,6 +694,7 @@ void handleEncoder() noexcept
                         // Enviar START/BLACKOUT en broadcast con el nuevo formato (targetType + NS_ZERO)
                         if (turningOn) {
                             send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, START_CMD));
+                            send_frame(frameMaker_SEND_FLAG_BYTE (DEFAULT_BOTONERA, BROADCAST, NS_ZERO, 0x01));
                         } else {
                             send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, BLACKOUT));
                             showMessageWithLoading(getTranslation("APAGANDO_ELEMENTOS"), 4000);
