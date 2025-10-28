@@ -688,13 +688,16 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
         if (event != BUTTON_PRESSED) return;            // Sólo en PRESSED
         if (digitalRead(ENC_BUTTON) == LOW) return;     // Evitar interferir con el encoder
 
+        const unsigned GAP_MS = 30; // retardo entre tramas
+
         extern TARGETNS communicatorActiveNS;
 
         auto isNSZero2 = [](const TARGETNS& n){
             return n.mac01==0 && n.mac02==0 && n.mac03==0 && n.mac04==0 && n.mac05==0;
         };
         auto eqNS = [](const TARGETNS& a, const TARGETNS& b){
-            return a.mac01==b.mac01 && a.mac02==b.mac02 && a.mac03==b.mac03 && a.mac04==b.mac04 && a.mac05==b.mac05;
+            return a.mac01==b.mac01 && a.mac02==b.mac02 && a.mac03==b.mac03 &&
+                a.mac04==b.mac04 && a.mac05==b.mac05;
         };
         auto cmpNS = [&](const TARGETNS& a, const TARGETNS& b){
             if (a.mac01 != b.mac01) return a.mac01 < b.mac01;
@@ -714,7 +717,7 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
         }
         std::sort(nsSPIFFS.begin(), nsSPIFFS.end(), cmpNS);
 
-        // Realineación/Acotado de relayStep
+        // Realineación / Acotado de relayStep respecto al NS activo actual
         if (!nsSPIFFS.empty() && !isNSZero2(communicatorActiveNS)) {
             int idx = -1;
             for (size_t k = 0; k < nsSPIFFS.size(); ++k) {
@@ -722,9 +725,10 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
             }
             if (idx != -1) relayStep = idx;
         }
-        if (relayStep < -1 || relayStep >= (int)nsSPIFFS.size()) {
-            relayStep = -1;
-        }
+        if (relayStep < -1 || relayStep >= (int)nsSPIFFS.size()) relayStep = -1;
+
+        // Marcador de "primera pulsación" (venimos de broadcast)
+        bool firstCycleKick = false;
 
         // Determinar objetivos black / white
         uint8_t  blackType, whiteType;
@@ -735,9 +739,11 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
             whiteType = BROADCAST;  whiteNS = NS_ZERO;
         } else {
             if (relayStep == -1) {
+                // venimos de broadcast: siguiente será el primer NS
                 blackType = BROADCAST;       blackNS = NS_ZERO;
                 whiteType = DEFAULT_DEVICE;  whiteNS = nsSPIFFS[0];
                 relayStep = 0;
+                firstCycleKick = true; // primera pulsación del ciclo (NO mandamos START aquí)
             } else if (relayStep < (int)nsSPIFFS.size() - 1) {
                 blackType = DEFAULT_DEVICE;  blackNS = nsSPIFFS[relayStep];
                 ++relayStep;
@@ -745,37 +751,66 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
             } else {
                 blackType = DEFAULT_DEVICE;  blackNS = nsSPIFFS[relayStep];
                 whiteType = BROADCAST;       whiteNS = NS_ZERO;
-                relayStep = -1;
+                relayStep = -1; // regreso a broadcast al finalizar la lista
             }
         }
 
-        // OFF al black target
-        if (blackType == BROADCAST) {
+        // PRIMERA PULSACIÓN DEL CICLO (desde broadcast):
+        // BLACK(broadcast) → FLAG(0)(broadcast), y luego encender el primer NS.
+        if (firstCycleKick) {
+            // Apaga todo lo que sea color (BLACK a broadcast)
             send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, BLACK));
-            #ifdef LEGACY_COLOR_SUPPORT
-                send_old_color(BLACK);
-            #endif
+            delay(GAP_MS);
 
+            // Apaga todos los relés globalmente
+            send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, 0x00));
+            delay(GAP_MS);
+            // No hacemos OFF adicional porque blackType==BROADCAST ya se ha tratado arriba.
         } else {
-            uint8_t cfgB[2] = {0};
-            bool hasColorB = false, hasRelayB = false;
-            if (RelayStateManager::getModeConfigForNS(blackNS, cfgB)) {
-                hasColorB = getModeFlag(cfgB, HAS_BASIC_COLOR) || getModeFlag(cfgB, HAS_ADVANCED_COLOR);
-                hasRelayB = getModeFlag(cfgB, HAS_RELAY);
-            }
-            if (hasColorB) {
-                send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, DEFAULT_DEVICE, blackNS, BLACK));
-            } else if (hasRelayB) {
-                send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, DEFAULT_DEVICE, blackNS, 0x00));
+            // PULSACIONES INTERMEDIAS: OFF al anterior (prioridad relé > color)
+            if (blackType == BROADCAST) {
+                send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, BLACK));
+                delay(GAP_MS);
+                #ifdef LEGACY_COLOR_SUPPORT
+                    send_old_color(BLACK);
+                    delay(GAP_MS);
+                #endif
             } else {
-                send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, DEFAULT_DEVICE, blackNS, BLACK));
+                uint8_t cfgB[2] = {0};
+                bool hasColorB = false, hasRelayB = false;
+                if (RelayStateManager::getModeConfigForNS(blackNS, cfgB)) {
+                    hasColorB = getModeFlag(cfgB, HAS_BASIC_COLOR) || getModeFlag(cfgB, HAS_ADVANCED_COLOR);
+                    hasRelayB = getModeFlag(cfgB, HAS_RELAY);
+                }
+
+                if (hasRelayB && hasColorB) {
+                    // Apaga relé y color (orden: relé → color)
+                    send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, DEFAULT_DEVICE, blackNS, 0x00));
+                    delay(GAP_MS);
+                    send_frame(frameMaker_SEND_COLOR     (DEFAULT_BOTONERA, DEFAULT_DEVICE, blackNS, BLACK));
+                    delay(GAP_MS);
+                } else if (hasRelayB) {
+                    send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, DEFAULT_DEVICE, blackNS, 0x00));
+                    delay(GAP_MS);
+                } else if (hasColorB) {
+                    send_frame(frameMaker_SEND_COLOR     (DEFAULT_BOTONERA, DEFAULT_DEVICE, blackNS, BLACK));
+                    delay(GAP_MS);
+                } else {
+                    // Fallback
+                    send_frame(frameMaker_SEND_COLOR     (DEFAULT_BOTONERA, DEFAULT_DEVICE, blackNS, BLACK));
+                    delay(GAP_MS);
+                }
             }
         }
-        delay(30);
 
-        // ON al white target
+        // Pequeño gap entre apagar y encender
+        delay(GAP_MS);
+
+        // ON al white target (enciende relé si lo hay y pone blanco si acepta color)
         if (whiteType == BROADCAST) {
+            // Al terminar la lista, quedamos en broadcast (si quieres reponer WHITE global aquí, déjalo)
             send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, WHITE));
+            delay(GAP_MS);
         } else {
             uint8_t cfgW[2] = {0};
             bool hasColorW = false, hasRelayW = false;
@@ -783,12 +818,23 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
                 hasColorW = getModeFlag(cfgW, HAS_BASIC_COLOR) || getModeFlag(cfgW, HAS_ADVANCED_COLOR);
                 hasRelayW = getModeFlag(cfgW, HAS_RELAY);
             }
-            if (hasColorW) {
-                send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, DEFAULT_DEVICE, whiteNS, WHITE));
+
+            if (hasRelayW && hasColorW) {
+                // Encendido completo: relé + color (orden: relé → color)
+                send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, DEFAULT_DEVICE, whiteNS, 0x01));
+                delay(GAP_MS);
+                send_frame(frameMaker_SEND_COLOR     (DEFAULT_BOTONERA, DEFAULT_DEVICE, whiteNS, WHITE));
+                delay(GAP_MS);
             } else if (hasRelayW) {
                 send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, DEFAULT_DEVICE, whiteNS, 0x01));
+                delay(GAP_MS);
+            } else if (hasColorW) {
+                send_frame(frameMaker_SEND_COLOR     (DEFAULT_BOTONERA, DEFAULT_DEVICE, whiteNS, WHITE));
+                delay(GAP_MS);
             } else {
-                send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, DEFAULT_DEVICE, whiteNS, WHITE));
+                // Fallback
+                send_frame(frameMaker_SEND_COLOR     (DEFAULT_BOTONERA, DEFAULT_DEVICE, whiteNS, WHITE));
+                delay(GAP_MS);
             }
         }
 
@@ -800,6 +846,8 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
         colorHandler.setPatternBotonera(currentModeIndex, ledManager);
         return;
     }
+
+
 
     // ─────────────────────────────────────────────────────────────
     // 7) RELÉ ÚNICO (botón RELAY)
