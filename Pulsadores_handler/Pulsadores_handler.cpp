@@ -170,14 +170,8 @@ void PulsadoresHandler::procesarPulsadores() {
 
                     if (color == RELAY) {
                         // RELAY se lee SIEMPRE si el modo lo soporta (no lo bloquea la máscara 'active')
-                        #ifdef DEBUG
-                        DEBUG__________printf("[SCAN COG] RELAY bypass ACTIVE mask en (%d,%d)\n", i, j);
-                        #endif
                         // no cambiamos currentPressed
                     } else if (!(respMode || communicatorBroadcast)) {
-                        #ifdef DEBUG
-                        DEBUG__________printf("[SCAN COG] ACTIVE mask bloquea color %u en (%d,%d)\n", color, i, j);
-                        #endif
                         currentPressed = false;
                     }
                 }
@@ -354,20 +348,11 @@ void PulsadoresHandler::procesarPulsadores() {
                     communicatorActiveNS.mac03==0 && communicatorActiveNS.mac04==0 &&
                     communicatorActiveNS.mac05==0);
 
-                if (color == RELAY) {
-                    #ifdef DEBUG
-                    DEBUG__________printf("[SCAN] RELAY bypass ACTIVE mask en (%d,%d)\n", i, j);
-                    #endif
-                    // Permitimos leer el RELAY aunque 'active' sea 0
-                } else if (!(respMode || communicatorBroadcast)) {
-                    #ifdef DEBUG
-                    DEBUG__________printf("[SCAN] ACTIVE mask bloquea color %u en (%d,%d)\n", color, i, j);
-                    #endif
-                    currentPressed = false;
-                }
+            const bool allowRelay = (color == RELAY) && hasRelay;   // ← usa el hasRelay que ya calculaste arriba
+            if (!(respMode || communicatorBroadcast || allowRelay)) {
+                currentPressed = false;
             }
-
-
+            }
 
             if (color != RELAY) {
                 if (!lastState[i][j] && currentPressed)      pressTime[i][j] = millis();
@@ -767,7 +752,10 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
         // OFF al black target
         if (blackType == BROADCAST) {
             send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, BLACK));
-            send_old_color(BLACK);
+            #ifdef LEGACY_COLOR_SUPPORT
+                send_old_color(BLACK);
+            #endif
+
         } else {
             uint8_t cfgB[2] = {0};
             bool hasColorB = false, hasRelayB = false;
@@ -915,15 +903,21 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
                     sameColorParity = false;
                 }
                 if (lastLegacyColor != buttonColor) {
-                    send_old_color(buttonColor);
+                    #ifdef LEGACY_COLOR_SUPPORT
+                        send_old_color(buttonColor);
+                    #endif
                     lastLegacyColor = buttonColor;
                     sameColorParity = true;
                 } else {
                     if (sameColorParity) {
-                        send_old_color(BLACK);   // 0x08
+                    #ifdef LEGACY_COLOR_SUPPORT
+                        send_old_color(BLACK);
+                    #endif
                         sameColorParity = false;
                     } else {
+                    #ifdef LEGACY_COLOR_SUPPORT
                         send_old_color(buttonColor);
+                    #endif
                         sameColorParity = true;
                     }
                 }

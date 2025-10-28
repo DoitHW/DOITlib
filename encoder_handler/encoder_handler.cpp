@@ -356,6 +356,11 @@ void handleEncoder() noexcept
             int  realModeIndex = 0;
             byte modeConfig[2] = {0};
 
+            // Refresca el mapeo de LEDs/botones al cambiar de foco
+            colorHandler.setCurrentFile(currentFile);
+            colorHandler.setPatternBotonera(realModeIndex, ledManager);
+
+
             if (isSpecialFile(currentFile))
             {
                 INFO_PACK_T* opt = nullptr;

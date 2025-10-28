@@ -1732,7 +1732,7 @@ void BOTONERA_::sectorIn_handler(const std::vector<byte>& data,
                         useMic = getModeFlag(modeConfig, HAS_SENS_VAL_2);
 
                         colorHandler.setCurrentFile(currentFile);
-                        //colorHandler.setPatternBotonera(currentMode, ledManager);
+                        colorHandler.setPatternBotonera(currentMode, ledManager);
 
                         DEBUG__________ln("Configuración de modo actual actualizada tras recibir ELEM_CMODE_SECTOR.");
                     }

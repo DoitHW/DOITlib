@@ -81,17 +81,20 @@ constexpr byte DEFAULT_PAD          = 0xD9;
 #define AP_SSID_PASS                  "12345678"
 #define OTA_PASS                      "wakeupneo" 
 
+#define LEGACY_COLOR_SUPPORT
+
 #define DEBUG
 #define DEBUG_
-#ifdef DEBUG_
-  #define DEBUG__________ln(...)          Serial.println(__VA_ARGS__);
-  #define DEBUG__________(...)            Serial.print(__VA_ARGS__);
-  #define DEBUG__________printf(fmt, ...) Serial.printf(fmt, __VA_ARGS__);
+#if defined(DEBUG_) && !defined(NODEBUG)
+  #define DEBUG__________ln(...)          Serial.println(__VA_ARGS__)
+  #define DEBUG__________(...)            Serial.print(__VA_ARGS__)
+  #define DEBUG__________printf(fmt, ...) Serial.printf(fmt, __VA_ARGS__)
 #else
   #define DEBUG__________ln(...)
   #define DEBUG__________(...)
   #define DEBUG__________printf(fmt, ...)
 #endif
+
                                                 
 /*                                                                                                 
                                      .-+***+-:....                                                  
