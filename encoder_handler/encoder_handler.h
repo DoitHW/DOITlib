@@ -73,7 +73,9 @@ void handleConfirmRestoreMenu() noexcept;
 
 void handleConfirmRestoreElementMenu();
 
-bool isInMainMenu() ;
+bool isInMainMenu();
+
+void enfocarElementoPorNombre(const String& name);
 
 //int getTotalModesForFile(const String &file);
 

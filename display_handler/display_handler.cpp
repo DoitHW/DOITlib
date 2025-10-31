@@ -2257,6 +2257,8 @@ void drawSoundMenu(int selection)
  * @param selection Índice lógico actualmente seleccionado (0..N-1); se clampa a rango válido.
  */
 
+
+
 void drawFormatMenu(int selection)
 {
 

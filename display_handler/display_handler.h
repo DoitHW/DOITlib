@@ -50,6 +50,8 @@ void setFontForCurrentLanguage();
 
 void drawLoadingModalFrame(const char* message, int frameCount);
 void showWelcomeAnimation();
+
+
                                  
 extern TFT_eSPI tft;
 extern TFT_eSprite uiSprite;

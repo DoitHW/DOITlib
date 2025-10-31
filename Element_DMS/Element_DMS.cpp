@@ -242,10 +242,10 @@ void ELEMENT_::activarAP_OTA() {
     });
     ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
         // Progreso (silenciado para no saturar)
-        // DEBUG__________("Progreso OTA: " + String(progress * 100 / total) + "%");
+         DEBUG__________("Progreso OTA: " + String(progress * 100 / total) + "%");
     });
     ArduinoOTA.onError([](ota_error_t error) {
-        // DEBUG__________("Error OTA: " + String(error));
+         DEBUG__________("Error OTA: " + String(error));
     });
 
     ArduinoOTA.begin();      // ¡Arranca el servidor OTA!

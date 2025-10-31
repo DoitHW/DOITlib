@@ -25,9 +25,6 @@ Adafruit_PN532 nfc(PN532_IRQ, PN532_RESET, &PN532_Wire);
 // Variables para manejo de IRQ (para uso interno de la lectura)
 extern int irqCurr;
 extern int irqPrev;
-extern const int DELAY_BETWEEN_CARDS;  // Si lo defines globalmente en main o aquí
-extern unsigned long timeLastCardRead; // Lo mismo para estas variables
-extern boolean readerDisabled;         // Estas pueden definirse globalmente en main
 extern bool cardIsRead;
 extern TOKEN_ token;
 
@@ -155,7 +152,7 @@ void TOKEN_::handleCardDetected() {
     // Si falló la lectura, reiniciar la detección
     startListeningToNFC();
   }
-  timeLastCardRead = millis();
+
 }
 
 bool TOKEN_::readCard(String &uid) {

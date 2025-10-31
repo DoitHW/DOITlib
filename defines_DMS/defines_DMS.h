@@ -56,7 +56,7 @@
 
 
 //DELFINES GLOBALES
-#define BOTONERA_OLD           // -> BOTONERA_OLD / BOTONERA_NEW
+//#define BOTONERA_NEW           // -> BOTONERA_OLD / BOTONERA_NEW
 #define NOELEM
 #define BOTONERA
 #define PLAYER                 // -> PLAYER / NOPLAYER
@@ -77,7 +77,18 @@ constexpr byte ROOM_BROADCAST       = 0xFF;
 constexpr byte DEFAULT_PAD          = 0xD9;
 
 #define AP_ELEM_IP                    200, 200, 200, 1
-#define AP_SSID_NAME                  "DOIT_BOTONERA_LINK"
+#if !defined(BOTONERA_NEW) && !defined(BOTONERA_OLD)
+  #error "Debe definirse BOTONERA_NEW o BOTONERA_OLD desde platformio.ini"
+#elif defined(BOTONERA_NEW) && defined(BOTONERA_OLD)
+  #error "No defina BOTONERA_NEW y BOTONERA_OLD a la vez"
+#endif
+
+#if defined(BOTONERA_NEW)
+  #define AP_SSID_NAME  "DOIT_BOTONERA_LINK_NEW"
+#elif defined(BOTONERA_OLD)
+  #define AP_SSID_NAME  "DOIT_BOTONERA_LINK_OLD"
+#endif
+
 #define AP_SSID_PASS                  "12345678"
 #define OTA_PASS                      "wakeupneo" 
 

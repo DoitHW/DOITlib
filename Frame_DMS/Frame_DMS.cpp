@@ -43,6 +43,177 @@ uint8_t getLocalRoom() {
     return s_localRoom;
 }
 
+// void IRAM_ATTR onUartInterrupt() {
+//     static enum {
+//         WAITING_START,
+//         RECEIVING_LENGTH_MSB,
+//         RECEIVING_LENGTH_LSB,
+//         RECEIVING_FRAME
+//     } receiveState = WAITING_START;
+
+//     static uint16_t expectedFrameLength = 0;  // bytes desde origin .. checksum+end
+//     static uint16_t totalFrameLength    = 0;  // expected + 3 (start + 2 bytes length)
+//     static uint16_t receivedBytes       = 0;
+//     static uint16_t calculatedChecksum  = 0;
+//     static uint8_t  receivedChecksum    = 0;
+//     static unsigned long frameStartTime = 0;
+
+//     uint8_t bytesProcessed = 0;
+//     const unsigned long currentTime = millis();
+
+//     while (Serial1.available()) {
+//         byte receivedByte = Serial1.read();
+//         bytesProcessed++;
+//         DEBUG__________((" 0x"+String(receivedByte, HEX)).c_str());
+//         //lastReceivedTime = currentTime;
+
+//         // Filtro de START
+//         if (receiveState == WAITING_START && receivedByte != NEW_START) {
+//             continue;
+//         }
+
+//         // Protección de tamaño de buffer/longitud esperada
+//         if ((uartBuffer.size() > 0xFF) || (expectedFrameLength > 0xFF)) {
+//             receiveState = WAITING_START;
+//             uartBuffer.clear();
+//             expectedFrameLength = 0;
+//             return;
+//         }
+
+//         switch (receiveState) {
+//             case WAITING_START: {
+//                 // Inicio de una nueva trama
+//                 uartBuffer.reserve(MAX_FRAME_LENGTH);
+//                 uartBuffer.clear();
+//                 uartBuffer.push_back(receivedByte);
+
+//                 calculatedChecksum = receivedByte; // incluye START en la suma, como haces ahora
+//                 receiveState       = RECEIVING_LENGTH_MSB;
+//                 expectedFrameLength = 0;
+//                 receivedBytes       = 1;
+//                 frameStartTime      = currentTime;
+//                 break;
+//             }
+
+//             case RECEIVING_LENGTH_MSB: {
+//                 uartBuffer.push_back(receivedByte);
+//                 calculatedChecksum += receivedByte;
+//                 while (calculatedChecksum > 0xFF)
+//                     calculatedChecksum = (calculatedChecksum & 0xFF) + (calculatedChecksum >> 8);
+//                 expectedFrameLength = uint16_t(receivedByte) << 8;
+//                 receiveState = RECEIVING_LENGTH_LSB;
+//                 break;
+//             }
+
+//             case RECEIVING_LENGTH_LSB: {
+//                 uartBuffer.push_back(receivedByte);
+//                 calculatedChecksum += receivedByte;
+//                 while (calculatedChecksum > 0xFF)
+//                     calculatedChecksum = (calculatedChecksum & 0xFF) + (calculatedChecksum >> 8);
+
+//                 expectedFrameLength |= receivedByte;      // len = origin..checksum+end
+//                 totalFrameLength = expectedFrameLength + 3; // + start + 2 bytes de len
+
+//                 if (totalFrameLength < MIN_FRAME_LENGTH) {
+//                     // Longitud inválida 
+//                     receiveState = WAITING_START;
+//                     uartBuffer.clear();
+//                     return;
+//                 }
+
+//                 receiveState = RECEIVING_FRAME;
+//                 receivedBytes = 3; // ya hemos leí­do start + 2 len
+//                 break;
+//             }
+
+//             case RECEIVING_FRAME: {
+//                 uartBuffer.push_back(receivedByte);
+//                 receivedBytes++;
+
+//                 // Sumamos TODO menos el byte de checksum (penúltimo)
+//                 if (receivedBytes != totalFrameLength - 1) {
+//                     calculatedChecksum += receivedByte;
+//                 } else {
+//                     receivedChecksum = receivedByte; // penúltimo byte
+//                 }
+//                 while (calculatedChecksum > 0xFF)
+//                     calculatedChecksum = (calculatedChecksum & 0xFF) + (calculatedChecksum >> 8);
+
+//                 // ¿Hemos cerrado la trama?
+//                 if (receivedBytes == totalFrameLength) {
+//                     // Último byte debe ser NEW_END
+//                     if (receivedByte == NEW_END) {
+//                         if (calculatedChecksum == receivedChecksum) {
+//                             // ========= NUEVO BLOQUE DE DESTINATARIO =========
+//                             // Con el layout actual:
+//                             // [10] targetType
+//                             // [11..15] targetNS (5 bytes)
+//                             bool acceptFrame = false;
+//                             bool isBCFrame   = false;
+//                             printTargetID.clear();
+
+//                             if (uartBuffer.size() >= FRAME_MIN_TOTAL_BYTES) {
+//                                 const uint8_t frameRoom  = uartBuffer[3];
+//                                 const uint8_t localRoom  = getLocalRoom();
+//                                 const bool    roomMatches = (frameRoom == ROOM_BROADCAST) || (frameRoom == localRoom);
+//                                 const uint8_t targetType  = uartBuffer[10];
+
+//                                 if (roomMatches) {
+//                                     for (int i = 0; i < 5; ++i) {
+//                                         printTargetID.push_back(uartBuffer[11 + i]);
+//                                     }
+
+//                                     // Reglas de targeting para la BOTONERA:
+//                                     // - Broadcast -> siempre nos aplica (dentro de la misma sala o broadcast de sala)
+//                                     // - TargetType BOTONERA (0xDB) -> nos aplica
+//                                     if (targetType == BROADCAST) {
+//                                         acceptFrame = true;
+//                                         isBCFrame   = true;
+//                                     } else if (targetType == DEFAULT_BOTONERA) {
+//                                         acceptFrame = true;
+//                                     }
+//                                 }
+//                             }
+
+//                             if (acceptFrame) {
+//                                 frameReceived = true;
+//                                 BCframe       = isBCFrame;
+//                             } else {
+//                                 frameReceived = false;
+//                                 BCframe       = false;
+//                             }
+//                             // ========= FIN BLOQUE DESTINATARIO =========
+
+//                         } else {
+//                             Serial.println("Checksum inválido. Ignorar");
+//                         }
+//                     } else {
+//                         Serial1.println("Byte END inválido. Ignorar");
+//                     }
+
+//                     // Reset para la siguiente trama
+//                     receiveState = WAITING_START;
+//                     return;
+//                 }
+
+//                 // Protección adicional de buffer
+//                 if (uartBuffer.size() >= MAX_BUFFER_SIZE) {
+//                     receiveState = WAITING_START;
+//                     uartBuffer.clear();
+//                     return;
+//                 }
+
+//                 break;
+//             }
+//         } // switch
+//     } // while Serial1.available()
+
+//     // Aviso (opcional) de frame parcial
+//     if (Serial1.available() && bytesProcessed >= MAX_BYTES_PER_INTERRUPT) {
+//         partialFrameReceived = true;
+//     }
+// }
+
 void IRAM_ATTR onUartInterrupt() {
     static enum {
         WAITING_START,
@@ -51,8 +222,8 @@ void IRAM_ATTR onUartInterrupt() {
         RECEIVING_FRAME
     } receiveState = WAITING_START;
 
-    static uint16_t expectedFrameLength = 0;  // bytes desde origin .. checksum+end
-    static uint16_t totalFrameLength    = 0;  // expected + 3 (start + 2 bytes length)
+    static uint16_t expectedFrameLength = 0;  // origin..checksum+end
+    static uint16_t totalFrameLength    = 0;  // expected + 3 (start + 2 len)
     static uint16_t receivedBytes       = 0;
     static uint16_t calculatedChecksum  = 0;
     static uint8_t  receivedChecksum    = 0;
@@ -65,72 +236,84 @@ void IRAM_ATTR onUartInterrupt() {
         byte receivedByte = Serial1.read();
         bytesProcessed++;
         DEBUG__________((" 0x"+String(receivedByte, HEX)).c_str());
-        //lastReceivedTime = currentTime;
 
-        // Filtro de START
+        // START filter
         if (receiveState == WAITING_START && receivedByte != NEW_START) {
             continue;
         }
 
-        // Protección de tamaño de buffer/longitud esperada
+        // Protección de tamaños para evitar estados corruptos
         if ((uartBuffer.size() > 0xFF) || (expectedFrameLength > 0xFF)) {
-            receiveState = WAITING_START;
-            uartBuffer.clear();
+            receiveState        = WAITING_START;
             expectedFrameLength = 0;
+            uartBuffer.clear();          // NO libera capacidad
             return;
         }
 
         switch (receiveState) {
-            case WAITING_START: {
-                // Inicio de una nueva trama
-                uartBuffer.reserve(MAX_FRAME_LENGTH);
-                uartBuffer.clear();
-                uartBuffer.push_back(receivedByte);
 
-                calculatedChecksum = receivedByte; // incluye START en la suma, como haces ahora
-                receiveState       = RECEIVING_LENGTH_MSB;
+            case WAITING_START: {
+                // Inicio de nueva trama
+                uartBuffer.clear();                       // capacidad ya pre-reservada en setup
+                if (uartBuffer.size() < MAX_FRAME_LENGTH) // push seguro
+                    uartBuffer.push_back(receivedByte);
+
+                calculatedChecksum  = receivedByte;       // incluye START
+                receiveState        = RECEIVING_LENGTH_MSB;
                 expectedFrameLength = 0;
                 receivedBytes       = 1;
                 frameStartTime      = currentTime;
-                break;
-            }
+            } break;
 
             case RECEIVING_LENGTH_MSB: {
-                uartBuffer.push_back(receivedByte);
+                if (uartBuffer.size() < MAX_FRAME_LENGTH)
+                    uartBuffer.push_back(receivedByte);
+
                 calculatedChecksum += receivedByte;
                 while (calculatedChecksum > 0xFF)
                     calculatedChecksum = (calculatedChecksum & 0xFF) + (calculatedChecksum >> 8);
-                expectedFrameLength = uint16_t(receivedByte) << 8;
-                receiveState = RECEIVING_LENGTH_LSB;
-                break;
-            }
+
+                expectedFrameLength  = uint16_t(receivedByte) << 8;
+                receiveState         = RECEIVING_LENGTH_LSB;
+            } break;
 
             case RECEIVING_LENGTH_LSB: {
-                uartBuffer.push_back(receivedByte);
+                if (uartBuffer.size() < MAX_FRAME_LENGTH)
+                    uartBuffer.push_back(receivedByte);
+
                 calculatedChecksum += receivedByte;
                 while (calculatedChecksum > 0xFF)
                     calculatedChecksum = (calculatedChecksum & 0xFF) + (calculatedChecksum >> 8);
 
-                expectedFrameLength |= receivedByte;      // len = origin..checksum+end
-                totalFrameLength = expectedFrameLength + 3; // + start + 2 bytes de len
+                expectedFrameLength |= receivedByte;             // origin..checksum+end
+                totalFrameLength     = expectedFrameLength + 3;  // + start + 2 len
 
-                if (totalFrameLength < MIN_FRAME_LENGTH) {
-                    // Longitud inválida 
+                if (totalFrameLength < MIN_FRAME_LENGTH || totalFrameLength > MAX_FRAME_LENGTH) {
+                    // Longitud inválida o mayor que nuestro buffer máximo
+                    receiveState        = WAITING_START;
+                    expectedFrameLength = 0;
+                    uartBuffer.clear();
+                    return;
+                }
+
+                receiveState  = RECEIVING_FRAME;
+                receivedBytes = 3; // start + len(2)
+            } break;
+
+            case RECEIVING_FRAME: {
+                // Guard extra para no rebasar el buffer aun si llega corrupta
+                if (uartBuffer.size() < MAX_FRAME_LENGTH)
+                    uartBuffer.push_back(receivedByte);
+                else {
+                    // Overflow defensivo: descarta y resetea
                     receiveState = WAITING_START;
                     uartBuffer.clear();
                     return;
                 }
 
-                receiveState = RECEIVING_FRAME;
-                receivedBytes = 3; // ya hemos leí­do start + 2 len
-                break;
-            }
-
-            case RECEIVING_FRAME: {
-                uartBuffer.push_back(receivedByte);
                 receivedBytes++;
 
-                // Sumamos TODO menos el byte de checksum (penúltimo)
+                // Sumar todo menos penúltimo (checksum)
                 if (receivedBytes != totalFrameLength - 1) {
                     calculatedChecksum += receivedByte;
                 } else {
@@ -139,76 +322,69 @@ void IRAM_ATTR onUartInterrupt() {
                 while (calculatedChecksum > 0xFF)
                     calculatedChecksum = (calculatedChecksum & 0xFF) + (calculatedChecksum >> 8);
 
-                // ¿Hemos cerrado la trama?
+                // Fin de trama
                 if (receivedBytes == totalFrameLength) {
-                    // Último byte debe ser NEW_END
                     if (receivedByte == NEW_END) {
                         if (calculatedChecksum == receivedChecksum) {
-                            // ========= NUEVO BLOQUE DE DESTINATARIO =========
-                            // Con el layout actual:
-                            // [10] targetType
-                            // [11..15] targetNS (5 bytes)
+                            // ========= Targeting =========
                             bool acceptFrame = false;
                             bool isBCFrame   = false;
+
+                            // ⚠️ Evita realocaciones aquí: no uses push_back si printTargetID
+                            // no tiene capacidad. Pre-resérvalo a 5 en el setup (ver nota abajo).
                             printTargetID.clear();
 
                             if (uartBuffer.size() >= FRAME_MIN_TOTAL_BYTES) {
-                                const uint8_t frameRoom  = uartBuffer[3];
-                                const uint8_t localRoom  = getLocalRoom();
-                                const bool    roomMatches = (frameRoom == ROOM_BROADCAST) || (frameRoom == localRoom);
+                                const uint8_t frameRoom   = uartBuffer[3];
+                                const uint8_t localRoom   = getLocalRoom();
+                                const bool roomMatches    = (frameRoom == ROOM_BROADCAST) || (frameRoom == localRoom);
                                 const uint8_t targetType  = uartBuffer[10];
 
                                 if (roomMatches) {
-                                    for (int i = 0; i < 5; ++i) {
-                                        printTargetID.push_back(uartBuffer[11 + i]);
+                                    // Copia directa de 5 bytes (sin crecer capacidad)
+                                    if (printTargetID.capacity() >= 5) {
+                                        // garantizamos tamaño lógico sin nueva reserva
+                                        // (reserve hecho en setup); evita resize si no confías
+                                        for (int i = 0; i < 5; ++i) {
+                                            printTargetID.push_back(uartBuffer[11 + i]);
+                                        }
                                     }
 
-                                    // Reglas de targeting para la BOTONERA:
-                                    // - Broadcast -> siempre nos aplica (dentro de la misma sala o broadcast de sala)
-                                    // - TargetType BOTONERA (0xDB) -> nos aplica
                                     if (targetType == BROADCAST) {
-                                        acceptFrame = true;
-                                        isBCFrame   = true;
+                                        acceptFrame = true;  isBCFrame = true;
                                     } else if (targetType == DEFAULT_BOTONERA) {
                                         acceptFrame = true;
                                     }
                                 }
                             }
 
-                            if (acceptFrame) {
-                                frameReceived = true;
-                                BCframe       = isBCFrame;
-                            } else {
-                                frameReceived = false;
-                                BCframe       = false;
-                            }
-                            // ========= FIN BLOQUE DESTINATARIO =========
+                            if (acceptFrame) { frameReceived = true; BCframe = isBCFrame; }
+                            else              { frameReceived = false; BCframe = false;  }
+
+                            // ======= fin targeting =======
 
                         } else {
-                            Serial.println("Checksum inválido. Ignorar");
+                            // checksum inválido → ignorar
                         }
                     } else {
-                        Serial1.println("Byte END inválido. Ignorar");
+                        // end inválido → ignorar
                     }
 
-                    // Reset para la siguiente trama
                     receiveState = WAITING_START;
                     return;
                 }
 
-                // Protección adicional de buffer
+                // Protección adicional de buffer por seguridad
                 if (uartBuffer.size() >= MAX_BUFFER_SIZE) {
                     receiveState = WAITING_START;
                     uartBuffer.clear();
                     return;
                 }
-
-                break;
-            }
+            } break;
         } // switch
-    } // while Serial1.available()
+    } // while
 
-    // Aviso (opcional) de frame parcial
+    // Frame parcial (opcional)
     if (Serial1.available() && bytesProcessed >= MAX_BYTES_PER_INTERRUPT) {
         partialFrameReceived = true;
     }

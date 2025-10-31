@@ -666,7 +666,7 @@ void handleEncoder() noexcept
                         setAllElementsToBasicMode();
                         doitPlayer.stop_file();
                         showMessageWithLoading(getTranslation("APAGANDO_SALA"), 4000);
-                        currentIndex     = 0;
+                        enfocarElementoPorNombre("Comunicador");
                         drawCurrentElement();
                         buttonPressStart = 0;
                         isLongPress      = false;
@@ -778,9 +778,6 @@ void handleEncoder() noexcept
     }
 }
 
-//bool modeAlternateActive = false;
-
-// Función handleModeSelection modificada
 /**
  * @brief Gestiona la selección de modo del elemento actual (o conmutación ON/OFF).
  *
@@ -2657,6 +2654,15 @@ void handleConfirmEnableDadoMenu(){
             confirmEnableDadoActive = false;
             extraElementsMenuActive = false;
             //drawCurrentElement();
+        }
+    }
+}
+
+void enfocarElementoPorNombre(const String& name) {
+    for (size_t i = 0; i < elementFiles.size(); ++i) {
+        if (elementFiles[i] == name) {
+            currentIndex = static_cast<int>(i);
+            break;
         }
     }
 }
