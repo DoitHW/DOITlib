@@ -7,6 +7,8 @@
 // Definición de pines I2C
 #define SDA_ADXL_PIN 47
 #define SCL_ADXL_PIN 48
+#define INT1_ADXL_PIN 14
+#define INT2_ADXL_PIN 15
 
 // Clase para manejar el acelerómetro ADXL345
 class ADXL345Handler {
@@ -21,6 +23,8 @@ public:
     void readInclinations();
     SENSOR_DOUBLE_T createSensorDoubleValue(long finalValueX, long finalValueY);
     void sendSensorValueDouble(const SENSOR_DOUBLE_T &sensorValue);
+    void enableActivityInterrupt(uint16_t threshold_mg, bool enX, bool enY, bool enZ);
+    void clearInterrupts();
 
 private:
     Adafruit_ADXL345_Unified accel;

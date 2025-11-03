@@ -221,4 +221,71 @@ void ADXL345Handler::sendSensorValueDouble(const SENSOR_DOUBLE_T &sensorValue) {
     ));
 }
 
+// ====== Configuración de INT de ACTIVIDAD para wake (INT1) ======
+static inline void adxl_write_u8(uint8_t reg, uint8_t val) {
+  Wire.beginTransmission(0x53); // ADXL345 por defecto
+  Wire.write(reg);
+  Wire.write(val);
+  Wire.endTransmission();
+}
+
+static inline uint8_t adxl_read_u8(uint8_t reg) {
+  Wire.beginTransmission(0x53);
+  Wire.write(reg);
+  Wire.endTransmission(false);
+  Wire.requestFrom((uint8_t)0x53, (uint8_t)1);
+  return Wire.available() ? Wire.read() : 0;
+}
+
+// Registros
+#define ADXL_REG_THRESH_ACT     0x24
+#define ADXL_REG_ACT_INACT_CTL  0x27
+#define ADXL_REG_BW_RATE        0x2C
+#define ADXL_REG_POWER_CTL      0x2D
+#define ADXL_REG_INT_ENABLE     0x2E
+#define ADXL_REG_INT_MAP        0x2F
+#define ADXL_REG_INT_SOURCE     0x30
+#define ADXL_REG_DATA_FORMAT    0x31
+
+void ADXL345Handler::enableActivityInterrupt(uint16_t threshold_mg, bool enX, bool enY, bool enZ) {
+  if (!initialized) init();         // asegura I2C y detección
+  // Rango ±2g, INT activa en alto (por defecto). Full-res off.
+  adxl_write_u8(ADXL_REG_DATA_FORMAT, 0x00);
+  // Frecuencia moderada (25–50 Hz) para menos ruido y consumo. 0x08 = 25 Hz, 0x0A = 100 Hz.
+  adxl_write_u8(ADXL_REG_BW_RATE, 0x08); // 25 Hz
+
+  // Umbral de actividad (62.5 mg/LSB): satura 1..255
+  uint16_t lsbs = (threshold_mg + 31) / 62; // redondeo aproximado
+  if (lsbs < 1) lsbs = 1;
+  if (lsbs > 255) lsbs = 255;
+  adxl_write_u8(ADXL_REG_THRESH_ACT, (uint8_t)lsbs);
+
+  // ACT_INACT_CTL: ACT_AC=1 (acoplamiento AC para “movimiento”), X/Y/Z según flags
+  uint8_t act = 0;
+  if (enX) act |= (1 << 6);
+  if (enY) act |= (1 << 5);
+  if (enZ) act |= (1 << 4);
+  act |= (1 << 7); // ACT_AC=1
+  adxl_write_u8(ADXL_REG_ACT_INACT_CTL, act);
+
+  // Mapear ACTIVIDAD (bit4) a INT1 (bit=0 → INT1)
+  uint8_t int_map = adxl_read_u8(ADXL_REG_INT_MAP);
+  int_map &= ~(1 << 4);
+  adxl_write_u8(ADXL_REG_INT_MAP, int_map);
+
+  // Habilitar INT de ACTIVIDAD (bit4)
+  uint8_t int_en = adxl_read_u8(ADXL_REG_INT_ENABLE);
+  int_en |= (1 << 4);
+  adxl_write_u8(ADXL_REG_INT_ENABLE, int_en);
+
+  // Modo Measure
+  adxl_write_u8(ADXL_REG_POWER_CTL, 0x08);
+}
+
+void ADXL345Handler::clearInterrupts() {
+  (void)adxl_read_u8(ADXL_REG_INT_SOURCE);  // leer limpia el latch
+}
+
+
+
 
