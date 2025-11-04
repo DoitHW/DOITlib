@@ -110,24 +110,6 @@ bool PulsadoresHandler::isButtonPressed(byte color) {
     return false; // ← faltaba: si no se encontró pulsado, devolver false
 }
 
-
-// bool PulsadoresHandler::isButtonPressed(byte color) {
-//     for (int i = 0; i < FILAS; i++) {
-//         digitalWrite(filas[i], LOW); // Activamos la fila
-//         delayMicroseconds(1); // Pequeña pausa para asegurar estabilidad en la lectura
-        
-//         for (int j = 0; j < COLUMNAS; j++) {
-//             if (pulsadorColor[i][j] == color && digitalRead(columnas[j]) == LOW) {
-//                 digitalWrite(filas[i], HIGH); // Restauramos la fila antes de salir
-//                 return true; // Se encontró el botón presionado
-//             }
-//         }
-        
-//         digitalWrite(filas[i], HIGH); // Restauramos la fila antes de continuar
-//     }
-//     return false; // Ningún botón con ese color está presionado
-// }
-
 void PulsadoresHandler::procesarPulsadores() {
     
     auto isNSZero = [](const TARGETNS& ns) -> bool {
@@ -140,6 +122,13 @@ void PulsadoresHandler::procesarPulsadores() {
     String currentFile = elementFiles[currentIndex];
     const bool respMode = PulsadoresHandler::isResponseRouteActive();
     const bool noInputGlobal = PulsadoresHandler::isGlobalFxNoInput();
+
+    if (currentFile == "Comunicador" && !selectedStates[currentIndex]) {
+    // Evita estados pegados de estas flags
+    relayButtonPressed = false;
+    blueButtonPressed  = false;
+    return;
+}
 
     /*───────────────────────────
       1) MODO COGNITIVO (Consola)
@@ -204,8 +193,7 @@ void PulsadoresHandler::procesarPulsadores() {
 
     // Ignorar pulsaciones si es elemento normal no seleccionado
     if (!respMode && currentFile != "Ambientes" && currentFile != "Fichas" &&
-    currentFile != "Comunicador" && !selectedStates[currentIndex]) return;
-
+    !selectedStates[currentIndex]) return;
 
     const bool isFichas = (currentFile == "Fichas");
 

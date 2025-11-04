@@ -725,7 +725,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
  * @brief Despacha y atiende un frame RX de control para la botonera.
  *
  * Procesa el campo de función de @p LEF y ejecuta la acción correspondiente:
- * sincronización de sector, actualización de estado de relí©, reproducción de
+ * sincronización de sector, actualización de estado de relé, reproducción de
  * sonidos y gestión de comandos (p. ej., modo cognitivo y respuestas WIN/FAIL).
  *
  * @param LEF Estructura de frame recibido. Se espera que contenga:
@@ -800,7 +800,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
     #endif
 
     // Constantes
-    constexpr uint8_t kFlagsBit0Mask    = 0x01u; // Bit 0: estado del relí© remoto.
+    constexpr uint8_t kFlagsBit0Mask    = 0x01u; // Bit 0: estado del relé remoto.
     constexpr uint8_t kIdx0             = 0u;
     constexpr uint8_t kIdx1             = 1u;
     constexpr uint8_t kLangStride       = 10u;
@@ -1232,7 +1232,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
 
             // NS estado de relé (sin fallback a ID)
             RelayStateManager::set(senderNS, flags_bit0);
-            DEBUG__________printf("Relí© [%02X:%02X:%02X:%02X:%02X] => %s\n",
+            DEBUG__________printf("Relé [%02X:%02X:%02X:%02X:%02X] => %s\n",
                                   senderNS.mac01, senderNS.mac02, senderNS.mac03, senderNS.mac04, senderNS.mac05,
                                   flags_bit0 ? "ON" : "OFF");
             break;
@@ -1355,7 +1355,7 @@ static inline bool isSpiffsPath(const String& s) {
  *
  * @note En ELEM_CMODE_SECTOR: data[1] = modo actual; se persiste en OFFSET_CURRENTMODE,
  *       se actualizan flags de sensores y patrón de color del elemento actual.
- * @note En ELEM_CURRENT_FLAGS_SECTOR: data[1] usa el bit 0 como estado ON/OFF del relí©.
+ * @note En ELEM_CURRENT_FLAGS_SECTOR: data[1] usa el bit 0 como estado ON/OFF del relé.
  *
  * @warning Este manejador accede a data[1] en algunos sectores. Si la trama no tiene
  *          al menos 2 bytes, se ignora el sector con traza de depuración.
@@ -1794,7 +1794,7 @@ bool BOTONERA_::guardar_elemento(INFO_PACK_T* infoPack) {
         success &= writeBytesChecked(file, (uint8_t*)infoPack->icono[y], ICON_COLUMNS * 2);
     }
 
-    // Despuí©s del icono
+    // Después del icono
     success &= writeBytesChecked(file, &infoPack->situacion, 1);
 
 
@@ -2088,7 +2088,7 @@ void BOTONERA_::escanearSala()
     };
 
     // ===== Parámetros del escaneo =====
-    constexpr unsigned long kDiscoveryWindowMs = 20000UL; // 20 s para recoger SERIAL/NS
+    constexpr unsigned long kDiscoveryWindowMs = 30000UL; // 30 s para recoger SERIAL/NS
     constexpr unsigned long kSectorTimeoutMs   = 2000UL;  // t/o por sector
     constexpr int           kRetriesPerSector  = 10;      // reintentos por (NS, sector)
     constexpr unsigned long kInterReqDelayMs   = 35UL;    // pausa entre peticiones

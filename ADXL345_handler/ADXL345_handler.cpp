@@ -41,7 +41,8 @@ void ADXL345Handler::init()
         return;
     }
 
-    accel.setRange(ADXL345_RANGE_16_G);
+    //accel.setRange(ADXL345_RANGE_16_G);
+    accel.setRange(ADXL345_RANGE_2_G);
     initialized = true;
     DEBUG__________ln("ADXL345 inicializado correctamente");
 }
@@ -248,39 +249,46 @@ static inline uint8_t adxl_read_u8(uint8_t reg) {
 #define ADXL_REG_DATA_FORMAT    0x31
 
 void ADXL345Handler::enableActivityInterrupt(uint16_t threshold_mg, bool enX, bool enY, bool enZ) {
-  if (!initialized) init();         // asegura I2C y detección
-  // Rango ±2g, INT activa en alto (por defecto). Full-res off.
-  adxl_write_u8(ADXL_REG_DATA_FORMAT, 0x00);
-  // Frecuencia moderada (25–50 Hz) para menos ruido y consumo. 0x08 = 25 Hz, 0x0A = 100 Hz.
-  adxl_write_u8(ADXL_REG_BW_RATE, 0x08); // 25 Hz
+  if (!initialized) init();  // asegura I2C y detección
 
-  // Umbral de actividad (62.5 mg/LSB): satura 1..255
-  uint16_t lsbs = (threshold_mg + 31) / 62; // redondeo aproximado
-  if (lsbs < 1) lsbs = 1;
+  // --- Mantener DATA_FORMAT de init y forzar solo el rango a ±16 g ---
+  // DATA_FORMAT: [D3=FULL_RES][D2=JUSTIFY][D1:D0=RANGE]
+  uint8_t fmt = adxl_read_u8(ADXL_REG_DATA_FORMAT);
+  fmt = (fmt & ~0x03) | 0x03;              // D1:D0 = 11b => ±16 g; no toca FULL_RES/JUSTIFY
+  //adxl_write_u8(ADXL_REG_DATA_FORMAT, fmt);
+  adxl_write_u8(ADXL_REG_DATA_FORMAT, 0x00);
+
+  // --- Tasa de datos / ancho de banda ---
+  // 0x08 = 25 Hz (OK para bajo consumo y menos ruido). Cambia si necesitas más rapidez.
+  adxl_write_u8(ADXL_REG_BW_RATE, 0x08);
+
+  // --- Umbral de actividad (62,5 mg/LSB), saturado a 1..255 LSB ---
+  uint16_t lsbs = (uint16_t)lroundf(threshold_mg / 62.5f);
+  if (lsbs < 1)   lsbs = 1;
   if (lsbs > 255) lsbs = 255;
   adxl_write_u8(ADXL_REG_THRESH_ACT, (uint8_t)lsbs);
 
-  // ACT_INACT_CTL: ACT_AC=1 (acoplamiento AC para “movimiento”), X/Y/Z según flags
+  // --- ACT_INACT_CTL: AC-coupled en actividad; ejes habilitados según flags ---
   uint8_t act = 0;
   if (enX) act |= (1 << 6);
   if (enY) act |= (1 << 5);
   if (enZ) act |= (1 << 4);
-  act |= (1 << 7); // ACT_AC=1
+  act |= (1 << 7); // ACT_AC = 1
   adxl_write_u8(ADXL_REG_ACT_INACT_CTL, act);
 
-  // Mapear ACTIVIDAD (bit4) a INT1 (bit=0 → INT1)
+  // --- Mapear / habilitar la interrupción de ACTIVIDAD en INT1 ---
   uint8_t int_map = adxl_read_u8(ADXL_REG_INT_MAP);
-  int_map &= ~(1 << 4);
+  int_map &= ~(1 << 4);                    // bit4=0 -> INT1
   adxl_write_u8(ADXL_REG_INT_MAP, int_map);
 
-  // Habilitar INT de ACTIVIDAD (bit4)
   uint8_t int_en = adxl_read_u8(ADXL_REG_INT_ENABLE);
-  int_en |= (1 << 4);
+  int_en |= (1 << 4);                      // habilita ACTIVIDAD
   adxl_write_u8(ADXL_REG_INT_ENABLE, int_en);
 
-  // Modo Measure
+  // --- Entrar en modo Measure ---
   adxl_write_u8(ADXL_REG_POWER_CTL, 0x08);
 }
+
 
 void ADXL345Handler::clearInterrupts() {
   (void)adxl_read_u8(ADXL_REG_INT_SOURCE);  // leer limpia el latch

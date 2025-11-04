@@ -352,7 +352,7 @@ void IRAM_ATTR onUartInterrupt() {
 
                                     if (targetType == BROADCAST) {
                                         acceptFrame = true;  isBCFrame = true;
-                                    } else if (targetType == DEFAULT_BOTONERA) {
+                                    } else /*if (targetType == DEFAULT_BOTONERA)*/ {
                                         acceptFrame = true;
                                     }
                                 }
@@ -364,10 +364,10 @@ void IRAM_ATTR onUartInterrupt() {
                             // ======= fin targeting =======
 
                         } else {
-                            // checksum inválido → ignorar
+                            Serial.println("Checksum inválido. Ignorar");
                         }
                     } else {
-                        // end inválido → ignorar
+                        Serial.println("Byte END inválido. Ignorar");
                     }
 
                     receiveState = WAITING_START;
@@ -491,9 +491,10 @@ LAST_ENTRY_FRAME_T extract_info_from_frameIn(const std::vector<uint8_t> &frame) 
 
 void send_frame(const FRAME_T &f) {
   int  i      = 0;
-  byte dTime  = 5;
+  byte dTime  = 0;
 
   #ifdef DEBUG
+    DEBUG__________ln(String(COLOR_BRIGHT_WHITE) + "======================================" + COLOR_RESET);
     DEBUG__________ln(String(COLOR_BRIGHT_WHITE) + " #### Trama enviada ####" + COLOR_RESET);
   #endif
 

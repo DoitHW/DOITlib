@@ -2846,7 +2846,7 @@ void showCriticalBatteryMessage()
     // ── Icono de batería centrado bajo el texto ──
     const int iconX = (tft.width() - kIconW) / 2;
     uiSprite.pushImage(iconX, kIconY, kIconW, kIconH,
-                       reinterpret_cast<const uint16_t*>(vbat32x61_0_));
+                       reinterpret_cast<const uint16_t*>(vbat32x61_0));
 
     // ── Volcado a pantalla ──
     uiSprite.pushSprite(0, 0);
@@ -2858,9 +2858,17 @@ const uint16_t* vbatallArray[5] = {
 	vbat30x15_horizontal_10_25_1,
 	vbat30x15_horizontal_10_25_2,
 	vbat30x15_horizontal_25_66,
-	vbat30x15_horizontal_66_100,
-	vbat32x61_0_
+	vbat30x15_horizontal_66_100
 };
+
+const uint16_t* vbatallArrayCharging[5] = {
+    vbat30x15_cargando_horizontal_10_25_1,
+    vbat30x15_cargando_horizontal_10_25_2,
+    vbat30x15_cargando_horizontal_25_66,
+    vbat30x15_cargando_horizontal_66_100 // <— usa el nombre con rayo
+                                // no se usa en mini; lo dejamos igual
+};
+
 unsigned long lastBatteryToggleTime = 0;
 bool batteryToggleState = false;
 
@@ -2876,55 +2884,129 @@ bool batteryToggleState = false;
  * @param percentage Porcentaje visual de batería (0..100). Si es mayor que el
  *        umbral de *sentinel*, se muestra el icono de “cargando”.
  */
+// void drawBatteryIconMini(float percentage) {
+//     // ── Constantes de layout y umbrales ─────────────────────────────
+//     constexpr int   kIconW              = 30;
+//     constexpr int   kIconH              = 15;
+//     constexpr int   kIconTopY           = 2;
+//     constexpr float kLowThresholdPct    = 25.0f;
+//     constexpr float kMedThresholdPct    = 66.0f;
+//     constexpr unsigned long kBlinkMs    = 500UL;
+//     constexpr float kChargingSentinel   = 150.0f; // Forzar icono de carga si se supera
+
+//     // Posición en esquina superior derecha (dinámico según ancho de la TFT)
+//     const int x = tft.width() - kIconW;
+//     const int y = kIconTopY;
+
+//     // ── Caso "cargando": sentinel ───────────────────────────────────
+//     if (percentage > kChargingSentinel) {
+//         uiSprite.pushImage(x, y, kIconW, kIconH, vbat30x15_horizontal_cargando);
+//         return;
+//     }
+
+//     // ── Selección de icono en función del nivel ─────────────────────
+//     const uint16_t* icon = nullptr;
+
+//     if (percentage < kLowThresholdPct) {
+//         // Parpadeo entre 0 y 1 barra cada kBlinkMs
+//         const unsigned long now = millis();
+//         if ((now - lastBatteryToggleTime) > kBlinkMs) {
+//             batteryToggleState   = !batteryToggleState;
+//             lastBatteryToggleTime = now;
+//         }
+//         const int idx = batteryToggleState ? 1 : 0;
+//         if (idx >= 0 && idx < vbatallArray_LEN) icon = vbatallArray[idx];
+//     } else if (percentage < kMedThresholdPct) {
+//         const int idx = 2; // 2 barras
+//         if (idx >= 0 && idx < vbatallArray_LEN) icon = vbatallArray[idx];
+//     } else {
+//         const int idx = 3; // 3 barras
+//         if (idx >= 0 && idx < vbatallArray_LEN) icon = vbatallArray[idx];
+//     }
+
+//     // ── Fallback defensivo si el índice/puntero no son válidos ──────
+//     if (icon == nullptr && vbatallArray_LEN > 0) {
+//         icon = vbatallArray[0]; // usa el primer icono disponible como reserva
+//     }
+//     if (icon == nullptr) return; // nada que dibujar
+
+//     // ── Dibujo ──────────────────────────────────────────────────────
+//     uiSprite.pushImage(x, y, kIconW, kIconH, icon);
+// }
+
 void drawBatteryIconMini(float percentage) {
     // ── Constantes de layout y umbrales ─────────────────────────────
-    constexpr int   kIconW              = 30;
-    constexpr int   kIconH              = 15;
-    constexpr int   kIconTopY           = 2;
-    constexpr float kLowThresholdPct    = 25.0f;
-    constexpr float kMedThresholdPct    = 66.0f;
-    constexpr unsigned long kBlinkMs    = 500UL;
-    constexpr float kChargingSentinel   = 150.0f; // Forzar icono de carga si se supera
+    constexpr int   kIconW            = 30;
+    constexpr int   kIconH            = 15;
+    constexpr int   kIconTopY         = 2;
+    constexpr float kLowThresholdPct  = 25.0f;  // 10–25%  → toggle
+    constexpr float kMedThresholdPct  = 66.0f;  // 25–66%  → icono 2 barras
+    constexpr float kFullChargePct    = 100.0f; // 100%    → icono “cargado”
+    constexpr unsigned long kBlinkMs  = 500UL;
+    constexpr float BAT_VIS_CHARGING  = 200.0f; // tu sentinel real de “cargando”
 
     // Posición en esquina superior derecha (dinámico según ancho de la TFT)
     const int x = tft.width() - kIconW;
     const int y = kIconTopY;
 
-    // ── Caso "cargando": sentinel ───────────────────────────────────
-    if (percentage > kChargingSentinel) {
-        uiSprite.pushImage(x, y, kIconW, kIconH, vbat30x15_horizontal_cargando);
-        return;
-    }
+    // Estado “cargando” fiable desde la capa de batería
+    const bool isChargingVisual = (batteryVisualPercentage == BAT_VIS_CHARGING);
 
-    // ── Selección de icono en función del nivel ─────────────────────
+    // Selección por nivel (%)
     const uint16_t* icon = nullptr;
 
-    if (percentage < kLowThresholdPct) {
-        // Parpadeo entre 0 y 1 barra cada kBlinkMs
-        const unsigned long now = millis();
-        if ((now - lastBatteryToggleTime) > kBlinkMs) {
-            batteryToggleState   = !batteryToggleState;
-            lastBatteryToggleTime = now;
+    if (isChargingVisual) {
+        // ── CARGANDO ────────────────────────────────────────────────
+        if (percentage >= kFullChargePct) {
+            // 100% mientras sigue enchufado → icono especial
+            icon = vbat30x15_horizontal_cargado;
+        } else if (percentage < kLowThresholdPct) {
+            // 10–25% con rayo → toggle
+            const unsigned long now = millis();
+            if ((now - lastBatteryToggleTime) > kBlinkMs) {
+                batteryToggleState    = !batteryToggleState;
+                lastBatteryToggleTime = now;
+            }
+            icon = batteryToggleState
+                ? vbat30x15_cargando_horizontal_10_25_2
+                : vbat30x15_cargando_horizontal_10_25_1;
+        } else if (percentage < kMedThresholdPct) {
+            // 25–66% con rayo
+            icon = vbat30x15_cargando_horizontal_25_66;
+        } else {
+            // 66–99% con rayo
+            icon = vbat30x15_cargando_horizontal_66_100;
         }
-        const int idx = batteryToggleState ? 1 : 0;
-        if (idx >= 0 && idx < vbatallArray_LEN) icon = vbatallArray[idx];
-    } else if (percentage < kMedThresholdPct) {
-        const int idx = 2; // 2 barras
-        if (idx >= 0 && idx < vbatallArray_LEN) icon = vbatallArray[idx];
     } else {
-        const int idx = 3; // 3 barras
-        if (idx >= 0 && idx < vbatallArray_LEN) icon = vbatallArray[idx];
+        // ── NO CARGANDO ─────────────────────────────────────────────
+        if (percentage < kLowThresholdPct) {
+            // 10–25% → toggle sin rayo
+            const unsigned long now = millis();
+            if ((now - lastBatteryToggleTime) > kBlinkMs) {
+                batteryToggleState    = !batteryToggleState;
+                lastBatteryToggleTime = now;
+            }
+            icon = batteryToggleState
+                ? vbat30x15_horizontal_10_25_2
+                : vbat30x15_horizontal_10_25_1;
+        } else if (percentage < kMedThresholdPct) {
+            // 25–66% normal
+            icon = vbat30x15_horizontal_25_66;
+        } else {
+            // 66–100% normal
+            icon = vbat30x15_horizontal_66_100;
+        }
     }
 
-    // ── Fallback defensivo si el índice/puntero no son válidos ──────
-    if (icon == nullptr && vbatallArray_LEN > 0) {
-        icon = vbatallArray[0]; // usa el primer icono disponible como reserva
+    // Fallback defensivo
+    if (icon == nullptr) {
+        icon = vbat30x15_horizontal_10_25_1;
     }
-    if (icon == nullptr) return; // nada que dibujar
 
-    // ── Dibujo ──────────────────────────────────────────────────────
+    // Dibujo
     uiSprite.pushImage(x, y, kIconW, kIconH, icon);
 }
+
 
 /**
  * @brief Dibuja el menú de actividades cognitivas con opción “Salir”.
