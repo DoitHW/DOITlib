@@ -93,6 +93,7 @@ void TOKEN_::resetReader() {
   // Iniciar detección pasiva
   startListeningToNFC();
 }
+
 void TOKEN_::startListeningToNFC() {
   // Reiniciar los indicadores de IRQ
   irqPrev = HIGH;
@@ -195,7 +196,6 @@ String TOKEN_::decodeNdefText(const byte* payload, int payloadLength) {
   }
   return decodedText;
 }
-
 
 // Función modificada para leer el mensaje NDEF (token) desde las páginas 6 a 18
 bool TOKEN_::leerMensajeNFC(String &mensaje) {
@@ -314,11 +314,6 @@ token.currentToken.familyName[24] = '\0'; // Asegurar string nulo-terminado
   return true;
 }
 
-// bool TOKEN_::leerPagina(uint8_t pagina, uint8_t *buffer) {
-//     // En la nueva lógica se utiliza la lectura completa de NDEF, por lo que esta función queda sin implementar.
-//     return false;
-// }
-
 void TOKEN_::proponer_token(byte guessbank) {
     lang = 0;
     int fileRand = random(1, 8);  // Genera un número aleatorio entre 1 y 7
@@ -380,11 +375,15 @@ void TOKEN_::token_handler(const TOKEN_DATA& token,
             }
         }
         else if (tokenCurrentMode == TOKEN_PARTNER_MODE) {
+           DEBUG__________printf("[TOKEN][PARTNER] branch  waitingForPartner=%d\n", waitingForPartner ? 1 : 0);
+
             static bool firstTokenStored = false;
             static byte firstTokenBank = 0;
             static byte firstTokenFile = 0;
 
             if (!waitingForPartner) {
+        DEBUG__________printf("[TOKEN][PARTNER] -> store first  bank=0x%02X file=0x%02X\n",
+                              token.addr.bank, token.addr.file);
                 // Guardar la 1ª ficha y esperar la pareja
                 firstTokenBank   = token.addr.bank;
                 firstTokenFile   = token.addr.file;
@@ -403,6 +402,8 @@ void TOKEN_::token_handler(const TOKEN_DATA& token,
                     DEBUG__________ln("Primer token: Color temporal, apagando después del audio.");
                 }
             } else {
+                      DEBUG__________printf("[TOKEN][PARTNER] -> compare  second bank=0x%02X file=0x%02X  vs first bank=0x%02X file=0x%02X\n",
+                              token.addr.bank, token.addr.file, firstTokenBank, firstTokenFile);
                 // Ya había 1ª ficha almacenada: evaluar pareja
                 if (!firstTokenStored) {
                     DEBUG__________ln("Error: No se encontró el primer token almacenado.");
@@ -437,7 +438,7 @@ void TOKEN_::token_handler(const TOKEN_DATA& token,
                 delay(50);
                 while (doitPlayer.is_playing()) { delay(10); }
                 delay(200);
-
+                DEBUG__________printf("[TOKEN][PARTNER] RESP=%s\n", match ? "WIN" : "FAIL");
                 // Respuesta WIN/FAIL + audio correspondiente
                 int fileNum = match ? random(1, 4) : random(1, 3);
                 for (const TARGETNS& ns : targetsNS) {
@@ -474,7 +475,10 @@ void TOKEN_::token_handler(const TOKEN_DATA& token,
             // ¿Acierto o fallo?
             bool isCorrect = (token.addr.bank == propossedToken.addr.bank &&
                               token.addr.file == propossedToken.addr.file);
-
+DEBUG__________printf("[TOKEN][GUESS] branch  proposed B=0x%02X F=0x%02X  scanned B=0x%02X F=0x%02X  RESP=%s\n",
+                          propossedToken.addr.bank, propossedToken.addr.file,
+                          token.addr.bank, token.addr.file,
+                          isCorrect ? "WIN" : "FAIL");
             while (doitPlayer.is_playing()) { delay(10); }
             delay(600);
 
@@ -540,54 +544,4 @@ byte TOKEN_::asciiHexToByte(char high, char low) {
   
   return value;
 }
-
-// byte TOKEN_::hexToByte(const String &hex) {
-//   if (hex.length() < 2) return 0;
-//   char high = hex.charAt(0);
-//   char low  = hex.charAt(1);
-
-//   auto nibble = [](char c) -> byte {
-//     if (c >= '0' && c <= '9') return c - '0';
-//     if (c >= 'A' && c <= 'F') return c - 'A' + 10;
-//     if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-//     return 0;
-//   };
-
-//   return (nibble(high) << 4) | nibble(low);
-// }
-
-
-// TOKEN_::TOKEN_DATA TOKEN_::parseTokenString(const String &tokenStr) {
-//   TOKEN_DATA data = {}; // Inicializa en 0
-
-//   // Se remueven los delimitadores '#' del inicio y fin
-//   if(tokenStr.charAt(0) != '#' || tokenStr.charAt(tokenStr.length()-1) != '#') {
-//     DEBUG__________ln("DEBUG: Token sin delimitadores válidos");
-//     return data;
-//   }
-//   String content = tokenStr.substring(1, tokenStr.length()-1);
-
-//   // Ahora se espera que el contenido tenga 46 caracteres (23 bytes)
-//   if(content.length() != 94) {
-//     DEBUG__________("DEBUG: Longitud incorrecta del token: ");
-//     DEBUG__________ln(content.length());
-//     return data;
-//   }
-  
-//   data.cmd       = asciiHexToByte(content.charAt(0), content.charAt(1));
-//   data.cmd2      = asciiHexToByte(content.charAt(2), content.charAt(3));
-//   data.addr.bank = asciiHexToByte(content.charAt(4), content.charAt(5));
-//   data.addr.file = asciiHexToByte(content.charAt(6), content.charAt(7));
-//   data.color.r   = asciiHexToByte(content.charAt(8), content.charAt(9));
-//   data.color.g   = asciiHexToByte(content.charAt(10), content.charAt(11));
-//   data.color.b   = asciiHexToByte(content.charAt(12), content.charAt(13));
-  
-//   for (int i = 0; i < 8; i++) {
-//     int idx = 14 + i * 4;
-//     data.partner[i].bank = asciiHexToByte(content.charAt(idx), content.charAt(idx+1));
-//     data.partner[i].file = asciiHexToByte(content.charAt(idx+2), content.charAt(idx+3));
-//   }
-//   return data;
-// }
-
 

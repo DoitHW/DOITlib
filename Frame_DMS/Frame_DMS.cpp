@@ -213,8 +213,10 @@ uint8_t getLocalRoom() {
 //         partialFrameReceived = true;
 //     }
 // }
+extern unsigned long lastDisplayInteraction; 
 
 void IRAM_ATTR onUartInterrupt() {
+    lastDisplayInteraction = millis(); 
     static enum {
         WAITING_START,
         RECEIVING_LENGTH_MSB,
@@ -901,7 +903,7 @@ FRAME_T frameMaker_SEND_COMMAND(byte originin, byte targetType, TARGETNS targetN
     f.frameLengthLsb = frameLength & 0xFF;
     f.frameLengthMsb = (frameLength >> 8) & 0xFF;
     f.room           = getLocalRoom();
-    f.origin          = originin;
+    f.origin         = originin;
     f.originNS       = getLocalNS();
     f.targetType     = targetType;
     f.targetNS       = targetNS;
