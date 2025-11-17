@@ -1501,17 +1501,36 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event,
         }
     }
 
-    // 3) AMBIENTES
+    // // 3) AMBIENTES
+    // if (currentFile == "Ambientes") {
+    //     if (event == BUTTON_PRESSED && isCurrentElementSelected()) {
+    //         const uint8_t sendColorByte = (buttonColor == RELAY) ? BLACK : buttonColor;
+    //         send_frame(frameMaker_SEND_PATTERN_NUM(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, sendColorByte));
+    //         delay(100);
+    //         if (sendColorByte != BLACK) doitPlayer.play_file(AMBIENTS_BANK, sendColorByte + 1);
+    //         else                         doitPlayer.stop_file();
+    //         return;
+    //     }
+    // }
+
+    // 3) AMBIENTES (broadcast patterns cuando está seleccionado)
     if (currentFile == "Ambientes") {
         if (event == BUTTON_PRESSED && isCurrentElementSelected()) {
             const uint8_t sendColorByte = (buttonColor == RELAY) ? BLACK : buttonColor;
             send_frame(frameMaker_SEND_PATTERN_NUM(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, sendColorByte));
             delay(100);
-            if (sendColorByte != BLACK) doitPlayer.play_file(AMBIENTS_BANK, sendColorByte + 1);
-            else                         doitPlayer.stop_file();
+
+            if (sendColorByte != BLACK) {
+                doitPlayer.play_file(AMBIENTS_BANK, sendColorByte + 1);
+                ambienteActivo = true;     // ← desde ahora consideramos que hay ambiente “puesto”
+            } else {
+                doitPlayer.stop_file();
+                ambienteActivo = false;    // ← pulsación de RELAY (negro) = ambiente apagado
+            }
             return;
         }
     }
+
 
     // 4) Capacidades del target (ligero y cacheado).
     //    Para broadcast/comunicador-broadcast no bloqueamos por falta de flags.

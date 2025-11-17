@@ -1117,7 +1117,7 @@ void drawCurrentElement()
         uiSprite.pushImage(0, 0, 16, 16, device_lock);
     }
 
-    drawBatteryIconMini(batteryVisualPercentage);
+    drawBatteryIconMini(batteryPercentage);
 
 
     uiSprite.pushSprite(0, 0);
@@ -1138,7 +1138,7 @@ void display_sleep() {
     uiSprite.fillSprite(TFT_BLACK);
     uiSprite.pushSprite(0, 0);
     displayOn = false;
-    DEBUG__________ln("Pantalla apagada por inactividad.");
+    //DEBUG__________ln("Pantalla apagada por inactividad.");
 }
 
 /**
@@ -1152,7 +1152,7 @@ void display_wakeup() {
     if (inCognitiveMenu) drawCognitiveMenu();
     else drawCurrentElement();
     lastDisplayInteraction = millis();
-    DEBUG__________ln("Pantalla reactivada por interacción.");
+    //DEBUG__________ln("Pantalla reactivada por interacción.");
   }
 
 std::map<String, std::vector<bool>> elementAlternateStates;
@@ -1896,6 +1896,229 @@ void drawBankSelectionMenu(const std::vector<byte>& bankList, const std::vector<
  *
  * @note Los separadores se dibujan en gris y no son seleccionables lógicamente.
  */
+// void drawSoundMenu(int selection)
+// {
+//     /*──────── Constantes/layout (como en Modos) ────────*/
+//     const int screenW         = tft.width();
+//     constexpr int kTitleY     = 5;
+//     constexpr int kListStartY = 30;
+//     constexpr int kCardRadius = 3;
+//     constexpr int kHLPadX     = 3;
+//     constexpr int kHLPadY     = 1;
+//     constexpr int kRowTopInset= (kHLPadY + 1);
+//     constexpr int kTickerFrameMs = 50;
+
+//     constexpr int kVisibleOptions  = 4;
+//     constexpr int kTotalOptions    = 10;
+//     constexpr int kScrollBarW      = 5;
+//     constexpr int kScrollBarRightP = 3;
+//     constexpr int kListLeftX       = 9;
+//     constexpr int kTextAreaPad     = 2;
+//     static constexpr const char kSep[] = "---------";
+
+//     const char* options[kTotalOptions] = {
+//         getTranslation("MUJER"),
+//         getTranslation("HOMBRE"),
+//         kSep,
+//         getTranslation("CON_NEG"),
+//         getTranslation("SIN_NEG"),
+//         kSep,
+//         getTranslation("VOL_NORMAL"),
+//         getTranslation("VOL_ATENUADO"),
+//         kSep,
+//         getTranslation("CONFIRMAR")
+//     };
+
+//     const int cardHeight  = CARD_HEIGHT;
+//     const int cardMargin  = CARD_MARGIN;
+//     const int stepY       = cardHeight + cardMargin;
+
+//     const int scrollBarX  = screenW - kScrollBarW - kScrollBarRightP;
+//     const int textAreaW   = scrollBarX - kListLeftX - kTextAreaPad;
+
+//     /*──────── Estado scroll persistente ────────*/
+//     static int scrollOffset       = 0;   // px actuales
+//     static int targetScrollOffset = 0;   // px destino
+
+//     /*──────── Estado del ticker (persistente) ────────*/
+//     static int lastSelectedIndex  = -1;
+//     static int sndTickerOffset    = 0;
+//     static int sndTickerDirection = 1;   // 1→derecha, -1→izquierda
+//     static unsigned long sndLastFrameTime = 0;
+//     static TFT_eSprite tickerSprite(&tft);
+//     static int tickerW = 0, tickerH = 0;
+
+//     /*──────── Fondo + título ────────*/
+//     uiSprite.fillSprite(BACKGROUND_COLOR);
+//     uiSprite.setFreeFont(&FreeSans12pt7b);
+//     uiSprite.setTextColor(TEXT_COLOR);
+//     uiSprite.setTextDatum(TC_DATUM);
+//     uiSprite.setTextSize(1);
+//     uiSprite.drawString(getTranslation("SONIDO"), screenW/2, kTitleY);
+
+//     /*──────── Ventana rodante (misma lógica que Modos) ────────*/
+//     // selection aquí es el índice lógico 0..9 (tú ya te saltas separadores en handle)
+//     static int startIndex = 0;
+//     if ((selection - startIndex) > (kVisibleOptions - 2) &&
+//         startIndex < (kTotalOptions - kVisibleOptions))
+//         startIndex++;
+//     else if ((selection - startIndex) < 1 && startIndex > 0)
+//         startIndex--;
+
+//     if (startIndex < 0) startIndex = 0;
+//     const int lastStart = (kTotalOptions > kVisibleOptions) ? (kTotalOptions - kVisibleOptions) : 0;
+//     if (startIndex > lastStart) startIndex = lastStart;
+
+//     /*──────── Resolver SCROLL ANTES de dibujar ────────*/
+//     targetScrollOffset = startIndex * stepY;
+//     const int maxScroll = lastStart * stepY;
+//     if (targetScrollOffset < 0)         targetScrollOffset = 0;
+//     if (targetScrollOffset > maxScroll) targetScrollOffset = maxScroll;
+
+//     int delta = targetScrollOffset - scrollOffset;
+//     if (delta >= -1 && delta <= 1) scrollOffset = targetScrollOffset;
+//     else                           scrollOffset += (delta / 4);
+
+//     /*──────── Viewport con clipping ────────*/
+//     static TFT_eSprite listSprite(&tft);
+//     static int listW = 0, listH = 0;
+//     const int wantedListW = screenW;
+//     const int wantedListH = kVisibleOptions * stepY;
+
+//     if (!listSprite.created() || listW != wantedListW || listH != wantedListH) {
+//         if (listSprite.created()) listSprite.deleteSprite();
+//         listSprite.createSprite(wantedListW, wantedListH);
+//         listW = wantedListW; listH = wantedListH;
+//     }
+
+//     listSprite.fillSprite(BACKGROUND_COLOR);
+//     listSprite.setFreeFont(&FreeSans9pt7b);
+//     listSprite.setTextSize(1);
+//     listSprite.setTextDatum(TL_DATUM);
+
+//     const int listYOffset = -(scrollOffset - startIndex * stepY);
+//     const int firstVI     = startIndex - 1;
+//     const int lastVI      = startIndex + kVisibleOptions;
+
+//     for (int vi = firstVI; vi <= lastVI; ++vi)
+//     {
+//         if (vi < 0 || vi >= kTotalOptions) continue;
+
+//         const int y = kRowTopInset + listYOffset + (vi - startIndex) * stepY;
+//         if (y <= -cardHeight + kHLPadY || y >= listH - kHLPadY) continue;
+
+//         const char* labelC = options[vi];
+//         const bool isSeparator = (strcmp(labelC, kSep) == 0);
+//         const bool isCursor    = (vi == selection);
+
+//         // Fondo resaltado sólo si es cursor y no es separador
+//         if (isCursor && !isSeparator) {
+//             int rectY = y - kHLPadY;
+//             int rectH = cardHeight + (kHLPadY * 2);
+//             if (rectY < 0)            { rectH += rectY; rectY = 0; }
+//             if (rectY + rectH > listH){ rectH = listH - rectY; }
+//             if (rectH > 0) {
+//                 listSprite.fillRoundRect(
+//                     kListLeftX - kHLPadX, rectY,
+//                     textAreaW + (kHLPadX * 2),
+//                     rectH, kCardRadius,
+//                     CARD_COLOR
+//                 );
+//             }
+//         }
+
+//         // Color lógico seleccionado (tu misma lógica)
+//         const bool isLogicallySelected =
+//             (vi == 0 && selectedVoiceGender == 0) ||
+//             (vi == 1 && selectedVoiceGender == 1) ||
+//             (vi == 3 && negativeResponse)         ||
+//             (vi == 4 && !negativeResponse)        ||
+//             (vi == 6 && selectedVolume == 0)      ||
+//             (vi == 7 && selectedVolume == 1);
+
+//         const uint16_t textColor =
+//             isSeparator ? TFT_DARKGREY :
+//             (isLogicallySelected ? HIGHLIGHT_COLOR : TEXT_COLOR);
+
+//         listSprite.setTextColor(textColor);
+
+//         String label = String(labelC);
+
+//         if (isCursor && !isSeparator) {
+//             // —— TICKER integrado (igual que en Modos) ——
+//             if (selection != lastSelectedIndex) {
+//                 sndTickerOffset    = 0;
+//                 sndTickerDirection = 1;
+//                 lastSelectedIndex  = selection;
+//             }
+
+//             const int fullW = listSprite.textWidth(label);
+//             if (fullW > textAreaW) {
+//                 const unsigned long now = millis();
+//                 if (now - sndLastFrameTime >= kTickerFrameMs) {
+//                     sndTickerOffset += sndTickerDirection;
+//                     if (sndTickerOffset < 0) { sndTickerOffset = 0; sndTickerDirection = 1; }
+//                     const int maxOffsetX = fullW - textAreaW;
+//                     if (sndTickerOffset > maxOffsetX) { sndTickerOffset = maxOffsetX; sndTickerDirection = -1; }
+//                     sndLastFrameTime = now;
+//                 }
+
+//                 // (Re)crear sprite del ticker
+//                 if (!tickerSprite.created() || tickerW != textAreaW || tickerH != cardHeight) {
+//                     if (tickerSprite.created()) tickerSprite.deleteSprite();
+//                     tickerSprite.createSprite(textAreaW, cardHeight);
+//                     tickerW = textAreaW; tickerH = cardHeight;
+//                 }
+
+//                 tickerSprite.fillSprite(CARD_COLOR);
+//                 tickerSprite.setFreeFont(&FreeSans9pt7b);
+//                 tickerSprite.setTextSize(1);
+//                 tickerSprite.setTextDatum(TL_DATUM);
+//                 tickerSprite.setTextColor(textColor, CARD_COLOR);
+//                 tickerSprite.drawString(label, -sndTickerOffset, 0);
+//                 // ¡Dentro del viewport!
+//                 tickerSprite.pushToSprite(&listSprite, kListLeftX, y);
+//             } else {
+//                 listSprite.drawString(label, kListLeftX, y);
+//             }
+//         } else {
+//             // No cursor o separador: sin ticker, cortar si no cabe
+//             while (listSprite.textWidth(label) > textAreaW && label.length() > 0) {
+//                 label.remove(label.length() - 1);
+//             }
+//             listSprite.drawString(label, kListLeftX, y);
+//         }
+//     }
+
+//     // Empujar viewport y volcar
+//     listSprite.pushToSprite(&uiSprite, 0, kListStartY);
+
+//     // Barra scroll (opcional; si la quieres, dibújala sobre uiSprite aquí)
+//     const int scrollBarHeight = kVisibleOptions * stepY - CARD_MARGIN;
+//     uiSprite.fillRect(scrollBarX, kListStartY, kScrollBarW, scrollBarHeight, TFT_DARKGREY);
+
+//     if (kTotalOptions > kVisibleOptions) {
+//         const float thumbRatio  = float(kVisibleOptions) / float(kTotalOptions);
+//         const int   thumbHeight = ((int)(scrollBarHeight * thumbRatio) > 20)
+//                                     ? (int)(scrollBarHeight * thumbRatio) : 20;
+
+//         // posRatio de 0..1 según startIndex
+//         const int denom = (kTotalOptions - kVisibleOptions) > 0 ? (kTotalOptions - kVisibleOptions) : 1;
+//         float posRatio = float(startIndex) / float(denom);
+
+//         // clamp manual (0..1)
+//         if (posRatio < 0.0f) posRatio = 0.0f;
+//         else if (posRatio > 1.0f) posRatio = 1.0f;
+
+//         const int thumbY = kListStartY + int((scrollBarHeight - thumbHeight) * posRatio);
+//         uiSprite.fillRect(scrollBarX, thumbY, kScrollBarW, thumbHeight, TFT_LIGHTGREY);
+//     } else {
+//         uiSprite.fillRect(scrollBarX, kListStartY, kScrollBarW, scrollBarHeight, TFT_LIGHTGREY);
+//     }
+
+//     uiSprite.pushSprite(0, 0);
+// }
+
 void drawSoundMenu(int selection)
 {
     /*──────── Constantes/layout (como en Modos) ────────*/
@@ -1957,13 +2180,13 @@ void drawSoundMenu(int selection)
     uiSprite.drawString(getTranslation("SONIDO"), screenW/2, kTitleY);
 
     /*──────── Ventana rodante (misma lógica que Modos) ────────*/
-    // selection aquí es el índice lógico 0..9 (tú ya te saltas separadores en handle)
     static int startIndex = 0;
     if ((selection - startIndex) > (kVisibleOptions - 2) &&
-        startIndex < (kTotalOptions - kVisibleOptions))
+        startIndex < (kTotalOptions - kVisibleOptions)) {
         startIndex++;
-    else if ((selection - startIndex) < 1 && startIndex > 0)
+    } else if ((selection - startIndex) < 1 && startIndex > 0) {
         startIndex--;
+    }
 
     if (startIndex < 0) startIndex = 0;
     const int lastStart = (kTotalOptions > kVisibleOptions) ? (kTotalOptions - kVisibleOptions) : 0;
@@ -1985,115 +2208,192 @@ void drawSoundMenu(int selection)
     const int wantedListW = screenW;
     const int wantedListH = kVisibleOptions * stepY;
 
+    bool listReady = true;
     if (!listSprite.created() || listW != wantedListW || listH != wantedListH) {
         if (listSprite.created()) listSprite.deleteSprite();
-        listSprite.createSprite(wantedListW, wantedListH);
-        listW = wantedListW; listH = wantedListH;
+        void* fb = listSprite.createSprite(wantedListW, wantedListH);
+        if (!fb) {
+            listReady = false; // Fallback si no hay memoria
+        } else {
+            listW = wantedListW; listH = wantedListH;
+        }
     }
-
-    listSprite.fillSprite(BACKGROUND_COLOR);
-    listSprite.setFreeFont(&FreeSans9pt7b);
-    listSprite.setTextSize(1);
-    listSprite.setTextDatum(TL_DATUM);
 
     const int listYOffset = -(scrollOffset - startIndex * stepY);
     const int firstVI     = startIndex - 1;
     const int lastVI      = startIndex + kVisibleOptions;
 
-    for (int vi = firstVI; vi <= lastVI; ++vi)
-    {
-        if (vi < 0 || vi >= kTotalOptions) continue;
+    if (listReady) {
+        // ───────── Rama A: hay listSprite (ruta normal) ─────────
+        listSprite.fillSprite(BACKGROUND_COLOR);
+        listSprite.setFreeFont(&FreeSans9pt7b);
+        listSprite.setTextSize(1);
+        listSprite.setTextDatum(TL_DATUM);
 
-        const int y = kRowTopInset + listYOffset + (vi - startIndex) * stepY;
-        if (y <= -cardHeight + kHLPadY || y >= listH - kHLPadY) continue;
+        for (int vi = firstVI; vi <= lastVI; ++vi) {
+            if (vi < 0 || vi >= kTotalOptions) continue;
 
-        const char* labelC = options[vi];
-        const bool isSeparator = (strcmp(labelC, kSep) == 0);
-        const bool isCursor    = (vi == selection);
+            const int y = kRowTopInset + listYOffset + (vi - startIndex) * stepY;
+            if (y <= -cardHeight + kHLPadY || y >= listH - kHLPadY) continue;
 
-        // Fondo resaltado sólo si es cursor y no es separador
-        if (isCursor && !isSeparator) {
-            int rectY = y - kHLPadY;
-            int rectH = cardHeight + (kHLPadY * 2);
-            if (rectY < 0)            { rectH += rectY; rectY = 0; }
-            if (rectY + rectH > listH){ rectH = listH - rectY; }
-            if (rectH > 0) {
-                listSprite.fillRoundRect(
-                    kListLeftX - kHLPadX, rectY,
-                    textAreaW + (kHLPadX * 2),
-                    rectH, kCardRadius,
-                    CARD_COLOR
-                );
+            const char* labelC = options[vi];
+            const bool isSeparator = (strcmp(labelC, kSep) == 0);
+            const bool isCursor    = (vi == selection);
+
+            // Fondo resaltado sólo si es cursor y no es separador
+            if (isCursor && !isSeparator) {
+                int rectY = y - kHLPadY;
+                int rectH = cardHeight + (kHLPadY * 2);
+                if (rectY < 0)            { rectH += rectY; rectY = 0; }
+                if (rectY + rectH > listH){ rectH = listH - rectY; }
+                if (rectH > 0) {
+                    listSprite.fillRoundRect(
+                        kListLeftX - kHLPadX, rectY,
+                        textAreaW + (kHLPadX * 2),
+                        rectH, kCardRadius,
+                        CARD_COLOR
+                    );
+                }
+            }
+
+            // Color lógico seleccionado (tu misma lógica)
+            const bool isLogicallySelected =
+                (vi == 0 && selectedVoiceGender == 0) ||
+                (vi == 1 && selectedVoiceGender == 1) ||
+                (vi == 3 && negativeResponse)         ||
+                (vi == 4 && !negativeResponse)        ||
+                (vi == 6 && selectedVolume == 0)      ||
+                (vi == 7 && selectedVolume == 1);
+
+            const uint16_t textColor =
+                isSeparator ? TFT_DARKGREY :
+                (isLogicallySelected ? HIGHLIGHT_COLOR : TEXT_COLOR);
+
+            listSprite.setTextColor(textColor);
+
+            String label = String(labelC);
+
+            if (isCursor && !isSeparator) {
+                // —— TICKER integrado —— (con guardia de memoria)
+                if (selection != lastSelectedIndex) {
+                    sndTickerOffset    = 0;
+                    sndTickerDirection = 1;
+                    lastSelectedIndex  = selection;
+                }
+
+                const int fullW = listSprite.textWidth(label);
+                if (fullW > textAreaW) {
+                    const unsigned long now = millis();
+                    if (now - sndLastFrameTime >= kTickerFrameMs) {
+                        sndTickerOffset += sndTickerDirection;
+                        if (sndTickerOffset < 0) { sndTickerOffset = 0; sndTickerDirection = 1; }
+                        const int maxOffsetX = fullW - textAreaW;
+                        if (sndTickerOffset > maxOffsetX) { sndTickerOffset = maxOffsetX; sndTickerDirection = -1; }
+                        sndLastFrameTime = now;
+                    }
+
+                    bool tickerReady = true;
+                    if (!tickerSprite.created() || tickerW != textAreaW || tickerH != cardHeight) {
+                        if (tickerSprite.created()) tickerSprite.deleteSprite();
+                        void* tfb = tickerSprite.createSprite(textAreaW, cardHeight);
+                        if (!tfb) tickerReady = false;
+                        else { tickerW = textAreaW; tickerH = cardHeight; }
+                    }
+
+                    if (tickerReady) {
+                        tickerSprite.fillSprite(CARD_COLOR);
+                        tickerSprite.setFreeFont(&FreeSans9pt7b);
+                        tickerSprite.setTextSize(1);
+                        tickerSprite.setTextDatum(TL_DATUM);
+                        tickerSprite.setTextColor(textColor, CARD_COLOR);
+                        tickerSprite.drawString(label, -sndTickerOffset, 0);
+                        // ¡Dentro del viewport!
+                        tickerSprite.pushToSprite(&listSprite, kListLeftX, y);
+                    } else {
+                        // Sin memoria para ticker: recortar
+                        String tmp = label;
+                        while (listSprite.textWidth(tmp) > textAreaW && tmp.length() > 0)
+                            tmp.remove(tmp.length() - 1);
+                        listSprite.drawString(tmp, kListLeftX, y);
+                    }
+                } else {
+                    listSprite.drawString(label, kListLeftX, y);
+                }
+            } else {
+                // No cursor o separador: sin ticker, cortar si no cabe
+                String tmp = label;
+                while (!isSeparator && listSprite.textWidth(tmp) > textAreaW && tmp.length() > 0) {
+                    tmp.remove(tmp.length() - 1);
+                }
+                listSprite.drawString(tmp, kListLeftX, y);
             }
         }
 
-        // Color lógico seleccionado (tu misma lógica)
-        const bool isLogicallySelected =
-            (vi == 0 && selectedVoiceGender == 0) ||
-            (vi == 1 && selectedVoiceGender == 1) ||
-            (vi == 3 && negativeResponse)         ||
-            (vi == 4 && !negativeResponse)        ||
-            (vi == 6 && selectedVolume == 0)      ||
-            (vi == 7 && selectedVolume == 1);
+        // Empujar viewport y volcar
+        listSprite.pushToSprite(&uiSprite, 0, kListStartY);
 
-        const uint16_t textColor =
-            isSeparator ? TFT_DARKGREY :
-            (isLogicallySelected ? HIGHLIGHT_COLOR : TEXT_COLOR);
+    } else {
+        // ───────── Rama B: NO hay listSprite → dibujar DIRECTO en uiSprite ─────────
+        const int listH_fb = kVisibleOptions * stepY;
+        uiSprite.fillRect(0, kListStartY, screenW, listH_fb, BACKGROUND_COLOR);
 
-        listSprite.setTextColor(textColor);
+        uiSprite.setFreeFont(&FreeSans9pt7b);
+        uiSprite.setTextSize(1);
+        uiSprite.setTextDatum(TL_DATUM);
 
-        String label = String(labelC);
+        for (int vi = firstVI; vi <= lastVI; ++vi) {
+            if (vi < 0 || vi >= kTotalOptions) continue;
 
-        if (isCursor && !isSeparator) {
-            // —— TICKER integrado (igual que en Modos) ——
-            if (selection != lastSelectedIndex) {
-                sndTickerOffset    = 0;
-                sndTickerDirection = 1;
-                lastSelectedIndex  = selection;
+            const int y = kListStartY + kRowTopInset + listYOffset + (vi - startIndex) * stepY;
+            if (y <= (kListStartY - cardHeight) || y >= (kListStartY + listH_fb)) continue;
+
+            const char* labelC = options[vi];
+            const bool isSeparator = (strcmp(labelC, kSep) == 0);
+            const bool isCursor    = (vi == selection);
+
+            // Resaltado (directo en uiSprite)
+            if (isCursor && !isSeparator) {
+                int rectY = y - kHLPadY;
+                int rectH = cardHeight + (kHLPadY * 2);
+                if (rectY < kListStartY) { rectH -= (kListStartY - rectY); rectY = kListStartY; }
+                const int maxH = (kListStartY + listH_fb) - rectY;
+                if (rectH > maxH) rectH = maxH;
+                if (rectH > 0) {
+                    uiSprite.fillRoundRect(
+                        kListLeftX - kHLPadX, rectY,
+                        (screenW - kScrollBarW - kScrollBarRightP - kListLeftX),
+                        rectH, kCardRadius, CARD_COLOR
+                    );
+                }
             }
 
-            const int fullW = listSprite.textWidth(label);
-            if (fullW > textAreaW) {
-                const unsigned long now = millis();
-                if (now - sndLastFrameTime >= kTickerFrameMs) {
-                    sndTickerOffset += sndTickerDirection;
-                    if (sndTickerOffset < 0) { sndTickerOffset = 0; sndTickerDirection = 1; }
-                    const int maxOffsetX = fullW - textAreaW;
-                    if (sndTickerOffset > maxOffsetX) { sndTickerOffset = maxOffsetX; sndTickerDirection = -1; }
-                    sndLastFrameTime = now;
-                }
+            // Color del texto (igual que la lógica normal)
+            const bool isLogicallySelected =
+                (vi == 0 && selectedVoiceGender == 0) ||
+                (vi == 1 && selectedVoiceGender == 1) ||
+                (vi == 3 && negativeResponse)         ||
+                (vi == 4 && !negativeResponse)        ||
+                (vi == 6 && selectedVolume == 0)      ||
+                (vi == 7 && selectedVolume == 1);
 
-                // (Re)crear sprite del ticker
-                if (!tickerSprite.created() || tickerW != textAreaW || tickerH != cardHeight) {
-                    if (tickerSprite.created()) tickerSprite.deleteSprite();
-                    tickerSprite.createSprite(textAreaW, cardHeight);
-                    tickerW = textAreaW; tickerH = cardHeight;
-                }
+            const uint16_t textColor =
+                isSeparator ? TFT_DARKGREY :
+                (isLogicallySelected ? HIGHLIGHT_COLOR : TEXT_COLOR);
 
-                tickerSprite.fillSprite(CARD_COLOR);
-                tickerSprite.setFreeFont(&FreeSans9pt7b);
-                tickerSprite.setTextSize(1);
-                tickerSprite.setTextDatum(TL_DATUM);
-                tickerSprite.setTextColor(textColor, CARD_COLOR);
-                tickerSprite.drawString(label, -sndTickerOffset, 0);
-                // ¡Dentro del viewport!
-                tickerSprite.pushToSprite(&listSprite, kListLeftX, y);
-            } else {
-                listSprite.drawString(label, kListLeftX, y);
-            }
-        } else {
-            // No cursor o separador: sin ticker, cortar si no cabe
-            while (listSprite.textWidth(label) > textAreaW && label.length() > 0) {
+            uiSprite.setTextColor(textColor, isCursor && !isSeparator ? CARD_COLOR : BACKGROUND_COLOR);
+
+            // Fallback: sin ticker → recortamos
+            String label = String(labelC);
+            while (!isSeparator && uiSprite.textWidth(label) >
+                   (screenW - kScrollBarW - kScrollBarRightP - kListLeftX - kTextAreaPad)
+                   && label.length() > 0) {
                 label.remove(label.length() - 1);
             }
-            listSprite.drawString(label, kListLeftX, y);
+            uiSprite.drawString(label, kListLeftX, y);
         }
     }
 
-    // Empujar viewport y volcar
-    listSprite.pushToSprite(&uiSprite, 0, kListStartY);
-
-    // Barra scroll (opcional; si la quieres, dibújala sobre uiSprite aquí)
+    // ───────── Barra scroll sobre uiSprite ─────────
     const int scrollBarHeight = kVisibleOptions * stepY - CARD_MARGIN;
     uiSprite.fillRect(scrollBarX, kListStartY, kScrollBarW, scrollBarHeight, TFT_DARKGREY);
 
@@ -2102,11 +2402,8 @@ void drawSoundMenu(int selection)
         const int   thumbHeight = ((int)(scrollBarHeight * thumbRatio) > 20)
                                     ? (int)(scrollBarHeight * thumbRatio) : 20;
 
-        // posRatio de 0..1 según startIndex
         const int denom = (kTotalOptions - kVisibleOptions) > 0 ? (kTotalOptions - kVisibleOptions) : 1;
         float posRatio = float(startIndex) / float(denom);
-
-        // clamp manual (0..1)
         if (posRatio < 0.0f) posRatio = 0.0f;
         else if (posRatio > 1.0f) posRatio = 1.0f;
 
@@ -2117,7 +2414,17 @@ void drawSoundMenu(int selection)
     }
 
     uiSprite.pushSprite(0, 0);
+
+    // ───────── Limpieza defensiva al cerrar el menú ─────────
+    extern bool soundMenuActive;
+    if (!soundMenuActive) {
+        if (listSprite.created())   listSprite.deleteSprite();
+        if (tickerSprite.created()) tickerSprite.deleteSprite();
+        listW = listH = 0;
+        tickerW = tickerH = 0;
+    }
 }
+
 
 // /**
 //  * @brief Ticker de texto con rebote para la opción seleccionada del menú de sonido.
@@ -2853,15 +3160,15 @@ void showCriticalBatteryMessage()
 }
 
 
-const int vbatallArray_LEN = 5;
-const uint16_t* vbatallArray[5] = {
+const int vbatallArray_LEN = 4;
+const uint16_t* vbatallArray[4] = {
 	vbat30x15_horizontal_10_25_1,
 	vbat30x15_horizontal_10_25_2,
 	vbat30x15_horizontal_25_66,
 	vbat30x15_horizontal_66_100
 };
 
-const uint16_t* vbatallArrayCharging[5] = {
+const uint16_t* vbatallArrayCharging[4] = {
     vbat30x15_cargando_horizontal_10_25_1,
     vbat30x15_cargando_horizontal_10_25_2,
     vbat30x15_cargando_horizontal_25_66,
@@ -2871,6 +3178,7 @@ const uint16_t* vbatallArrayCharging[5] = {
 
 unsigned long lastBatteryToggleTime = 0;
 bool batteryToggleState = false;
+extern float batteryVoltagePercent;
 
 /**
  * @brief Dibuja el icono de batería mini en la esquina superior derecha.
@@ -2884,84 +3192,105 @@ bool batteryToggleState = false;
  * @param percentage Porcentaje visual de batería (0..100). Si es mayor que el
  *        umbral de *sentinel*, se muestra el icono de “cargando”.
  */
-// void drawBatteryIconMini(float percentage) {
-//     // ── Constantes de layout y umbrales ─────────────────────────────
-//     constexpr int   kIconW              = 30;
-//     constexpr int   kIconH              = 15;
-//     constexpr int   kIconTopY           = 2;
-//     constexpr float kLowThresholdPct    = 25.0f;
-//     constexpr float kMedThresholdPct    = 66.0f;
-//     constexpr unsigned long kBlinkMs    = 500UL;
-//     constexpr float kChargingSentinel   = 150.0f; // Forzar icono de carga si se supera
 
-//     // Posición en esquina superior derecha (dinámico según ancho de la TFT)
+// void drawBatteryIconMini(float /*percentage_ignored*/) {
+//     // ── Constantes ─────────────────────────────────────────────────
+//     constexpr int   kIconW                 = 30;
+//     constexpr int   kIconH                 = 15;
+//     constexpr int   kIconTopY              = 2;
+//     constexpr float kLowThresholdPct       = 25.0f;  // 10–25% → toggle
+//     constexpr float kMedThresholdPct       = 66.0f;  // 25–66%
+//     constexpr float kChargedWhileCharging  = 98.0f;  // >98% y CARGANDO → “cargado”
+//     constexpr unsigned long kBlinkMs       = 500UL;
+//     constexpr float BAT_VIS_CHARGING       = 200.0f;
+
 //     const int x = tft.width() - kIconW;
 //     const int y = kIconTopY;
 
-//     // ── Caso "cargando": sentinel ───────────────────────────────────
-//     if (percentage > kChargingSentinel) {
-//         uiSprite.pushImage(x, y, kIconW, kIconH, vbat30x15_horizontal_cargando);
-//         return;
-//     }
+//     const bool isChargingVisual = (batteryVisualPercentage == BAT_VIS_CHARGING);
 
-//     // ── Selección de icono en función del nivel ─────────────────────
+//     // Usamos el % VISUAL basado en tensión para los iconos
+//     float p = batteryVoltagePercent;               // 0..100 según Vbat/4.22
+//     if (p < 0.0f)   p = 0.0f;
+//     if (p > 100.0f) p = 100.0f;
+
 //     const uint16_t* icon = nullptr;
 
-//     if (percentage < kLowThresholdPct) {
-//         // Parpadeo entre 0 y 1 barra cada kBlinkMs
-//         const unsigned long now = millis();
-//         if ((now - lastBatteryToggleTime) > kBlinkMs) {
-//             batteryToggleState   = !batteryToggleState;
-//             lastBatteryToggleTime = now;
+//     if (isChargingVisual) {
+//         // ── CARGANDO ────────────────────────────────────────────────
+//         if (p >= kChargedWhileCharging) {
+//             // Sólo cuando está cargando y supera 98%
+//             icon = vbat30x15_horizontal_cargado;
+//         } else if (p < kLowThresholdPct) {
+//             const unsigned long now = millis();
+//             if ((now - lastBatteryToggleTime) > kBlinkMs) {
+//                 batteryToggleState    = !batteryToggleState;
+//                 lastBatteryToggleTime = now;
+//             }
+//             icon = batteryToggleState
+//                 ? vbat30x15_cargando_horizontal_10_25_2
+//                 : vbat30x15_cargando_horizontal_10_25_1;
+//         } else if (p < kMedThresholdPct) {
+//             icon = vbat30x15_cargando_horizontal_25_66;
+//         } else {
+//             icon = vbat30x15_cargando_horizontal_66_100; // 66–98%
 //         }
-//         const int idx = batteryToggleState ? 1 : 0;
-//         if (idx >= 0 && idx < vbatallArray_LEN) icon = vbatallArray[idx];
-//     } else if (percentage < kMedThresholdPct) {
-//         const int idx = 2; // 2 barras
-//         if (idx >= 0 && idx < vbatallArray_LEN) icon = vbatallArray[idx];
 //     } else {
-//         const int idx = 3; // 3 barras
-//         if (idx >= 0 && idx < vbatallArray_LEN) icon = vbatallArray[idx];
+//         // ── NO CARGANDO ─────────────────────────────────────────────
+//         if (p < kLowThresholdPct) {
+//             const unsigned long now = millis();
+//             if ((now - lastBatteryToggleTime) > kBlinkMs) {
+//                 batteryToggleState    = !batteryToggleState;
+//                 lastBatteryToggleTime = now;
+//             }
+//             icon = batteryToggleState
+//                 ? vbat30x15_horizontal_10_25_2
+//                 : vbat30x15_horizontal_10_25_1;
+//         } else if (p < kMedThresholdPct) {
+//             icon = vbat30x15_horizontal_25_66;
+//         } else {
+//             icon = vbat30x15_horizontal_66_100;         // 66–100%
+//         }
 //     }
 
-//     // ── Fallback defensivo si el índice/puntero no son válidos ──────
-//     if (icon == nullptr && vbatallArray_LEN > 0) {
-//         icon = vbatallArray[0]; // usa el primer icono disponible como reserva
-//     }
-//     if (icon == nullptr) return; // nada que dibujar
-
-//     // ── Dibujo ──────────────────────────────────────────────────────
+//     if (icon == nullptr) icon = vbat30x15_horizontal_10_25_1; // fallback
 //     uiSprite.pushImage(x, y, kIconW, kIconH, icon);
 // }
 
-void drawBatteryIconMini(float percentage) {
-    // ── Constantes de layout y umbrales ─────────────────────────────
-    constexpr int   kIconW            = 30;
-    constexpr int   kIconH            = 15;
-    constexpr int   kIconTopY         = 2;
-    constexpr float kLowThresholdPct  = 25.0f;  // 10–25%  → toggle
-    constexpr float kMedThresholdPct  = 66.0f;  // 25–66%  → icono 2 barras
-    constexpr float kFullChargePct    = 100.0f; // 100%    → icono “cargado”
-    constexpr unsigned long kBlinkMs  = 500UL;
-    constexpr float BAT_VIS_CHARGING  = 200.0f; // tu sentinel real de “cargando”
+void drawBatteryIconMini(float /*percentage_ignored*/) {
+    // ── Constantes ─────────────────────────────────────────────────
+    constexpr int   kIconW                 = 30;
+    constexpr int   kIconH                 = 15;
+    constexpr int   kIconTopY              = 2;
+    constexpr float kLowThresholdPct       = 25.0f;  // 10–25% → toggle
+    constexpr float kMedThresholdPct       = 66.0f;  // 25–66%
+    constexpr float kChargedWhileCharging  = 98.0f;  // vVis ≥98% → “cargado” SI está cargando
+    constexpr unsigned long kBlinkMs       = 500UL;
+    constexpr float BAT_VIS_CHARGING       = 200.0f;
 
-    // Posición en esquina superior derecha (dinámico según ancho de la TFT)
     const int x = tft.width() - kIconW;
     const int y = kIconTopY;
 
-    // Estado “cargando” fiable desde la capa de batería
     const bool isChargingVisual = (batteryVisualPercentage == BAT_VIS_CHARGING);
 
-    // Selección por nivel (%)
+    // pVis: % por tensión absoluta (V/4.20*100)
+    float pVis = batteryVoltagePercent;
+    if (pVis < 0.0f)   pVis = 0.0f;
+    if (pVis > 100.0f) pVis = 100.0f;
+
+    // pIcon: % para icono con suelo 3.00V (ya calculado en updateBatteryStatus)
+    float pIcon = batteryPercentage;
+    if (pIcon < 0.0f)   pIcon = 0.0f;
+    if (pIcon > 100.0f) pIcon = 100.0f;
+
     const uint16_t* icon = nullptr;
 
     if (isChargingVisual) {
         // ── CARGANDO ────────────────────────────────────────────────
-        if (percentage >= kFullChargePct) {
-            // 100% mientras sigue enchufado → icono especial
+        if (pVis >= kChargedWhileCharging) {
+            // “cargado” SOLO si (visual cargando) y vVis ≥98%
             icon = vbat30x15_horizontal_cargado;
-        } else if (percentage < kLowThresholdPct) {
-            // 10–25% con rayo → toggle
+        } else if (pIcon < kLowThresholdPct) {
             const unsigned long now = millis();
             if ((now - lastBatteryToggleTime) > kBlinkMs) {
                 batteryToggleState    = !batteryToggleState;
@@ -2970,17 +3299,14 @@ void drawBatteryIconMini(float percentage) {
             icon = batteryToggleState
                 ? vbat30x15_cargando_horizontal_10_25_2
                 : vbat30x15_cargando_horizontal_10_25_1;
-        } else if (percentage < kMedThresholdPct) {
-            // 25–66% con rayo
+        } else if (pIcon < kMedThresholdPct) {
             icon = vbat30x15_cargando_horizontal_25_66;
         } else {
-            // 66–99% con rayo
-            icon = vbat30x15_cargando_horizontal_66_100;
+            icon = vbat30x15_cargando_horizontal_66_100; // 66–98%
         }
     } else {
         // ── NO CARGANDO ─────────────────────────────────────────────
-        if (percentage < kLowThresholdPct) {
-            // 10–25% → toggle sin rayo
+        if (pIcon < kLowThresholdPct) {
             const unsigned long now = millis();
             if ((now - lastBatteryToggleTime) > kBlinkMs) {
                 batteryToggleState    = !batteryToggleState;
@@ -2989,21 +3315,14 @@ void drawBatteryIconMini(float percentage) {
             icon = batteryToggleState
                 ? vbat30x15_horizontal_10_25_2
                 : vbat30x15_horizontal_10_25_1;
-        } else if (percentage < kMedThresholdPct) {
-            // 25–66% normal
+        } else if (pIcon < kMedThresholdPct) {
             icon = vbat30x15_horizontal_25_66;
         } else {
-            // 66–100% normal
-            icon = vbat30x15_horizontal_66_100;
+            icon = vbat30x15_horizontal_66_100;         // 66–100%
         }
     }
 
-    // Fallback defensivo
-    if (icon == nullptr) {
-        icon = vbat30x15_horizontal_10_25_1;
-    }
-
-    // Dibujo
+    if (icon == nullptr) icon = vbat30x15_horizontal_10_25_1; // fallback
     uiSprite.pushImage(x, y, kIconW, kIconH, icon);
 }
 

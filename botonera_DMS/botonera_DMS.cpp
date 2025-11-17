@@ -1309,7 +1309,26 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
             } else if (receivedCommand == OTA_AP_OFF) {
                 DEBUG__________ln("Comando OTA_AP_OFF recibido  Desactivando AP + OTA...");
                 element->desactivarAP_OTA();
+            } else if (receivedCommand == BLACKOUT) {
+                DEBUG__________ln("BLACKOUT recibido → stop_file + limpiar selección + foco Comunicador");
+
+                // 1) Parar cualquier audio en curso
+                doitPlayer.stop_file();
+
+                // 2) Deseleccionar todos los elementos (vector global)
+                for (size_t i = 0; i < selectedStates.size(); ++i) {
+                    selectedStates[i] = false;
+                }
+
+                // 3) Mover foco a Comunicador
+                enfocarElemento("Comunicador");
+
+                // 4) Redibujar el elemento actual para reflejar el nuevo foco
+                drawCurrentElement();
+
+                break; // No procesar más comandos para este frame
             }
+
             break;
         }
 

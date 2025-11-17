@@ -13,6 +13,12 @@ extern int columnas[COLUMNAS];
 
 extern byte pulsadorColor[FILAS][COLUMNAS];
 extern byte relay_state;
+
+// En Pulsadores_handler.cpp, cerca de otros externs
+extern bool ambienteActivo;
+
+
+
 enum ButtonEventType { BUTTON_PRESSED, BUTTON_RELEASED };
 
 class PulsadoresHandler {
