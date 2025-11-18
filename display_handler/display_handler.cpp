@@ -3160,7 +3160,7 @@ void showCriticalBatteryMessage()
 }
 
 
-const int vbatallArray_LEN = 4;
+const int vbatallArray_LEN = 5;
 const uint16_t* vbatallArray[4] = {
 	vbat30x15_horizontal_10_25_1,
 	vbat30x15_horizontal_10_25_2,
@@ -3168,11 +3168,12 @@ const uint16_t* vbatallArray[4] = {
 	vbat30x15_horizontal_66_100
 };
 
-const uint16_t* vbatallArrayCharging[4] = {
+const uint16_t* vbatallArrayCharging[5] = {
     vbat30x15_cargando_horizontal_10_25_1,
     vbat30x15_cargando_horizontal_10_25_2,
     vbat30x15_cargando_horizontal_25_66,
-    vbat30x15_cargando_horizontal_66_100 // <— usa el nombre con rayo
+    vbat30x15_cargando_horizontal_66_100, // <— usa el nombre con rayo
+    vbat30x15_horizontal_cargado
                                 // no se usa en mini; lo dejamos igual
 };
 

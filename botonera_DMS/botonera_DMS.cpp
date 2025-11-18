@@ -1310,6 +1310,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
                 DEBUG__________ln("Comando OTA_AP_OFF recibido  Desactivando AP + OTA...");
                 element->desactivarAP_OTA();
             } else if (receivedCommand == BLACKOUT) {
+                if (LEF.origin >= 0x90 && LEF.origin <= 0x9F) return; 
                 DEBUG__________ln("BLACKOUT recibido → stop_file + limpiar selección + foco Comunicador");
 
                 // 1) Parar cualquier audio en curso

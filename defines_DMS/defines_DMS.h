@@ -463,10 +463,6 @@ enum TOKEN_CONFIG_{
 #define RELAY_3_FLAG     0x02
 #define RELAY_4_FLAG     0x03
 
-// Histéresis para batería crítica
-const float BATTERY_LOCK_THRESHOLD = 15.0;
-const float BATTERY_UNLOCK_THRESHOLD = 17.0;
-
 #define SET_RELAY        0x01
 #define RESET_RELAY      0x00
 
