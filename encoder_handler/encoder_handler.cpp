@@ -1136,11 +1136,11 @@ void handleModeSelection(const String& currentFile) noexcept
 
             if (selectedStates[currentIndex]) {
                 dadoOption.currentMode = basicModeIndex;
-                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xDD, dadoNS, START_CMD));
+                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, DEFAULT_DEVICE, dadoNS, START_CMD));
                 delay(kInterCmdDelayMs);
-                send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, 0xDD, dadoNS, basicModeIndex));
+                send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, DEFAULT_DEVICE, dadoNS, basicModeIndex));
             } else {
-                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xDD, dadoNS, BLACKOUT));
+                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, DEFAULT_DEVICE, dadoNS, BLACKOUT));
                 dadoOption.currentMode = basicModeIndex;
             }
             inModesScreen = false; drawCurrentElement(); return;
@@ -1151,13 +1151,21 @@ void handleModeSelection(const String& currentFile) noexcept
                 TARGETNS elemNS = getCurrentElementNS();
 
                 if (selectedStates[currentIndex]) {
-                    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xDD, elemNS, START_CMD));
-
+                    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, DEFAULT_DEVICE, elemNS, START_CMD));
+                    delay(100);
                     if (!isSpecialFile(currentFile) && !awaitingResponse) {
-                        pendingQueryIndex = currentIndex;
-                        pendingQueryNS    = elemNS;
-                        lastModeQueryTime = millis();
-                        awaitingResponse  = true;
+                        // NS al que se le pide el CMODE
+                        pendingQueryNS   = elemNS;
+                        awaitingResponse = true;
+
+                        // Petición de sector CMODE
+                        send_frame(frameMaker_REQ_ELEM_SECTOR(DEFAULT_BOTONERA, DEFAULT_DEVICE, elemNS, (byte)currentLanguage, ELEM_CMODE_SECTOR));
+
+                        // Marcar timeout y estado de espera
+                        lastModeQueryTime    = millis();
+                        pendingQueryIndex    = currentIndex;
+                        frameReceived        = false;
+                        lastQueriedElementIndex = currentIndex;  // evita una segunda query inmediata por foco
                     }
 
                     byte basicMode = DEFAULT_BASIC_MODE;
@@ -1175,7 +1183,7 @@ void handleModeSelection(const String& currentFile) noexcept
                     colorHandler.setCurrentFile(currentFile);
                     colorHandler.setPatternBotonera(basicMode, ledManager);
                 } else {
-                    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xDD, elemNS, BLACKOUT));
+                    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, DEFAULT_DEVICE, elemNS, BLACKOUT));
 
                     byte basicMode = DEFAULT_BASIC_MODE;
                     f.seek(OFFSET_CURRENTMODE, SeekSet);
@@ -1294,15 +1302,15 @@ void handleModeSelection(const String& currentFile) noexcept
         if (!wasAlreadySelected && isDadoEnabled()) {
             Serial1.write(0xDA);
             delay(kInterCmdDelayMs);
-            send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xDD, dadoNS, START_CMD));
+            send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, DEFAULT_DEVICE, dadoNS, START_CMD));
             delay(kInterCmdDelayMs);
         }
-        send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, 0xDD, dadoNS, realModeIndex));
+        send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, DEFAULT_DEVICE, dadoNS, realModeIndex));
     }
     else if (currentFile != "Apagar") {
         TARGETNS elemNS = getCurrentElementNS();
         if (!wasAlreadySelected) {
-            send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xDD, elemNS, START_CMD));
+            send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, DEFAULT_DEVICE, elemNS, START_CMD));
             if (!isSpecialFile(currentFile) && !awaitingResponse) {
                 pendingQueryIndex = currentIndex;
                 pendingQueryNS    = elemNS;
@@ -1311,13 +1319,13 @@ void handleModeSelection(const String& currentFile) noexcept
             }
             delay(kInterCmdDelayMs);
         }
-        send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, 0xDD, elemNS, realModeIndex));
+        send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, DEFAULT_DEVICE, elemNS, realModeIndex));
 
         if (getModeFlag(modeConfig, HAS_ALTERNATIVE_MODE) &&
             currentAlternateStates.size() > (size_t)adjustedVisibleIndex)
         {
             send_frame(frameMaker_SEND_COMMAND(
-                DEFAULT_BOTONERA, 0xDD, elemNS,
+                DEFAULT_BOTONERA, DEFAULT_DEVICE, elemNS,
                 currentAlternateStates[adjustedVisibleIndex] ? ALTERNATE_MODE_ON : ALTERNATE_MODE_OFF
             ));
         }

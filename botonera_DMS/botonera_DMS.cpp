@@ -286,38 +286,38 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
         DPRINTF_COLOR(COLOR_BRIGHT_MAGENTA, "OriginNS: %s\n", nsStr);
     }
 
-    // TargetType (del raw en uartBuffer[10])
-    if (uartBuffer.size() >= 11) {
-        uint8_t tgtType = uartBuffer[10];
-        const char* tgtStr;
-        switch (tgtType) {
-            case DEFAULT_BOTONERA:     tgtStr = "BOTONERA";    break;
-            case DEFAULT_DEVICE:       tgtStr = "DISPOSITIVO"; break;
-            case DEFAULT_CONSOLE:      tgtStr = "CONSOLA";     break;
-            case BROADCAST:            tgtStr = "BROADCAST";   break;
-            case DEFAULT_TECH_TOOL_ID: tgtStr = "BROADCAST";   break;
-            default:                   tgtStr = "DESCONOCIDO"; break;
-        }
-        DPRINTF_COLOR(targetTypeColor(tgtType), "TargetType: %s (0x%02X)\n", tgtStr, tgtType);
-    } else {
-        DPRINTLN_COLOR(COLOR_DIM, "TargetType: no disponible (frame demasiado corto)");
+    // TargetType (usar LEF.targetType, no uartBuffer)
+    uint8_t tgtType = LEF.targetType;
+    const char* tgtStr;
+    switch (tgtType) {
+        case DEFAULT_BOTONERA:     tgtStr = "BOTONERA";    break;
+        case DEFAULT_DEVICE:       tgtStr = "DISPOSITIVO"; break;
+        case DEFAULT_CONSOLE:      tgtStr = "CONSOLA";     break;
+        case BROADCAST:            tgtStr = "BROADCAST";   break;
+        case DEFAULT_TECH_TOOL_ID: tgtStr = "HACKING BOX"; break;
+        default:                   tgtStr = "DESCONOCIDO"; break;
     }
+    DPRINTF_COLOR(targetTypeColor(tgtType), "TargetType: %s (0x%02X)\n", tgtStr, tgtType);
 
-    // Destino / Targets
-    if (printTargetID.empty()) {
-        DPRINTLN_COLOR(COLOR_DIM, "Destino/Targets: Ninguno (posible broadcast)");
-    } else if (printTargetID.size() == 5) {
-        char nsStr[16];
-        snprintf(nsStr, sizeof(nsStr), "%02X:%02X:%02X:%02X:%02X",
-                 printTargetID[0], printTargetID[1], printTargetID[2],
-                 printTargetID[3], printTargetID[4]);
-        DPRINTF_COLOR(COLOR_BRIGHT_BLUE, "Destino (NS): %s\n", nsStr);
-    } else {
-        DEBUG__________printf("%sTargets: ", COLOR_BRIGHT_BLUE);
-        for (size_t i = 0; i < printTargetID.size(); i++) {
-            DEBUG__________printf("0x%02X ", printTargetID[i]);
+    // Destino / Targets (usar LEF.targetNS)
+    {
+        auto nsIsZero = [](const TARGETNS& ns) {
+            return ns.mac01 == 0 &&
+                ns.mac02 == 0 &&
+                ns.mac03 == 0 &&
+                ns.mac04 == 0 &&
+                ns.mac05 == 0;
+        };
+
+        if (LEF.targetType == BROADCAST || nsIsZero(LEF.targetNS)) {
+            DPRINTLN_COLOR(COLOR_DIM, "Destino/Targets: Ninguno (posible broadcast)");
+        } else {
+            char nsStr[16];
+            snprintf(nsStr, sizeof(nsStr), "%02X:%02X:%02X:%02X:%02X",
+                    LEF.targetNS.mac01, LEF.targetNS.mac02, LEF.targetNS.mac03,
+                    LEF.targetNS.mac04, LEF.targetNS.mac05);
+            DPRINTF_COLOR(COLOR_BRIGHT_BLUE, "Destino (NS): %s\n", nsStr);
         }
-        DEBUG__________printf("%s\n", COLOR_RESET);
     }
 
     // Función

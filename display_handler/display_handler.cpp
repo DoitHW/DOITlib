@@ -3265,7 +3265,7 @@ void drawBatteryIconMini(float /*percentage_ignored*/) {
     constexpr int   kIconTopY              = 2;
     constexpr float kLowThresholdPct       = 25.0f;  // 10–25% → toggle
     constexpr float kMedThresholdPct       = 66.0f;  // 25–66%
-    constexpr float kChargedWhileCharging  = 98.0f;  // vVis ≥98% → “cargado” SI está cargando
+    constexpr float kChargedWhileCharging  = 99.0f;  // vVis ≥98% → “cargado” SI está cargando
     constexpr unsigned long kBlinkMs       = 500UL;
     constexpr float BAT_VIS_CHARGING       = 200.0f;
 
