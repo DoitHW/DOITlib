@@ -65,6 +65,10 @@ public:
     
     static bool isButtonEnabled(uint8_t ledIdx); 
     static void setButtonActiveMask(const bool mask[9]);
+
+    //mapeo de numColor recibido por EXT MAP
+    static void setButtonMappedNumColor(uint8_t ledIdx, uint8_t numColor);
+    static uint8_t getButtonMappedNumColor(uint8_t ledIdx);
     
     // Ruta de Respuesta
     static void setResponseRoute(uint8_t targetType, const TARGETNS& targetNS);
@@ -86,6 +90,9 @@ private:
     static uint8_t  s_respTargetType;
     static TARGETNS s_respTargetNS;
     static bool     s_globalFxNoInput;  
+    
+    //numColor configurado por F_SET_BUTTONS_EXTMAP para cada LED
+    static uint8_t  s_btnMappedNumColor[9];
 
     // --- Dispatcher Principal ---
     void processButtonEvent(int i, int j, ButtonEventType event, const ButtonContext& ctx);

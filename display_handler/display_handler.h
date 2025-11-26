@@ -51,6 +51,16 @@ void setFontForCurrentLanguage();
 void drawLoadingModalFrame(const char* message, int frameCount);
 void showWelcomeAnimation();
 
+// Estructura para la caché de modos (Optimización RAM)
+struct ModeCacheEntry {
+    int originalIndex;  // Índice real (0-15), o -2 (Volver), -3 (Apagar/Encender)
+    String label;       // Texto ya traducido y listo para mostrar
+    bool isAlternate;   // Si es un modo alternativo (para lógica visual si fuera necesaria)
+};
+
+// Declaración de la función de carga y la caché externa
+void loadModesCache(const String& fileName);
+extern std::vector<ModeCacheEntry> cachedModes;
                                  
 extern TFT_eSPI tft;
 extern TFT_eSprite uiSprite;

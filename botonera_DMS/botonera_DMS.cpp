@@ -885,7 +885,11 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
                 btn[i].active = (active != 0);
                 btn[i].base   = colorFrom(numColor, r, g, b);
                 btn[i].fx     = fx;
+
+                // NUEVO: guardar numColor para respuestas
+                PulsadoresHandler::setButtonMappedNumColor(i, numColor);
             }
+
 
             // --- Actualiza la máscara de habilitados segun 'active' recibido ---
             bool mask[9];
@@ -1168,20 +1172,25 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
             }
 
             // 1) Determinar el destino al que contestaremos:
-            //    - Si el ORIGEN del frame es DC (consola): NS = 00:00:00:00:00
+            //    - Si el ORIGEN del frame es DC (consola) o la propia botonera lógica: NS = 00:00:00:00:00
             //    - Si el ORIGEN es DD (dispositivo): usar su NS (el del origen)
-            // uint8_t originType = LEF.origin;           // el tipo que envió la trama
-            // //TARGETNS originNS  = LEF.originNS;       // NS del que la envió (si es DC lo ignoraremos)
-            // TARGETNS respNS;
-            // if (originType == DEFAULT_CONSOLE || originType == DEFAULT_BOTONERA) {
-            //     respNS = TARGETNS{0,0,0,0,0};
-            // } 
-            // // 2) Habilitar el modo respuesta en los pulsadores
-            // PulsadoresHandler::setResponseRoute(originType, respNS);
-            uint8_t originType = LEF.origin;                                  // <-- Nueva lí­nea
-            PulsadoresHandler::setResponseRoute(originType, getOwnNS());
+            uint8_t originType = LEF.origin;
+            TARGETNS respNS;
+
+            if (originType == DEFAULT_CONSOLE || originType == DEFAULT_BOTONERA) {
+                // Consola / Botonera lógica -> NS cero
+                respNS = TARGETNS{0,0,0,0,0};
+            } else {
+                // Dispositivo físico -> responder a su NS
+                respNS = LEF.originNS;
+            }
+
+            // 2) Habilitar el modo respuesta en los pulsadores
+            PulsadoresHandler::setResponseRoute(originType, respNS);
+
             FastLED.show();
             break;
+
         }
 
         case F_REQ_ELEM_SECTOR: {

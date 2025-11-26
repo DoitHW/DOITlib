@@ -21,6 +21,9 @@ bool brightnessMenuActive = false;
 uint8_t currentBrightness = 100;       // Valor actual en porcentaje
 uint8_t tempBrightness = currentBrightness;  // Valor temporal mientras se ajusta
 
+// Caché global para el menú de modos (evita leer SPIFFS en el loop de render)
+std::vector<ModeCacheEntry> cachedModes;
+
 /**
  * @brief  Muestra una lista de opciones de brillo (normal/atenuado) con cursor de selección,
  * título centrado con icono de sol y recorte de texto según el ancho disponible.
@@ -1155,6 +1158,112 @@ void display_wakeup() {
     //DEBUG__________ln("Pantalla reactivada por interacción.");
   }
 
+/**
+ * @brief Carga la lista de modos en RAM para evitar leer SPIFFS durante el renderizado.
+ * Se debe llamar UNA VEZ antes de empezar a dibujar el menú de modos.
+ */
+void loadModesCache(const String& currentFile) {
+    cachedModes.clear();
+
+    // 1) Acción de Encender/Apagar (Siempre primera)
+    ModeCacheEntry actionToggle;
+    actionToggle.originalIndex = -3;
+    actionToggle.label = selectedStates[currentIndex] ? getTranslation("APAGAR") : getTranslation("ENCENDER");
+    actionToggle.isAlternate = false;
+    cachedModes.push_back(actionToggle);
+
+    // 2) Cargar modos del elemento (RAM o SPIFFS)
+    if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Comunicador" || currentFile == "Dado") {
+        // -- Elementos en RAM --
+        INFO_PACK_T* option = nullptr;
+        if (currentFile == "Ambientes")        option = &ambientesOption;
+        else if (currentFile == "Fichas")      option = &fichasOption;
+        else if (currentFile == "Comunicador") option = &comunicadorOption;
+        else                                   option = &dadoOption;
+
+        // Recalcular estados alternativos si no existen
+        if (elementAlternateStates.find(currentFile) == elementAlternateStates.end()) {
+             // Lógica simplificada: inicializar en falso si no está cargado
+             std::vector<bool> tempStates(16, false); 
+             elementAlternateStates[currentFile] = tempStates;
+        }
+        currentAlternateStates = elementAlternateStates[currentFile];
+
+        // Iterar modos
+        int visibleCount = 0;
+        for (int i = 0; i < 16; ++i) {
+            if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
+                ModeCacheEntry entry;
+                entry.originalIndex = i;
+                
+                String rawName = String((char*)option->mode[i].name);
+                String translatedName = getTranslation(rawName.c_str());
+                
+                // Calcular nombre final (Alternate)
+                bool altActive = (visibleCount < (int)currentAlternateStates.size()) ? currentAlternateStates[visibleCount] : false;
+                entry.label = getModeDisplayName(translatedName, altActive);
+                entry.isAlternate = altActive;
+
+                cachedModes.push_back(entry);
+                visibleCount++;
+            }
+        }
+    } 
+    else if (currentFile != "Apagar") { 
+        // -- Elementos en SPIFFS --
+        fs::File f = SPIFFS.open(currentFile, "r");
+        if (f) {
+            // Cargar estados alternativos (offset fijo)
+            const int OFFSET_ALTERNATE = OFFSET_CURRENTMODE + 1;
+            f.seek(OFFSET_ALTERNATE, SeekSet);
+            byte storedStates[16] = {0};
+            f.read(storedStates, 16);
+            
+            int visibleCount = 0;
+            for (int i = 0; i < 16; ++i) {
+                char modeName[25] = {0};
+                byte modeCfg[2]   = {0};
+                
+                f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet);
+                f.read((uint8_t*)modeName, 24);
+                f.seek(OFFSET_MODES + i * SIZE_MODE + 216, SeekSet);
+                f.read(modeCfg, 2);
+
+                if (strlen(modeName) > 0 && checkMostSignificantBit(modeCfg)) {
+                    ModeCacheEntry entry;
+                    entry.originalIndex = i;
+                    
+                    // Nombre base
+                    String baseName = String(modeName); // En SPIFFS el nombre suele venir directo
+                    
+                    // Lógica Alternate
+                    bool hasAltFeature = getModeFlag(modeCfg, HAS_ALTERNATIVE_MODE);
+                    bool altActive = (hasAltFeature && visibleCount < 16) ? (storedStates[visibleCount] > 0) : false;
+                    
+                    entry.label = getModeDisplayName(baseName, altActive);
+                    entry.isAlternate = altActive;
+
+                    cachedModes.push_back(entry);
+                    visibleCount++;
+                }
+            }
+            f.close(); // ¡Cerramos aquí, no en el render!
+        }
+    }
+
+    // 3) Acción de Volver (Siempre última)
+    ModeCacheEntry actionBack;
+    actionBack.originalIndex = -2;
+    actionBack.label = getTranslation("VOLVER");
+    cachedModes.push_back(actionBack);
+    
+    // Copiar el mapa de índices globales para la navegación (necesario para handleEncoder)
+    totalModes = cachedModes.size();
+    for(int i=0; i<totalModes && i<18; i++) {
+        globalVisibleModesMap[i] = cachedModes[i].originalIndex;
+    }
+}
+
 std::map<String, std::vector<bool>> elementAlternateStates;
 std::vector<bool> currentAlternateStates;
 
@@ -1168,40 +1277,50 @@ std::vector<bool> currentAlternateStates;
  */
 void drawModesScreen()
 {
+    /*────────────────── Seguridad: Carga diferida ──────────────────*/
+    // Si por algún motivo la caché está vacía (reinicio o bug), cargarla ahora.
+    if (cachedModes.empty()) {
+        loadModesCache(elementFiles[currentIndex]);
+        // Resetear variables de visualización
+        // (Opcional, para evitar saltos visuales)
+    }
+
     /*────────────────── Constantes de layout ──────────────────*/
     const int screenW           = tft.width();
-    const int screenH           = tft.height();
     const int kTitleCenterX     = screenW / 2;
     constexpr int kTitleY       = 5;
     constexpr int kListStartY   = 30;
     constexpr int kCardRadius   = 3;
-    constexpr int kHLPadX       = 3;   // expansión horizontal del resaltado
-    constexpr int kHLPadY       = 1;   // expansión vertical del resaltado
-    constexpr int kVisibleRows  = 4;   // filas visibles simultáneas
-    constexpr int kTickerFrameMs= 50;  // cadencia del ticker horizontal
-    constexpr int kMaxEntries   = 18;  // 16 modos + Enc/Ap + Volver
-    constexpr int kRowTopInset  = (kHLPadY + 1); // margen anti-recorte en viewport
+    constexpr int kHLPadX       = 3;
+    constexpr int kHLPadY       = 1;
+    constexpr int kVisibleRows  = 4;
+    constexpr int kTickerFrameMs= 50;
+    constexpr int kRowTopInset  = (kHLPadY + 1);
 
-    // Márgenes laterales → ancho de texto disponible
     constexpr int kListLeftX    = 10;
     constexpr int kRightMargin  = 10;
     const int textAreaW         = screenW - kListLeftX - kRightMargin;
 
-    /*────────────────── Variables de scroll y ticker ──────────────────*/
-    static int  scrollOffset        = 0;    // suavizado vertical acumulado (px)
-    static int  targetScrollOffset  = 0;    // destino del suavizado (px)
-    static int  modeTickerOffset    = 0;    // offset X del ticker horizontal
-    static int  modeTickerDirection = 1;    // 1 → derecha; -1 → izquierda
+    /*────────────────── Variables estáticas (Scroll/Ticker) ──────────────────*/
+    static int  scrollOffset        = 0;
+    static int  targetScrollOffset  = 0;
+    static int  modeTickerOffset    = 0;
+    static int  modeTickerDirection = 1;
     static unsigned long modeLastFrameTime = 0;
     static int  lastSelectedMode    = -1;
 
-    // Sprite estático para el ticker (evita crear/borrar cada frame)
     static TFT_eSprite tickerSprite(&tft);
     static int tickerW = 0, tickerH = 0;
 
-    // Viewport de lista (clipping)
     static TFT_eSprite listSprite(&tft);
     static int listW = 0, listH = 0;
+
+    // Total de modos disponibles en la caché
+    const int totalEntries = cachedModes.size();
+
+    // Normalizar selección
+    if (currentModeIndex < 0) currentModeIndex = 0;
+    if (currentModeIndex >= totalEntries) currentModeIndex = totalEntries - 1;
 
     /*────────────────── Cabecera ──────────────────*/
     uiSprite.fillSprite(BACKGROUND_COLOR);
@@ -1211,213 +1330,112 @@ void drawModesScreen()
     uiSprite.setTextSize(1);
     uiSprite.drawString(getTranslation("MODOS"), kTitleCenterX, kTitleY);
 
-    /*────────────────── Elemento actual ──────────────────*/
-    if (elementFiles.empty()) {
-        uiSprite.pushSprite(0, 0);
-        return;
-    }
-    if (currentIndex < 0) currentIndex = 0;
-    if (currentIndex >= static_cast<int>(elementFiles.size()))
-        currentIndex = static_cast<int>(elementFiles.size()) - 1;
-
-    const String currentFile = elementFiles[currentIndex];
-
-    /*────────────────── Construir mapa de modos visibles ──────────────*/
-    int     visibleModesMap[kMaxEntries];
-    String  preloadedLabels[kMaxEntries];
-    int     count = 0;
-
-    // 1) Acción de Encender/Apagar
-    visibleModesMap[count++] = -3;
-
-    // 2) Modos del elemento
-    if (currentFile == "Ambientes" || currentFile == "Fichas" || currentFile == "Comunicador" || currentFile == "Dado")
-    {
-        INFO_PACK_T* option =
-            (currentFile == "Ambientes")   ? &ambientesOption  :
-            (currentFile == "Fichas")      ? &fichasOption     :
-            (currentFile == "Comunicador") ? &comunicadorOption :
-                                             &dadoOption;      
-
-        for (int i = 0; i < 16 && count < kMaxEntries - 1; ++i) {
-            if (strlen((char*)option->mode[i].name) > 0 &&
-                checkMostSignificantBit(option->mode[i].config))
-            {
-                visibleModesMap[count] = i;
-                String nameKey = String((char*)option->mode[i].name);
-                preloadedLabels[count] = getTranslation(nameKey.c_str());
-                ++count;
-            }
-        }
-    }
-    else if (currentFile != "Apagar")   // Elementos en SPIFFS
-    {
-        fs::File f = SPIFFS.open(currentFile, "r");
-        if (f) {
-            for (int i = 0; i < 16 && count < kMaxEntries - 1; ++i) {
-                char modeName[25] = {0};
-                byte modeCfg[2]   = {0};
-                f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet);
-                f.read((uint8_t*)modeName, 24);
-                f.seek(OFFSET_MODES + i * SIZE_MODE + 216, SeekSet);
-                f.read(modeCfg, 2);
-                if (strlen(modeName) > 0 && checkMostSignificantBit(modeCfg)) {
-                    visibleModesMap[count]  = i;
-                    preloadedLabels[count]  = String(modeName);
-                    ++count;
-                }
-            }
-            f.close();
-        }
-    }
-
-    // 3) Acción de Volver
-    if (count < kMaxEntries) {
-        visibleModesMap[count++] = -2;
-    }
-    totalModes = count;
-
-    // Normalizar índice seleccionado en rango
-    if (currentModeIndex < 0 || currentModeIndex >= totalModes) currentModeIndex = 0;
-
-    // Exportar el mapa a la global (tamaño exacto)
-    memcpy(globalVisibleModesMap, visibleModesMap, sizeof(int) * totalModes);
-
-    /*────────────────── Gestión de ventana vertical ───────────────────*/
+    /*────────────────── Gestión de ventana (Scroll) ──────────────────*/
     static int startIndex = 0;
-    if ((currentModeIndex - startIndex) > (kVisibleRows - 2) &&
-        startIndex < (totalModes - kVisibleRows))
+    // Lógica de seguimiento del cursor
+    if ((currentModeIndex - startIndex) > (kVisibleRows - 2) && startIndex < (totalEntries - kVisibleRows)) {
         ++startIndex;
-    else if ((currentModeIndex - startIndex) < 1 && startIndex > 0)
+    } else if ((currentModeIndex - startIndex) < 1 && startIndex > 0) {
         --startIndex;
+    }
 
+    // Clamp
     if (startIndex < 0) startIndex = 0;
-    const int lastStart = (totalModes > kVisibleRows) ? (totalModes - kVisibleRows) : 0;
+    const int lastStart = (totalEntries > kVisibleRows) ? (totalEntries - kVisibleRows) : 0;
     if (startIndex > lastStart) startIndex = lastStart;
 
-    /*────────────────── Resolver SCROLL ANTES de dibujar ──────────────*/
+    /*────────────────── Suavizado del Scroll ──────────────────*/
     const int stepY = CARD_HEIGHT + CARD_MARGIN;
-
-    // Objetivo basado en inicio de ventana
     targetScrollOffset = startIndex * stepY;
-    const int maxScroll = lastStart * stepY;
+    const int maxScrollPixel = lastStart * stepY;
 
-    if (targetScrollOffset < 0)         targetScrollOffset = 0;
-    if (targetScrollOffset > maxScroll) targetScrollOffset = maxScroll;
+    if (targetScrollOffset < 0) targetScrollOffset = 0;
+    if (targetScrollOffset > maxScrollPixel) targetScrollOffset = maxScrollPixel;
 
-    // Suavizado con SNAP ±1 px
-    {
-        int delta = targetScrollOffset - scrollOffset;
-        if (delta >= -1 && delta <= 1) {
-            scrollOffset = targetScrollOffset;   // colócalo EXACTO para este frame
-        } else {
-            scrollOffset += (delta / 4);         // easing
-        }
-    }
+    int delta = targetScrollOffset - scrollOffset;
+    if (delta >= -1 && delta <= 1) scrollOffset = targetScrollOffset; // Snap
+    else scrollOffset += (delta / 4); // Easing
 
-    /*────────────────── Dibujar las opciones visibles (con CLIPPING) ──*/
-    // Asegurar/crear viewport de lista del alto exacto de 4 filas
+    /*────────────────── Preparar Viewport (Clipping) ──────────────────*/
     const int wantedListW = screenW;
     const int wantedListH = kVisibleRows * stepY;
+    
     if (!listSprite.created() || listW != wantedListW || listH != wantedListH) {
         if (listSprite.created()) listSprite.deleteSprite();
         listSprite.createSprite(wantedListW, wantedListH);
         listW = wantedListW; listH = wantedListH;
     }
+    
     listSprite.fillSprite(BACKGROUND_COLOR);
     listSprite.setFreeFont(&FreeSans9pt7b);
     listSprite.setTextSize(1);
     listSprite.setTextDatum(TL_DATUM);
     listSprite.setTextColor(TEXT_COLOR);
 
-    // Offset animado dentro del viewport (ya con scrollOffset actualizado)
     const int listYOffset = -(scrollOffset - startIndex * stepY);
-
-    // Dibujamos una fila extra por arriba y por abajo para cubrir el movimiento
     const int firstVI = startIndex - 1;
     const int lastVI  = startIndex + kVisibleRows;
 
-    for (int currentVisibleIndex = firstVI; currentVisibleIndex <= lastVI; ++currentVisibleIndex)
-    {
-        if (currentVisibleIndex < 0 || currentVisibleIndex >= totalModes) continue;
+    /*────────────────── Bucle de Dibujado (RAM ONLY) ──────────────────*/
+    for (int i = firstVI; i <= lastVI; ++i) {
+        if (i < 0 || i >= totalEntries) continue;
 
-        const int y = kRowTopInset + listYOffset + (currentVisibleIndex - startIndex) * stepY;
+        // Recuperar datos de la caché (¡RÁPIDO!)
+        const ModeCacheEntry& item = cachedModes[i];
+        String label = item.label;
 
-        // Culling con margen: evita gastar ciclos cuando está fuera
+        const int y = kRowTopInset + listYOffset + (i - startIndex) * stepY;
+        
+        // Culling
         if (y <= -CARD_HEIGHT + kHLPadY || y >= listH - kHLPadY) continue;
 
-        const bool isSelected = (currentVisibleIndex == currentModeIndex);
+        const bool isSelected = (i == currentModeIndex);
 
-        // Fondo si está seleccionado (clamp para no salirse del viewport)
+        // Fondo Resaltado
         if (isSelected) {
             int rectY = y - kHLPadY;
             int rectH = CARD_HEIGHT + (kHLPadY * 2);
-            if (rectY < 0)            { rectH += rectY; rectY = 0; }
-            if (rectY + rectH > listH){ rectH = listH - rectY; }
+            if (rectY < 0) { rectH += rectY; rectY = 0; }
+            if (rectY + rectH > listH) { rectH = listH - rectY; }
+            
             if (rectH > 0) {
                 listSprite.fillRoundRect(
-                    kListLeftX - kHLPadX,
-                    rectY,
-                    textAreaW + (kHLPadX * 2),
-                    rectH,
-                    kCardRadius,
-                    CARD_COLOR
+                    kListLeftX - kHLPadX, rectY,
+                    textAreaW + (kHLPadX * 2), rectH,
+                    kCardRadius, CARD_COLOR
                 );
             }
         }
 
-        /* ───── Etiqueta ─────*/
-        const int modeVal = visibleModesMap[currentVisibleIndex];
-        String label;
-
-        if (modeVal == -2) {
-            label = getTranslation("VOLVER");
-        } else if (modeVal == -3) {
-            label = selectedStates[currentIndex]
-                        ? getTranslation("APAGAR")
-                        : getTranslation("ENCENDER");
-        } else {
-            label = preloadedLabels[currentVisibleIndex];
-            bool modeAlt = false;
-            const int altIndex = currentVisibleIndex - 1; // índice visible 0 es -3
-            if (modeVal >= 0 && altIndex >= 0 &&
-                static_cast<size_t>(altIndex) < currentAlternateStates.size())
-            {
-                modeAlt = currentAlternateStates[altIndex];
-            }
-            label = getModeDisplayName(label, modeAlt);
-        }
-
-        /* ───── Dibujar texto (ticker si hace falta) ─────*/
+        /* ───── Texto y Ticker ─────*/
         if (isSelected) {
             if (currentModeIndex != lastSelectedMode) {
-                modeTickerOffset    = 0;
+                modeTickerOffset = 0;
                 modeTickerDirection = 1;
-                lastSelectedMode    = currentModeIndex;
+                lastSelectedMode = currentModeIndex;
             }
 
             const int fullW = listSprite.textWidth(label);
             if (fullW > textAreaW) {
+                // Lógica Ticker
                 const unsigned long now = millis();
                 if (now - modeLastFrameTime >= kTickerFrameMs) {
                     modeTickerOffset += modeTickerDirection;
                     if (modeTickerOffset < 0) {
-                        modeTickerOffset = 0;
-                        modeTickerDirection = 1;
+                        modeTickerOffset = 0; modeTickerDirection = 1;
                     }
-                    const int maxOffsetX = fullW - textAreaW;
-                    if (modeTickerOffset > maxOffsetX) {
-                        modeTickerOffset = maxOffsetX;
-                        modeTickerDirection = -1;
+                    const int maxOffset = fullW - textAreaW;
+                    if (modeTickerOffset > maxOffset) {
+                        modeTickerOffset = maxOffset; modeTickerDirection = -1;
                     }
                     modeLastFrameTime = now;
                 }
 
-                if (tickerW != textAreaW || tickerH != CARD_HEIGHT || tickerSprite.created() == false) {
+                // Sprite del Ticker
+                if (!tickerSprite.created() || tickerW != textAreaW || tickerH != CARD_HEIGHT) {
                     if (tickerSprite.created()) tickerSprite.deleteSprite();
                     tickerSprite.createSprite(textAreaW, CARD_HEIGHT);
-                    tickerW = textAreaW;
-                    tickerH = CARD_HEIGHT;
+                    tickerW = textAreaW; tickerH = CARD_HEIGHT;
                 }
 
                 tickerSprite.fillSprite(CARD_COLOR);
@@ -1435,12 +1453,9 @@ void drawModesScreen()
         }
     }
 
-    // Empujar la lista justo debajo del título
+    // Volcado final
     listSprite.pushToSprite(&uiSprite, 0, kListStartY);
-
-    // Volcado total a la pantalla
     uiSprite.pushSprite(0, 0);
-
 }
 
 // Opciones del menú oculto

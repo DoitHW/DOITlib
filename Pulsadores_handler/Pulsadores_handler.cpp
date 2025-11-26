@@ -232,45 +232,73 @@ void PulsadoresHandler::resolveContext(ButtonContext& ctx) {
 // 2. FUNCIÓN PRINCIPAL: procesarPulsadores
 // ==========================================
 void PulsadoresHandler::procesarPulsadores() {
-    
-    // A) Filtros Globales
-    if (elementFiles[currentIndex] == "Apagar") return;
-    const bool noInput = isGlobalFxNoInput();
-    const bool respMode = isResponseRouteActive();
 
-    // B) Resolver Contexto
-    ButtonContext ctx;
-    resolveContext(ctx);
+    String currentFile = elementFiles[currentIndex];
 
-    // C) Validar selección (excepto modos especiales)
-    bool isSelected = selectedStates[currentIndex];
-    bool isException = (ctx.currentFile == "Ambientes" || ctx.currentFile == "Fichas" || ctx.currentFile == "Comunicador");
-    
-    if (!respMode && !isException && !isSelected) return;
-    
-    if (ctx.currentFile == "Comunicador" && !isSelected) {
-        relayButtonPressed = false; blueButtonPressed = false;
+    // Si estoy en la pantalla de modos de un elemento “normal”
+    if (inModesScreen &&
+        currentFile != "Ambientes" &&
+        currentFile != "Fichas" &&
+        currentFile != "Comunicador" &&
+        currentFile != "Dado") {
+        relayButtonPressed = false;
+        blueButtonPressed  = false;
         return;
     }
+    
+    // A) Filtros Globales mínimos
+    if (elementFiles[currentIndex] == "Apagar") return;
+    const bool noInput  = isGlobalFxNoInput();
+    const bool respMode = isResponseRouteActive();
 
-    // D) Menu Cognitivo (Consola) - Prioridad Alta
+    // B) Menú Cognitivo → prioridad absoluta
+    //    Si estás en actividades cognitivas, lo primero es esta ruta.
     if (inCognitiveMenu && !respMode && !noInput) {
         for (int i = 0; i < FILAS; i++) {
-            digitalWrite(filas[i], LOW); delayMicroseconds(10);
+            digitalWrite(filas[i], LOW);
+            delayMicroseconds(10);
+
             for (int j = 0; j < COLUMNAS; j++) {
-                byte color = pulsadorColor[i][j];
+                byte color   = pulsadorColor[i][j];
                 bool pressed = (digitalRead(columnas[j]) == LOW);
-                // Filtro active mask
-                int idx = colorToLedIdx(color);
-                if (idx >= 0 && !isButtonEnabled(idx) && color != RELAY) pressed = false;
+
+                // Sólo botones relevantes: colores + RELAY
+                if (color != BLUE   && color != GREEN &&
+                    color != YELLOW && color != RED   &&
+                    color != RELAY) {
+                    pressed = false;
+                }
+
+                // En menú cognitivo IGNORAMOS la máscara de 'active'.
+                // La idea es que cognitivas siempre funcione, independientemente
+                // de lo que haya hecho setButtonActiveMask() en otros contextos.
 
                 if (pressed != lastState[i][j]) {
-                    handleCognitiveMenu(i, j, pressed ? BUTTON_PRESSED : BUTTON_RELEASED);
+                    handleCognitiveMenu(i, j,
+                        pressed ? BUTTON_PRESSED : BUTTON_RELEASED);
                     lastState[i][j] = pressed;
                 }
             }
+
             digitalWrite(filas[i], HIGH);
         }
+        return;  // Nada más se ejecuta en modo cognitivo
+    }
+
+    // C) A partir de aquí, el resto de modos “normales”
+    ButtonContext ctx;
+    resolveContext(ctx);
+
+    bool isSelected  = selectedStates[currentIndex];
+    bool isException = (ctx.currentFile == "Ambientes" ||
+                        ctx.currentFile == "Fichas"    ||
+                        ctx.currentFile == "Comunicador");
+
+    if (!respMode && !isException && !isSelected) return;
+
+    if (ctx.currentFile == "Comunicador" && !isSelected) {
+        relayButtonPressed = false;
+        blueButtonPressed  = false;
         return;
     }
 
@@ -302,7 +330,8 @@ void PulsadoresHandler::procesarPulsadores() {
             // RELAY siempre permitido si hasRelay, RespMode o Broadcast Comunicador
             int ledIdx = colorToLedIdx(color);
             if (ledIdx >= 0 && !isButtonEnabled(ledIdx)) {
-                bool allowed = respMode || ctx.isCommunicatorBroadcast || (color == RELAY && ctx.hasRelay);
+                bool allowed = ctx.isCommunicatorBroadcast || (color == RELAY && ctx.hasRelay);
+                // En modo respuesta, respeta siempre la máscara de active → no añadas respMode aquí
                 if (!allowed) isPressed = false;
             }
 
@@ -351,9 +380,12 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event, 
     // 1. Fichas (Solo actualiza flags globales, ya hecho en el loop)
     if (ctx.currentFile == "Fichas") return;
 
-    // 2. Ruta Respuesta
+    // 2. Ruta Respuesta (modo mapeo desde consola)
+    //    Si estamos en modo respuesta, sólo gestionamos el RESPONSE y salimos.
     if (ctx.isRespMode) {
-        if (event == BUTTON_PRESSED) handleResponseRoute(buttonColor);
+        if (event == BUTTON_PRESSED) {
+            handleResponseRoute(buttonColor);
+        }
         return;
     }
 
@@ -367,7 +399,9 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event, 
     if (ctx.currentFile == "Comunicador") {
         // Caso Relé de Ciclo (Botón RELAY)
         if (buttonColor == RELAY) {
-             if (event == BUTTON_PRESSED && digitalRead(ENC_BUTTON) != LOW) handleComunicadorRelayCycle();
+             if (event == BUTTON_PRESSED && digitalRead(ENC_BUTTON) != LOW) {
+                 handleComunicadorRelayCycle();
+             }
              return;
         }
         // Caso "Solo Relé" (Sin color, con Relé)
@@ -376,7 +410,12 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event, 
                 // Blue actúa como toggle
                 bool cur = RelayStateManager::get(ctx.targetNS);
                 RelayStateManager::set(ctx.targetNS, !cur);
-                send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, DEFAULT_DEVICE, ctx.targetNS, !cur ? 0x01:0x00));
+                send_frame(frameMaker_SEND_FLAG_BYTE(
+                    DEFAULT_BOTONERA,
+                    DEFAULT_DEVICE,
+                    ctx.targetNS,
+                    !cur ? 0x01 : 0x00
+                ));
             }
             return;
         }
@@ -385,8 +424,10 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event, 
     // 5. Relés (Lógica Unificada)
     // Si es botón RELAY o estamos en modo MultiRelay (colores actúan como relés)
     bool isRelayAction = (buttonColor == RELAY);
-    bool isMultiRelayAction = (ctx.isMultiRelay || ctx.isAromaterapia) && 
-                              (buttonColor == BLUE || buttonColor == GREEN || buttonColor == YELLOW || buttonColor == RED);
+    bool isMultiRelayAction =
+        (ctx.isMultiRelay || ctx.isAromaterapia) &&
+        (buttonColor == BLUE || buttonColor == GREEN ||
+         buttonColor == YELLOW || buttonColor == RED);
 
     if (isRelayAction || isMultiRelayAction) {
         handleRelayLogic(buttonColor, event, ctx);
@@ -399,6 +440,7 @@ void PulsadoresHandler::processButtonEvent(int i, int j, ButtonEventType event, 
         handleColorLogic(buttonColor, event, ctx);
     }
 }
+
 
 // ==========================================
 // 4. HANDLERS ESPECÍFICOS
@@ -418,16 +460,93 @@ void PulsadoresHandler::handleCognitiveMenu(int i, int j, ButtonEventType event)
 }
 
 // 4.2 Ruta Respuesta
-void PulsadoresHandler::handleResponseRoute(byte buttonColor) {
-    int ledIdx = colorToLedIdx(buttonColor);
-    if (ledIdx < 0 || !isButtonEnabled(ledIdx)) return;
+// void PulsadoresHandler::handleResponseRoute(byte buttonColor) {
+//     int ledIdx = colorToLedIdx(buttonColor);
+//     if (ledIdx < 0 || !isButtonEnabled(ledIdx)) return;
     
-    static const uint8_t kMap[9] = { 5, 9, 4, 8, 3, 7, 2, 6, 1 };
-    uint8_t response = (ledIdx < 9) ? kMap[ledIdx] : 0;
-    if (response > 0) {
-        send_frame(frameMaker_SEND_RESPONSE(DEFAULT_BOTONERA, s_respTargetType, getOwnNS(), response));
+//     static const uint8_t kMap[9] = { 5, 9, 4, 8, 3, 7, 2, 6, 1 };
+//     uint8_t response = (ledIdx < 9) ? kMap[ledIdx] : 0;
+//     if (response > 0) {
+//         send_frame(frameMaker_SEND_RESPONSE(DEFAULT_BOTONERA, s_respTargetType, getOwnNS(), response));
+//     }
+// }
+
+// void PulsadoresHandler::handleResponseRoute(byte buttonColor)
+// {
+//     // 1) Mapear color lógico → índice de LED [0..8]
+//     const int ledIdx = colorToLedIdx(buttonColor);
+//     if (ledIdx < 0) return;
+
+//     // 2) Respetar la máscara de botones activos del mapeo
+//     if (!PulsadoresHandler::isButtonEnabled(static_cast<uint8_t>(ledIdx))) {
+//         return;
+//     }
+
+//     // 3) Convertir índice de LED → ID de botón (1..9) según tu layout físico
+//     auto ledIdxToButtonId = [](uint8_t idx) -> uint8_t {
+//         static const uint8_t kMap[9] = { 5, 9, 4, 8, 3, 7, 2, 6, 1 };
+//         return (idx < 9) ? kMap[idx] : 0;
+//     };
+
+//     const uint8_t response = ledIdxToButtonId(static_cast<uint8_t>(ledIdx));
+//     if (response == 0) return; // índice fuera de rango o sin mapeo válido
+
+//     // 4) Recuperar destino de respuesta configurado con setResponseRoute(...)
+//     const uint8_t targetType = PulsadoresHandler::getResponseTargetType();
+//     const TARGETNS targetNS  = PulsadoresHandler::getResponseTargetNS();
+
+//     // 5) Enviar F_SEND_RESPONSE hacia la consola/dispositivo que nos configuró
+//     send_frame(frameMaker_SEND_RESPONSE(
+//         DEFAULT_BOTONERA, // origen: botonera
+//         targetType,       // destino lógico (DC, DD, etc.)
+//         targetNS,         // NS del destino (o 00:00:00:00:00 para consola)
+//         response          // ID de botón 1..9
+//     ));
+// }
+
+void PulsadoresHandler::handleResponseRoute(byte buttonColor)
+{
+    const int ledIdx = colorToLedIdx(buttonColor);
+    if (ledIdx < 0) return;
+
+    // 1) Respetar la máscara de botones activos del mapeo
+    if (!PulsadoresHandler::isButtonEnabled(static_cast<uint8_t>(ledIdx))) {
+        return;
     }
+
+    // 2) Consultar el numColor configurado por F_SET_BUTTONS_EXTMAP
+    uint8_t mapped = PulsadoresHandler::getButtonMappedNumColor(static_cast<uint8_t>(ledIdx));
+
+    uint8_t colorToSend = 0;
+
+    // Caso A: color de lista → enviar numColor tal cual
+    if (mapped != 0xFF && mapped != BTN_RGB_DIRECT) {
+        colorToSend = mapped;
+    } else {
+        // Caso B: RGB directo (0x80) o sin mapeo → comportamiento antiguo:
+        // enviar el "valor normal" del botón (ID 1..9)
+        auto ledIdxToButtonId = [](uint8_t idx) -> uint8_t {
+            static const uint8_t kMap[9] = { 5, 9, 4, 8, 3, 7, 2, 6, 1 };
+            return (idx < 9) ? kMap[idx] : 0;
+        };
+        colorToSend = ledIdxToButtonId(static_cast<uint8_t>(ledIdx));
+    }
+
+    if (colorToSend == 0) return;
+
+    const uint8_t targetType = PulsadoresHandler::getResponseTargetType();
+    const TARGETNS targetNS  = PulsadoresHandler::getResponseTargetNS();
+
+    // AQUÍ EL ÚNICO CAMBIO REAL:
+    send_frame(frameMaker_SEND_COLOR(
+        DEFAULT_BOTONERA,
+        targetType,
+        targetNS,
+        colorToSend
+    ));
 }
+
+
 
 // 4.3 Ambientes
 void PulsadoresHandler::handleAmbientes(byte buttonColor, ButtonEventType event) {
@@ -516,6 +635,22 @@ void PulsadoresHandler::handleColorLogic(byte buttonColor, ButtonEventType event
         }
         return;
     }
+
+    // --- CASO ESPECIAL: modo PASIVO sin flags de color ---
+    // En modos donde sólo hay HAS_PASSIVE=1 y no hay color básico/avanzado,
+    // queremos que el botón BLUE siga enviando su color.
+    if (ctx.hasPassive && !ctx.hasBasic && !ctx.hasAdvanced) {
+        if (event == BUTTON_PRESSED && buttonColor == BLUE) {
+            send_frame(frameMaker_SEND_COLOR(
+                DEFAULT_BOTONERA,
+                ctx.targetType,
+                ctx.targetNS,
+                BLUE
+            ));
+        }
+        return;
+    }
+    // ------------------------------------------------------
 
     // 3.1 Sin capacidades de color
     if (!ctx.hasBasic && !ctx.hasAdvanced) return;
@@ -752,4 +887,21 @@ void PulsadoresHandler::handleComunicadorRelayCycle() {
     ::communicatorActiveNS = (whiteType == DEFAULT_DEVICE) ? whiteNS : NS_ZERO;
     colorHandler.setCurrentFile("Comunicador");
     colorHandler.setPatternBotonera(currentModeIndex, ledManager);
+}
+
+// NUEVO: numColor recibido en F_SET_BUTTONS_EXTMAP para cada LED
+uint8_t PulsadoresHandler::s_btnMappedNumColor[9] = {
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
+};
+
+void PulsadoresHandler::setButtonMappedNumColor(uint8_t ledIdx, uint8_t numColor)
+{
+    if (ledIdx < 9) {
+        s_btnMappedNumColor[ledIdx] = numColor;
+    }
+}
+
+uint8_t PulsadoresHandler::getButtonMappedNumColor(uint8_t ledIdx)
+{
+    return (ledIdx < 9) ? s_btnMappedNumColor[ledIdx] : 0xFF;
 }
