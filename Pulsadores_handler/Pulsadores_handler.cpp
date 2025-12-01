@@ -168,36 +168,81 @@ void PulsadoresHandler::resolveContext(ButtonContext& ctx) {
     uint8_t modeConfig[2] = {0, 0};
     bool cfgOK = false;
 
+    // Cache local para evitar lecturas repetidas de SPIFFS cuando
+    // ni el NS ni el modo han cambiado.
+    struct ModeConfigCache {
+        bool     valid;
+        TARGETNS ns;
+        int      modeIdx;
+        uint8_t  cfg[2];
+    };
+
+    // Inicialización estática
+    static ModeConfigCache s_cache = { false, {0,0,0,0,0}, -1, {0,0} };
+
+    // Helper local para comparar TARGETNS (5 bytes)
+    auto sameNS = [](const TARGETNS& a, const TARGETNS& b) -> bool {
+        return a.mac01 == b.mac01 &&
+            a.mac02 == b.mac02 &&
+            a.mac03 == b.mac03 &&
+            a.mac04 == b.mac04 &&
+            a.mac05 == b.mac05;
+    };
+
     // Archivos especiales con manejo propio o sin flags
     bool isSpecial = (ctx.currentFile == "Ambientes" || ctx.currentFile == "Fichas" || 
-                      ctx.currentFile == "Comunicador" || ctx.currentFile == "Apagar");
+                    ctx.currentFile == "Comunicador" || ctx.currentFile == "Apagar");
 
     if (!isSpecial && !ctx.isRespMode && ctx.targetType == DEFAULT_DEVICE) {
-        // Obtener del RelayStateManager (Cacheado internamente o lectura directa)
-        cfgOK = RelayStateManager::getModeConfigForNS(ctx.targetNS, modeConfig);
-        
-        // Fallback robusto a lectura de archivo si falla RelayManager (como en tu código original)
-        if (!cfgOK) {
-             fs::File f = SPIFFS.open(ctx.currentFile, "r");
-             if (f) {
-                 int rIdx = 0;
-                 f.seek(OFFSET_CURRENTMODE, SeekSet);
-                 if(f.available()) rIdx = f.read();
-                 if(rIdx < 0) rIdx = 0;
-                 if(rIdx > 15) rIdx = 15;
-                 
-                 // 216 es el offset del config dentro del bloque del modo
-                 f.seek(OFFSET_MODES + rIdx * SIZE_MODE + 216, SeekSet);
-                 if(f.available() >= 2) {
-                     f.read(modeConfig, 2);
-                     cfgOK = true;
-                 }
-                 f.close();
-             }
+        // 1º: intentar usar la caché local
+        if (s_cache.valid &&
+            sameNS(s_cache.ns, ctx.targetNS) &&
+            s_cache.modeIdx == currentModeIndex)
+        {
+            modeConfig[0] = s_cache.cfg[0];
+            modeConfig[1] = s_cache.cfg[1];
+            cfgOK = true;
+        } else {
+            // 2º: pedir al RelayStateManager (cache propio o lectura)
+            cfgOK = RelayStateManager::getModeConfigForNS(ctx.targetNS, modeConfig);
+
+            // 3º: Fallback robusto a lectura de archivo si falla RelayManager
+            if (!cfgOK) {
+                fs::File f = SPIFFS.open(ctx.currentFile, "r");
+                if (f) {
+                    int rIdx = 0;
+                    f.seek(OFFSET_CURRENTMODE, SeekSet);
+                    if (f.available()) rIdx = f.read();
+                    if (rIdx < 0)  rIdx = 0;
+                    if (rIdx > 15) rIdx = 15;
+
+                    // 216 es el offset del config dentro del bloque del modo
+                    f.seek(OFFSET_MODES + rIdx * SIZE_MODE + 216, SeekSet);
+                    if (f.available() >= 2) {
+                        f.read(modeConfig, 2);
+                        cfgOK = true;
+                    }
+                    f.close();
+                }
+            }
+
+            // 4º: actualizar caché si hemos obtenido una config válida
+            if (cfgOK) {
+                s_cache.valid   = true;
+                s_cache.ns      = ctx.targetNS;
+                s_cache.modeIdx = currentModeIndex;
+                s_cache.cfg[0]  = modeConfig[0];
+                s_cache.cfg[1]  = modeConfig[1];
+            }
         }
     } else if (ctx.currentFile == "Comunicador" && !ctx.isCommunicatorBroadcast) {
-        // Comunicador apuntando a dispositivo: Intentar obtener flags de ese dispositivo
+        // Comunicador apuntando a dispositivo
         cfgOK = RelayStateManager::getModeConfigForNS(ctx.targetNS, modeConfig);
+        // Para evitar mezclar contextos muy distintos, invalidamos la caché
+        s_cache.valid = false;
+    } else {
+        // Otros casos (especiales, respMode, broadcast, etc.) no usan esta caché
+        s_cache.valid = false;
     }
 
     // 1.3 Asignar Flags
@@ -212,7 +257,6 @@ void PulsadoresHandler::resolveContext(ButtonContext& ctx) {
         ctx.hasPatterns = getModeFlag(modeConfig, HAS_PATTERNS);
     } else {
         // Defaults seguros si no hay config (ej: Broadcast general)
-        // Por defecto permitimos básico
         ctx.hasPulse    = false;
         ctx.hasPassive  = false;
         ctx.hasRelay    = true; 
@@ -222,6 +266,7 @@ void PulsadoresHandler::resolveContext(ButtonContext& ctx) {
         ctx.hasBasic    = true;
         ctx.hasPatterns = false;
     }
+
 
     // Lógica derivada
     ctx.isMultiRelay   = (ctx.hasRelayN1 || ctx.hasRelayN2);
@@ -235,16 +280,43 @@ void PulsadoresHandler::procesarPulsadores() {
 
     String currentFile = elementFiles[currentIndex];
 
-    // Si estoy en la pantalla de modos de un elemento “normal”
-    if (inModesScreen &&
+
+    // Ignorar completamente los pulsadores cuando:
+    //  - Estamos en la pantalla de modos de un elemento "normal" (no fijos)
+    //  - O está activo cualquier menú / submenú donde se navega con encoder
+    if (
+        // 1) Pantalla de modos de un elemento SPIFFS
+        (inModesScreen &&
         currentFile != "Ambientes" &&
         currentFile != "Fichas" &&
         currentFile != "Comunicador" &&
-        currentFile != "Dado") {
+        currentFile != "Dado")
+
+        // 2) Menú oculto de ajustes y submenús
+        || hiddenMenuActive
+
+        // 3) Submenús específicos
+        || soundMenuActive
+        || brightnessMenuActive
+        || formatSubMenuActive
+        || deleteElementMenuActive
+        || confirmDeleteMenuActive
+        || confirmRestoreMenuActive
+        || confirmRestoreMenuElementActive
+
+        // 4) Menús extra (Dado, elementos extra…)
+        || extraElementsMenuActive
+        || confirmEnableDadoActive
+
+        // 5) Cualquier modal que ya marca que no debe haber entrada
+        || ignoreInputs
+    )
+    {
         relayButtonPressed = false;
         blueButtonPressed  = false;
         return;
     }
+
     
     // A) Filtros Globales mínimos
     if (elementFiles[currentIndex] == "Apagar") return;
@@ -291,7 +363,7 @@ void PulsadoresHandler::procesarPulsadores() {
 
     bool isSelected  = selectedStates[currentIndex];
     bool isException = (ctx.currentFile == "Ambientes" ||
-                        ctx.currentFile == "Fichas"    ||
+                        /*ctx.currentFile == "Fichas"    ||*/
                         ctx.currentFile == "Comunicador");
 
     if (!respMode && !isException && !isSelected) return;

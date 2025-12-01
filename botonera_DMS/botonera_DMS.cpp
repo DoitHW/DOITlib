@@ -2092,6 +2092,8 @@ void BOTONERA_::activateCognitiveMode() {
 
 void BOTONERA_::deactivateCognitiveMode() {
     inCognitiveMenu = false;
+    colorHandler.setCurrentFile("Comunicador");
+    colorHandler.setPatternBotonera(0, ledManager);
     drawCurrentElement(); // Volver a la pantalla principal
 }
 

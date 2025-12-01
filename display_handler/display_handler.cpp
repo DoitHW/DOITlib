@@ -1183,42 +1183,48 @@ void loadModesCache(const String& currentFile) {
 
         // Recalcular estados alternativos si no existen
         if (elementAlternateStates.find(currentFile) == elementAlternateStates.end()) {
-             // Lógica simplificada: inicializar en falso si no está cargado
-             std::vector<bool> tempStates(16, false); 
-             elementAlternateStates[currentFile] = tempStates;
+            std::vector<bool> tempStates(16, false);
+            elementAlternateStates[currentFile] = tempStates;
         }
         currentAlternateStates = elementAlternateStates[currentFile];
 
         // Iterar modos
         int visibleCount = 0;
         for (int i = 0; i < 16; ++i) {
-            if (strlen((char*)option->mode[i].name) > 0 && checkMostSignificantBit(option->mode[i].config)) {
+            if (strlen((char*)option->mode[i].name) > 0 &&
+                checkMostSignificantBit(option->mode[i].config)) {
+
                 ModeCacheEntry entry;
                 entry.originalIndex = i;
                 
-                String rawName = String((char*)option->mode[i].name);
+                String rawName        = String((char*)option->mode[i].name);
                 String translatedName = getTranslation(rawName.c_str());
-                
-                // Calcular nombre final (Alternate)
-                bool altActive = (visibleCount < (int)currentAlternateStates.size()) ? currentAlternateStates[visibleCount] : false;
-                entry.label = getModeDisplayName(translatedName, altActive);
-                entry.isAlternate = altActive;
+
+                bool altActive = (visibleCount < (int)currentAlternateStates.size())
+                                ? currentAlternateStates[visibleCount]
+                                : false;
+
+                // 👇 Muy importante: la caché guarda SIEMPRE el nombre base
+                entry.label       = translatedName; 
+                entry.isAlternate = altActive;  // meta, por si quieres usarlo en otros sitios
 
                 cachedModes.push_back(entry);
-                visibleCount++;
+                ++visibleCount;
             }
         }
+
     } 
     else if (currentFile != "Apagar") { 
         // -- Elementos en SPIFFS --
         fs::File f = SPIFFS.open(currentFile, "r");
         if (f) {
-            // Cargar estados alternativos (offset fijo)
             const int OFFSET_ALTERNATE = OFFSET_CURRENTMODE + 1;
             f.seek(OFFSET_ALTERNATE, SeekSet);
             byte storedStates[16] = {0};
             f.read(storedStates, 16);
-            
+
+            std::vector<bool> tempStates;   // estados alternativos por índice visible
+
             int visibleCount = 0;
             for (int i = 0; i < 16; ++i) {
                 char modeName[25] = {0};
@@ -1233,22 +1239,32 @@ void loadModesCache(const String& currentFile) {
                     ModeCacheEntry entry;
                     entry.originalIndex = i;
                     
-                    // Nombre base
-                    String baseName = String(modeName); // En SPIFFS el nombre suele venir directo
-                    
-                    // Lógica Alternate
+                    String baseName = String(modeName);
+
                     bool hasAltFeature = getModeFlag(modeCfg, HAS_ALTERNATIVE_MODE);
-                    bool altActive = (hasAltFeature && visibleCount < 16) ? (storedStates[visibleCount] > 0) : false;
-                    
-                    entry.label = getModeDisplayName(baseName, altActive);
+                    bool altActive     = (hasAltFeature && visibleCount < 16)
+                                        ? (storedStates[visibleCount] > 0)
+                                        : false;
+
+                    // 👇 de nuevo, solo nombre base en la caché
+                    entry.label       = baseName;
                     entry.isAlternate = altActive;
 
                     cachedModes.push_back(entry);
-                    visibleCount++;
+
+                    // Mantener el vector de estados alternativos alineado por índice visible
+                    tempStates.push_back(altActive);
+                    ++visibleCount;
                 }
             }
-            f.close(); // ¡Cerramos aquí, no en el render!
+
+            // Ahora sí: sincronizas el estado global con lo leído de SPIFFS
+            currentAlternateStates              = tempStates;
+            elementAlternateStates[currentFile] = currentAlternateStates;
+
+            f.close();
         }
+
     }
 
     // 3) Acción de Volver (Siempre última)
@@ -1379,10 +1395,28 @@ void drawModesScreen()
     /*────────────────── Bucle de Dibujado (RAM ONLY) ──────────────────*/
     for (int i = firstVI; i <= lastVI; ++i) {
         if (i < 0 || i >= totalEntries) continue;
+        
+        // Recuperar datos de la caché (nombre BASE + meta)
+        const ModeCacheEntry& item      = cachedModes[i];
+        const int             realIndex = item.originalIndex;
+        String                baseLabel = item.label;
+        String                label     = baseLabel;
 
-        // Recuperar datos de la caché (¡RÁPIDO!)
-        const ModeCacheEntry& item = cachedModes[i];
-        String label = item.label;
+        // Solo los modos reales (realIndex >= 0) pueden tener nombre alternativo
+        if (realIndex >= 0) {
+            // i = índice visible en cachedModes
+            // 0 = Encender/Apagar → primer modo visible está en i = 1
+            const int altIdx = i - 1;
+
+            bool alternateActive = false;
+            if (altIdx >= 0 && (size_t)altIdx < currentAlternateStates.size()) {
+                alternateActive = currentAlternateStates[altIdx];
+            }
+
+            // Construir el nombre final en función del estado alternativo
+            label = getModeDisplayName(baseLabel, alternateActive);
+        }
+
 
         const int y = kRowTopInset + listYOffset + (i - startIndex) * stepY;
         
