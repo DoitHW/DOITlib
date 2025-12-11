@@ -45,6 +45,7 @@ void MICROPHONE_::begin(){
         i2s_set_pin(I2S_NUM_0, &pin_config);
         micInitialized = true;
         //DEBUG__________ln("Micrófono activado.");
+        lastSoundTime = millis();
     }
     else {
         DEBUG__________ln("Micrófono ya estaba activado.");
@@ -202,23 +203,25 @@ byte MICROPHONE_::get_mic_value_BYTE_voice() {
 }
 
 bool MICROPHONE_::detect_sound_threshold() {
-    const int THRESHOLD = 320; // Ajusta este valor según tus necesidades
+    const int THRESHOLD = 320; 
     int32_t sample = 0;
     size_t bytes_read = 0;
 
-    // Leer una muestra del micrófono
     i2s_read(I2S_NUM_0, &sample, sizeof(int32_t), &bytes_read, portMAX_DELAY);
 
     if (bytes_read > 0) {
-        sample >>= 14; // Ajusta el valor a 16 bits
-        sample = abs(sample); // Tomar el valor absoluto
-                                                                #ifdef DEBUG
-                                                                  //  DEBUG__________ln("Detectado sonido, Umbral=" +String(THRESHOLD));
-                                                                #endif
-        return sample > THRESHOLD;
-    }
+        sample >>= 14; 
+        sample = abs(sample); 
+        
+        bool detected = (sample > THRESHOLD);
+        
+        if (detected) {
+            lastSoundTime = millis(); // Actualizar reloj si supera umbral interno
+        }
 
-    return false; // Si no se leyó ninguna muestra, devolver false
+        return detected;
+    }
+    return false; 
 }
 
 

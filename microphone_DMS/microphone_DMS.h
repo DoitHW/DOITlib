@@ -26,6 +26,7 @@ class MICROPHONE_{
         // Frecuencias centrales de las notas (en Hz)
         const float noteFrequencies[7] = {261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88};
         const char* noteNames[7] = {"DO", "RE", "MI", "FA", "SOL", "LA", "SI"};
+        unsigned long lastSoundTime = 0;
 ;
 
     public:
@@ -40,6 +41,9 @@ class MICROPHONE_{
         void end();
         int readMicRaw();
         void calibracionInicial(unsigned long duracionCalibracion);
+        void updateSoundTime() { lastSoundTime = millis(); }
+        unsigned long getLastSoundTime() const { return lastSoundTime; }
+        
 };
 
 extern bool useMic;

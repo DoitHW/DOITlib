@@ -26,6 +26,7 @@ public:
     void enableActivityInterrupt(uint16_t threshold_mg, bool enX, bool enY, bool enZ);
     void clearInterrupts();
     bool isInitialized() const { return initialized; }
+    unsigned long getLastMovementTime() const { return lastMovementTime; }
 
 private:
     Adafruit_ADXL345_Unified accel;

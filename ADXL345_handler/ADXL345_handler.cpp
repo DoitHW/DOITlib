@@ -217,6 +217,8 @@ void ADXL345Handler::readInclinations() {
                     lastSentValX = valX;
                     lastSentValY = valY;
                     lastFrameTime = nowFrame; 
+
+                    lastMovementTime = nowFrame;
                     
                     // Actualizamos la referencia con el valor SUAVIZADO actual
                     lastSampleX = currX;
