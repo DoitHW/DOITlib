@@ -494,6 +494,7 @@ LAST_ENTRY_FRAME_T extract_info_from_frameIn(const std::vector<uint8_t> &frame) 
 void send_frame(const FRAME_T &f) {
   int  i      = 0;
   byte dTime  = 0;
+  
 
   #ifdef DEBUG
     DEBUG__________ln(String(COLOR_BRIGHT_WHITE) + "======================================" + COLOR_RESET);
@@ -527,7 +528,7 @@ void send_frame(const FRAME_T &f) {
   // ORIGIN (byte)
   Serial1.write(f.origin); delay(dTime);
   #ifdef DEBUG
-    DEBUG__________ln(String(COLOR_BRIGHT_YELLOW) + "[" + String(++i) + "] Origin = " + String(f.origin, HEX) + COLOR_RESET);
+   // DEBUG__________ln(String(COLOR_BRIGHT_YELLOW) + "[" + String(++i) + "] Origin = " + String(f.origin, HEX) + COLOR_RESET);
   #endif
 
   // ORIGIN MAC[0..4]
@@ -548,12 +549,12 @@ void send_frame(const FRAME_T &f) {
 
   Serial1.write(f.originNS.mac04); delay(dTime);
   #ifdef DEBUG
-    DEBUG__________ln(String(COLOR_BRIGHT_MAGENTA) + "[" + String(++i) + "] Origin MAC[3] = " + String(f.originNS.mac04, HEX) + COLOR_RESET);
+   // DEBUG__________ln(String(COLOR_BRIGHT_MAGENTA) + "[" + String(++i) + "] Origin MAC[3] = " + String(f.originNS.mac04, HEX) + COLOR_RESET);
   #endif
 
   Serial1.write(f.originNS.mac05); delay(dTime);
   #ifdef DEBUG
-    DEBUG__________ln(String(COLOR_BRIGHT_MAGENTA) + "[" + String(++i) + "] Origin MAC[4] = " + String(f.originNS.mac05, HEX) + COLOR_RESET);
+   // DEBUG__________ln(String(COLOR_BRIGHT_MAGENTA) + "[" + String(++i) + "] Origin MAC[4] = " + String(f.originNS.mac05, HEX) + COLOR_RESET);
   #endif
 
   // TARGET TYPE
@@ -619,7 +620,7 @@ void send_frame(const FRAME_T &f) {
   // CHECKSUM
   Serial1.write(f.checksum); delay(dTime);
   #ifdef DEBUG
-    DEBUG__________ln(String(COLOR_BRIGHT_MAGENTA) + "[" + String(++i) + "] Checksum = " + String(f.checksum, HEX) + COLOR_RESET);
+     DEBUG__________ln(String(COLOR_BRIGHT_MAGENTA) + "[" + String(++i) + "] Checksum = " + String(f.checksum, HEX) + COLOR_RESET);
   #endif
 
   // END
@@ -1232,45 +1233,6 @@ FRAME_T frameMaker_SET_BUTTONS_EXTMAP(
 }
 
 //////////////////////////////////////////////////////////////////////////////////////
-
-// void sendRawFrame(const std::vector<byte>& raw) {
-//     if (raw.size() < FRAME_MIN_TOTAL_BYTES) {
-//         DEBUG__________ln("Trama demasiado corta para ser válida");
-//         return;
-//     }
-
-//     FRAME_T f{};
-//     size_t i = 0;
-
-//     f.start          = raw[i++];
-//     f.frameLengthMsb = raw[i++];
-//     f.frameLengthLsb = raw[i++];
-//     f.room           = raw[i++];
-//     f.origin         = raw[i++];
-//     f.originNS.mac01 = raw[i++];
-//     f.originNS.mac02 = raw[i++];
-//     f.originNS.mac03 = raw[i++];
-//     f.originNS.mac04 = raw[i++];
-//     f.originNS.mac05 = raw[i++];
-//     f.targetType     = raw[i++];
-//     f.targetNS.mac01 = raw[i++];
-//     f.targetNS.mac02 = raw[i++];
-//     f.targetNS.mac03 = raw[i++];
-//     f.targetNS.mac04 = raw[i++];
-//     f.targetNS.mac05 = raw[i++];
-//     f.function       = raw[i++];
-//     f.dataLengthMsb  = raw[i++];
-//     f.dataLengthLsb  = raw[i++];
-
-//     int dataLen = (int(f.dataLengthMsb) << 8) | f.dataLengthLsb;
-//     f.data.assign(raw.begin() + i, raw.begin() + i + dataLen);
-//     i += dataLen;
-
-//     f.checksum = raw[i++];
-//     f.end      = raw[i++];
-
-//     send_frame(f);
-// }
 
 constexpr uint8_t OLD_NODE     = 0x01;
 constexpr uint8_t OLD_FUNC     = 0xCB;

@@ -25,6 +25,7 @@ public:
     void sendSensorValueDouble(const SENSOR_DOUBLE_T &sensorValue);
     void enableActivityInterrupt(uint16_t threshold_mg, bool enX, bool enY, bool enZ);
     void clearInterrupts();
+    bool isInitialized() const { return initialized; }
 
 private:
     Adafruit_ADXL345_Unified accel;
@@ -43,6 +44,10 @@ private:
     bool         movementDetectedLast = false;
     float        lastSampleX = 0, lastSampleY = 0;
 
+    // --- NUEVO: Control de envío duplicado y throttling ---
+    long          lastSentValX = -99999; // Valor imposible inicial
+    long          lastSentValY = -99999; // Valor imposible inicial
+    unsigned long lastFrameTime = 0;     // Para controlar los 100ms
 };
 
 // Declaración de variable global para el control del ADXL345

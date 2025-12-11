@@ -9,16 +9,30 @@ ADXL345Handler adxl345Handler;
 
 // Constructor
 ADXL345Handler::ADXL345Handler() 
-    : accel(Adafruit_ADXL345_Unified(12345)), /*lastInclination(0.0),*/ threshold(0.4), thresholdBinary(0.7), initialized(false) {}
+    : accel(Adafruit_ADXL345_Unified(12345)), 
+      threshold(1.0), 
+      thresholdBinary(1.0), 
+      initialized(false),
+      lastSentValX(-99999), 
+      lastSentValY(-99999), 
+      lastFrameTime(0) {}
 
 // Inicialización del ADXL345
 void ADXL345Handler::init()
 {
+    // Si ya estaba activo, lo cerramos para reiniciar limpio
+    if (initialized) {
+        Wire.end(); 
+    }
+
+    // Iniciamos Wire forzando los pines explícitamente
     Wire.begin(SDA_ADXL_PIN, SCL_ADXL_PIN);
-    Wire.setClock(100000); // Reducir la velocidad I2C para mayor estabilidad
+    Wire.setClock(100000); // 100kHz es más estable para cables largos/compartidos
+
     const int maxAttempts = 3;
     int attempt = 0;
     bool detected = false;
+    
     while (attempt < maxAttempts)
     {
         if (accel.begin())
@@ -29,24 +43,27 @@ void ADXL345Handler::init()
         else
         {
             DEBUG__________ln("ADXL345 no detectado, reintentando...");
-            delay(500); // Espera antes del siguiente intento
+            
+            // Intento de recuperación leve dentro del bucle
+            Wire.end();
+            delay(50);
+            Wire.begin(SDA_ADXL_PIN, SCL_ADXL_PIN);
+            delay(100); 
         }
         attempt++;
     }
 
     if (!detected)
     {
-        DEBUG__________ln("ADXL345 no detectado");
+        DEBUG__________ln("ADXL345 no detectado tras varios intentos.");
         initialized = false;
         return;
     }
 
-    //accel.setRange(ADXL345_RANGE_16_G);
     accel.setRange(ADXL345_RANGE_2_G);
     initialized = true;
     DEBUG__________ln("ADXL345 inicializado correctamente");
 }
-
 // Función para convertir la inclinación en un valor escalado
 long ADXL345Handler::convertInclinationToValue(float inclination) {
     long scaledInclination = inclination * 100;
@@ -96,7 +113,7 @@ void ADXL345Handler::end()
 void ADXL345Handler::readInclinations() {
     if (!initialized || !adxl) return;
 
-    // 1) Leemos siempre, pero procesamos sólo cada movementSampleInterval
+    // 1) Control de tiempo (50ms)
     unsigned long now = millis();
     if (now - lastSampleTime < movementSampleInterval) return;
     lastSampleTime = now;
@@ -104,80 +121,110 @@ void ADXL345Handler::readInclinations() {
     sensors_event_t event;
     if (!accel.getEvent(&event)) return;
 
-    float currX = event.acceleration.x;
-    float currY = event.acceleration.y;
+    // --- NUEVO: FILTRO PASO BAJO (Suavizado) ---
+    // Usamos variables estáticas para guardar el estado del filtro entre llamadas
+    static float smoothX = 0;
+    static float smoothY = 0;
+    static bool firstRun = true;
 
-    // 2) Obtenemos el flag binario
+    if (firstRun) {
+        // Inicializamos el filtro con el primer valor real para evitar saltos al inicio
+        smoothX = event.acceleration.x;
+        smoothY = event.acceleration.y;
+        
+        // Inicializamos la referencia de movimiento para evitar disparo al arrancar
+        lastSampleX = smoothX;
+        lastSampleY = smoothY;
+        
+        firstRun = false;
+        return; 
+    }
+
+    // Factor de suavizado (Alpha). 
+    // 0.2 = Muy suave (elimina mucho ruido, un pelín de lag). 
+    // 0.5 = Respuesta rápida (menos filtrado).
+    // Con tus picos de ruido, 0.2 es ideal.
+    float alpha = 0.2; 
+
+    // Aplicamos el filtro:
+    smoothX = (event.acceleration.x * alpha) + (smoothX * (1.0 - alpha));
+    smoothY = (event.acceleration.y * alpha) + (smoothY * (1.0 - alpha));
+
+    // Usamos los valores SUAVIZADOS para toda la lógica
+    float currX = smoothX;
+    float currY = smoothY;
+    // ---------------------------------------------
+
     byte modeConfig[2] = {0};
     getModeConfig(elementFiles[currentIndex], currentModeIndex, modeConfig);
     bool isBinary = getModeFlag(modeConfig, HAS_BINARY_SENSORS);
 
-    // 3) Calculamos la diferencia
-    float diffX = abs(currX - lastSampleX);
-    float diffY = abs(currY - lastSampleY);
-
-    // DEBUG__________printf(
-    //   "currX=%.2f, lastSampleX=%.2f, diffX=%.2f | currY=%.2f, lastSampleY=%.2f, diffY=%.2f\n",
-    //   currX, lastSampleX, diffX,
-    //   currY, lastSampleY, diffY
-    // );
-
-    // 4) Si es binario, gestionamos ON inmediato y OFF tras inactivityTimeout
     if (isBinary) {
-        bool movementDetected = (diffX >= thresholdBinary ||
-                                 diffY >= thresholdBinary);
+        float diffX = abs(currX - lastSampleX);
+        float diffY = abs(currY - lastSampleY);
+        bool movementDetected = (diffX >= thresholdBinary || diffY >= thresholdBinary);
 
-        // Inicio de movimiento → enviar ‘1’ de inmediato
         if (movementDetected && !movementDetectedLast) {
-        TARGETNS ns = getCurrentElementNS();
-        SENSOR_DOUBLE_T binVal = {0,0, 0,1, 0,1, 0,0, 0,0, 0,0};;
-        send_frame(frameMaker_SEND_SENSOR_VALUE(
-        DEFAULT_BOTONERA,     // origin = la botonera
-        DEFAULT_DEVICE,       // targetType = un dispositivo normal
-        ns,                  // el número de serie del elemento actual
-        binVal
-        ));
-
+            TARGETNS ns = getCurrentElementNS();
+            SENSOR_DOUBLE_T binVal = {0,0, 0,1, 0,1, 0,0, 0,0, 0,0};
+            send_frame(frameMaker_SEND_SENSOR_VALUE(DEFAULT_BOTONERA, DEFAULT_DEVICE, ns, binVal));
             movementDetectedLast = true;
         }
+        if (movementDetected) lastMovementTime = now;
 
-        // Cada vez que haya movimiento, actualizamos el timestamp
-        if (movementDetected) {
-            lastMovementTime = now;
-        }
-
-        // Si llevamos inactivityTimeout sin movimiento → enviar ‘0’
-        if (movementDetectedLast &&
-            (now - lastMovementTime >= inactivityTimeout)) {
+        if (movementDetectedLast && (now - lastMovementTime >= inactivityTimeout)) {
             TARGETNS ns = getCurrentElementNS();
-            SENSOR_DOUBLE_T binVal = {0,0, 0,1, 0,0, 0,0, 0,0, 0,0};  // min=0,max=1,val=0
-            send_frame(frameMaker_SEND_SENSOR_VALUE(
-            DEFAULT_BOTONERA,     // origin = la botonera
-            DEFAULT_DEVICE,       // targetType = un dispositivo normal
-            ns,                  // el número de serie del elemento actual
-            binVal
-            ));
+            SENSOR_DOUBLE_T binVal = {0,0, 0,1, 0,0, 0,0, 0,0, 0,0};
+            send_frame(frameMaker_SEND_SENSOR_VALUE(DEFAULT_BOTONERA, DEFAULT_DEVICE, ns, binVal));
             movementDetectedLast = false;
         }
-    }
+        lastSampleX = currX;
+        lastSampleY = currY;
+    } 
     else {
-        // Comportamiento analógico original: sólo cuando supera umbral
-        bool movementDetected = (diffX >= threshold || diffY >= threshold);
-        if (movementDetected) {
-            // Limita y convierte igual que antes
-            currX = constrain(currX, -10, 10);
-            currY = constrain(currY, -10, 10);
-            long valX = convertInclinationToValue(currX);
-            long valY = convertInclinationToValue(currY);
-            SENSOR_DOUBLE_T sensorVal = createSensorDoubleValue(valX, valY);
-            sendSensorValueDouble(sensorVal);
-            //lastInclinationX = currX;
-            //lastInclinationY = currY;
+        // --- LÓGICA ANALÓGICA ACUMULATIVA (Usando valores suavizados) ---
+        
+        float diffX = abs(currX - lastSampleX);
+        float diffY = abs(currY - lastSampleY);
+
+        // Mantenemos tu threshold de 1.2 (es correcto para filtrar, el filtro de software ayuda extra)
+        bool triggerX = (diffX >= threshold);
+        bool triggerY = (diffY >= threshold);
+        
+        if (triggerX || triggerY) {
+            
+            long valXraw = constrain(currX, -10, 10);
+            long valYraw = constrain(currY, -10, 10);
+            long valX = convertInclinationToValue(valXraw);
+            long valY = convertInclinationToValue(valYraw);
+
+            unsigned long nowFrame = millis();
+            
+            if (nowFrame - lastFrameTime >= 70) {
+                
+                if (valX != lastSentValX || valY != lastSentValY) {
+                    
+                    String axisCause = "";
+                    if (triggerX) axisCause += "[X🟢]";
+                    if (triggerY) axisCause += "[Y🛑]";
+
+                    // DEBUG__________printf("🚀 TX | Causa: %s | DiffAcum: [X=%.2f Y=%.2f] | Send: [X=%ld Y=%ld]\n", 
+                    //                       axisCause.c_str(), diffX, diffY, valX, valY);
+
+                    SENSOR_DOUBLE_T sensorVal = createSensorDoubleValue(valX, valY);
+                    sendSensorValueDouble(sensorVal);
+
+                    lastSentValX = valX;
+                    lastSentValY = valY;
+                    lastFrameTime = nowFrame; 
+                    
+                    // Actualizamos la referencia con el valor SUAVIZADO actual
+                    lastSampleX = currX;
+                    lastSampleY = currY;
+                }
+            }
         }
     }
-    // Actualizar referencia para siguiente comparación
-    lastSampleX = currX;
-    lastSampleY = currY;
 }
 
 SENSOR_DOUBLE_T ADXL345Handler::createSensorDoubleValue(long finalValueX, long finalValueY) {

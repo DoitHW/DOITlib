@@ -55,6 +55,36 @@ String generateUniqueFileName(const char* baseName) {
 }
 
 
+// bool readElementData(fs::File& f, char* elementName, char* modeName, int& startX, int& startY) {
+//     // Leer nombre del elemento
+//     f.seek(OFFSET_NAME, SeekSet);
+//     f.read((uint8_t*)elementName, 24);
+//     elementName[23] = 0;
+
+//     // Leer nombre del modo actual
+//     byte currentMode;
+//     f.seek(OFFSET_CURRENTMODE, SeekSet);
+//     f.read(&currentMode, 1);
+
+//     f.seek(OFFSET_MODES + (SIZE_MODE * currentMode), SeekSet);
+//     f.read((uint8_t*)modeName, 24);
+//     modeName[23] = 0;
+
+//     // Calcular posiciones del icono
+//     startX = (tft.width() - 64) / 2;
+//     startY = (tft.height() - 64) / 2 - 20;
+
+//     // Leer situación
+//     f.seek(OFFSET_SITUACION, SeekSet);
+//     byte situacionByte = 0;
+//     f.read(&situacionByte, 1);
+//     // Puedes usarlo si quieres mostrarlo o pasarlo por referencia
+
+
+//     return true;
+// }
+
+
 bool readElementData(fs::File& f, char* elementName, char* modeName, int& startX, int& startY) {
     // Leer nombre del elemento
     f.seek(OFFSET_NAME, SeekSet);
@@ -62,13 +92,24 @@ bool readElementData(fs::File& f, char* elementName, char* modeName, int& startX
     elementName[23] = 0;
 
     // Leer nombre del modo actual
-    byte currentMode;
+    byte currentMode = 0;
     f.seek(OFFSET_CURRENTMODE, SeekSet);
-    f.read(&currentMode, 1);
+    if (f.read(&currentMode, 1) != 1) {
+        currentMode = 0; // fallback defensivo
+    }
 
-    f.seek(OFFSET_MODES + (SIZE_MODE * currentMode), SeekSet);
-    f.read((uint8_t*)modeName, 24);
-    modeName[23] = 0;
+    constexpr byte MAX_KNOWN_CMODE = 8;
+
+    if (currentMode > MAX_KNOWN_CMODE) {
+        // CMODE > 8 → mostrar texto genérico
+        strncpy(modeName, "DESCONOCIDO", 24);
+        modeName[23] = 0;
+    } else {
+        // CMODE válido → leer nombre desde la tabla de modos
+        f.seek(OFFSET_MODES + (SIZE_MODE * currentMode), SeekSet);
+        f.read((uint8_t*)modeName, 24);
+        modeName[23] = 0;
+    }
 
     // Calcular posiciones del icono
     startX = (tft.width() - 64) / 2;
@@ -79,7 +120,6 @@ bool readElementData(fs::File& f, char* elementName, char* modeName, int& startX
     byte situacionByte = 0;
     f.read(&situacionByte, 1);
     // Puedes usarlo si quieres mostrarlo o pasarlo por referencia
-
 
     return true;
 }

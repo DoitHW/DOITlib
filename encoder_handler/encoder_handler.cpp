@@ -442,7 +442,7 @@ void handleEncoder() noexcept
         if (shouldQuery) {
             pendingQueryNS = nsToQuery;   // ← el NS al que preguntas el CMODE
             awaitingResponse = true;
-
+            delay(10);
             send_frame(frameMaker_REQ_ELEM_SECTOR(
                 DEFAULT_BOTONERA,
                 TARGET_TYPE_DEVICE,
@@ -450,7 +450,7 @@ void handleEncoder() noexcept
                 (byte) currentLanguage,
                 ELEM_CMODE_SECTOR
             ));
-
+            delay(50);
             lastModeQueryTime       = millis();
             pendingQueryIndex       = currentIndex;
             awaitingResponse        = true;
