@@ -76,6 +76,9 @@ void saveLanguageToSPIFFS(Language lang);
 Language loadLanguageFromSPIFFS();
 void saveSoundSettingsToSPIFFS();
 void loadSoundSettingsFromSPIFFS();
+void    saveMicSilenceThresholdToSPIFFS(uint8_t value);
+uint8_t loadMicSilenceThresholdFromSPIFFS();
+
 
 // --- NS/MAC propia de la BOTONERA ---
 TARGETNS getOwnNS();                    

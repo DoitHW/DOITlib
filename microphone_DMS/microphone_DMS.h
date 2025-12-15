@@ -43,6 +43,7 @@ class MICROPHONE_{
         void calibracionInicial(unsigned long duracionCalibracion);
         void updateSoundTime() { lastSoundTime = millis(); }
         unsigned long getLastSoundTime() const { return lastSoundTime; }
+        bool isActive() const;
         
 };
 

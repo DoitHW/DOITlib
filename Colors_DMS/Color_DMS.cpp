@@ -17,6 +17,7 @@
 
 #ifdef MIC
   extern MICROPHONE_ doitMic;
+  extern int micSensRuntime;
 #endif
 
 extern ELEMENT_ *element;

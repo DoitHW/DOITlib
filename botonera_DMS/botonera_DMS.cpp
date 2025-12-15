@@ -1219,11 +1219,6 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
             break;
         }
 
-        case F_SET_ELEM_MODE: {
-            // Reservado; no usamos IDs.
-            break;
-        }
-
         case F_SEND_FLAG_BYTE: {
             if (LEF.data.empty()) {
                 DEBUG__________ln("F_SEND_FLAG_BYTE sin datos. Ignorado.");
@@ -1247,10 +1242,6 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
             break;
         }
 
-        case F_SEND_COLOR: {
-            break;
-        }
-
         case F_SEND_PATTERN_NUM: {
             if (LEF.data.empty()) {
                 #ifdef DEBUG
@@ -1262,7 +1253,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
             #ifdef DEBUG
             DEBUG__________printf("F_SEND_PATTERN_NUM bank=0x%02X, file=%u\n", AMBIENTS_BANK, pattern);
             #endif
-            doitPlayer.play_file(AMBIENTS_BANK, pattern);
+            doitPlayer.play_file(AMBIENTS_BANK, pattern + 1);
             break;
         }
 
@@ -1273,11 +1264,6 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
             } else {
                 DEBUG__________ln("F_SEND_FILE_NUM con datos insuficientes.");
             }
-            break;
-        }
-
-        case F_SEND_RESPONSE: {
-            DEBUG__________ln("Recibido un RESPONSE");
             break;
         }
 

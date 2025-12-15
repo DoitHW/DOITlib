@@ -28,6 +28,9 @@ void display_wakeup();
 void drawLanguageMenu(int selection);
 void drawBankSelectionMenu(const std::vector<byte>& bankList, const std::vector<bool>& selectedBanks, int currentSelection, int windowOffset);
 void drawBrightnessMenu();
+#ifdef MIC
+void drawMicCalibMenu(uint8_t editingThreshold, uint8_t liveRaw, bool showSaved);
+#endif
 void drawSunIcon(int16_t x, int16_t y, uint16_t color);
 void drawSoundMenu(int selection);
 //void scrollTextTickerBounceSound(int selection);

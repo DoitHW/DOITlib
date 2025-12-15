@@ -786,18 +786,7 @@ enum SECTOR_LIST{
   ELEM_COLORPAD_BTN_MAP
 };
 
-enum AMBIENTS{
 
-  RAIN,
-  BEACH,
-  SPACE,
-  CITY,
-  ZEN,
-  OCEAN,
-  AURORA,
-  FOREST,
-  NEUTRAL
-};
 
 
 #define TT1 &TomThumb

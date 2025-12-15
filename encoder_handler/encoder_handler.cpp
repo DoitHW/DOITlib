@@ -55,6 +55,69 @@ byte selectedVolume = 0; // 0 = Normal, 1 = Atenuado
 bool formatSubMenuActive = false;
 int formatMenuSelection = 0;
 
+#ifdef MIC
+extern MICROPHONE_ doitMic;
+extern uint8_t micSilenceThreshold;  // ✅
+bool micCalibMenuActive = false;
+extern int micSensRuntime;
+
+void saveMicSilenceThresholdToSPIFFS(uint8_t value);
+void drawMicCalibMenu(uint8_t editingThreshold, uint8_t liveRaw, bool showSaved);
+#endif
+
+// ============================================================
+// Helpers: leer modo activo real y restaurar patrón/máscara
+// ============================================================
+
+static uint8_t readActiveModeIndexForFile(const String& file) noexcept
+{
+    // Elementos “especiales” (RAM)
+    if (file == "Ambientes")   return (uint8_t)ambientesOption.currentMode;
+    if (file == "Fichas")      return (uint8_t)fichasOption.currentMode;
+    if (file == "Dado")        return (uint8_t)dadoOption.currentMode;
+    if (file == "Apagar")      return (uint8_t)apagarSala.currentMode;
+    if (file == "Comunicador") return (uint8_t)comunicadorOption.currentMode;
+
+    // Elementos en SPIFFS
+    fs::File f = SPIFFS.open(file, "r");
+    if (!f) return 0;
+
+    uint8_t m = 0;
+    if (f.seek(OFFSET_CURRENTMODE, SeekSet)) {
+        (void)f.read(&m, 1);
+    }
+    f.close();
+
+    if (m >= 16) m = 0;
+    return m;
+}
+
+static void applyModePatternForFile(const String& file, uint8_t mode) noexcept
+{
+    colorHandler.setCurrentFile(file);
+    colorHandler.setPatternBotonera(mode, ledManager);
+}
+
+static void restoreActiveModePatternForFile(const String& file) noexcept
+{
+    const uint8_t activeMode = readActiveModeIndexForFile(file);
+    applyModePatternForFile(file, activeMode);
+}
+
+static void applyPreviewPatternOrRestoreOnBack(const String& file, int realModeIndex) noexcept
+{
+    if (realModeIndex >= 0) {
+        applyModePatternForFile(file, (uint8_t)realModeIndex);
+        return;
+    }
+
+    // -2 == Volver
+    if (realModeIndex == -2) {
+        restoreActiveModePatternForFile(file);
+    }
+}
+
+
 /**
  * @brief Inicializa el encoder rotativo y su pulsador asociado.
  * 
@@ -271,6 +334,9 @@ void handleEncoder() noexcept
     if (ignoreInputs           ) return;
     if (confirmEnableDadoActive) { handleConfirmEnableDadoMenu(); return; }
     if (extraElementsMenuActive) { handleExtraElementsMenu(); return; }
+    #ifdef MIC
+    if (micCalibMenuActive) { handleMicCalibMenu(); return; }
+    #endif
 
     // 5) Menú selección de bancos
     if (bankSelectionActive) {
@@ -405,16 +471,15 @@ void handleEncoder() noexcept
             }
         }
         else if (inModesScreen && totalModes > 0) {
-            // Cambio de modo
             const int newIndex = currentModeIndex + direction;
             if (newIndex >= 0 && newIndex < totalModes) {
                 currentModeIndex = newIndex;
+
+                const String file = elementFiles[currentIndex];
                 const int realModeIndex = globalVisibleModesMap[currentModeIndex];
-                if (realModeIndex >= 0) {
-                    String file = elementFiles[currentIndex];
-                    colorHandler.setCurrentFile(file);
-                    colorHandler.setPatternBotonera(realModeIndex, ledManager);
-                }
+
+                //si el cursor cae en "Volver", restaurar el modo activo real
+                applyPreviewPatternOrRestoreOnBack(file, realModeIndex);
                 drawModesScreen();
             }
         }
@@ -440,7 +505,7 @@ void handleEncoder() noexcept
         }
 
         if (shouldQuery) {
-            pendingQueryNS = nsToQuery;   // ← el NS al que preguntas el CMODE
+            pendingQueryNS = nsToQuery;
             awaitingResponse = true;
             delay(10);
             send_frame(frameMaker_REQ_ELEM_SECTOR(
@@ -812,12 +877,14 @@ void handleEncoder() noexcept
  *  - Escrituras en SPIFFS (modo r+) pueden afectar a la vida útil si se invoca con mucha frecuencia.
  *  - Función pensada para ejecutarse desde el bucle principal (no ISR).
  */
+
 void handleModeSelection(const String& currentFile) noexcept
 {
     constexpr int  kMaxModesPerFile    = 16;
     constexpr int  kModeNameLen        = 32;     // name = 32
     constexpr int  kModeConfigOffset   = 216;
     constexpr unsigned long kInterCmdDelayMs = 300UL;
+    constexpr unsigned long kPostSetModeDelayMs = 50UL;
 
     if (elementFiles.empty()) return;
     if ((size_t)currentIndex >= elementFiles.size()) return;
@@ -826,32 +893,55 @@ void handleModeSelection(const String& currentFile) noexcept
         return (size_t)currentIndex < selectedStates.size();
     };
 
-    // 1) "Regresar"
-    bool isRegresar = false;
+    auto startCModeQuery = [&](const TARGETNS& ns) {
+        // Ventana de espera CMODE (solo si no hay otra en curso)
+        if (!awaitingResponse) {
+            pendingQueryNS          = ns;
+            pendingQueryIndex       = currentIndex;
+            lastModeQueryTime       = millis();
+            awaitingResponse        = true;
+            frameReceived           = false;
+            lastQueriedElementIndex = currentIndex; // evita re-REQ inmediato por foco
+
+            send_frame(frameMaker_REQ_ELEM_SECTOR(
+                DEFAULT_BOTONERA,
+                DEFAULT_DEVICE,
+                ns,
+                (byte)currentLanguage,
+                ELEM_CMODE_SECTOR
+            ));
+        }
+    };
+
+    // 1) "Volver" (acción especial)
+    bool isBack = false;
     if ((size_t)currentModeIndex < sizeof(globalVisibleModesMap)/sizeof(globalVisibleModesMap[0])) {
-        isRegresar = (globalVisibleModesMap[currentModeIndex] == -2);
+        isBack = (globalVisibleModesMap[currentModeIndex] == -2);
     }
-    if (isRegresar) {
+    if (isBack) {
+        // Importantísimo: restaurar patrón del modo REAL del elemento
+        restoreActiveModePatternForFile(currentFile);
         inModesScreen = false;
         drawCurrentElement();
         return;
     }
 
-    // 2) Encender/Apagar (NO aplica a “Fichas”)
-    if (currentModeIndex == 0 /*&& currentFile != "Fichas"*/) {
+    // 2) Encender/Apagar (índice visible 0)
+    if (currentModeIndex == 0) {
+
         if (!hasSelectedIndex()) { inModesScreen = false; drawCurrentElement(); return; }
 
         const bool wasSelected = selectedStates[currentIndex];
         selectedStates[currentIndex] = !wasSelected;
 
+        // Fichas: solo estado visual
         if (currentFile == "Fichas") {
-        // Solo cambiamos el estado visual (verde/no verde),
-        // no se envían frames ni se toca SPIFFS.
-        inModesScreen = false;
-        drawCurrentElement();
-        return;
-    }
+            inModesScreen = false;
+            drawCurrentElement();
+            return;
+        }
 
+        // Ambientes
         if (currentFile == "Ambientes") {
             TARGETNS bcast = {0,0,0,0,0};
             if (selectedStates[currentIndex]) {
@@ -863,10 +953,15 @@ void handleModeSelection(const String& currentFile) noexcept
                 doitPlayer.stop_file();
                 ambienteActivo = false;
             }
+            inModesScreen = false; drawCurrentElement(); return;
         }
-        else if (currentFile == "Dado") {
+
+        // Dado
+        if (currentFile == "Dado") {
             const uint8_t basicModeIndex = 1;
+
             if (isDadoEnabled()) { Serial1.write(0xDA); delay(kInterCmdDelayMs); }
+
             TARGETNS dadoNS = {0}; memcpy(&dadoNS, dadoOption.serialNum, 5);
 
             if (selectedStates[currentIndex]) {
@@ -880,65 +975,54 @@ void handleModeSelection(const String& currentFile) noexcept
             }
             inModesScreen = false; drawCurrentElement(); return;
         }
-        else if (currentFile != "Apagar") {
+
+        // Elemento SPIFFS (no "Apagar")
+        if (currentFile != "Apagar") {
             fs::File f = SPIFFS.open(currentFile, "r+");
             if (f) {
                 TARGETNS elemNS = getCurrentElementNS();
 
                 if (selectedStates[currentIndex]) {
-                    // ENCENDER → START + REQ_ELEM_SECTOR(CMODE)
-                    send_frame(frameMaker_SEND_COMMAND(
-                        DEFAULT_BOTONERA, DEFAULT_DEVICE, elemNS, START_CMD
-                    ));
+                    // ENCENDER → START + (opcional) REQ CMODE
+                    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, DEFAULT_DEVICE, elemNS, START_CMD));
                     delay(100);
 
-                    // Abrir ventana de espera de CMODE SOLO si no hay otra en curso
-                    if (!isSpecialFile(currentFile) && !awaitingResponse) {
-                        pendingQueryNS        = elemNS;      // NS al que preguntas CMODE
-                        pendingQueryIndex     = currentIndex;
-                        lastModeQueryTime     = millis();
-                        awaitingResponse      = true;
-                        frameReceived         = false;
-                        lastQueriedElementIndex = currentIndex; // evita re-REQ inmediato por foco
-
-                        send_frame(frameMaker_REQ_ELEM_SECTOR(
-                            DEFAULT_BOTONERA,
-                            DEFAULT_DEVICE,
-                            elemNS,
-                            (byte) currentLanguage,
-                            ELEM_CMODE_SECTOR
-                        ));
+                    if (!isSpecialFile(currentFile)) {
+                        startCModeQuery(elemNS);
                     }
 
-                    // Forzar modo básico en SPIFFS (asunción local inmediata)
-                    byte basicMode = DEFAULT_BASIC_MODE;
+                    // Forzar modo básico en SPIFFS
+                    const uint8_t basicMode = DEFAULT_BASIC_MODE;
                     f.seek(OFFSET_CURRENTMODE, SeekSet);
                     f.write(&basicMode, 1);
 
                     // Mapeo inmediato de LEDs según modo básico
-                    byte cfg[2] = {0};
+                    uint8_t cfg[2] = {0};
                     const size_t cfgOffset =
                         (size_t)OFFSET_MODES +
                         (size_t)basicMode * (size_t)SIZE_MODE +
                         (size_t)kModeConfigOffset;
+
                     if (f.seek(cfgOffset, SeekSet)) {
                         (void)f.read(cfg, 2);
                     }
+
                     adxl   = getModeFlag(cfg, HAS_SENS_VAL_1);
                     useMic = getModeFlag(cfg, HAS_SENS_VAL_2);
 
                     colorHandler.setCurrentFile(currentFile);
                     colorHandler.setPatternBotonera(basicMode, ledManager);
+
                 } else {
-                    // APAGAR: dejas esta rama EXACTAMENTE igual que ahora
+                    // APAGAR
                     send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, DEFAULT_DEVICE, elemNS, BLACKOUT));
 
-                    byte basicMode = DEFAULT_BASIC_MODE;
+                    const uint8_t basicMode = DEFAULT_BASIC_MODE;
                     f.seek(OFFSET_CURRENTMODE, SeekSet);
                     f.write(&basicMode, 1);
 
                     const int OFFSET_ALTERNATE_STATES = OFFSET_CURRENTMODE + 1;
-                    byte zeros[kMaxModesPerFile] = {0};
+                    uint8_t zeros[kMaxModesPerFile] = {0};
                     f.seek(OFFSET_ALTERNATE_STATES, SeekSet);
                     f.write(zeros, sizeof(zeros));
                     elementAlternateStates[currentFile].assign(
@@ -954,15 +1038,17 @@ void handleModeSelection(const String& currentFile) noexcept
                     colorHandler.setCurrentFile(currentFile);
                     colorHandler.setPatternBotonera(0, ledManager);
                 }
+
                 f.close();
             }
         }
 
-        inModesScreen = false; drawCurrentElement(); return;
+        inModesScreen = false;
+        drawCurrentElement();
+        return;
     }
 
-    // 3) Selección de modo
-    // ⚠️ En “Fichas” el índice visible = índice real (NO restar 1)
+    // 3) Selección de modo (índice visible -> real)
     const int adjustedVisibleIndex = currentModeIndex - 1;
 
     String  modeName;
@@ -974,6 +1060,7 @@ void handleModeSelection(const String& currentFile) noexcept
             (currentFile == "Ambientes") ? &ambientesOption :
             (currentFile == "Fichas")    ? &fichasOption    :
                                            &dadoOption;
+
         int count = 0;
         for (int i = 0; i < kMaxModesPerFile; i++) {
             if (strlen((char*)option->mode[i].name) > 0 &&
@@ -995,11 +1082,14 @@ void handleModeSelection(const String& currentFile) noexcept
             int count = 0;
             for (int i = 0; i < kMaxModesPerFile; i++) {
                 char buf[kModeNameLen+1] = {0};
-                byte tempCfg[2] = {0};
+                uint8_t tempCfg[2] = {0};
+
                 f.seek(OFFSET_MODES + i * SIZE_MODE, SeekSet);
                 f.read((uint8_t*)buf, kModeNameLen);
+
                 f.seek(OFFSET_MODES + i * SIZE_MODE + kModeConfigOffset, SeekSet);
                 f.read(tempCfg, 2);
+
                 if (strlen(buf) > 0 && checkMostSignificantBit(tempCfg)) {
                     if (count == adjustedVisibleIndex) {
                         realModeIndex = i;
@@ -1010,8 +1100,11 @@ void handleModeSelection(const String& currentFile) noexcept
                     ++count;
                 }
             }
+
+            const uint8_t realModeU8 = (uint8_t)realModeIndex;
             f.seek(OFFSET_CURRENTMODE, SeekSet);
-            f.write((uint8_t*)&realModeIndex, 1);
+            f.write(&realModeU8, 1);
+
             f.close();
         }
     }
@@ -1030,7 +1123,6 @@ void handleModeSelection(const String& currentFile) noexcept
         send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, 0xFF, bcast, realModeIndex));
     }
     else if (currentFile == "Fichas") {
-        // ← NO enviar frames (elemento en RAM)
         fichasOption.currentMode = realModeIndex;
 
         TOKEN_MODE_ tmode = (realModeIndex == 1) ? TOKEN_PARTNER_MODE :
@@ -1038,7 +1130,6 @@ void handleModeSelection(const String& currentFile) noexcept
                                                    TOKEN_BASIC_MODE;
         token.set_mode(tmode);
 
-        // Limpiar estados residuales al cambiar de modo
         token.waitingForPartner = false;
         memset(&token.propossedToken, 0, sizeof(token.propossedToken));
 
@@ -1047,52 +1138,38 @@ void handleModeSelection(const String& currentFile) noexcept
     }
     else if (currentFile == "Dado") {
         TARGETNS dadoNS = {0}; memcpy(&dadoNS, dadoOption.serialNum, 5);
+
         if (!wasAlreadySelected && isDadoEnabled()) {
             Serial1.write(0xDA);
             delay(kInterCmdDelayMs);
             send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, DEFAULT_DEVICE, dadoNS, START_CMD));
             delay(kInterCmdDelayMs);
         }
+
         send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, DEFAULT_DEVICE, dadoNS, realModeIndex));
     }
     else if (currentFile != "Apagar") {
         TARGETNS elemNS = getCurrentElementNS();
 
+        // Si estaba apagado: START → (delay) → SET_MODE → (delay corto) → REQ CMODE
         if (!wasAlreadySelected) {
-            // START + REQ_ELEM_SECTOR(CMODE) al encender desde off
-            send_frame(frameMaker_SEND_COMMAND(
-                DEFAULT_BOTONERA, DEFAULT_DEVICE, elemNS, START_CMD
-            ));
-
-            if (!isSpecialFile(currentFile) && !awaitingResponse) {
-                pendingQueryNS        = elemNS;
-                pendingQueryIndex     = currentIndex;
-                lastModeQueryTime     = millis();
-                awaitingResponse      = true;
-                frameReceived         = false;
-                lastQueriedElementIndex = currentIndex;
-
-                send_frame(frameMaker_REQ_ELEM_SECTOR(
-                    DEFAULT_BOTONERA,
-                    DEFAULT_DEVICE,
-                    elemNS,
-                    (byte) currentLanguage,
-                    ELEM_CMODE_SECTOR
-                ));
-            }
-
+            send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, DEFAULT_DEVICE, elemNS, START_CMD));
             delay(kInterCmdDelayMs);
         }
 
         // Siempre aplicamos el modo elegido
-        send_frame(frameMaker_SET_ELEM_MODE(
-            DEFAULT_BOTONERA, DEFAULT_DEVICE, elemNS, realModeIndex
-        ));
-            
+        send_frame(frameMaker_SET_ELEM_MODE(DEFAULT_BOTONERA, DEFAULT_DEVICE, elemNS, realModeIndex));
+        delay(kPostSetModeDelayMs);
+
+        // Tu nuevo requisito: preguntar CMODE DESPUÉS de fijar el modo (solo al encender desde OFF)
+        if (!wasAlreadySelected && !isSpecialFile(currentFile)) {
+            startCModeQuery(elemNS);
+        }
+
         if (getModeFlag(modeConfig, HAS_ALTERNATIVE_MODE) &&
             currentAlternateStates.size() > (size_t)adjustedVisibleIndex)
         {
-            delay(30);
+            delay(50);
             send_frame(frameMaker_SEND_COMMAND(
                 DEFAULT_BOTONERA, DEFAULT_DEVICE, elemNS,
                 currentAlternateStates[adjustedVisibleIndex]
@@ -1102,8 +1179,13 @@ void handleModeSelection(const String& currentFile) noexcept
         }
     }
 
-    if (!bankSelectionActive) { inModesScreen = false; drawCurrentElement(); }
-    else { inModesScreen = false; drawBankSelectionMenu(bankList, selectedBanks, bankMenuCurrentSelection, bankMenuWindowOffset); }
+    if (!bankSelectionActive) {
+        inModesScreen = false;
+        drawCurrentElement();
+    } else {
+        inModesScreen = false;
+        drawBankSelectionMenu(bankList, selectedBanks, bankMenuCurrentSelection, bankMenuWindowOffset);
+    }
 }
 
 
@@ -1122,6 +1204,7 @@ void handleModeSelection(const String& currentFile) noexcept
  * @note El tamaño del vector para "Ambientes"/"Fichas" depende del número de modos visibles.
  * @warning Se asume que `option->mode[i].name` está correctamente terminado en '\0'.
  */
+
 std::vector<bool> initializeAlternateStates(const String &currentFile) noexcept
 {
     constexpr int kMaxModesPerFile = 16;
@@ -1188,6 +1271,127 @@ std::vector<bool> initializeAlternateStates(const String &currentFile) noexcept
 int lastEncoderCount = 0;
 bool encoderPressed = false;
 bool ignoreFirstRelease = true;
+
+
+
+#ifdef MIC
+static void handleMicCalibMenu()
+{
+    static bool firstEntry = true;
+
+    static bool encoderPressed = false;
+    static bool ignoreFirstRelease = false;
+
+    static int32_t lastCount = 0;
+    static uint8_t editing = 5;
+
+    static unsigned long lastPreviewMs = 0;
+    static uint8_t liveRaw = 0;
+
+    // Para saber si el menú arrancó el micro o ya venía activo por “Modo Voz”
+    static bool startedMicHere = false;
+
+    // Feedback “Guardado” sin bloquear
+    static bool pendingExit = false;
+    static unsigned long savedAt = 0;
+
+    // --- Entrada al menú ---
+    if (firstEntry) {
+        firstEntry = false;
+        pendingExit = false;
+
+        // Si el micro no está activo (menú principal), actívalo para poder previsualizar
+        if (!doitMic.isActive()) {
+            doitMic.begin();              // tu begin() es void; marca estado interno
+            startedMicHere = true;
+        } else {
+            startedMicHere = false;
+        }
+
+        editing = micSilenceThreshold;
+        encoder.setCount((int32_t)editing);
+        lastCount = encoder.getCount();
+
+        const bool btnNow = (digitalRead(ENC_BUTTON) == LOW);
+        ignoreFirstRelease = btnNow;     // si entrases con botón ya pulsado, ignorar esa suelta
+        encoderPressed     = btnNow;
+
+        lastPreviewMs = 0;
+        liveRaw       = 0;
+
+        drawMicCalibMenu(editing, liveRaw, false);
+    }
+
+    // --- Si acabamos de guardar, mostrar “Guardado” y salir tras 700ms ---
+    if (pendingExit) {
+        if (millis() - savedAt >= 700) {
+            pendingExit = false;
+
+            // Si el micro lo encendió este menú, lo apagamos al salir
+            if (startedMicHere) {
+                doitMic.end();
+                startedMicHere = false;
+            }
+
+            micCalibMenuActive = false;
+            hiddenMenuActive   = true;
+            ignoreEncoderClick = true;
+
+            firstEntry = true;
+            drawHiddenMenu(0); // si quieres mantener selección, pásale hiddenMenuSelection real
+        }
+        return;
+    }
+
+    // --- Preview del ruido actual (solo si el micro está activo) ---
+    if (millis() - lastPreviewMs >= 80) {
+        lastPreviewMs = millis();
+        if (doitMic.isActive()) {
+            liveRaw = doitMic.get_mic_value_BYTE(micSensRuntime);
+        } else {
+            liveRaw = 0;
+        }
+        drawMicCalibMenu(editing, liveRaw, false);
+    }
+
+    // --- Giro encoder => editar umbral ---
+    const int32_t c = encoder.getCount();
+    if (c != lastCount) {
+        const int delta = (int)(c - lastCount);
+        lastCount = c;
+
+        int nv = (int)editing + delta;
+        nv = constrain(nv, 0, 255);
+        editing = (uint8_t)nv;
+
+        encoder.setCount((int32_t)editing);
+        lastCount = (int32_t)editing;
+
+        drawMicCalibMenu(editing, liveRaw, false);
+    }
+
+    // --- Click => guardar ---
+    const bool btn = (digitalRead(ENC_BUTTON) == LOW);
+
+    // Detectar “release” (btn pasa de LOW a HIGH)
+    if (encoderPressed && !btn) {
+        if (ignoreFirstRelease) {
+            ignoreFirstRelease = false;
+        } else {
+            micSilenceThreshold = editing;
+            saveMicSilenceThresholdToSPIFFS(micSilenceThreshold);
+
+            drawMicCalibMenu(editing, liveRaw, true);
+            pendingExit = true;
+            savedAt = millis();
+        }
+    }
+
+    encoderPressed = btn;
+}
+#endif
+
+
 
 // Índice seleccionado en el menú (0 = Normal, 1 = Atenuado)
 int brightnessMenuIndex = 0;
@@ -1365,7 +1569,11 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) noexcept
     // ----------------------------
     // Constantes y utilidades
     // ----------------------------
-    constexpr int kHiddenMenuMaxIndex = 4; // Opciones 0..4 (5 opciones reales)
+    #ifdef MIC
+    constexpr int kHiddenMenuMaxIndex = 5; // ahora hay 6 opciones (0..5)
+    #else
+    constexpr int kHiddenMenuMaxIndex = 4; // 5 opciones (0..4)
+    #endif
 
     auto isButtonPressed = []() -> bool { return digitalRead(ENC_BUTTON) == LOW; };
     auto isButtonReleased = []() -> bool { return digitalRead(ENC_BUTTON) == HIGH; };
@@ -1422,29 +1630,30 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) noexcept
         ignoreEncoderClick   = true; // Evita relecturas residuales al salir de submenús
 
         switch (hiddenMenuSelection) {
+
             case 0: { // Idioma
-                languageMenuActive   = true;
+                hiddenMenuActive      = false;
+                languageMenuActive    = true;
                 languageMenuSelection = 0;
                 drawLanguageMenu(languageMenuSelection);
-                hiddenMenuActive     = false;
             } break;
 
             case 1: { // Sonido
+                hiddenMenuActive   = false;
                 soundMenuActive    = true;
                 soundMenuSelection = 0;
                 drawSoundMenu(soundMenuSelection);
-                hiddenMenuActive   = false;
                 #ifdef DEBUG
-                                DEBUG__________ln("Cambiando Sonido...");
+                DEBUG__________ln("Cambiando Sonido...");
                 #endif
             } break;
 
             case 2: { // Brillo
                 #ifdef DEBUG
-                                DEBUG__________ln("Ajustando brillo...");
+                DEBUG__________ln("Ajustando brillo...");
                 #endif
-                hiddenMenuActive    = false;  // Desactiva menú oculto
-                brightnessMenuActive = true;  // Activa menú de brillo
+                hiddenMenuActive     = false;
+                brightnessMenuActive = true;
 
                 currentBrightness = loadBrightnessFromSPIFFS();
                 tempBrightness    = currentBrightness;
@@ -1458,40 +1667,44 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) noexcept
                 drawBrightnessMenu();
             } break;
 
-            case 3: { // Control / Formateo
+            case 3: { // MIC_CALIB  (índice 3 según menuOptions[])
                 hiddenMenuActive   = false;
+                micCalibMenuActive = true;
+
+                // Preparar encoder para editar (arranca desde el valor actual)
+                encoder.setCount((int32_t)micSilenceThreshold);
+
+                // Dibujo inmediato: no dependas del handler para el primer frame
+                drawMicCalibMenu(micSilenceThreshold, 0 /*liveRaw*/, false /*showSaved*/);
+
+                // // Consumir pulsación para evitar “guardar” instantáneo al entrar
+                // while (digitalRead(ENC_BUTTON) == LOW) { /* consume */ }
+            } break;
+
+            case 4: { // CONTROL_SALA_MENU / Formateo  (índice 4 según menuOptions[])
+                hiddenMenuActive    = false;
                 formatSubMenuActive = true;
                 formatMenuSelection = 0;
                 buttonPressStart    = 0;
 
-                // Variables externas utilizadas por el submenú
-                extern int   formatMenuCurrentIndex;
+                extern int    formatMenuCurrentIndex;
                 extern int32_t formatMenuLastValue;
                 formatMenuCurrentIndex = 0;
                 formatMenuLastValue    = encoder.getCount();
 
-                // Espera activa hasta soltar (igual que en el original; bloqueante)
-                while (isButtonPressed()) { /* busy wait */ }
-
+                while (digitalRead(ENC_BUTTON) == LOW) { /* consume */ }
                 drawFormatMenu(formatMenuSelection);
             } break;
 
-            case 4: { // Volver
-                // Consumir pulsación en curso antes de salir
-                while (digitalRead(ENC_BUTTON) == LOW) { /* busy wait breve */ }
-
-                // Evitar que la suelta siguiente dispare acciones en la pantalla principal
+            case 5: { // Volver  (índice 5 según menuOptions[])
+                while (digitalRead(ENC_BUTTON) == LOW) { /* consume */ }
                 ignoreEncoderClick = true;
-
-                // Reiniciar estado interno para la próxima entrada a Ajustes
-                initialEntry   = true;
-                menuJustOpened = true;
-                encoderButtonPressed = false;
 
                 PulsadoresHandler::limpiarEstados();
                 hiddenMenuActive = false;
                 drawCurrentElement();
             } break;
+
 
             default:
                 // Índice fuera de las opciones contempladas (defensivo)
@@ -2258,7 +2471,8 @@ bool isInMainMenu() {
            !confirmRestoreMenuElementActive &&
            !inCognitiveMenu &&
            !extraElementsMenuActive &&
-           !confirmEnableDadoActive;
+           !confirmEnableDadoActive &&
+           !micCalibMenuActive;
 }
 
 

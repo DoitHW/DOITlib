@@ -799,7 +799,9 @@ extern float batteryVisualPercentage;
  * y, si aplica, el candado. Al final vuelca el sprite a la TFT.
  */
 void drawCurrentElement()
-{
+{   
+    if (!isInMainMenu()) return;
+    
     // ───────── Constantes de layout (evitan “números mágicos”) ─────────
     constexpr int kIconSizePx        = 64;   // icono 64x64
     constexpr int kIconYOffsetPx     = 20;   // eleva el icono 20 px respecto al centro
@@ -1497,6 +1499,7 @@ const char* menuOptions[] = {
     "IDIOMA",
     "SONIDO",
     "BRILLO",
+    "MIC_CALIB",
     "CONTROL_SALA_MENU",
     "VOLVER"
 };
@@ -1664,6 +1667,163 @@ void drawHiddenMenu(int selection)
     listSprite.pushToSprite(&uiSprite, 0, kListStartY);
     uiSprite.pushSprite(0, 0);
 }
+
+
+#ifdef MIC
+extern uint8_t micSilenceThreshold;
+
+// Colores definidos
+#define UI_BAR_BG      0x2124 // Gris muy oscuro
+#define UI_BAR_FILL    0x07E0 // Verde
+#define UI_BAR_TRIG    0xF800 // Rojo
+
+void drawMicCalibMenu(uint8_t editingThreshold, uint8_t liveRaw, bool showSaved)
+{
+    // 1. Limpiar fondo
+    uiSprite.fillSprite(TFT_BLACK);
+
+    // --- TÍTULO ---
+    uiSprite.setTextDatum(TC_DATUM);
+    uiSprite.setTextColor(TFT_SILVER, TFT_BLACK);
+    uiSprite.setFreeFont(&FreeSans9pt7b);
+    uiSprite.drawString("CALIBRACION", 64, 2);
+
+    // Definición de geometría de la barra
+    const int barW = 114;
+    const int barH = 20;
+    const int barX = (128 - barW) / 2;
+    const int barY = 56; // Bajamos la barra un pelín para dar aire arriba
+
+    // --- ETIQUETA ---
+    // Ahora la dibujamos más arriba para que no toque el triángulo
+    uiSprite.setTextDatum(BC_DATUM);
+    uiSprite.setTextFont(1); 
+    uiSprite.setTextColor(TFT_DARKGREY, TFT_BLACK);
+    // Antes estaba en (barY - 4), ahora (barY - 15) para dejar hueco
+    uiSprite.drawString("Ajuste sensibilidad", 64, barY - 15);
+
+    // 2. Fondo de la barra
+    uiSprite.fillRoundRect(barX, barY, barW, barH, 4, UI_BAR_BG);
+
+    // 3. Lógica de color (Verde vs Rojo)
+    uint16_t barColor = (liveRaw > editingThreshold) ? UI_BAR_TRIG : UI_BAR_FILL;
+
+    // 4. Relleno de la barra (Ruido actual)
+    int fillW = map((int)liveRaw, 0, 255, 0, barW);
+    fillW = constrain(fillW, 0, barW);
+    
+    if (fillW > 0) {
+        uiSprite.fillRoundRect(barX, barY, fillW, barH, 4, barColor);
+        // Truco visual: parchear esquinas derechas si no está llena
+        if (fillW < barW - 4) {
+            uiSprite.fillRect(barX + fillW - 2, barY, 2, barH, barColor); 
+        }
+    }
+
+    // 5. Marca del Umbral (Gate)
+    int markX = map((int)editingThreshold, 0, 255, 0, barW);
+    markX = constrain(markX, 0, barW);
+    int absMarkX = barX + markX;
+
+    // Línea vertical
+    uiSprite.drawLine(absMarkX, barY - 3, absMarkX, barY + barH + 3, TFT_WHITE);
+    // Triángulo superior
+    uiSprite.fillTriangle(absMarkX - 4, barY - 8, absMarkX + 4, barY - 8, absMarkX, barY - 2, TFT_WHITE);
+    // Triángulo inferior
+    uiSprite.fillTriangle(absMarkX - 4, barY + barH + 8, absMarkX + 4, barY + barH + 8, absMarkX, barY + barH + 2, TFT_WHITE);
+
+
+    // --- FOOTER ---
+    uiSprite.setTextDatum(BC_DATUM);
+    uiSprite.setTextFont(1);
+
+    if (showSaved) {
+        uiSprite.setTextColor(TFT_GREEN, TFT_BLACK);
+        uiSprite.setFreeFont(&FreeSans9pt7b);
+        uiSprite.drawString("GUARDADO", 64, 115);
+    } else {
+        uiSprite.setTextColor(TFT_DARKGREY, TFT_BLACK);
+        // Instrucciones apiladas
+        uiSprite.drawString("Girar: Ajustar", 64, 116);
+        uiSprite.drawString("Click: Guardar", 64, 127);
+    }
+
+    uiSprite.pushSprite(0, 0);
+}
+#endif
+
+// ---- Mic Calibration Menu ----
+// Variable runtime definida en encoder_handler.cpp
+// #ifdef MIC
+// extern uint8_t micSilenceThreshold;
+
+// void drawMicCalibMenu(uint8_t editingThreshold, uint8_t liveRaw, bool showSaved)
+// {
+//     // Fondo
+//     uiSprite.fillSprite(BACKGROUND_COLOR);
+
+//     // Título
+//     uiSprite.setTextDatum(TC_DATUM);
+//     uiSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
+//     uiSprite.setFreeFont(&FreeSans9pt7b);
+//     uiSprite.drawString("Calibración micrófono", tft.width() / 2, 6);
+
+//     // “Card” central
+//     const int x = 8;
+//     const int y = 28;
+//     const int w = tft.width() - 16;
+//     const int h = 76;
+
+//     uiSprite.fillRoundRect(x, y, w, h, 6, TFT_DARKGREY);
+//     uiSprite.drawRoundRect(x, y, w, h, 6, TEXT_COLOR);
+
+//     // Etiquetas
+//     uiSprite.setTextDatum(TL_DATUM);
+//     uiSprite.setTextColor(WHITE, TFT_DARKGREY);
+//     uiSprite.setFreeFont(&FreeSans9pt7b);
+//     uiSprite.drawString("Umbral silencio", x + 10, y + 10);
+
+//     // Valor grande
+//     uiSprite.setTextDatum(TR_DATUM);
+//     uiSprite.setFreeFont(&FreeSans12pt7b);
+//     uiSprite.drawString(String(editingThreshold), x + w - 10, y + 12);
+
+//     // Medidor de ruido actual
+//     uiSprite.setTextDatum(TL_DATUM);
+//     uiSprite.setFreeFont(&FreeSans9pt7b);
+//     uiSprite.drawString("Ruido actual", x + 10, y + 42);
+
+//     // Barra 0..255
+//     const int barX = x + 10;
+//     const int barY = y + 58;
+//     const int barW = w - 20;
+//     const int barH = 10;
+
+//     uiSprite.drawRoundRect(barX, barY, barW, barH, 3, WHITE);
+
+//     const int fillW = map((int)liveRaw, 0, 255, 0, barW - 2);
+//     uiSprite.fillRoundRect(barX + 1, barY + 1, fillW, barH - 2, 2, WHITE);
+
+//     // Marca del umbral
+//     const int markX = barX + 1 + map((int)editingThreshold, 0, 255, 0, barW - 2);
+//     uiSprite.drawLine(markX, barY - 3, markX, barY + barH + 3, RED);
+
+//     // Footer UX
+//     uiSprite.setTextDatum(BC_DATUM);
+//     uiSprite.setTextColor(TEXT_COLOR, BACKGROUND_COLOR);
+//     uiSprite.setFreeFont(&FreeSans9pt7b);
+//     uiSprite.drawString("Gira: ajustar  |  Click: guardar", tft.width() / 2, tft.height() - 6);
+
+//     if (showSaved) {
+//         uiSprite.setTextDatum(TC_DATUM);
+//         uiSprite.setTextColor(GREEN, BACKGROUND_COLOR);
+//         uiSprite.drawString("Guardado", tft.width() / 2, y + h + 6);
+//     }
+
+//     uiSprite.pushSprite(0, 0);
+// }
+// #endif
+
 
 /**
  * @brief Dibuja un “ticker” horizontal con vaivén para la opción seleccionada

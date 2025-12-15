@@ -61,6 +61,8 @@ void handleBankSelectionMenu(std::vector<byte>& bankList, std::vector<bool>& sel
 
 void handleBrightnessMenu();
 
+static void handleMicCalibMenu();
+
 void handleSoundMenu();
 
 void handleFormatMenu();
@@ -76,6 +78,9 @@ void handleConfirmRestoreElementMenu();
 bool isInMainMenu();
 
 void enfocarElemento(const String& name);
+
+void drawMicCalibrationMenu(int sens);
+
 
 //int getTotalModesForFile(const String &file);
 

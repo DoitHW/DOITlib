@@ -762,7 +762,47 @@ TARGETNS getOwnNS() {
 void setOwnNS(const TARGETNS& ns) {                    
     s_ownNS = ns;                                      
     setLocalNS(ns);
-}                                                      
+}                                  
+
+void saveMicSilenceThresholdToSPIFFS(uint8_t value)
+{
+    value = constrain(value, 0, 255);
+
+    File file = SPIFFS.open("/mic_silence.txt", FILE_WRITE);
+    if (!file) {
+        DEBUG__________ln("❌ Error al guardar micSilenceThreshold en SPIFFS");
+        return;
+    }
+
+    file.println(value);
+    file.close();
+
+    DEBUG__________ln("🎤 Umbral MIC guardado en SPIFFS: " + String(value));
+}
+
+uint8_t loadMicSilenceThresholdFromSPIFFS()
+{
+    if (!SPIFFS.exists("/mic_silence.txt")) {
+        // Default seguro
+        return 5;
+    }
+
+    File file = SPIFFS.open("/mic_silence.txt", FILE_READ);
+    if (!file) {
+        DEBUG__________ln("❌ Error al leer micSilenceThreshold desde SPIFFS");
+        return 5;
+    }
+
+    String content = file.readStringUntil('\n');
+    file.close();
+
+    int value = content.toInt();
+    value = constrain(value, 0, 255);
+
+    DEBUG__________ln("🎤 Umbral MIC cargado desde SPIFFS: " + String(value));
+    return (uint8_t)value;
+}
+
 
 
 

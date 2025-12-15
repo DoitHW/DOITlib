@@ -65,6 +65,7 @@ const Translation translations[] = {
   {"DESHABILITAR_DADO",         "Deshabilitar Dado",          "Deshabilitar Dado",          "Deshabilitar el Dau",        "Dadoa desgaitu",               "Désactiver le dé",             "Würfel deaktivieren",       "Disable Dice",              "Disabilitare il dado"},
   {"DESEA_HABILITAR_EL_DADO",   "¿Desea habilitar el dado?",  "¿Desea habilitar el dado?",  "Voleu habilitar el dau?",    "Dadoa gaitu nahi duzu?",       "Voulez-vous activer le dé ?",  "Möchten Sie den Würfel aktivieren?", "Do you want to enable the dice?", "Vuoi abilitare il dado?"},
   {"DESEA_DESHABILITAR_EL_DADO","¿Desea deshabilitar el dado?","¿Desea deshabilitar el dado?","Voleu deshabilitar el dau?","Dadoa desgaitu nahi duzu?",   "Voulez-vous désactiver le dé ?", "Möchten Sie den Würfel deaktivieren?", "Do you want to disable the dice?", "Vuoi disabilitare il dado?"},
+  {"MIC_CALIB","Sens. Mic","Sens. Mic","Sens. Mic","Sens. Mic","Sens. Mic","Sens. Mic","Sens. Mic","Sens. Mic"},
   {nullptr,              nullptr,                     nullptr,                    nullptr,                          nullptr,                              nullptr,                             nullptr,                       nullptr,                      nullptr} // Entrada final
 };
 
