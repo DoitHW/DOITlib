@@ -39,6 +39,8 @@ byte relay_state = false;
 std::vector<uint8_t> idsSPIFFS;
 int  relayStep = -1;
 TARGETNS communicatorActiveNS = NS_ZERO;
+bool communicatorPendingBroadcastStart = false;
+
 
 // Inicialización de estáticos de clase
 bool     PulsadoresHandler::s_responseModeEnabled = false;
@@ -911,6 +913,7 @@ void PulsadoresHandler::handleComunicadorRelayCycle() {
     }
     std::sort(nsList.begin(), nsList.end(), cmpNS);
 
+    // Re-sincroniza relayStep con el NS activo actual (si aplica)
     if (!nsList.empty() && !_isNSZero(communicatorActiveNS)) {
         for (size_t k = 0; k < nsList.size(); ++k) {
             if (eqNS(nsList[k], communicatorActiveNS)) { relayStep = (int)k; break; }
@@ -918,27 +921,56 @@ void PulsadoresHandler::handleComunicadorRelayCycle() {
     }
     if (relayStep < -1 || relayStep >= (int)nsList.size()) relayStep = -1;
 
+    if (communicatorPendingBroadcastStart) {
+        communicatorPendingBroadcastStart = false;
+
+        send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, START_CMD));
+        delay(CONSEC_DELAY);
+
+        // Mantengo tu lógica: en broadcast también mandas ON
+        send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, 0x01));
+        delay(CONSEC_DELAY);
+
+        ::communicatorActiveNS = NS_ZERO;
+        relayStep = -1;
+
+        colorHandler.setCurrentFile("Comunicador");
+        colorHandler.setPatternBotonera(currentModeIndex, ledManager);
+        return;
+    }
+
     bool firstKick = false;
     uint8_t blackType = BROADCAST, whiteType = BROADCAST;
     TARGETNS blackNS = NS_ZERO, whiteNS = NS_ZERO;
 
     if (nsList.empty()) {
-        // Nada: Loop en broadcast
+        // Nada: Loop en broadcast (mantienes tu comportamiento base)
+        // -> blackType/whiteType ya están en BROADCAST/NS_ZERO
     } else {
         if (relayStep == -1) {
             blackType = BROADCAST; whiteType = DEFAULT_DEVICE; whiteNS = nsList[0];
             relayStep = 0; firstKick = true;
+
         } else if (relayStep < (int)nsList.size() - 1) {
             blackType = DEFAULT_DEVICE; blackNS = nsList[relayStep];
             relayStep++;
             whiteType = DEFAULT_DEVICE; whiteNS = nsList[relayStep];
+
         } else {
-            blackType = DEFAULT_DEVICE; blackNS = nsList[relayStep];
-            whiteType = BROADCAST; whiteNS = NS_ZERO;
+            send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, BLACKOUT));
+            delay(CONSEC_DELAY);
+
+            ::communicatorActiveNS = NS_ZERO;
             relayStep = -1;
+            communicatorPendingBroadcastStart = true;
+
+            colorHandler.setCurrentFile("Comunicador");
+            colorHandler.setPatternBotonera(currentModeIndex, ledManager);
+            return;
         }
     }
 
+    // Flujo normal (no estamos en el "cierre especial de ciclo")
     send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, blackType, blackNS, BLACKOUT));
     delay(firstKick ? FIRST_ON_DELAY : CONSEC_DELAY);
     send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, whiteType, whiteNS, START_CMD));

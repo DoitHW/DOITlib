@@ -17,9 +17,11 @@ extern byte relay_state;
 extern bool ambienteActivo;
 extern std::vector<uint8_t> idsSPIFFS;
 extern int  relayStep;
+extern bool communicatorPendingBroadcastStart;
 extern std::vector<TARGETNS> nsSPIFFS;
 extern uint8_t  communicatorTargetType;
 extern TARGETNS communicatorActiveNS;
+
 
 enum ButtonEventType { BUTTON_PRESSED, BUTTON_RELEASED };
 
@@ -118,3 +120,4 @@ private:
 };
 
 extern PulsadoresHandler pulsadores;
+

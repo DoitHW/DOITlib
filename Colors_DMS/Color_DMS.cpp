@@ -187,10 +187,10 @@ void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager)
   ledManager.clearEffects(); // Limpiar efectos dinámicos previos
   /*────────────────  COMUNICADOR · elemento sólo-relé  ────────────────*/
   if (currentFile == "Comunicador") {
-      TARGETNS communicatorActiveNS;   // NS del dispositivo activo
-      if (memcmp(&communicatorActiveNS, &NS_ZERO, sizeof(TARGETNS)) != 0) {
+      const TARGETNS& activeNS = ::communicatorActiveNS;
+      if (memcmp(&activeNS, &NS_ZERO, sizeof(TARGETNS)) != 0) {
           uint8_t cfg[2] = {0};
-          if (RelayStateManager::getModeConfigForNS(communicatorActiveNS, cfg)) {
+          if (RelayStateManager::getModeConfigForNS(activeNS, cfg)) {
               bool hasCol = getModeFlag(cfg, HAS_BASIC_COLOR) ||
                             getModeFlag(cfg, HAS_ADVANCED_COLOR);
               bool hasRel = getModeFlag(cfg, HAS_RELAY);
@@ -200,6 +200,7 @@ void COLORHANDLER_::setPatternBotonera(byte mode, DynamicLEDManager& ledManager)
                   ledManager.clearEffects();
                   ledManager.addEffect(new FadeEffect(*this, 0, CRGB::Blue, CRGB::Cyan, 50));
                   leds[8] = CRGB::Blue;
+                  leds[0] = CRGB::Blue;
                   this->syncButtonsWithLEDs();
                   FastLED.show();
                   return;
