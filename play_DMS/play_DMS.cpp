@@ -43,3 +43,29 @@ void DOITSOUNDS_::get_available_folders(){
     if(player.readFileCountsInFolder(i)) availableFolders[j++]= i;
   }
 }
+
+bool DOITSOUNDS_::wait_end(uint32_t startTimeoutMs, uint32_t endTimeoutMs, uint32_t pollMs)
+{
+    if (pollMs < 5) pollMs = 5;
+
+    // 1) Espera a que el DFPlayer “arranque” realmente el estado PLAYING
+    const uint32_t t0 = millis();
+    while ((millis() - t0) < startTimeoutMs) {
+        if (is_playing()) break;
+        delay(pollMs);
+    }
+
+    // Si nunca llegó a marcar PLAYING, no bloquees indefinidamente
+    if (!is_playing()) return false;
+
+    // 2) Espera a que termine
+    const uint32_t t1 = millis();
+    while ((millis() - t1) < endTimeoutMs) {
+        if (!is_playing()) return true;
+        delay(pollMs);
+    }
+
+    // Recovery: si se quedó colgado, corta para no bloquear el sistema
+    player.stop();
+    return false;
+}

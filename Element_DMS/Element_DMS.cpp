@@ -208,10 +208,9 @@ void ELEMENT_::configurar_RF(int baudRate) {
     delay(10);
 }
 
-
-
 void ELEMENT_::activarAP_OTA() {
     delay(100);
+
     if (ap_ota_activo) {
         DEBUG__________("OTA YA ESTA ACTIVO");
         return;
@@ -219,14 +218,33 @@ void ELEMENT_::activarAP_OTA() {
 
     DEBUG__________("Activando Access Point...");
 
+    // 0) Saneado fuerte del estado WiFi (evita hostap_init en estado roto)
+    WiFi.disconnect(true, true);
+    WiFi.softAPdisconnect(true);
+    WiFi.mode(WIFI_OFF);
+    delay(100);
+    WiFi.mode(WIFI_AP);
+    delay(100);
+
     // 1) Config IP del AP
     IPAddress ap_ip(AP_ELEM_IP);
     IPAddress gw(AP_ELEM_IP);
     IPAddress mask(255, 255, 255, 0);
-    WiFi.softAPConfig(ap_ip, gw, mask);
+
+    if (!WiFi.softAPConfig(ap_ip, gw, mask)) {
+        DEBUG__________("ERROR: softAPConfig fallo");
+        WiFi.mode(WIFI_OFF);
+        return;
+    }
 
     // 2) Levantar AP
-    WiFi.softAP(AP_SSID, AP_PASSWORD);
+    // Nota: password debe ser "" (abierto) o >= 8 chars. Si no, softAP falla.
+    if (!WiFi.softAP(AP_SSID, AP_PASSWORD)) {
+        DEBUG__________("ERROR: softAP fallo (SSID/PASS o estado WiFi)");
+        WiFi.mode(WIFI_OFF);
+        return;
+    }
+
     DEBUG__________("IP ADDR: " + String(ap_ip));
 
     // 3) Preparar OTA (protegido por password)
@@ -238,17 +256,15 @@ void ELEMENT_::activarAP_OTA() {
     });
     ArduinoOTA.onEnd([]() {
         DEBUG__________("\nFinalizando OTA");
-        // Si quieres auto-apagar el AP al terminar, marca algo y ciérralo desde loop().
     });
     ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-        // Progreso (silenciado para no saturar)
-         DEBUG__________("Progreso OTA: " + String(progress * 100 / total) + "%");
+        DEBUG__________("Progreso OTA: " + String(progress * 100 / total) + "%");
     });
     ArduinoOTA.onError([](ota_error_t error) {
-         DEBUG__________("Error OTA: " + String(error));
+        DEBUG__________("Error OTA: " + String(error));
     });
 
-    ArduinoOTA.begin();      // ¡Arranca el servidor OTA!
+    ArduinoOTA.begin();
     ap_ota_activo = true;
     DEBUG__________("Access Point y OTA ACTIVADOS.");
 }

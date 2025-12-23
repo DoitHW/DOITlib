@@ -1296,11 +1296,8 @@ std::vector<bool> currentAlternateStates;
 void drawModesScreen()
 {
     /*────────────────── Seguridad: Carga diferida ──────────────────*/
-    // Si por algún motivo la caché está vacía (reinicio o bug), cargarla ahora.
     if (cachedModes.empty()) {
         loadModesCache(elementFiles[currentIndex]);
-        // Resetear variables de visualización
-        // (Opcional, para evitar saltos visuales)
     }
 
     /*────────────────── Constantes de layout ──────────────────*/
@@ -1319,6 +1316,8 @@ void drawModesScreen()
     constexpr int kRightMargin  = 10;
     const int textAreaW         = screenW - kListLeftX - kRightMargin;
 
+    const int stepY             = CARD_HEIGHT + CARD_MARGIN;
+
     /*────────────────── Variables estáticas (Scroll/Ticker) ──────────────────*/
     static int  scrollOffset        = 0;
     static int  targetScrollOffset  = 0;
@@ -1326,6 +1325,7 @@ void drawModesScreen()
     static int  modeTickerDirection = 1;
     static unsigned long modeLastFrameTime = 0;
     static int  lastSelectedMode    = -1;
+    static int  startIndex          = 0;
 
     static TFT_eSprite tickerSprite(&tft);
     static int tickerW = 0, tickerH = 0;
@@ -1333,12 +1333,7 @@ void drawModesScreen()
     static TFT_eSprite listSprite(&tft);
     static int listW = 0, listH = 0;
 
-    // Total de modos disponibles en la caché
-    const int totalEntries = cachedModes.size();
-
-    // Normalizar selección
-    if (currentModeIndex < 0) currentModeIndex = 0;
-    if (currentModeIndex >= totalEntries) currentModeIndex = totalEntries - 1;
+    const int totalEntries = (int)cachedModes.size();
 
     /*────────────────── Cabecera ──────────────────*/
     uiSprite.fillSprite(BACKGROUND_COLOR);
@@ -1348,102 +1343,157 @@ void drawModesScreen()
     uiSprite.setTextSize(1);
     uiSprite.drawString(getTranslation("MODOS"), kTitleCenterX, kTitleY);
 
+    // Si no hay nada que mostrar, no sigas.
+    if (totalEntries <= 0) {
+        uiSprite.setFreeFont(&FreeSans9pt7b);
+        uiSprite.setTextDatum(TC_DATUM);
+        uiSprite.drawString(getTranslation("SIN_DATOS"), kTitleCenterX, kListStartY + 25);
+        uiSprite.pushSprite(0, 0);
+        return;
+    }
+
+    // Normalizar selección
+    if (currentModeIndex < 0) currentModeIndex = 0;
+    if (currentModeIndex >= totalEntries) currentModeIndex = totalEntries - 1;
+
     /*────────────────── Gestión de ventana (Scroll) ──────────────────*/
-    static int startIndex = 0;
-    // Lógica de seguimiento del cursor
     if ((currentModeIndex - startIndex) > (kVisibleRows - 2) && startIndex < (totalEntries - kVisibleRows)) {
         ++startIndex;
     } else if ((currentModeIndex - startIndex) < 1 && startIndex > 0) {
         --startIndex;
     }
 
-    // Clamp
     if (startIndex < 0) startIndex = 0;
     const int lastStart = (totalEntries > kVisibleRows) ? (totalEntries - kVisibleRows) : 0;
     if (startIndex > lastStart) startIndex = lastStart;
 
     /*────────────────── Suavizado del Scroll ──────────────────*/
-    const int stepY = CARD_HEIGHT + CARD_MARGIN;
     targetScrollOffset = startIndex * stepY;
     const int maxScrollPixel = lastStart * stepY;
 
     if (targetScrollOffset < 0) targetScrollOffset = 0;
     if (targetScrollOffset > maxScrollPixel) targetScrollOffset = maxScrollPixel;
 
-    int delta = targetScrollOffset - scrollOffset;
-    if (delta >= -1 && delta <= 1) scrollOffset = targetScrollOffset; // Snap
-    else scrollOffset += (delta / 4); // Easing
+    const int delta = targetScrollOffset - scrollOffset;
+    if (delta >= -1 && delta <= 1) scrollOffset = targetScrollOffset;
+    else scrollOffset += (delta / 4);
 
-    /*────────────────── Preparar Viewport (Clipping) ──────────────────*/
+    /*────────────────── Viewport (sprite) con fallback ──────────────────*/
     const int wantedListW = screenW;
     const int wantedListH = kVisibleRows * stepY;
-    
+
+    bool listReady = true;
     if (!listSprite.created() || listW != wantedListW || listH != wantedListH) {
         if (listSprite.created()) listSprite.deleteSprite();
-        listSprite.createSprite(wantedListW, wantedListH);
-        listW = wantedListW; listH = wantedListH;
+        void* fb = listSprite.createSprite(wantedListW, wantedListH);
+        if (!fb) {
+            listReady = false;
+            listW = listH = 0;
+            DEBUG__________ln("[UI][MODOS] listSprite.createSprite FAIL");
+        } else {
+            listW = wantedListW;
+            listH = wantedListH;
+        }
     }
-    
-    listSprite.fillSprite(BACKGROUND_COLOR);
-    listSprite.setFreeFont(&FreeSans9pt7b);
-    listSprite.setTextSize(1);
-    listSprite.setTextDatum(TL_DATUM);
-    listSprite.setTextColor(TEXT_COLOR);
+
+    // Limpiar área de lista en uiSprite (siempre), para que el fallback sea limpio.
+    uiSprite.fillRect(0, kListStartY, screenW, wantedListH, BACKGROUND_COLOR);
+
+    // Preparar destino de dibujo
+    TFT_eSprite* dst = listReady ? &listSprite : &uiSprite;
+
+    if (listReady) {
+        dst->fillSprite(BACKGROUND_COLOR);
+    }
+
+    dst->setFreeFont(&FreeSans9pt7b);
+    dst->setTextSize(1);
+    dst->setTextDatum(TL_DATUM);
+    dst->setTextColor(TEXT_COLOR);
 
     const int listYOffset = -(scrollOffset - startIndex * stepY);
     const int firstVI = startIndex - 1;
     const int lastVI  = startIndex + kVisibleRows;
 
-    /*────────────────── Bucle de Dibujado (RAM ONLY) ──────────────────*/
+    // Helper local: truncar a ancho (sin heap extra)
+    auto drawTruncated = [&](TFT_eSprite* spr, const String& s, int x, int y, int maxW) {
+        char buf[64];
+        const char* src = s.c_str();
+        strncpy(buf, src ? src : "", sizeof(buf) - 1);
+        buf[sizeof(buf) - 1] = 0;
+
+        size_t len = strlen(buf);
+        while (len > 0 && spr->textWidth(buf) > maxW) {
+            buf[--len] = 0;
+        }
+        spr->drawString(buf, x, y);
+    };
+
     for (int i = firstVI; i <= lastVI; ++i) {
         if (i < 0 || i >= totalEntries) continue;
-        
-        // Recuperar datos de la caché (nombre BASE + meta)
-        const ModeCacheEntry& item      = cachedModes[i];
-        const int             realIndex = item.originalIndex;
-        String                baseLabel = item.label;
-        String                label     = baseLabel;
 
-        // Solo los modos reales (realIndex >= 0) pueden tener nombre alternativo
+        const ModeCacheEntry& item = cachedModes[i];
+        const int realIndex        = item.originalIndex;
+        const String& baseLabelRef = item.label;
+        String label               = baseLabelRef;
+
         if (realIndex >= 0) {
-            // i = índice visible en cachedModes
-            // 0 = Encender/Apagar → primer modo visible está en i = 1
             const int altIdx = i - 1;
-
             bool alternateActive = false;
             if (altIdx >= 0 && (size_t)altIdx < currentAlternateStates.size()) {
                 alternateActive = currentAlternateStates[altIdx];
             }
-
-            // Construir el nombre final en función del estado alternativo
-            label = getModeDisplayName(baseLabel, alternateActive);
+            label = getModeDisplayName(baseLabelRef, alternateActive);
         }
 
+        int yRel = kRowTopInset + listYOffset + (i - startIndex) * stepY;
 
-        const int y = kRowTopInset + listYOffset + (i - startIndex) * stepY;
-        
+        // Convertir a coordenadas del dst
+        int y = yRel;
+        if (!listReady) {
+            // Dibujando en uiSprite: desplazar al área de lista
+            y = kListStartY + yRel;
+        }
+
         // Culling
-        if (y <= -CARD_HEIGHT + kHLPadY || y >= listH - kHLPadY) continue;
+        const int dstH = listReady ? listH : (kListStartY + wantedListH);
+        if (listReady) {
+            if (yRel <= -CARD_HEIGHT + kHLPadY || yRel >= listH - kHLPadY) continue;
+        } else {
+            // Culling en área lista
+            if (y <= (kListStartY - CARD_HEIGHT + kHLPadY) || y >= (kListStartY + wantedListH - kHLPadY)) continue;
+        }
 
         const bool isSelected = (i == currentModeIndex);
 
-        // Fondo Resaltado
         if (isSelected) {
-            int rectY = y - kHLPadY;
+            int rectY = (listReady ? yRel : y) - kHLPadY;
             int rectH = CARD_HEIGHT + (kHLPadY * 2);
-            if (rectY < 0) { rectH += rectY; rectY = 0; }
-            if (rectY + rectH > listH) { rectH = listH - rectY; }
-            
+
+            // Clamp solo cuando usamos listSprite (viewport real). En fallback, clamp al área lista.
+            if (listReady) {
+                if (rectY < 0) { rectH += rectY; rectY = 0; }
+                if (rectY + rectH > listH) { rectH = listH - rectY; }
+            } else {
+                const int top = kListStartY;
+                const int bot = kListStartY + wantedListH;
+                if (rectY < top) { rectH -= (top - rectY); rectY = top; }
+                if (rectY + rectH > bot) { rectH = bot - rectY; }
+            }
+
             if (rectH > 0) {
-                listSprite.fillRoundRect(
-                    kListLeftX - kHLPadX, rectY,
-                    textAreaW + (kHLPadX * 2), rectH,
-                    kCardRadius, CARD_COLOR
+                dst->fillRoundRect(
+                    kListLeftX - kHLPadX,
+                    rectY,
+                    textAreaW + (kHLPadX * 2),
+                    rectH,
+                    kCardRadius,
+                    CARD_COLOR
                 );
             }
         }
 
-        /* ───── Texto y Ticker ─────*/
+        // Texto y ticker
         if (isSelected) {
             if (currentModeIndex != lastSelectedMode) {
                 modeTickerOffset = 0;
@@ -1451,46 +1501,63 @@ void drawModesScreen()
                 lastSelectedMode = currentModeIndex;
             }
 
-            const int fullW = listSprite.textWidth(label);
-            if (fullW > textAreaW) {
-                // Lógica Ticker
+            const int fullW = dst->textWidth(label);
+            if (fullW > textAreaW && listReady) {
+                // Ticker SOLO si estamos en listSprite (si no, simplificamos y truncamos)
                 const unsigned long now = millis();
                 if (now - modeLastFrameTime >= kTickerFrameMs) {
                     modeTickerOffset += modeTickerDirection;
-                    if (modeTickerOffset < 0) {
-                        modeTickerOffset = 0; modeTickerDirection = 1;
-                    }
+                    if (modeTickerOffset < 0) { modeTickerOffset = 0; modeTickerDirection = 1; }
                     const int maxOffset = fullW - textAreaW;
-                    if (modeTickerOffset > maxOffset) {
-                        modeTickerOffset = maxOffset; modeTickerDirection = -1;
-                    }
+                    if (modeTickerOffset > maxOffset) { modeTickerOffset = maxOffset; modeTickerDirection = -1; }
                     modeLastFrameTime = now;
                 }
 
-                // Sprite del Ticker
+                bool tickerReady = true;
                 if (!tickerSprite.created() || tickerW != textAreaW || tickerH != CARD_HEIGHT) {
                     if (tickerSprite.created()) tickerSprite.deleteSprite();
-                    tickerSprite.createSprite(textAreaW, CARD_HEIGHT);
-                    tickerW = textAreaW; tickerH = CARD_HEIGHT;
+                    void* fb2 = tickerSprite.createSprite(textAreaW, CARD_HEIGHT);
+                    if (!fb2) {
+                        tickerReady = false;
+                        tickerW = tickerH = 0;
+                        DEBUG__________ln("[UI][MODOS] tickerSprite.createSprite FAIL");
+                    } else {
+                        tickerW = textAreaW;
+                        tickerH = CARD_HEIGHT;
+                    }
                 }
 
-                tickerSprite.fillSprite(CARD_COLOR);
-                tickerSprite.setFreeFont(&FreeSans9pt7b);
-                tickerSprite.setTextSize(1);
-                tickerSprite.setTextDatum(TL_DATUM);
-                tickerSprite.setTextColor(TEXT_COLOR, CARD_COLOR);
-                tickerSprite.drawString(label, -modeTickerOffset, 0);
-                tickerSprite.pushToSprite(&listSprite, kListLeftX, y);
+                if (tickerReady) {
+                    tickerSprite.fillSprite(CARD_COLOR);
+                    tickerSprite.setFreeFont(&FreeSans9pt7b);
+                    tickerSprite.setTextSize(1);
+                    tickerSprite.setTextDatum(TL_DATUM);
+                    tickerSprite.setTextColor(TEXT_COLOR, CARD_COLOR);
+                    tickerSprite.drawString(label, -modeTickerOffset, 0);
+
+                    // yRel es el “y dentro del viewport”
+                    tickerSprite.pushToSprite(&listSprite, kListLeftX, yRel);
+                } else {
+                    // Si no hay ticker sprite, al menos truncar
+                    drawTruncated(dst, label, kListLeftX, (listReady ? yRel : y), textAreaW);
+                }
             } else {
-                listSprite.drawString(label, kListLeftX, y);
+                // Cabe, o estamos en fallback: dibuja (truncado si hace falta)
+                if (fullW > textAreaW) drawTruncated(dst, label, kListLeftX, (listReady ? yRel : y), textAreaW);
+                else dst->drawString(label, kListLeftX, (listReady ? yRel : y));
             }
         } else {
-            listSprite.drawString(label, kListLeftX, y);
+            // No seleccionado
+            const int fullW = dst->textWidth(label);
+            if (fullW > textAreaW) drawTruncated(dst, label, kListLeftX, (listReady ? yRel : y), textAreaW);
+            else dst->drawString(label, kListLeftX, (listReady ? yRel : y));
         }
     }
 
     // Volcado final
-    listSprite.pushToSprite(&uiSprite, 0, kListStartY);
+    if (listReady) {
+        listSprite.pushToSprite(&uiSprite, 0, kListStartY);
+    }
     uiSprite.pushSprite(0, 0);
 }
 
@@ -1537,13 +1604,11 @@ void drawHiddenMenu(int selection)
     const int x               = 9;
     constexpr int kScrollBarMargin = 3;
     constexpr int kScrollBarW      = 5;
-    const int scrollBarX      = screenW - kScrollBarW - kScrollBarMargin; // no dibujamos aquí la barra
-    const int textAreaW       = scrollBarX - x - 2; // ancho útil de texto
+    const int scrollBarX      = screenW - kScrollBarW - kScrollBarMargin;
+    const int textAreaW       = scrollBarX - x - 2;
 
-    /*──────── Validaciones defensivas (no alteran semántica) ───────*/
-    // visibleOptions y numOptions son externos; garantizamos rangos seguros.
+    /*──────── Validaciones defensivas ───────*/
     if (numOptions <= 0) {
-        // Lista vacía: solo cabecera
         uiSprite.fillSprite(BACKGROUND_COLOR);
         setFontForCurrentLanguage();
         uiSprite.setTextColor(TEXT_COLOR);
@@ -1556,12 +1621,14 @@ void drawHiddenMenu(int selection)
     if (selection < 0) selection = 0;
     if (selection >= numOptions) selection = numOptions - 1;
 
-    const int kVisibleRows = (visibleOptions > 0) ? visibleOptions : 1;
-    const int safeTextAreaW = (textAreaW > 0) ? textAreaW : (screenW - x - 2);
+    const int kVisibleRows   = (visibleOptions > 0) ? visibleOptions : 1;
+    const int safeTextAreaW  = (textAreaW > 0) ? textAreaW : (screenW - x - 2);
+    const int wantedListH    = kVisibleRows * stepY;
 
     /*──────── Estado de scroll (persistente) ───────*/
     static int scrollOffset       = 0;
     static int targetScrollOffset = 0;
+    static int startIndex         = 0;
 
     /*──────── Cabecera ───────*/
     uiSprite.fillSprite(BACKGROUND_COLOR);
@@ -1572,13 +1639,9 @@ void drawHiddenMenu(int selection)
     uiSprite.drawString(getTranslation("MENU_AJUSTES"), screenW / 2, kTitleY);
 
     /*──────── Ventana (startIndex) ───────*/
-    static int startIndex = 0;
-    if ((selection - startIndex) > (kVisibleRows - 2) &&
-        startIndex < (numOptions - kVisibleRows))
-    {
+    if ((selection - startIndex) > (kVisibleRows - 2) && startIndex < (numOptions - kVisibleRows)) {
         ++startIndex;
-    }
-    else if ((selection - startIndex) < 1 && startIndex > 0) {
+    } else if ((selection - startIndex) < 1 && startIndex > 0) {
         --startIndex;
     }
 
@@ -1586,65 +1649,99 @@ void drawHiddenMenu(int selection)
     const int lastStart = (numOptions > kVisibleRows) ? (numOptions - kVisibleRows) : 0;
     if (startIndex > lastStart) startIndex = lastStart;
 
-    /*──────── Resolver SCROLL ANTES de dibujar ───────*/
+    /*──────── Scroll suave ───────*/
     targetScrollOffset = startIndex * stepY;
     const int maxScroll = lastStart * stepY;
 
     if (targetScrollOffset < 0)         targetScrollOffset = 0;
     if (targetScrollOffset > maxScroll) targetScrollOffset = maxScroll;
 
-    // Easing + snap ±1 px (igual que en drawModesScreen)
     const int delta = targetScrollOffset - scrollOffset;
-    if (delta >= -1 && delta <= 1) {
-        scrollOffset = targetScrollOffset;
-    } else {
-        scrollOffset += (delta / 4); // easing discreto
-    }
+    if (delta >= -1 && delta <= 1) scrollOffset = targetScrollOffset;
+    else scrollOffset += (delta / 4);
 
-    /*──────── Viewport con clipping (sprite intermedio) ───────*/
+    /*──────── Viewport (sprite) con fallback ───────*/
     static TFT_eSprite listSprite(&tft);
     static int listW = 0, listH = 0;
 
     const int wantedListW = screenW;
-    const int wantedListH = kVisibleRows * stepY; // alto según filas visibles
 
+    bool listReady = true;
     if (!listSprite.created() || listW != wantedListW || listH != wantedListH) {
         if (listSprite.created()) listSprite.deleteSprite();
-        listSprite.createSprite(wantedListW, wantedListH);
-        listW = wantedListW;
-        listH = wantedListH;
+        void* fb = listSprite.createSprite(wantedListW, wantedListH);
+        if (!fb) {
+            listReady = false;
+            listW = listH = 0;
+            DEBUG__________ln("[UI][AJUSTES] listSprite.createSprite FAIL");
+        } else {
+            listW = wantedListW;
+            listH = wantedListH;
+        }
     }
 
-    listSprite.fillSprite(BACKGROUND_COLOR);
-    listSprite.setFreeFont(&FreeSans9pt7b);
-    listSprite.setTextColor(TEXT_COLOR);
-    listSprite.setTextSize(1);
-    listSprite.setTextDatum(TL_DATUM);
+    // Limpiar área lista SIEMPRE en uiSprite para que el fallback sea limpio
+    uiSprite.fillRect(0, kListStartY, screenW, wantedListH, BACKGROUND_COLOR);
 
-    // Desfase vertical dentro de la ventana (aplica suavizado real)
+    TFT_eSprite* dst = listReady ? &listSprite : &uiSprite;
+
+    if (listReady) {
+        dst->fillSprite(BACKGROUND_COLOR);
+    }
+
+    dst->setFreeFont(&FreeSans9pt7b);
+    dst->setTextColor(TEXT_COLOR);
+    dst->setTextSize(1);
+    dst->setTextDatum(TL_DATUM);
+
     const int listYOffset = -(scrollOffset - startIndex * stepY);
-    const int firstVI = startIndex - 1;                // dibujar 1 por encima (si asoma)
-    const int lastVI  = startIndex + kVisibleRows;     // y 1 por debajo
+    const int firstVI = startIndex - 1;
+    const int lastVI  = startIndex + kVisibleRows;
 
-    for (int vi = firstVI; vi <= lastVI; ++vi)
-    {
+    // Helper: truncar sin usar String/remove()
+    auto drawTruncCStr = [&](TFT_eSprite* spr, const char* src, int px, int py, int maxW) {
+        char buf[64];
+        strncpy(buf, (src ? src : ""), sizeof(buf) - 1);
+        buf[sizeof(buf) - 1] = 0;
+
+        size_t len = strlen(buf);
+        while (len > 0 && spr->textWidth(buf) > maxW) {
+            buf[--len] = 0;
+        }
+        spr->drawString(buf, px, py);
+    };
+
+    for (int vi = firstVI; vi <= lastVI; ++vi) {
         if (vi < 0 || vi >= numOptions) continue;
 
-        const int y = kRowTopInset + listYOffset + (vi - startIndex) * stepY;
+        const int yRel = kRowTopInset + listYOffset + (vi - startIndex) * stepY;
+        const int y    = listReady ? yRel : (kListStartY + yRel);
 
-        // Culling: descartar si queda completamente fuera del viewport
-        if (y <= -cardHeight + kHLPadY || y >= listH - kHLPadY) continue;
+        // Culling
+        if (listReady) {
+            if (yRel <= -cardHeight + kHLPadY || yRel >= listH - kHLPadY) continue;
+        } else {
+            if (y <= (kListStartY - cardHeight + kHLPadY) || y >= (kListStartY + wantedListH - kHLPadY)) continue;
+        }
 
         const bool isSelected = (vi == selection);
 
-        // Resaltado con clamp vertical al viewport
         if (isSelected) {
-            int rectY = y - kHLPadY;
+            int rectY = (listReady ? yRel : y) - kHLPadY;
             int rectH = cardHeight + (kHLPadY * 2);
-            if (rectY < 0)            { rectH += rectY; rectY = 0; }
-            if (rectY + rectH > listH){ rectH = listH - rectY; }
+
+            if (listReady) {
+                if (rectY < 0)             { rectH += rectY; rectY = 0; }
+                if (rectY + rectH > listH) { rectH = listH - rectY; }
+            } else {
+                const int top = kListStartY;
+                const int bot = kListStartY + wantedListH;
+                if (rectY < top) { rectH -= (top - rectY); rectY = top; }
+                if (rectY + rectH > bot) { rectH = bot - rectY; }
+            }
+
             if (rectH > 0) {
-                listSprite.fillRoundRect(
+                dst->fillRoundRect(
                     x - kHLPadX,
                     rectY,
                     safeTextAreaW + (kHLPadX * 2),
@@ -1655,16 +1752,13 @@ void drawHiddenMenu(int selection)
             }
         }
 
-        // Etiqueta traducida y truncada al ancho disponible (sin “…”)
-        String tempStr = String(getTranslation(menuOptions[vi]));
-        while (listSprite.textWidth(tempStr) > safeTextAreaW && tempStr.length() > 0) {
-            tempStr.remove(tempStr.length() - 1);
-        }
-        listSprite.drawString(tempStr, x, y);
+        const char* label = getTranslation(menuOptions[vi]);
+        drawTruncCStr(dst, label, x, (listReady ? yRel : y), safeTextAreaW);
     }
 
-    // Volcado del viewport al sprite principal y a pantalla
-    listSprite.pushToSprite(&uiSprite, 0, kListStartY);
+    if (listReady) {
+        listSprite.pushToSprite(&uiSprite, 0, kListStartY);
+    }
     uiSprite.pushSprite(0, 0);
 }
 
@@ -2341,7 +2435,7 @@ void drawSoundMenu(int selection)
     constexpr int kTickerFrameMs = 50;
 
     constexpr int kVisibleOptions  = 4;
-    constexpr int kTotalOptions    = 10;
+    constexpr int kTotalOptions    = 11;
     constexpr int kScrollBarW      = 5;
     constexpr int kScrollBarRightP = 3;
     constexpr int kListLeftX       = 9;
@@ -2355,12 +2449,12 @@ void drawSoundMenu(int selection)
         getTranslation("CON_NEG"),
         getTranslation("SIN_NEG"),
         kSep,
+        getTranslation("VOL_MAXIMO"),
         getTranslation("VOL_NORMAL"),
-        getTranslation("VOL_ATENUADO"),
+        getTranslation("VOL_ATENUADO"),  
         kSep,
         getTranslation("CONFIRMAR")
     };
-
     const int cardHeight  = CARD_HEIGHT;
     const int cardMargin  = CARD_MARGIN;
     const int stepY       = cardHeight + cardMargin;
@@ -2465,14 +2559,15 @@ void drawSoundMenu(int selection)
                 }
             }
 
-            // Color lógico seleccionado (tu misma lógica)
-            const bool isLogicallySelected =
-                (vi == 0 && selectedVoiceGender == 0) ||
-                (vi == 1 && selectedVoiceGender == 1) ||
-                (vi == 3 && negativeResponse)         ||
-                (vi == 4 && !negativeResponse)        ||
-                (vi == 6 && selectedVolume == 0)      ||
-                (vi == 7 && selectedVolume == 1);
+        const bool isLogicallySelected =
+            (vi == 0 && selectedVoiceGender == 0) ||
+            (vi == 1 && selectedVoiceGender == 1) ||
+            (vi == 3 && negativeResponse)         ||
+            (vi == 4 && !negativeResponse)        ||
+            (vi == 6 && selectedVolume == 0)      ||
+            (vi == 7 && selectedVolume == 1)      ||
+            (vi == 8 && selectedVolume == 2);     // <-- NUEVO
+
 
             const uint16_t textColor =
                 isSeparator ? TFT_DARKGREY :
@@ -2582,8 +2677,9 @@ void drawSoundMenu(int selection)
                 (vi == 1 && selectedVoiceGender == 1) ||
                 (vi == 3 && negativeResponse)         ||
                 (vi == 4 && !negativeResponse)        ||
-                (vi == 6 && selectedVolume == 0)      ||
-                (vi == 7 && selectedVolume == 1);
+                (vi == 6 && selectedVolume == 0)      || // VOL_MAXIMO
+                (vi == 7 && selectedVolume == 1)      || // VOL_NORMAL
+                (vi == 8 && selectedVolume == 2);     
 
             const uint16_t textColor =
                 isSeparator ? TFT_DARKGREY :

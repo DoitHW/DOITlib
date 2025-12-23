@@ -1468,8 +1468,9 @@ void handleBrightnessMenu()
     encoderPressed = currentEncoderState;
 }
 
-const int soundOptions[] = {0, 1, 3, 4, 6, 7, 9}; // Índices seleccionables
+const int soundOptions[] = {0, 1, 3, 4, 6, 7, 8, 10}; // + VOL_MAXIMO, CONFIRMAR=10
 const int numSoundOptions = sizeof(soundOptions) / sizeof(soundOptions[0]);
+
 
 /**
  * @brief Gestiona la navegación y confirmación del menú de sonido.
@@ -1485,8 +1486,9 @@ void handleSoundMenu()
     constexpr bool kButtonActiveLow = true;         // Botón activo en LOW
 
     // Valores de volumen asociados a las opciones (mantener semántica)
-    constexpr int kVolNormal  = 26;
-    constexpr int kVolAtenuado = 20;
+    constexpr int kVolNormal   = 20;
+    constexpr int kVolAtenuado = 15;
+    constexpr int kVolMaximo   = 30; 
 
     // ──────────────── Lectura del encoder y navegación ─────────────
     static int currentIndex = 0; // índice dentro de soundOptions[]
@@ -1524,17 +1526,13 @@ void handleSoundMenu()
                 case 1:  selectedVoiceGender = 1; token.genre = 1;                  break; // Voz: hombre
                 case 3: negativeResponse = true;                                    break; // Respuesta negativa: activar
                 case 4: negativeResponse = false;                                   break; // Respuesta negativa: desactivar
-                case 6: selectedVolume = 0; doitPlayer.player.volume(kVolNormal);   break; // Volumen: normal
-                case 7: selectedVolume = 1; doitPlayer.player.volume(kVolAtenuado); break; // Volumen: atenuado
-                case 9: // Confirmar y salir
+                case 6: selectedVolume = 0; doitPlayer.player.volume(kVolMaximo);   break;
+                case 7: selectedVolume = 1; doitPlayer.player.volume(kVolNormal);   break;
+                case 8: selectedVolume = 2; doitPlayer.player.volume(kVolAtenuado); break;
+                case 10: // Confirmar y salir
                     saveSoundSettingsToSPIFFS();
                     soundMenuActive = false;
                     ignoreEncoderClick = true;
-                    //drawCurrentElement();
-                    DEBUG__________ln("✅ Ajustes de sonido confirmados:");
-                    DEBUG__________printf(" - Tipo de voz: %s\n", (selectedVoiceGender == 0) ? "Mujer" : "Hombre");
-                    DEBUG__________printf(" - Respuesta negativa: %s\n", negativeResponse ? "Con" : "Sin");
-                    DEBUG__________printf(" - Volumen: %s\n", (selectedVolume == 0) ? "Normal" : "Atenuado");
                     break;
 
                 default:

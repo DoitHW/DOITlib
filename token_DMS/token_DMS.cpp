@@ -360,8 +360,11 @@ void TOKEN_::token_handler(const TOKEN_DATA& token,
                           ", File: " + String(token.addr.file + lang,  HEX));
         doitPlayer.play_file(token.addr.bank + genre_in, token.addr.file + lang);
         delay(50);
-        while (doitPlayer.is_playing()) { delay(10); }
-        delay(500);
+        // while (doitPlayer.is_playing()) { delay(10); }
+        // delay(500);
+
+        doitPlayer.wait_end(300, 20000, 20);
+        delay(200); // separación entre audios
 
         // 3) Comportamiento según modo del Token
         if (tokenCurrentMode == TOKEN_BASIC_MODE) {
@@ -436,8 +439,8 @@ void TOKEN_::token_handler(const TOKEN_DATA& token,
                 }
 
                 delay(50);
-                while (doitPlayer.is_playing()) { delay(10); }
-                delay(200);
+                doitPlayer.wait_end(300, 20000, 20);
+delay(200);
                 DEBUG__________printf("[TOKEN][PARTNER] RESP=%s\n", match ? "WIN" : "FAIL");
                 // Respuesta WIN/FAIL + audio correspondiente
                 int fileNum = match ? random(1, 4) : random(1, 3);
@@ -449,8 +452,8 @@ void TOKEN_::token_handler(const TOKEN_DATA& token,
                                      fileNum + lang);
 
                 delay(50);
-                while (doitPlayer.is_playing()) { delay(10); }
-                delay(600);
+                doitPlayer.wait_end(300, 20000, 20);
+delay(200);
 
                 // Color post-respuesta según configuración
                 if (token.cmd2 == TEMP_COLOR_CONF) {
@@ -479,8 +482,8 @@ DEBUG__________printf("[TOKEN][GUESS] branch  proposed B=0x%02X F=0x%02X  scanne
                           propossedToken.addr.bank, propossedToken.addr.file,
                           token.addr.bank, token.addr.file,
                           isCorrect ? "WIN" : "FAIL");
-            while (doitPlayer.is_playing()) { delay(10); }
-            delay(600);
+            doitPlayer.wait_end(300, 20000, 20);
+            delay(200);
 
             // Respuesta WIN/FAIL y audio
             for (const TARGETNS& ns : targetsNS) {
@@ -491,8 +494,8 @@ DEBUG__________printf("[TOKEN][GUESS] branch  proposed B=0x%02X F=0x%02X  scanne
             doitPlayer.play_file((isCorrect ? WIN_RESP_BANK : FAIL_RESP_BANK) + genre_in,
                                  random(1, isCorrect ? 4 : 3) + lang);
 
-            while (doitPlayer.is_playing()) { delay(10); }
-            delay(600);
+            doitPlayer.wait_end(300, 20000, 20);
+            delay(200);
 
             // Color post-respuesta
             if (token.cmd2 == TEMP_COLOR_CONF) {

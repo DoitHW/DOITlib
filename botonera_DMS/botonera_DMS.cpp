@@ -1194,7 +1194,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
         }
 
         case F_REQ_ELEM_SECTOR: {
-            DEBUG__________ln("Recibido un F_REQ_ELEM_SECTOR");
+            //DEBUG__________ln("Recibido un F_REQ_ELEM_SECTOR");
             if (LEF.data.empty()) {
                 DEBUG__________ln("F_REQ_ELEM_SECTOR sin datos. Ignorado.");
                 break;
@@ -1298,6 +1298,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
                 doitPlayer.play_file(FAIL_RESP_BANK, file);
 
             } else if (receivedCommand == OTA_AP_ON) {
+                if (LEF.origin != DEFAULT_BOTONERA) return;
                 DEBUG__________ln("Comando OTA_AP_ON recibido  Activando AP + OTA...");
                 element->activarAP_OTA();
 
@@ -1330,7 +1331,7 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
 
         default: {
         #ifdef DEBUG
-            DEBUG__________ln("Se ha recibido una función desconocida.");
+            //DEBUG__________ln("Se ha recibido una función desconocida.");
         #endif
             break;
         }

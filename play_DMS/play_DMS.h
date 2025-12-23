@@ -24,6 +24,8 @@ class DOITSOUNDS_ : public ELEMENT_{
         void stop_file();
         bool is_playing();
         void get_available_folders();
+        bool wait_end(uint32_t startTimeoutMs = 300, uint32_t endTimeoutMs = 20000, uint32_t pollMs = 20);
+
 
 };
 

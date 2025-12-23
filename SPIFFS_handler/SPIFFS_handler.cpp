@@ -588,27 +588,61 @@ Language loadLanguageFromSPIFFS() {
 }
 
 
-void saveSoundSettingsToSPIFFS() {
+void saveSoundSettingsToSPIFFS()
+{
     File f = SPIFFS.open("/config_sonido.txt", FILE_WRITE);
-    if (f) {
-        f.write(selectedVoiceGender);  // 0 = mujer, 1 = hombre
-        f.write(negativeResponse ? 1 : 0);  // true = 1, false = 0
-        f.write(selectedVolume);  // 0 = normal, 1 = atenuado
-        f.close();
-    }
+    if (!f) return;
+
+    // 0 = mujer, 1 = hombre
+    f.write((uint8_t)selectedVoiceGender);
+
+    // 0 = sin negativa, 1 = con negativa
+    f.write((uint8_t)(negativeResponse ? 1 : 0));
+
+    // Volumen (según tu orden de menú):
+    // 0 = máximo (30), 1 = normal (20), 2 = atenuado (15)
+    uint8_t volSel = (uint8_t)selectedVolume;
+    if (volSel > 2) volSel = 1; // clamp a NORMAL por seguridad
+    f.write(volSel);
+
+    f.close();
 }
 
-void loadSoundSettingsFromSPIFFS() {
+void loadSoundSettingsFromSPIFFS()
+{
     File f = SPIFFS.open("/config_sonido.txt", FILE_READ);
-    if (f && f.available() >= 3) {
-        selectedVoiceGender = f.read();          // 0 o 1
-        token.genre = selectedVoiceGender;       // Sincronizar token.genre
-        negativeResponse = f.read() == 1;        // true o false
-        selectedVolume = f.read();               // 0 o 1
-        doitPlayer.player.volume(selectedVolume == 0 ? 26 : 20);  // Aplicar volumen
-        f.close();
-    }
+    if (!f) return;
+
+    if (f.available() < 3) { f.close(); return; }
+
+    // Leer ajustes
+    uint8_t vg   = (uint8_t)f.read();   // 0/1
+    uint8_t neg  = (uint8_t)f.read();   // 0/1
+    uint8_t vsel = (uint8_t)f.read();   // 0..2
+
+    f.close();
+
+    // Validaciones mínimas
+    if (vg > 1) vg = 0;
+    if (vsel > 2) vsel = 1; // NORMAL por defecto
+
+    selectedVoiceGender = vg;
+    token.genre         = selectedVoiceGender;
+    negativeResponse    = (neg == 1);
+    selectedVolume      = vsel;
+
+    // Aplicar volumen real según selector y tu orden
+    constexpr uint8_t kVolMaximo   = 30;
+    constexpr uint8_t kVolNormal   = 20;
+    constexpr uint8_t kVolAtenuado = 15;
+
+    uint8_t vol = kVolNormal;
+    if (selectedVolume == 0)      vol = kVolMaximo;
+    else if (selectedVolume == 2) vol = kVolAtenuado;
+
+    doitPlayer.player.volume(vol);
 }
+
 
 
 // --- persistencia on/off de DADO ---
