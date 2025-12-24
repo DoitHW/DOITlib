@@ -7,7 +7,7 @@
 #include <WiFi.h>
 
 std::vector<uint8_t> printTargetID;
-extern LAST_ENTRY_FRAME_T            LEF;
+extern LAST_ENTRY_FRAME_T  LEF;
 
 extern byte xManager;
 //volatile bool startFrameReceived=    false;
@@ -528,7 +528,7 @@ void send_frame(const FRAME_T &f) {
   // ORIGIN (byte)
   Serial1.write(f.origin); delay(dTime);
   #ifdef DEBUG
-   // DEBUG__________ln(String(COLOR_BRIGHT_YELLOW) + "[" + String(++i) + "] Origin = " + String(f.origin, HEX) + COLOR_RESET);
+   DEBUG__________ln(String(COLOR_BRIGHT_YELLOW) + "[" + String(++i) + "] Origin = " + String(f.origin, HEX) + COLOR_RESET);
   #endif
 
   // ORIGIN MAC[0..4]
@@ -549,12 +549,12 @@ void send_frame(const FRAME_T &f) {
 
   Serial1.write(f.originNS.mac04); delay(dTime);
   #ifdef DEBUG
-   // DEBUG__________ln(String(COLOR_BRIGHT_MAGENTA) + "[" + String(++i) + "] Origin MAC[3] = " + String(f.originNS.mac04, HEX) + COLOR_RESET);
+    DEBUG__________ln(String(COLOR_BRIGHT_MAGENTA) + "[" + String(++i) + "] Origin MAC[3] = " + String(f.originNS.mac04, HEX) + COLOR_RESET);
   #endif
 
   Serial1.write(f.originNS.mac05); delay(dTime);
   #ifdef DEBUG
-   // DEBUG__________ln(String(COLOR_BRIGHT_MAGENTA) + "[" + String(++i) + "] Origin MAC[4] = " + String(f.originNS.mac05, HEX) + COLOR_RESET);
+    DEBUG__________ln(String(COLOR_BRIGHT_MAGENTA) + "[" + String(++i) + "] Origin MAC[4] = " + String(f.originNS.mac05, HEX) + COLOR_RESET);
   #endif
 
   // TARGET TYPE

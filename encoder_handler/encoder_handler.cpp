@@ -763,6 +763,8 @@ void handleEncoder() noexcept
                             send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, START_CMD));
                             delay(30);
                             send_frame(frameMaker_SEND_FLAG_BYTE (DEFAULT_BOTONERA, BROADCAST, NS_ZERO, 0x01));
+                            delay(50);
+                            send_frame(frameMaker_SEND_PATTERN_NUM(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, 0x09));
                         } else {
                             send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, BLACKOUT));
                             showMessageWithLoading(getTranslation("APAGANDO_ELEMENTOS"), 4000);
