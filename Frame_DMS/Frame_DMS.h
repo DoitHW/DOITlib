@@ -222,6 +222,9 @@ FRAME_T frameMaker_SET_BUTTONS_EXTMAP(
 void send_old_color(uint8_t color);
 inline uint8_t old_color_checksum(uint8_t color, uint8_t node, uint8_t func, uint8_t dl, uint8_t room );
 
+void rfDebugPrint(const char* msg);
+void rfDebugPrintf(const char* fmt, ...);
+
 #endif
 
 

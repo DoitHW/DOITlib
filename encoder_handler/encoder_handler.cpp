@@ -13,6 +13,8 @@
 #include <RelayManager_DMS/RelayStateManager.h>
 
 
+
+
 // Variables globales para el manejo del encoder
 ESP32Encoder encoder;
 int32_t lastEncoderValue = 0;
@@ -948,6 +950,8 @@ void handleModeSelection(const String& currentFile) noexcept
             TARGETNS bcast = {0,0,0,0,0};
             if (selectedStates[currentIndex]) {
                 send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xFF, bcast, START_CMD));
+                delay(200);
+                send_frame(frameMaker_SEND_PATTERN_NUM(DEFAULT_BOTONERA, 0xFF, bcast, 9));
             } else {
                 send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xFF, bcast, BLACKOUT));
                 for (auto &s : selectedStates) s = false;
@@ -1277,6 +1281,120 @@ bool ignoreFirstRelease = true;
 
 
 #ifdef MIC
+// static void handleMicCalibMenu()
+// {
+//     static bool firstEntry = true;
+
+//     static bool encoderPressed = false;
+//     static bool ignoreFirstRelease = false;
+
+//     static int32_t lastCount = 0;
+//     static uint8_t editing = 5;
+
+//     static unsigned long lastPreviewMs = 0;
+//     static uint8_t liveRaw = 0;
+
+//     // Para saber si el menú arrancó el micro o ya venía activo por “Modo Voz”
+//     static bool startedMicHere = false;
+
+//     // Feedback “Guardado” sin bloquear
+//     static bool pendingExit = false;
+//     static unsigned long savedAt = 0;
+
+//     // --- Entrada al menú ---
+//     if (firstEntry) {
+//         firstEntry = false;
+//         pendingExit = false;
+
+//         // Si el micro no está activo (menú principal), actívalo para poder previsualizar
+//         if (!doitMic.isActive()) {
+//             doitMic.begin();              // tu begin() es void; marca estado interno
+//             startedMicHere = true;
+//         } else {
+//             startedMicHere = false;
+//         }
+
+//         editing = micSilenceThreshold;
+//         encoder.setCount((int32_t)editing);
+//         lastCount = encoder.getCount();
+
+//         const bool btnNow = (digitalRead(ENC_BUTTON) == LOW);
+//         ignoreFirstRelease = btnNow;     // si entrases con botón ya pulsado, ignorar esa suelta
+//         encoderPressed     = btnNow;
+
+//         lastPreviewMs = 0;
+//         liveRaw       = 0;
+
+//         drawMicCalibMenu(editing, liveRaw, false);
+//     }
+
+//     // --- Si acabamos de guardar, mostrar “Guardado” y salir tras 700ms ---
+//     if (pendingExit) {
+//         if (millis() - savedAt >= 700) {
+//             pendingExit = false;
+
+//             // Si el micro lo encendió este menú, lo apagamos al salir
+//             if (startedMicHere) {
+//                 doitMic.end();
+//                 startedMicHere = false;
+//             }
+
+//             micCalibMenuActive = false;
+//             hiddenMenuActive   = true;
+//             ignoreEncoderClick = true;
+
+//             firstEntry = true;
+//             drawHiddenMenu(0); // si quieres mantener selección, pásale hiddenMenuSelection real
+//         }
+//         return;
+//     }
+
+//     // --- Preview del ruido actual (solo si el micro está activo) ---
+//     if (millis() - lastPreviewMs >= 80) {
+//         lastPreviewMs = millis();
+//         if (doitMic.isActive()) {
+//             liveRaw = doitMic.get_mic_value_BYTE(micSensRuntime);
+//         } else {
+//             liveRaw = 0;
+//         }
+//         drawMicCalibMenu(editing, liveRaw, false);
+//     }
+
+//     // --- Giro encoder => editar umbral ---
+//     const int32_t c = encoder.getCount();
+//     if (c != lastCount) {
+//         const int delta = (int)(c - lastCount);
+//         lastCount = c;
+
+//         int nv = (int)editing + delta;
+//         nv = constrain(nv, 0, 255);
+//         editing = (uint8_t)nv;
+
+//         encoder.setCount((int32_t)editing);
+//         lastCount = (int32_t)editing;
+
+//         drawMicCalibMenu(editing, liveRaw, false);
+//     }
+
+//     // --- Click => guardar ---
+//     const bool btn = (digitalRead(ENC_BUTTON) == LOW);
+
+//     // Detectar “release” (btn pasa de LOW a HIGH)
+//     if (encoderPressed && !btn) {
+//         if (ignoreFirstRelease) {
+//             ignoreFirstRelease = false;
+//         } else {
+//             micSilenceThreshold = editing;
+//             saveMicSilenceThresholdToSPIFFS(micSilenceThreshold);
+
+//             drawMicCalibMenu(editing, liveRaw, true);
+//             pendingExit = true;
+//             savedAt = millis();
+//         }
+//     }
+
+//     encoderPressed = btn;
+// }
 static void handleMicCalibMenu()
 {
     static bool firstEntry = true;
@@ -1284,11 +1402,13 @@ static void handleMicCalibMenu()
     static bool encoderPressed = false;
     static bool ignoreFirstRelease = false;
 
+    // OJO: ya no usamos el encoder como valor absoluto 0..255.
+    // Lo usamos como contador libre para aplicar aceleración.
     static int32_t lastCount = 0;
     static uint8_t editing = 5;
 
     static unsigned long lastPreviewMs = 0;
-    static uint8_t liveRaw = 0;
+    static uint8_t liveRaw = 0; // ESTE ES EL BYTE REAL (mismo que runtime)
 
     // Para saber si el menú arrancó el micro o ya venía activo por “Modo Voz”
     static bool startedMicHere = false;
@@ -1297,6 +1417,15 @@ static void handleMicCalibMenu()
     static bool pendingExit = false;
     static unsigned long savedAt = 0;
 
+    // Aceleración del encoder
+    static unsigned long lastEncMoveMs = 0;
+
+    auto constrain_u8 = [](int v) -> uint8_t {
+        if (v < 0)   return 0;
+        if (v > 255) return 255;
+        return (uint8_t)v;
+    };
+
     // --- Entrada al menú ---
     if (firstEntry) {
         firstEntry = false;
@@ -1304,22 +1433,25 @@ static void handleMicCalibMenu()
 
         // Si el micro no está activo (menú principal), actívalo para poder previsualizar
         if (!doitMic.isActive()) {
-            doitMic.begin();              // tu begin() es void; marca estado interno
+            doitMic.begin();
             startedMicHere = true;
         } else {
             startedMicHere = false;
         }
 
         editing = micSilenceThreshold;
-        encoder.setCount((int32_t)editing);
-        lastCount = encoder.getCount();
+
+        // Encoder como contador relativo
+        encoder.setCount(0);
+        lastCount = 0;
 
         const bool btnNow = (digitalRead(ENC_BUTTON) == LOW);
-        ignoreFirstRelease = btnNow;     // si entrases con botón ya pulsado, ignorar esa suelta
+        ignoreFirstRelease = btnNow;
         encoderPressed     = btnNow;
 
-        lastPreviewMs = 0;
-        liveRaw       = 0;
+        lastPreviewMs  = 0;
+        lastEncMoveMs  = millis();
+        liveRaw        = 0;
 
         drawMicCalibMenu(editing, liveRaw, false);
     }
@@ -1340,13 +1472,14 @@ static void handleMicCalibMenu()
             ignoreEncoderClick = true;
 
             firstEntry = true;
-            drawHiddenMenu(0); // si quieres mantener selección, pásale hiddenMenuSelection real
+            drawHiddenMenu(0);
         }
         return;
     }
 
-    // --- Preview del ruido actual (solo si el micro está activo) ---
-    if (millis() - lastPreviewMs >= 80) {
+    // --- Preview del ruido actual (BYTE REAL, el mismo que runtime) ---
+    // Un pelín más rápido para sensación “viva”
+    if (millis() - lastPreviewMs >= 40) {
         lastPreviewMs = millis();
         if (doitMic.isActive()) {
             liveRaw = doitMic.get_mic_value_BYTE(micSensRuntime);
@@ -1356,19 +1489,30 @@ static void handleMicCalibMenu()
         drawMicCalibMenu(editing, liveRaw, false);
     }
 
-    // --- Giro encoder => editar umbral ---
+    // --- Giro encoder => editar umbral (con aceleración) ---
     const int32_t c = encoder.getCount();
     if (c != lastCount) {
-        const int delta = (int)(c - lastCount);
+        const int32_t deltaCounts = (c - lastCount);
         lastCount = c;
 
-        int nv = (int)editing + delta;
-        nv = constrain(nv, 0, 255);
-        editing = (uint8_t)nv;
+        const int dir = (deltaCounts > 0) ? 1 : -1;
+        const unsigned long now = millis();
+        const unsigned long dt  = now - lastEncMoveMs;
+        lastEncMoveMs = now;
 
-        encoder.setCount((int32_t)editing);
-        lastCount = (int32_t)editing;
+        // Modo fino: si mantienes pulsado el botón mientras giras => step=1
+        const bool btnHeld = (digitalRead(ENC_BUTTON) == LOW);
+        int step = 1;
 
+        if (!btnHeld) {
+            // Aceleración por velocidad (dt pequeño => más step)
+            if      (dt < 25) step = 12;
+            else if (dt < 45) step = 6;
+            else if (dt < 80) step = 3;
+            else              step = 2; // base más cómodo que 1
+        }
+
+        editing = constrain_u8((int)editing + dir * step);
         drawMicCalibMenu(editing, liveRaw, false);
     }
 
@@ -1391,6 +1535,8 @@ static void handleMicCalibMenu()
 
     encoderPressed = btn;
 }
+
+
 #endif
 
 
@@ -1483,74 +1629,150 @@ const int numSoundOptions = sizeof(soundOptions) / sizeof(soundOptions[0]);
  */
 void handleSoundMenu()
 {
-    // ──────────────── Constantes de comportamiento ────────────────
-    constexpr unsigned long kShortPressMs = 1000UL; // Umbral de pulsación corta
-    constexpr bool kButtonActiveLow = true;         // Botón activo en LOW
+    constexpr unsigned long kShortPressMs = 1000UL;
 
-    // Valores de volumen asociados a las opciones (mantener semántica)
     constexpr int kVolNormal   = 20;
     constexpr int kVolAtenuado = 15;
-    constexpr int kVolMaximo   = 30; 
+    constexpr int kVolMaximo   = 30;
 
-    // ──────────────── Lectura del encoder y navegación ─────────────
-    static int currentIndex = 0; // índice dentro de soundOptions[]
+    static bool   prevActive   = false;
+    static bool   inited       = false;
+    static int    currentIndex = 0;
+    static int32_t lastValue   = 0;
+
+    // Render tick para animaciones sin spamear
+    static unsigned long lastAnimMs = 0;
+    constexpr unsigned long kAnimMs = 50;
+
     const int32_t newEncoderValue = encoder.getCount();
-    static int32_t lastValue = newEncoderValue; // se inicializa la primera vez
+    if (!inited) { lastValue = newEncoderValue; inited = true; }
 
+    // ── Entrada al menú ──
+    if (soundMenuActive && !prevActive) {
+  
+
+        loadSoundSettingsFromSPIFFS();
+
+
+
+        // Alinear currentIndex con soundMenuSelection actual
+        currentIndex = 0;
+        for (int i = 0; i < numSoundOptions; ++i) {
+            if (soundOptions[i] == soundMenuSelection) { currentIndex = i; break; }
+        }
+
+        lastValue = newEncoderValue;
+        buttonPressStart = 0;
+        lastAnimMs = 0;
+
+        drawSoundMenu(soundMenuSelection);
+    }
+    prevActive = soundMenuActive;
+
+    if (!soundMenuActive) return;
+
+    // ───────── Navegación encoder ─────────
     if (newEncoderValue != lastValue) {
-        // Cualquier incremento => +1, decremento => -1
         const int dir = (newEncoderValue > lastValue) ? 1 : -1;
         lastValue = newEncoderValue;
 
-        // Avance circular en el vector de opciones válidas
-        currentIndex = (currentIndex + dir + numSoundOptions) % numSoundOptions;
+        // Saturar índice: 0..(numSoundOptions-1), sin wrap-around
+        int nextIndex = currentIndex + dir;
+        if (nextIndex < 0) nextIndex = 0;
+        else if (nextIndex >= numSoundOptions) nextIndex = numSoundOptions - 1;
 
-        // Actualizar selección efectiva (índice lógico del menú) y redibujar
-        soundMenuSelection = soundOptions[currentIndex];
-        drawSoundMenu(soundMenuSelection);
+        // Opcional: evitar repintar si no cambia (p. ej. giras en el borde)
+        if (nextIndex != currentIndex) {
+            currentIndex = nextIndex;
+            soundMenuSelection = soundOptions[currentIndex];
+            drawSoundMenu(soundMenuSelection);
+        }
     }
 
-    // ──────────────── Gestión de pulsación del botón ───────────────
-    const bool rawRead = (digitalRead(ENC_BUTTON) == LOW);
-    const bool buttonPressed = kButtonActiveLow ? rawRead : !rawRead;
+    // ───────── Botón encoder ─────────
+    const bool pressed = (digitalRead(ENC_BUTTON) == LOW);
 
-    if (buttonPressed) {
-        // Inicio de pulsación
-        if (buttonPressStart == 0) {
-            buttonPressStart = millis();
-        }
+    if (pressed) {
+        if (buttonPressStart == 0) buttonPressStart = millis();
     } else {
-        // Botón liberado: si hubo pulsación corta, ejecutar acción
         if (buttonPressStart > 0 && (millis() - buttonPressStart) < kShortPressMs) {
             const int sel = soundMenuSelection;
+
             switch (sel) {
-                case 0:  selectedVoiceGender = 0; token.genre = 0;                  break; // Voz: mujer
-                case 1:  selectedVoiceGender = 1; token.genre = 1;                  break; // Voz: hombre
-                case 3: negativeResponse = true;                                    break; // Respuesta negativa: activar
-                case 4: negativeResponse = false;                                   break; // Respuesta negativa: desactivar
-                case 6: selectedVolume = 0; doitPlayer.player.volume(kVolMaximo);   break;
-                case 7: selectedVolume = 1; doitPlayer.player.volume(kVolNormal);   break;
-                case 8: selectedVolume = 2; doitPlayer.player.volume(kVolAtenuado); break;
-                case 10: // Confirmar y salir
-                    saveSoundSettingsToSPIFFS();
-                    soundMenuActive = false;
-                    ignoreEncoderClick = true;
+                case 0: // MUJER
+                    selectedVoiceGender = 0;
+                    token.genre = 0;
+        
                     break;
 
+                case 1: // HOMBRE
+                    selectedVoiceGender = 1;
+                    token.genre = 1;
+
+                    break;
+
+                case 3: // CON_NEG
+                    negativeResponse = true;
+ 
+                    break;
+
+                case 4: // SIN_NEG
+                    negativeResponse = false;
+            
+                    break;
+
+                case 6: // VOL_MAXIMO
+                    selectedVolume = 0;
+                    doitPlayer.player.volume(kVolMaximo);
+             
+                    break;
+
+                case 7: // VOL_NORMAL
+                    selectedVolume = 1;
+                    doitPlayer.player.volume(kVolNormal);
+         
+                    break;
+
+                case 8: // VOL_ATENUADO
+                    selectedVolume = 2;
+                    doitPlayer.player.volume(kVolAtenuado);
+
+                    break;
+
+                case 10: // CONFIRMAR
+       
+                    saveSoundSettingsToSPIFFS();
+
+                    // Readback inmediato
+                    loadSoundSettingsFromSPIFFS();
+
+
+
+                    // Salir
+                    soundMenuActive = false;
+                    ignoreEncoderClick = true;
+
+                    // Reset interno
+                    prevActive = false;
+                    inited = false;
+                    buttonPressStart = 0;
+                    return;
+
                 default:
-                    // Opción no accionable: no hacer nada (se mantiene el estado)
                     break;
             }
 
-            // Refrescar para mostrar el nuevo estado tras la acción
             drawSoundMenu(soundMenuSelection);
         }
 
-        // Reset de la marca de tiempo al soltar
         buttonPressStart = 0;
     }
-    if (soundMenuActive) {
-        drawSoundMenu(soundMenuSelection);  // ticker y scroll integrados
+
+    // Tick para mantener ticker/scroll
+    const unsigned long now = millis();
+    if (now - lastAnimMs >= kAnimMs) {
+        lastAnimMs = now;
+        drawSoundMenu(soundMenuSelection);
     }
 }
 

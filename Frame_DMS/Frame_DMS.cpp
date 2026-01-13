@@ -1309,3 +1309,23 @@ void send_old_color(uint8_t color)
     DEBUG__________ln("======================================");
     #endif
 }
+
+#define RF_UART Serial1
+
+void rfDebugPrint(const char* msg)
+{
+    if (!msg || !*msg) return;
+    delay(100);
+    //RF_UART.write('\n'); // separador entre logs
+}
+
+void rfDebugPrintf(const char* fmt, ...)
+{
+    static char buf[256]; // tamaño razonable para logs
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+
+    rfDebugPrint(buf);
+}

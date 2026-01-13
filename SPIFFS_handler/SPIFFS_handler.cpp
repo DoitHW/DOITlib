@@ -21,7 +21,6 @@ bool writeBytesChecked(fs::File &f, const uint8_t* data, size_t length) {
     return true;
 }
 
-
 void formatSPIFFS() {
     #ifdef DEBUG
       DEBUG__________("Formateando SPIFFS...");                                                                            
@@ -610,28 +609,57 @@ void saveSoundSettingsToSPIFFS()
 
 void loadSoundSettingsFromSPIFFS()
 {
-    File f = SPIFFS.open("/config_sonido.txt", FILE_READ);
-    if (!f) return;
+    static const char* kPath = "/config_sonido.txt";
 
-    if (f.available() < 3) { f.close(); return; }
 
-    // Leer ajustes
-    uint8_t vg   = (uint8_t)f.read();   // 0/1
-    uint8_t neg  = (uint8_t)f.read();   // 0/1
-    uint8_t vsel = (uint8_t)f.read();   // 0..2
 
+    File f = SPIFFS.open(kPath, "r");
+    if (!f) {
+        rfDebugPrint("[SND][LOAD] file not found");
+        return;
+    }
+
+    const size_t sz = f.size();
+    rfDebugPrintf("[SND][LOAD] size=%u", (unsigned)sz);
+
+    if (sz < 3) {
+        f.close();
+        rfDebugPrint("[SND][LOAD] ERROR size<3");
+        return;
+    }
+
+    // Lee últimos 3 bytes si el fichero creció
+    if (sz > 3) {
+        f.seek((uint32_t)(sz - 3), SeekSet);
+        rfDebugPrintf("[SND][LOAD] seek to %u", (unsigned)(sz - 3));
+    }
+
+    uint8_t buf[3] = {0, 0, 1}; // defaults: mujer, sin, normal
+    const size_t r = f.read(buf, sizeof(buf));
     f.close();
 
-    // Validaciones mínimas
-    if (vg > 1) vg = 0;
-    if (vsel > 2) vsel = 1; // NORMAL por defecto
+    rfDebugPrintf("[SND][LOAD] read=%u expected=%u", (unsigned)r, (unsigned)sizeof(buf));
+    if (r != sizeof(buf)) {
+        rfDebugPrint("[SND][LOAD] ERROR short read");
+        return;
+    }
 
+
+
+    uint8_t vg   = buf[0];
+    uint8_t neg  = buf[1];
+    uint8_t vsel = buf[2];
+
+    if (vg > 1) vg = 0;
+    if (vsel > 2) vsel = 1;
+
+    // Aplicar a RAM
     selectedVoiceGender = vg;
-    token.genre         = selectedVoiceGender;
+    token.genre         = vg;
     negativeResponse    = (neg == 1);
     selectedVolume      = vsel;
 
-    // Aplicar volumen real según selector y tu orden
+    // Aplicar volumen real
     constexpr uint8_t kVolMaximo   = 30;
     constexpr uint8_t kVolNormal   = 20;
     constexpr uint8_t kVolAtenuado = 15;
@@ -641,6 +669,13 @@ void loadSoundSettingsFromSPIFFS()
     else if (selectedVolume == 2) vol = kVolAtenuado;
 
     doitPlayer.player.volume(vol);
+
+
+    // Compactación si el fichero estaba hinchado
+    if (sz != 3) {
+        rfDebugPrint("[SND][LOAD] compacting (sz!=3)...");
+        saveSoundSettingsToSPIFFS();
+    }
 }
 
 

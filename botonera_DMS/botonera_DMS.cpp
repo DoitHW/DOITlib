@@ -1254,6 +1254,13 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
             DEBUG__________printf("F_SEND_PATTERN_NUM bank=0x%02X, file=%u\n", AMBIENTS_BANK, pattern);
             #endif
             doitPlayer.play_file(AMBIENTS_BANK, pattern + 1);
+            enfocarElemento("Ambientes");
+            std::fill(selectedStates.begin(), selectedStates.end(), false);
+            // Marcar el actual como seleccionado
+            if (currentIndex >= 0 && currentIndex < (int)selectedStates.size()) {
+                selectedStates[currentIndex] = true;
+            }
+            drawCurrentElement();
             break;
         }
 

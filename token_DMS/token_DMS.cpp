@@ -198,121 +198,243 @@ String TOKEN_::decodeNdefText(const byte* payload, int payloadLength) {
 }
 
 // Función modificada para leer el mensaje NDEF (token) desde las páginas 6 a 18
+// bool TOKEN_::leerMensajeNFC(String &mensaje) {
+//   DEBUG__________ln("DEBUG: Procesando mensaje NDEF para la tarjeta con UID: " + currentUID);
+
+//   uint8_t rawBuffer[128] = {0};
+//   int len = 0;
+//   // Leer de la página 6 a la 18 (13 páginas * 4 bytes = 52 bytes)
+//   for (uint8_t page = 6; page <= 30; page++) {
+//     uint8_t pageBuffer[4] = {0};
+//     if (!nfc.ntag2xx_ReadPage(page, pageBuffer)) {
+//       DEBUG__________("⚠️ ERROR: Falló la lectura de la página ");
+//       DEBUG__________ln(page);
+//       mensaje = "";
+//       return false;
+//     }
+//     memcpy(rawBuffer + len, pageBuffer, 4);
+//     len += 4;
+//   }
+  
+//   // Convertir el buffer a una cadena completa (cada byte se interpreta como carácter)
+//   String fullData = "";
+//   for (int i = 0; i < len; i++) {
+//     fullData += (char)rawBuffer[i];
+//   }
+//   DEBUG__________ln("Dump completo (páginas 6 a 18): " + fullData);
+  
+//   // Buscar los delimitadores '#' en la cadena
+//   int firstHash = fullData.indexOf('#');
+//   if (firstHash < 0) {
+//     DEBUG__________ln("⚠️ ERROR: No se encontró el delimitador de inicio '#'.");
+//     mensaje = "";
+//     return false;
+//   }
+//   int secondHash = fullData.indexOf('#', firstHash + 1);
+//   if (secondHash < 0) {
+//     DEBUG__________ln("⚠️ ERROR: No se encontró el delimitador de fin '#'.");
+//     mensaje = "";
+//     return false;
+//   }
+  
+//   // Extraer la cadena entre los dos delimitadores
+//   String tokenStr = fullData.substring(firstHash + 1, secondHash);
+//   DEBUG__________ln("Token string extraído: " + tokenStr);
+  
+//   // Se espera que el token tenga 46 dígitos hexadecimales (23 bytes)
+//   if (tokenStr.length() != 94) {
+//     DEBUG__________ln("⚠️ ERROR: Longitud del token inválida. Se esperaba 46 dígitos hexadecimales, se obtuvo: " + String(tokenStr.length()));
+//     mensaje = "";
+//     return false;
+//   }
+  
+//   // Función lambda para convertir dos caracteres ASCII hex a un byte
+//   auto hexToByte = [](const String &str) -> byte {
+//     return (byte)strtol(str.c_str(), nullptr, 16);
+//   };
+
+//   // Nuevo orden:
+//   // Bytes 0-1: CMD
+//   // Bytes 2-3: CMD2
+//   // Bytes 4-5: Bank
+//   // Bytes 6-7: File
+//   // Bytes 8-9: Color R
+//   // Bytes 10-11: Color G
+//   // Bytes 12-13: Color B
+//   // Bytes 14-45: 8 parejas para los partners (8×4 dígitos = 32 dígitos)
+//   token.currentToken.cmd = hexToByte(tokenStr.substring(0, 2));
+//   token.currentToken.cmd2 = hexToByte(tokenStr.substring(2, 4));
+//   token.currentToken.addr.bank = hexToByte(tokenStr.substring(4, 6));
+//   //updateBankList(token.currentToken.addr.bank);
+//   DEBUG__________ln("SPIFFS: Bank actualizado: " + String(token.currentToken.addr.bank, HEX));
+//   token.currentToken.addr.file = hexToByte(tokenStr.substring(6, 8));
+//   token.currentToken.color.r = hexToByte(tokenStr.substring(8, 10));
+//   token.currentToken.color.g = hexToByte(tokenStr.substring(10, 12));
+//   token.currentToken.color.b = hexToByte(tokenStr.substring(12, 14));
+  
+//   for (int i = 0; i < 8; i++) {
+//     int startIdx = 14 + i * 4;
+//     token.currentToken.partner[i].bank = hexToByte(tokenStr.substring(startIdx, startIdx + 2));
+//     token.currentToken.partner[i].file = hexToByte(tokenStr.substring(startIdx + 2, startIdx + 4));
+//   }
+
+//   // Leer 24 bytes para el nombre de la familia (posiciones 46 a 93)
+// for (int i = 0; i < 24; i++) {
+//   token.currentToken.familyName[i] = hexToByte(tokenStr.substring(46 + i * 2, 48 + i * 2));
+// }
+// token.currentToken.familyName[24] = '\0'; // Asegurar string nulo-terminado
+
+//   updateBankAndFamilyList(token.currentToken.addr.bank, (char*)token.currentToken.familyName);
+//   bankList = readBankList();
+//   selectedBanks.resize(bankList.size(), false);
+//   // Imprimir valores para depuración
+//   DEBUG__________ln("Token decodificado:");
+//   DEBUG__________("CMD: 0x"); DEBUG__________ln(token.currentToken.cmd, HEX);
+//   DEBUG__________("CMD2: 0x"); DEBUG__________ln(token.currentToken.cmd2, HEX);
+//   DEBUG__________("Bank: 0x"); DEBUG__________ln(token.currentToken.addr.bank, HEX);
+//   DEBUG__________("File: 0x"); DEBUG__________ln(token.currentToken.addr.file, HEX);
+//   DEBUG__________("Color R: 0x"); DEBUG__________ln(token.currentToken.color.r, HEX);
+//   DEBUG__________("Color G: 0x"); DEBUG__________ln(token.currentToken.color.g, HEX);
+//   DEBUG__________("Color B: 0x"); DEBUG__________ln(token.currentToken.color.b, HEX);
+//   for (int i = 0; i < 8; i++) {
+//     DEBUG__________("Partner "); DEBUG__________(i); DEBUG__________(": Bank=0x");
+//     DEBUG__________(token.currentToken.partner[i].bank, HEX);
+//     DEBUG__________(", File=0x");
+//     DEBUG__________ln(token.currentToken.partner[i].file, HEX);
+//   }
+//   DEBUG__________("🏷️  Familia: ");
+//   DEBUG__________ln(token.currentToken.familyName);
+
+  
+//   mensaje = tokenStr;
+//   // Actualizar el UID procesado para evitar relecturas mientras la misma tarjeta esté presente
+//   lastProcessedUID = currentUID;
+//   mensajeLeido = true;
+
+//   return true;
+// }
+
 bool TOKEN_::leerMensajeNFC(String &mensaje) {
-  DEBUG__________ln("DEBUG: Procesando mensaje NDEF para la tarjeta con UID: " + currentUID);
+  DEBUG__________ln("[NFC] leerMensajeNFC() ENTER");
+  DEBUG__________ln("DEBUG: Procesando mensaje NDEF para UID: " + currentUID);
 
-  uint8_t rawBuffer[128] = {0};
-  int len = 0;
-  // Leer de la página 6 a la 18 (13 páginas * 4 bytes = 52 bytes)
-  for (uint8_t page = 6; page <= 30; page++) {
-    uint8_t pageBuffer[4] = {0};
-    if (!nfc.ntag2xx_ReadPage(page, pageBuffer)) {
-      DEBUG__________("⚠️ ERROR: Falló la lectura de la página ");
-      DEBUG__________ln(page);
-      mensaje = "";
-      return false;
+    uint8_t rawBuffer[128] = {0};
+    int len = 0;
+
+    // Rango real que estás usando (6..30). Ajusta si de verdad solo necesitas 6..18.
+    const uint8_t kFirstPage = 6;
+    const uint8_t kLastPage  = 30;
+
+    for (uint8_t page = kFirstPage; page <= kLastPage; page++) {
+        uint8_t pageBuffer[4] = {0};
+
+        bool ok = false;
+        for (int attempt = 0; attempt < 4; ++attempt) {
+            if (nfc.ntag2xx_ReadPage(page, pageBuffer)) {
+                ok = true;
+                break;
+            }
+            delay(6);
+        }
+
+        if (!ok) {
+            DEBUG__________("⚠️ ERROR: Falló lectura página ");
+            DEBUG__________ln(page);
+            mensaje = "";
+            return false;
+        }
+
+        if (len + 4 <= (int)sizeof(rawBuffer)) {
+            memcpy(rawBuffer + len, pageBuffer, 4);
+            len += 4;
+        } else {
+            DEBUG__________ln("⚠️ ERROR: rawBuffer overflow");
+            mensaje = "";
+            return false;
+        }
+
+        // Pequeña pausa para estabilidad I2C/PN532
+        delay(2);
     }
-    memcpy(rawBuffer + len, pageBuffer, 4);
-    len += 4;
-  }
-  
-  // Convertir el buffer a una cadena completa (cada byte se interpreta como carácter)
-  String fullData = "";
-  for (int i = 0; i < len; i++) {
-    fullData += (char)rawBuffer[i];
-  }
-  DEBUG__________ln("Dump completo (páginas 6 a 18): " + fullData);
-  
-  // Buscar los delimitadores '#' en la cadena
-  int firstHash = fullData.indexOf('#');
-  if (firstHash < 0) {
-    DEBUG__________ln("⚠️ ERROR: No se encontró el delimitador de inicio '#'.");
-    mensaje = "";
-    return false;
-  }
-  int secondHash = fullData.indexOf('#', firstHash + 1);
-  if (secondHash < 0) {
-    DEBUG__________ln("⚠️ ERROR: No se encontró el delimitador de fin '#'.");
-    mensaje = "";
-    return false;
-  }
-  
-  // Extraer la cadena entre los dos delimitadores
-  String tokenStr = fullData.substring(firstHash + 1, secondHash);
-  DEBUG__________ln("Token string extraído: " + tokenStr);
-  
-  // Se espera que el token tenga 46 dígitos hexadecimales (23 bytes)
-  if (tokenStr.length() != 94) {
-    DEBUG__________ln("⚠️ ERROR: Longitud del token inválida. Se esperaba 46 dígitos hexadecimales, se obtuvo: " + String(tokenStr.length()));
-    mensaje = "";
-    return false;
-  }
-  
-  // Función lambda para convertir dos caracteres ASCII hex a un byte
-  auto hexToByte = [](const String &str) -> byte {
-    return (byte)strtol(str.c_str(), nullptr, 16);
-  };
 
-  // Nuevo orden:
-  // Bytes 0-1: CMD
-  // Bytes 2-3: CMD2
-  // Bytes 4-5: Bank
-  // Bytes 6-7: File
-  // Bytes 8-9: Color R
-  // Bytes 10-11: Color G
-  // Bytes 12-13: Color B
-  // Bytes 14-45: 8 parejas para los partners (8×4 dígitos = 32 dígitos)
-  token.currentToken.cmd = hexToByte(tokenStr.substring(0, 2));
-  token.currentToken.cmd2 = hexToByte(tokenStr.substring(2, 4));
-  token.currentToken.addr.bank = hexToByte(tokenStr.substring(4, 6));
-  //updateBankList(token.currentToken.addr.bank);
-  DEBUG__________ln("SPIFFS: Bank actualizado: " + String(token.currentToken.addr.bank, HEX));
-  token.currentToken.addr.file = hexToByte(tokenStr.substring(6, 8));
-  token.currentToken.color.r = hexToByte(tokenStr.substring(8, 10));
-  token.currentToken.color.g = hexToByte(tokenStr.substring(10, 12));
-  token.currentToken.color.b = hexToByte(tokenStr.substring(12, 14));
-  
-  for (int i = 0; i < 8; i++) {
-    int startIdx = 14 + i * 4;
-    token.currentToken.partner[i].bank = hexToByte(tokenStr.substring(startIdx, startIdx + 2));
-    token.currentToken.partner[i].file = hexToByte(tokenStr.substring(startIdx + 2, startIdx + 4));
-  }
+    // Buscar delimitadores '#' (0x23) directamente en bytes
+    int firstHash = -1, secondHash = -1;
+    for (int i = 0; i < len; ++i) {
+        if (rawBuffer[i] == '#') {
+            if (firstHash < 0) firstHash = i;
+            else { secondHash = i; break; }
+        }
+    }
 
-  // Leer 24 bytes para el nombre de la familia (posiciones 46 a 93)
-for (int i = 0; i < 24; i++) {
-  token.currentToken.familyName[i] = hexToByte(tokenStr.substring(46 + i * 2, 48 + i * 2));
+    if (firstHash < 0 || secondHash < 0 || secondHash <= firstHash + 1) {
+        DEBUG__________ln("⚠️ ERROR: delimitadores '#' no encontrados o inválidos");
+        mensaje = "";
+        return false;
+    }
+
+    // Extraer token ASCII entre hashes (ignorando 0x00 no debería estar ahí, pero lo toleramos)
+    String tokenStr;
+    tokenStr.reserve(120);
+
+    for (int i = firstHash + 1; i < secondHash; ++i) {
+        const uint8_t b = rawBuffer[i];
+        if (b == 0x00) continue;
+        tokenStr += (char)b;
+    }
+
+    DEBUG__________ln("Token string extraído: " + tokenStr);
+
+    // Tu formato actual: 94 hex chars = 47 bytes
+    if (tokenStr.length() != 94) {
+        DEBUG__________ln("⚠️ ERROR: Longitud token inválida, esperada 94, obtenida: " + String(tokenStr.length()));
+        mensaje = "";
+        return false;
+    }
+
+    auto hexToByte = [](const String &str) -> byte {
+        return (byte)strtol(str.c_str(), nullptr, 16);
+    };
+
+    token.currentToken.cmd       = hexToByte(tokenStr.substring(0, 2));
+    token.currentToken.cmd2      = hexToByte(tokenStr.substring(2, 4));
+    token.currentToken.addr.bank = hexToByte(tokenStr.substring(4, 6));
+    DEBUG__________ln("SPIFFS: Bank actualizado: " + String(token.currentToken.addr.bank, HEX));
+    token.currentToken.addr.file = hexToByte(tokenStr.substring(6, 8));
+    token.currentToken.color.r   = hexToByte(tokenStr.substring(8, 10));
+    token.currentToken.color.g   = hexToByte(tokenStr.substring(10, 12));
+    token.currentToken.color.b   = hexToByte(tokenStr.substring(12, 14));
+
+    for (int i = 0; i < 8; i++) {
+        int startIdx = 14 + i * 4;
+        token.currentToken.partner[i].bank = hexToByte(tokenStr.substring(startIdx, startIdx + 2));
+        token.currentToken.partner[i].file = hexToByte(tokenStr.substring(startIdx + 2, startIdx + 4));
+    }
+
+    // familyName: 24 bytes = 48 hex chars, empieza en offset 46 (según tu implementación)
+    for (int i = 0; i < 24; i++) {
+        token.currentToken.familyName[i] = hexToByte(tokenStr.substring(46 + i * 2, 48 + i * 2));
+    }
+    token.currentToken.familyName[24] = '\0';
+
+    updateBankAndFamilyList(token.currentToken.addr.bank, (char*)token.currentToken.familyName);
+    bankList = readBankList();
+    selectedBanks.resize(bankList.size(), false);
+
+    DEBUG__________ln("Token decodificado:");
+    DEBUG__________("CMD: 0x");  DEBUG__________ln(token.currentToken.cmd, HEX);
+    DEBUG__________("CMD2: 0x"); DEBUG__________ln(token.currentToken.cmd2, HEX);
+    DEBUG__________("Bank: 0x"); DEBUG__________ln(token.currentToken.addr.bank, HEX);
+    DEBUG__________("File: 0x"); DEBUG__________ln(token.currentToken.addr.file, HEX);
+
+    DEBUG__________("🏷️  Familia: ");
+    DEBUG__________ln(token.currentToken.familyName);
+
+    mensaje = tokenStr;
+    lastProcessedUID = currentUID;
+    mensajeLeido = true;
+    return true;
 }
-token.currentToken.familyName[24] = '\0'; // Asegurar string nulo-terminado
 
-  updateBankAndFamilyList(token.currentToken.addr.bank, (char*)token.currentToken.familyName);
-  bankList = readBankList();
-  selectedBanks.resize(bankList.size(), false);
-  // Imprimir valores para depuración
-  DEBUG__________ln("Token decodificado:");
-  DEBUG__________("CMD: 0x"); DEBUG__________ln(token.currentToken.cmd, HEX);
-  DEBUG__________("CMD2: 0x"); DEBUG__________ln(token.currentToken.cmd2, HEX);
-  DEBUG__________("Bank: 0x"); DEBUG__________ln(token.currentToken.addr.bank, HEX);
-  DEBUG__________("File: 0x"); DEBUG__________ln(token.currentToken.addr.file, HEX);
-  DEBUG__________("Color R: 0x"); DEBUG__________ln(token.currentToken.color.r, HEX);
-  DEBUG__________("Color G: 0x"); DEBUG__________ln(token.currentToken.color.g, HEX);
-  DEBUG__________("Color B: 0x"); DEBUG__________ln(token.currentToken.color.b, HEX);
-  for (int i = 0; i < 8; i++) {
-    DEBUG__________("Partner "); DEBUG__________(i); DEBUG__________(": Bank=0x");
-    DEBUG__________(token.currentToken.partner[i].bank, HEX);
-    DEBUG__________(", File=0x");
-    DEBUG__________ln(token.currentToken.partner[i].file, HEX);
-  }
-  DEBUG__________("🏷️  Familia: ");
-  DEBUG__________ln(token.currentToken.familyName);
-
-  
-  mensaje = tokenStr;
-  // Actualizar el UID procesado para evitar relecturas mientras la misma tarjeta esté presente
-  lastProcessedUID = currentUID;
-  mensajeLeido = true;
-
-  return true;
-}
 
 void TOKEN_::proponer_token(byte guessbank) {
     lang = 0;

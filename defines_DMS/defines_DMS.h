@@ -94,8 +94,8 @@ constexpr byte DEFAULT_PAD          = 0xD9;
 
 #define LEGACY_COLOR_SUPPORT
 
-#define DEBUG
-#define DEBUG_
+#define NODEBUG
+#define NODEBUG_
 #if defined(DEBUG_) && !defined(NODEBUG)
   #define DEBUG__________ln(...)          Serial.println(__VA_ARGS__)
   #define DEBUG__________(...)            Serial.print(__VA_ARGS__)
