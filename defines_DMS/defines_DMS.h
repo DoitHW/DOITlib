@@ -94,8 +94,8 @@ constexpr byte DEFAULT_PAD          = 0xD9;
 
 #define LEGACY_COLOR_SUPPORT
 
-#define NODEBUG
-#define NODEBUG_
+#define DEBUG
+#define DEBUG_
 #if defined(DEBUG_) && !defined(NODEBUG)
   #define DEBUG__________ln(...)          Serial.println(__VA_ARGS__)
   #define DEBUG__________(...)            Serial.print(__VA_ARGS__)
@@ -156,6 +156,7 @@ constexpr byte DEFAULT_PAD          = 0xD9;
 #define RF_TX_PIN         18 
 #define RF_RX_PIN         17  
 #define RF_CONFIG_PIN     46 //botonera marc pin 45
+#define FAST_RF
 #if defined (FAST_RF)
   #define RF_BAUD_RATE      115200
 #else
@@ -165,7 +166,7 @@ constexpr byte DEFAULT_PAD          = 0xD9;
 #define UART_RX_BUFFER_SIZE 1024
 
 
-#define SAMPLES             1024
+#define SAMPLES             256
 #define SAMPLING_FREQUENCY  44100
 
 

@@ -4677,7 +4677,7 @@ void drawConfirmEnableDadoMenu(int selection)
     uiSprite.setTextSize(1);
     uiSprite.setTextDatum(MC_DATUM);
 
-    const char* opciones[] = { getTranslation("SI"), getTranslation("NO") };
+    const char* opciones[] = { getTranslation("YES_DELETE"), getTranslation("NO_DELETE") };
 
     // Clamp defensivo del índice seleccionado
     int sel = selection;

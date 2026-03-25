@@ -100,6 +100,38 @@ void MICROPHONE_::calibracionInicial(unsigned long duracionCalibracion) {
     DEBUG__________ln(promedio);
 }
 
+// byte MICROPHONE_::get_mic_value_BYTE(int sens)
+// {
+//     // Blindaje: si el driver I2S no está instalado, NO leer.
+//     if (!micInitialized) {
+//         return 0;
+//     }
+
+//     static int raw_min = 4097;
+//     static int raw_max = 0;
+
+//     int32_t sample = 0;
+//     size_t bytes_read = 0;
+
+//     i2s_read(I2S_NUM_0, &sample, sizeof(int32_t), &bytes_read, portMAX_DELAY);
+
+//     if (bytes_read > 0) {
+//         sample >>= 14;
+//         sample = abs(sample);
+
+//         if (sample < raw_min) raw_min = sample;
+//         if (sample > raw_max) raw_max = sample;
+
+//         // OJO: evita 5000 - sens <= 0
+//         int denom = 5000 - sens;
+//         if (denom <= 1) denom = 1;
+
+//         sample = map(sample, 0, denom, 0, 255);
+//         sample = constrain(sample, 0, 255);
+//     }
+//     return (byte)sample;
+// }
+
 byte MICROPHONE_::get_mic_value_BYTE(int sens)
 {
     // Blindaje: si el driver I2S no está instalado, NO leer.
@@ -107,31 +139,57 @@ byte MICROPHONE_::get_mic_value_BYTE(int sens)
         return 0;
     }
 
-    static int raw_min = 4097;
-    static int raw_max = 0;
-
-    int32_t sample = 0;
+    // --- CONFIGURACIÓN DE LECTURA ---
+    // Leemos un bloque de muestras para obtener un PROMEDIO real de la energía
+    const size_t SAMPLES_TO_READ = 256; 
+    
+    int32_t samples[SAMPLES_TO_READ];
     size_t bytes_read = 0;
 
-    i2s_read(I2S_NUM_0, &sample, sizeof(int32_t), &bytes_read, portMAX_DELAY);
+    // Leemos el bloque entero de una vez (rápido y estable)
+    i2s_read(I2S_NUM_0, &samples, sizeof(samples), &bytes_read, portMAX_DELAY);
 
     if (bytes_read > 0) {
-        sample >>= 14;
-        sample = abs(sample);
+        int numSamples = bytes_read / sizeof(int32_t);
+        long sumEnergy = 0;
 
-        if (sample < raw_min) raw_min = sample;
-        if (sample > raw_max) raw_max = sample;
+        for (int i = 0; i < numSamples; i++) {
+            int32_t sample = samples[i];
+            
+            // Ajuste a 16 bits y valor absoluto
+            sample >>= 14; 
+            sample = abs(sample);
+            
+            // Acumulamos energía
+            sumEnergy += sample;
+        }
 
-        // OJO: evita 5000 - sens <= 0
+        // --- CÁLCULO DEL PROMEDIO ---
+        int averageAmplitude = sumEnergy / numSamples;
+
+        // --- CORRECCIÓN DE GANANCIA (IMPORTANTE) ---
+        // El promedio siempre es menor que el pico. Multiplicamos por 2
+        // para recuperar "fuerza" y evitar que se detecte como silencio (00)
+        averageAmplitude = averageAmplitude * 2; 
+
+        // Calibración dinámica (igual que tu código original)
+        static int raw_min = 4097;
+        static int raw_max = 0;
+
+        if (averageAmplitude < raw_min) raw_min = averageAmplitude;
+        if (averageAmplitude > raw_max) raw_max = averageAmplitude;
+
+        // Mapeo
         int denom = 5000 - sens;
         if (denom <= 1) denom = 1;
 
-        sample = map(sample, 0, denom, 0, 255);
-        sample = constrain(sample, 0, 255);
+        int finalValue = map(averageAmplitude, 0, denom, 0, 255);
+        finalValue = constrain(finalValue, 0, 255);
+        
+        return (byte)finalValue;
     }
-    return (byte)sample;
+    return 0;
 }
-
 
 byte MICROPHONE_::get_mic_value_BYTE_voice() {
     static double vReal[SAMPLES];
@@ -202,7 +260,6 @@ bool MICROPHONE_::detect_sound_threshold() {
     }
     return false; 
 }
-
 
 byte MICROPHONE_::detect_musical_note() {
     // Usamos 1024 muestras para mejorar la resolución en frecuencia:

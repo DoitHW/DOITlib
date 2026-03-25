@@ -144,7 +144,7 @@ void ADXL345Handler::readInclinations() {
     // 0.2 = Muy suave (elimina mucho ruido, un pelín de lag). 
     // 0.5 = Respuesta rápida (menos filtrado).
     // Con tus picos de ruido, 0.2 es ideal.
-    float alpha = 0.2; 
+    float alpha = 0.6f; // originalfloat alpha = 0.2; 
 
     // Aplicamos el filtro:
     smoothX = (event.acceleration.x * alpha) + (smoothX * (1.0 - alpha));
@@ -193,14 +193,19 @@ void ADXL345Handler::readInclinations() {
         
         if (triggerX || triggerY) {
             
-            long valXraw = constrain(currX, -10, 10);
-            long valYraw = constrain(currY, -10, 10);
-            long valX = convertInclinationToValue(valXraw);
-            long valY = convertInclinationToValue(valYraw);
+            // long valXraw = constrain(currX, -10, 10);
+            // long valYraw = constrain(currY, -10, 10);
+            // long valX = convertInclinationToValue(valXraw);
+            // long valY = convertInclinationToValue(valYraw);
+
+            const float valXraw = constrain(currX, -10.0f, 10.0f);
+            const float valYraw = constrain(currY, -10.0f, 10.0f);
+            const long  valX    = convertInclinationToValue(valXraw);
+            const long  valY    = convertInclinationToValue(valYraw);
 
             unsigned long nowFrame = millis();
             
-            if (nowFrame - lastFrameTime >= 70) {
+            if (nowFrame - lastFrameTime >= 70) {//if (nowFrame - lastFrameTime >= 20) { //originalmente 70ms
                 
                 if (valX != lastSentValX || valY != lastSentValY) {
                     

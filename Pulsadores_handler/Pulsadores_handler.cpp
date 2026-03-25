@@ -527,7 +527,8 @@ void PulsadoresHandler::handleCognitiveMenu(int i, int j, ButtonEventType event)
     
     TARGETNS ownNS = getOwnNS();
     if (event == BUTTON_PRESSED && color != RELAY) {
-        send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, DEFAULT_CONSOLE, ownNS, color));
+        //send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, DEFAULT_CONSOLE, ownNS, color));
+        send_frame(frameMaker_SEND_RESPONSE(DEFAULT_BOTONERA, DEFAULT_CONSOLE, ownNS, color));
     } else if (event == BUTTON_RELEASED && color == RELAY) {
         send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, DEFAULT_CONSOLE, ownNS, 0x01));
     }
@@ -632,7 +633,7 @@ void PulsadoresHandler::handleAmbientes(byte buttonColor, ButtonEventType event)
     delay(100);
 
     if (sendVal != BLACK) {
-        doitPlayer.play_file(AMBIENTS_BANK, sendVal + 1);
+        doitPlayer.play_file(AMBIENTS_BANK, sendVal);
         ambienteActivo = true;
     } else {
         doitPlayer.stop_file();

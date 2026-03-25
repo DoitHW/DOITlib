@@ -19,7 +19,7 @@ class ELEMENT_ {
 
     public: 
         void   begin();
-        void   configurar_RF(int baudRate);
+        void   configurar_RF(uint32_t uartBaud);
 
         void      set_type(byte typein);
         //byte      get_type();

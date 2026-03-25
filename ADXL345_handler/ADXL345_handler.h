@@ -37,7 +37,7 @@ private:
     float thresholdBinary;  // Umbral para sensor binario
     bool initialized;       // Estado de inicialización
     //int errorCount;
-    static const unsigned long movementSampleInterval = 50;  // muestreo rápido
+    static const unsigned long movementSampleInterval = 20;  // muestreo rápido (50 originalmente)
     static const unsigned long inactivityTimeout     = 1000; // 1 s sin movimiento
 
     unsigned long lastSampleTime    = 0;

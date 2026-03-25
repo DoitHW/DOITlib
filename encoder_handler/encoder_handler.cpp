@@ -510,6 +510,7 @@ void handleEncoder() noexcept
             pendingQueryNS = nsToQuery;
             awaitingResponse = true;
             delay(10);
+            frameReceived           = false;
             send_frame(frameMaker_REQ_ELEM_SECTOR(
                 DEFAULT_BOTONERA,
                 TARGET_TYPE_DEVICE,
@@ -517,12 +518,12 @@ void handleEncoder() noexcept
                 (byte) currentLanguage,
                 ELEM_CMODE_SECTOR
             ));
-            delay(50);
+            delay(5);
             lastModeQueryTime       = millis();
             pendingQueryIndex       = currentIndex;
             awaitingResponse        = true;
             lastQueriedElementIndex = currentIndex;
-            frameReceived           = false;
+            
 
             // (Cambio de variable global a NS)
             pendingQueryNS = nsToQuery; // <<< ver cambios de cabecera más abajo
@@ -950,8 +951,8 @@ void handleModeSelection(const String& currentFile) noexcept
             TARGETNS bcast = {0,0,0,0,0};
             if (selectedStates[currentIndex]) {
                 send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xFF, bcast, START_CMD));
-                delay(200);
-                send_frame(frameMaker_SEND_PATTERN_NUM(DEFAULT_BOTONERA, 0xFF, bcast, 9));
+                // delay(200);
+                // send_frame(frameMaker_SEND_PATTERN_NUM(DEFAULT_BOTONERA, 0xFF, bcast, 0x09));
             } else {
                 send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, 0xFF, bcast, BLACKOUT));
                 for (auto &s : selectedStates) s = false;
@@ -1904,18 +1905,35 @@ void handleHiddenMenuNavigation(int &hiddenMenuSelection) noexcept
             } break;
 
             case 4: { // CONTROL_SALA_MENU / Formateo  (índice 4 según menuOptions[])
+                // hiddenMenuActive    = false;
+                // formatSubMenuActive = true;
+                // formatMenuSelection = 0;
+                // buttonPressStart    = 0;
+
+                // extern int    formatMenuCurrentIndex;
+                // extern int32_t formatMenuLastValue;
+                // formatMenuCurrentIndex = 0;
+                // formatMenuLastValue    = encoder.getCount();
+
+                // while (digitalRead(ENC_BUTTON) == LOW) { /* consume */ }
+                // drawFormatMenu(formatMenuSelection);
                 hiddenMenuActive    = false;
                 formatSubMenuActive = true;
-                formatMenuSelection = 0;
+
+                // Reset consistente: índice visual y opción lógica
+                formatMenuCurrentIndex = 0;
+                formatMenuSelection    = 0;
+
+                // Importante: “anclar” el delta del encoder al entrar
+                formatMenuLastValue = encoder.getCount();
                 buttonPressStart    = 0;
 
-                extern int    formatMenuCurrentIndex;
-                extern int32_t formatMenuLastValue;
-                formatMenuCurrentIndex = 0;
-                formatMenuLastValue    = encoder.getCount();
-
+                // Consume pulsación residual
                 while (digitalRead(ENC_BUTTON) == LOW) { /* consume */ }
-                drawFormatMenu(formatMenuSelection);
+
+                // Pinta con el ÍNDICE visual
+                drawFormatMenu(formatMenuCurrentIndex);
+
             } break;
 
             case 5: { // Volver  (índice 5 según menuOptions[])

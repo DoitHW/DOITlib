@@ -502,106 +502,106 @@ void send_frame(const FRAME_T &f) {
   #endif
 
   // START
-  Serial1.write(f.start); delay(dTime);
+  Serial1.write(f.start); // delay(dTime);
   #ifdef DEBUG
     DEBUG__________ln(String(COLOR_BRIGHT_GREEN) + "[" + String(++i) + "] START = " + String(f.start, HEX) + COLOR_RESET);
   #endif
 
   // Frame Length MSB
-  Serial1.write(f.frameLengthMsb); delay(dTime);
+  Serial1.write(f.frameLengthMsb); // delay(dTime);
   #ifdef DEBUG
     DEBUG__________ln(String(COLOR_DIM) + "[" + String(++i) + "] Frame Length Msb = " + String(f.frameLengthMsb, HEX) + COLOR_RESET);
   #endif
 
   // Frame Length LSB
-  Serial1.write(f.frameLengthLsb); delay(dTime);
+  Serial1.write(f.frameLengthLsb); // delay(dTime);
   #ifdef DEBUG
     DEBUG__________ln(String(COLOR_DIM) + "[" + String(++i) + "] Frame Length Lsb = " + String(f.frameLengthLsb, HEX) + COLOR_RESET);
   #endif
 
   // ROOM
-  Serial1.write(f.room); delay(dTime);
+  Serial1.write(f.room); // delay(dTime);
   #ifdef DEBUG
     DEBUG__________ln(String(COLOR_BRIGHT_RED) + "[" + String(++i) + "] Room = " + String(f.room, HEX) + COLOR_RESET);
   #endif
 
   // ORIGIN (byte)
-  Serial1.write(f.origin); delay(dTime);
+  Serial1.write(f.origin); // delay(dTime);
   #ifdef DEBUG
    DEBUG__________ln(String(COLOR_BRIGHT_YELLOW) + "[" + String(++i) + "] Origin = " + String(f.origin, HEX) + COLOR_RESET);
   #endif
 
   // ORIGIN MAC[0..4]
-  Serial1.write(f.originNS.mac01); delay(dTime);
+  Serial1.write(f.originNS.mac01); // delay(dTime);
   #ifdef DEBUG
     DEBUG__________ln(String(COLOR_BRIGHT_MAGENTA) + "[" + String(++i) + "] Origin MAC[0] = " + String(f.originNS.mac01, HEX) + COLOR_RESET);
   #endif
 
-  Serial1.write(f.originNS.mac02); delay(dTime);
+  Serial1.write(f.originNS.mac02); // delay(dTime);
   #ifdef DEBUG
     DEBUG__________ln(String(COLOR_BRIGHT_MAGENTA) + "[" + String(++i) + "] Origin MAC[1] = " + String(f.originNS.mac02, HEX) + COLOR_RESET);
   #endif
 
-  Serial1.write(f.originNS.mac03); delay(dTime);
+  Serial1.write(f.originNS.mac03); // delay(dTime);
   #ifdef DEBUG
     DEBUG__________ln(String(COLOR_BRIGHT_MAGENTA) + "[" + String(++i) + "] Origin MAC[2] = " + String(f.originNS.mac03, HEX) + COLOR_RESET);
   #endif
 
-  Serial1.write(f.originNS.mac04); delay(dTime);
+  Serial1.write(f.originNS.mac04); // delay(dTime);
   #ifdef DEBUG
     DEBUG__________ln(String(COLOR_BRIGHT_MAGENTA) + "[" + String(++i) + "] Origin MAC[3] = " + String(f.originNS.mac04, HEX) + COLOR_RESET);
   #endif
 
-  Serial1.write(f.originNS.mac05); delay(dTime);
+  Serial1.write(f.originNS.mac05); // delay(dTime);
   #ifdef DEBUG
     DEBUG__________ln(String(COLOR_BRIGHT_MAGENTA) + "[" + String(++i) + "] Origin MAC[4] = " + String(f.originNS.mac05, HEX) + COLOR_RESET);
   #endif
 
   // TARGET TYPE
-  Serial1.write(f.targetType); delay(dTime);
+  Serial1.write(f.targetType); // delay(dTime);
   #ifdef DEBUG
     DEBUG__________ln(String(COLOR_BRIGHT_CYAN) + "[" + String(++i) + "] Target Type = " + String(f.targetType, HEX) + COLOR_RESET);
   #endif
 
   // TARGET MAC[0..4]
-  Serial1.write(f.targetNS.mac01); delay(dTime);
+  Serial1.write(f.targetNS.mac01); // delay(dTime);
   #ifdef DEBUG
     DEBUG__________ln(String(COLOR_BRIGHT_BLUE) + "[" + String(++i) + "] MAC[0] = " + String(f.targetNS.mac01, HEX) + COLOR_RESET);
   #endif
 
-  Serial1.write(f.targetNS.mac02); delay(dTime);
+  Serial1.write(f.targetNS.mac02); // delay(dTime);
   #ifdef DEBUG
     DEBUG__________ln(String(COLOR_BRIGHT_BLUE) + "[" + String(++i) + "] MAC[1] = " + String(f.targetNS.mac02, HEX) + COLOR_RESET);
   #endif
 
-  Serial1.write(f.targetNS.mac03); delay(dTime);
+  Serial1.write(f.targetNS.mac03); // delay(dTime);
   #ifdef DEBUG
     DEBUG__________ln(String(COLOR_BRIGHT_BLUE) + "[" + String(++i) + "] MAC[2] = " + String(f.targetNS.mac03, HEX) + COLOR_RESET);
   #endif
 
-  Serial1.write(f.targetNS.mac04); delay(dTime);
+  Serial1.write(f.targetNS.mac04); // delay(dTime);
   #ifdef DEBUG
     DEBUG__________ln(String(COLOR_BRIGHT_BLUE) + "[" + String(++i) + "] MAC[3] = " + String(f.targetNS.mac04, HEX) + COLOR_RESET);
   #endif
 
-  Serial1.write(f.targetNS.mac05); delay(dTime);
+  Serial1.write(f.targetNS.mac05); // delay(dTime);
   #ifdef DEBUG
     DEBUG__________ln(String(COLOR_BRIGHT_BLUE) + "[" + String(++i) + "] MAC[4] = " + String(f.targetNS.mac05, HEX) + COLOR_RESET);
   #endif
 
   // FUNCTION
-  Serial1.write(f.function); delay(dTime);
+  Serial1.write(f.function); // delay(dTime);
   #ifdef DEBUG
     DEBUG__________ln(String(COLOR_BRIGHT_GREEN) + "[" + String(++i) + "] Function = " + String(f.function, HEX) + COLOR_RESET);
   #endif
 
   // DATA LENGTH MSB/LSB
-  Serial1.write(f.dataLengthMsb); delay(dTime);
+  Serial1.write(f.dataLengthMsb); // delay(dTime);
   #ifdef DEBUG
     DEBUG__________ln(String(COLOR_DIM) + "[" + String(++i) + "] Data Length Msb = " + String(f.dataLengthMsb, HEX) + COLOR_RESET);
   #endif
 
-  Serial1.write(f.dataLengthLsb); delay(dTime);
+  Serial1.write(f.dataLengthLsb); // delay(dTime);
   #ifdef DEBUG
     DEBUG__________ln(String(COLOR_DIM) + "[" + String(++i) + "] Data Length Lsb = " + String(f.dataLengthLsb, HEX) + COLOR_RESET);
   #endif
@@ -610,7 +610,7 @@ void send_frame(const FRAME_T &f) {
   {
     int dataIndex = 0;
     for (byte b : f.data) {
-      Serial1.write(b); delay(dTime);
+      Serial1.write(b); // delay(dTime);
       #ifdef DEBUG
         DEBUG__________ln(String(COLOR_DIM) + "[" + String(++i) + "] Data[" + String(dataIndex++) + "] = " + String(b, HEX) + COLOR_RESET);
       #endif
@@ -618,13 +618,13 @@ void send_frame(const FRAME_T &f) {
   }
 
   // CHECKSUM
-  Serial1.write(f.checksum); delay(dTime);
+  Serial1.write(f.checksum); // delay(dTime);
   #ifdef DEBUG
      DEBUG__________ln(String(COLOR_BRIGHT_MAGENTA) + "[" + String(++i) + "] Checksum = " + String(f.checksum, HEX) + COLOR_RESET);
   #endif
 
   // END
-  Serial1.write(f.end); delay(dTime);
+  Serial1.write(f.end); // delay(dTime);
   #ifdef DEBUG
     DEBUG__________ln(String(COLOR_BRIGHT_GREEN) + "[" + String(++i) + "] End = " + String(f.end, HEX) + COLOR_RESET);
     DEBUG__________ln(String(COLOR_BRIGHT_WHITE) + "======================================" + COLOR_RESET);
@@ -1268,42 +1268,42 @@ void send_old_color(uint8_t color)
     DEBUG__________ln(" #### Trama LEGACY enviada ####");
     #endif
 
-    Serial1.write(OLD_START);            delay(dTime);
+    Serial1.write(OLD_START);            // delay(dTime);
     #ifdef DEBUG
     DEBUG__________ln("[" + String(++i) + "] Start(OLD) = " + String(OLD_START, HEX));
     #endif
 
-    Serial1.write(OLD_NODE);             delay(dTime);
+    Serial1.write(OLD_NODE);             // delay(dTime);
     #ifdef DEBUG
     DEBUG__________ln("[" + String(++i) + "] NODE = " + String(OLD_NODE, HEX));
     #endif
 
-    Serial1.write(OLD_FUNC);             delay(dTime);
+    Serial1.write(OLD_FUNC);             // delay(dTime);
     #ifdef DEBUG
     DEBUG__________ln("[" + String(++i) + "] FunctionCode = " + String(OLD_FUNC, HEX));
     #endif
 
-    Serial1.write(OLD_DL);               delay(dTime);
+    Serial1.write(OLD_DL);               // delay(dTime);
     #ifdef DEBUG
     DEBUG__________ln("[" + String(++i) + "] DL = " + String(OLD_DL, HEX));
     #endif
 
-    Serial1.write(OLD_ROOM);             delay(dTime);
+    Serial1.write(OLD_ROOM);             // delay(dTime);
     #ifdef DEBUG
     DEBUG__________ln("[" + String(++i) + "] ROOM = " + String(OLD_ROOM, HEX));
     #endif
 
-    Serial1.write(color);                delay(dTime);
+    Serial1.write(color);                // delay(dTime);
     #ifdef DEBUG
     DEBUG__________ln("[" + String(++i) + "] COLOR = " + String(color, HEX));
     #endif
 
-    Serial1.write(chk);                  delay(dTime);
+    Serial1.write(chk);                  // delay(dTime);
     #ifdef DEBUG
     DEBUG__________ln("[" + String(++i) + "] CHK = " + String(chk, HEX));
     #endif
 
-    Serial1.write(OLD_END);              delay(dTime);
+    Serial1.write(OLD_END);              // delay(dTime);
     #ifdef DEBUG
     DEBUG__________ln("[" + String(++i) + "] END(OLD) = " + String(OLD_END, HEX));
     DEBUG__________ln("======================================");
