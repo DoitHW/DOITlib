@@ -1,4 +1,4 @@
-﻿#include <defines_DMS/defines_DMS.h>
+#include <defines_DMS/defines_DMS.h>
 #include <Frame_DMS/Frame_DMS.h>
 #include <Element_DMS/Element_DMS.h>
 #include <icons_64x64_DMS/icons_64x64_DMS.h>
@@ -491,10 +491,14 @@ LAST_ENTRY_FRAME_T extract_info_from_frameIn(const std::vector<uint8_t> &frame) 
     return result;
 }
 
+extern SemaphoreHandle_t uartTxMutex;
+
 void send_frame(const FRAME_T &f) {
   int  i      = 0;
   byte dTime  = 0;
   
+  if (uartTxMutex) { xSemaphoreTake(uartTxMutex, portMAX_DELAY); }
+
 
   #ifdef DEBUG
     DEBUG__________ln(String(COLOR_BRIGHT_WHITE) + "======================================" + COLOR_RESET);
@@ -629,6 +633,8 @@ void send_frame(const FRAME_T &f) {
     DEBUG__________ln(String(COLOR_BRIGHT_GREEN) + "[" + String(++i) + "] End = " + String(f.end, HEX) + COLOR_RESET);
     DEBUG__________ln(String(COLOR_BRIGHT_WHITE) + "======================================" + COLOR_RESET);
   #endif
+
+  if (uartTxMutex) { xSemaphoreGive(uartTxMutex); }
 }
 
 /*

@@ -110,7 +110,7 @@ void ADXL345Handler::end()
                                                                     #endif
 }
 
-void ADXL345Handler::readInclinations() {
+void ADXL345Handler::readInclinations(bool isBinary, TARGETNS ns) {
     if (!initialized || !adxl) return;
 
     // 1) Control de tiempo (50ms)
@@ -155,17 +155,12 @@ void ADXL345Handler::readInclinations() {
     float currY = smoothY;
     // ---------------------------------------------
 
-    byte modeConfig[2] = {0};
-    getModeConfig(elementFiles[currentIndex], currentModeIndex, modeConfig);
-    bool isBinary = getModeFlag(modeConfig, HAS_BINARY_SENSORS);
-
     if (isBinary) {
         float diffX = abs(currX - lastSampleX);
         float diffY = abs(currY - lastSampleY);
         bool movementDetected = (diffX >= thresholdBinary || diffY >= thresholdBinary);
 
         if (movementDetected && !movementDetectedLast) {
-            TARGETNS ns = getCurrentElementNS();
             SENSOR_DOUBLE_T binVal = {0,0, 0,1, 0,1, 0,0, 0,0, 0,0};
             send_frame(frameMaker_SEND_SENSOR_VALUE(DEFAULT_BOTONERA, DEFAULT_DEVICE, ns, binVal));
             movementDetectedLast = true;
@@ -173,7 +168,6 @@ void ADXL345Handler::readInclinations() {
         if (movementDetected) lastMovementTime = now;
 
         if (movementDetectedLast && (now - lastMovementTime >= inactivityTimeout)) {
-            TARGETNS ns = getCurrentElementNS();
             SENSOR_DOUBLE_T binVal = {0,0, 0,1, 0,0, 0,0, 0,0, 0,0};
             send_frame(frameMaker_SEND_SENSOR_VALUE(DEFAULT_BOTONERA, DEFAULT_DEVICE, ns, binVal));
             movementDetectedLast = false;
@@ -217,7 +211,7 @@ void ADXL345Handler::readInclinations() {
                     //                       axisCause.c_str(), diffX, diffY, valX, valY);
 
                     SENSOR_DOUBLE_T sensorVal = createSensorDoubleValue(valX, valY);
-                    sendSensorValueDouble(sensorVal);
+                    sendSensorValueDouble(sensorVal, ns);
 
                     lastSentValX = valX;
                     lastSentValY = valY;
@@ -249,8 +243,7 @@ SENSOR_DOUBLE_T ADXL345Handler::createSensorDoubleValue(long finalValueX, long f
     return s;
 }
 
-void ADXL345Handler::sendSensorValueDouble(const SENSOR_DOUBLE_T &sensorValue) {
-    TARGETNS ns = getCurrentElementNS();
+void ADXL345Handler::sendSensorValueDouble(const SENSOR_DOUBLE_T &sensorValue, TARGETNS ns) {
 
     // Verificar que el número de serie no sea nulo (ej. {0,0,0,0,0})
     bool isValid = false;

@@ -42,14 +42,13 @@ void MICROPHONE_::begin(){
 
     if (!micInitialized) {
         i2s_driver_install(I2S_NUM_0, &i2s_config, 0, NULL);
-        i2s_set_pin(I2S_NUM_0, &pin_config);
         micInitialized = true;
-        //DEBUG__________ln("Micrófono activado.");
         lastSoundTime = millis();
     }
-    else {
-        DEBUG__________ln("Micrófono ya estaba activado.");
-    }
+    
+    // Siempre configuramos los pines, por si han sido reseteados o usados por I2C
+    i2s_set_pin(I2S_NUM_0, &pin_config);
+    DEBUG__________ln("Pines del micrófono (I2S) configurados.");
 }
 
 int MICROPHONE_::readMicRaw() {
