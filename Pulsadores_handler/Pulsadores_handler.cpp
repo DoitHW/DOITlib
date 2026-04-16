@@ -32,7 +32,6 @@ byte pulsadorColor[FILAS][COLUMNAS] = {{ORANGE, GREEN, WHITE},
 // Estados globales estáticos
 static bool lastState[FILAS][COLUMNAS];
 static unsigned long pressTime[FILAS][COLUMNAS] = {{0}}; // Tiempo de pulsación
-bool ambienteActivo = false;
 byte relay_state = 0x00;
 std::vector<uint8_t> idsSPIFFS;
 int  relayStep = -1;
