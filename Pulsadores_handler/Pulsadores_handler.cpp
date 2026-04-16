@@ -908,12 +908,21 @@ void PulsadoresHandler::applyAdvancedPalettePulse(const ButtonContext &ctx) {
 // ==========================================
 // 7. LÓGICA COMPLEJA: Ciclo Comunicador
 // ==========================================
+// Máquina de estados:
+//   BroadcastNormal --relay--> ElementCycle(elem0)
+//   ElementCycle(elemK) --relay--> ElementCycle(elemK+1)    [si K < N-1]
+//   ElementCycle(elemN) --relay--> BroadcastPassive
+//   BroadcastPassive --relay--> BroadcastNormal             [si intacto]
+//   BroadcastPassive --color--> BroadcastPassiveOverridden  [primer color]
+//   BroadcastPassiveOverridden --relay--> ElementCycle(elem0)
+// ==========================================
 void PulsadoresHandler::handleComunicadorRelayCycle() {
-  const unsigned CONSEC_DELAY = 100;
+  const unsigned D = 100; // delay entre tramas consecutivas
 
+  // --- Helpers locales ---
   auto isZero = [](const TARGETNS &n) { return memcmp(&n, &NS_ZERO, sizeof(TARGETNS)) == 0; };
-  auto eqNS = [](const TARGETNS &a, const TARGETNS &b) { return memcmp(&a, &b, sizeof(TARGETNS)) == 0; };
-  auto cmpNS = [&](const TARGETNS &a, const TARGETNS &b) {
+  auto eqNS   = [](const TARGETNS &a, const TARGETNS &b) { return memcmp(&a, &b, sizeof(TARGETNS)) == 0; };
+  auto cmpNS  = [](const TARGETNS &a, const TARGETNS &b) {
     if (a.mac01 != b.mac01) return a.mac01 < b.mac01;
     if (a.mac02 != b.mac02) return a.mac02 < b.mac02;
     if (a.mac03 != b.mac03) return a.mac03 < b.mac03;
@@ -921,6 +930,7 @@ void PulsadoresHandler::handleComunicadorRelayCycle() {
     return a.mac05 < b.mac05;
   };
 
+  // --- Construir lista de elementos reales (NS válidos) ---
   std::vector<TARGETNS> nsList;
   nsList.reserve(elementFiles.size());
   for (const String &f : elementFiles) {
@@ -929,101 +939,99 @@ void PulsadoresHandler::handleComunicadorRelayCycle() {
     if (!isZero(ns)) nsList.push_back(ns);
   }
   std::sort(nsList.begin(), nsList.end(), cmpNS);
+  if (nsList.empty()) return;
 
-  if (!nsList.empty() && !_isNSZero(::communicatorActiveNS)) {
+  // --- Sincronizar relayStep con communicatorActiveNS ---
+  if (!_isNSZero(::communicatorActiveNS)) {
+    bool found = false;
     for (size_t k = 0; k < nsList.size(); ++k) {
       if (eqNS(nsList[k], ::communicatorActiveNS)) {
         relayStep = (int)k;
+        found = true;
         break;
       }
     }
+    if (!found) relayStep = -1;
   }
   if (relayStep < -1 || relayStep >= (int)nsList.size()) relayStep = -1;
 
-  if (nsList.empty()) return;
-
-  uint8_t blackType = 0, whiteType = 0;
-  TARGETNS blackNS = NS_ZERO, whiteNS = NS_ZERO;
-  bool doBlackout = false;
-  bool doAmbient9 = false;
-
-  if (relayStep == -1) {
-    if (!passiveModeActive) {
-      // 1. BROADCAST NORMAL -> Salta a Elem 0
-      blackType = BROADCAST;
-      blackNS = NS_ZERO;
-      doBlackout = true;
-      whiteType = DEFAULT_DEVICE;
-      whiteNS = nsList[0];
-      relayStep = 0;
-    } else {
-      // 3. BROADCAST PASIVO
-      if (!passiveIsMashed) {
-        // RAMA A: Pasivo Intacto -> Regresa a Broadcast Normal
-        whiteType = BROADCAST;
-        whiteNS = NS_ZERO;
-        passiveModeActive = false;
-        relayStep = -1;
-      } else {
-        // RAMA B: Pasivo Machacado -> Salta directo a Elem 0
-        blackType = BROADCAST;
-        blackNS = NS_ZERO;
-        doBlackout = true;
-        whiteType = DEFAULT_DEVICE;
-        whiteNS = nsList[0];
-        relayStep = 0;
-        passiveModeActive = false;
-        passiveIsMashed = false;
+  // --- Helper: encender un elemento con ON flag si tiene relé ---
+  auto startElement = [&](uint8_t tType, const TARGETNS &tNS) {
+    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, tType, tNS, START_CMD));
+    delay(D);
+    bool sendFlag = (tType == BROADCAST);
+    if (!sendFlag) {
+      uint8_t wCfg[2];
+      if (RelayStateManager::getModeConfigForNS(tNS, wCfg)) {
+        if (getModeFlag(wCfg, HAS_RELAY)) sendFlag = true;
       }
     }
+    if (sendFlag) {
+      send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, tType, tNS, 0x01));
+      delay(D);
+    }
+  };
+
+  // ==========================================================
+  // TRANSICIONES
+  // ==========================================================
+
+  if (relayStep == -1) {
+    // Estamos en algún estado broadcast (Normal, Pasivo o PasivoMachacado)
+
+    if (!passiveModeActive) {
+      // ── ESTADO 1: BroadcastNormal → ElementCycle(elem0) ──
+      send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, BLACKOUT));
+      delay(D);
+      startElement(DEFAULT_DEVICE, nsList[0]);
+      relayStep = 0;
+      ::communicatorActiveNS = nsList[0];
+
+    } else if (!passiveIsMashed) {
+      // ── ESTADO 3: BroadcastPassive intacto → BroadcastNormal ──
+      // Solo re-enviar START broadcast sin ambiente 9
+      send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, START_CMD));
+      delay(D);
+      send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, 0x01));
+      delay(D);
+      passiveModeActive = false;
+      relayStep = -1;
+      ::communicatorActiveNS = NS_ZERO;
+
+    } else {
+      // ── ESTADO 4: BroadcastPassiveOverridden → ElementCycle(elem0) ──
+      send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, BLACKOUT));
+      delay(D);
+      startElement(DEFAULT_DEVICE, nsList[0]);
+      relayStep = 0;
+      passiveModeActive = false;
+      passiveIsMashed = false;
+      ::communicatorActiveNS = nsList[0];
+    }
+
   } else if (relayStep < (int)nsList.size() - 1) {
-    // 2. FOCO INDIVIDUAL (Ciclo intermedio)
-    blackType = DEFAULT_DEVICE;
-    blackNS = nsList[relayStep];
-    doBlackout = true;
+    // ── ESTADO 2: ElementCycle intermedio → siguiente elemento ──
+    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, DEFAULT_DEVICE, nsList[relayStep], BLACKOUT));
+    delay(D);
     relayStep++;
-    whiteType = DEFAULT_DEVICE;
-    whiteNS = nsList[relayStep];
+    startElement(DEFAULT_DEVICE, nsList[relayStep]);
+    ::communicatorActiveNS = nsList[relayStep];
+
   } else {
-    // 3. ÚLTIMO ELEMENTO -> BROADCAST PASIVO
-    // "no apagas el último, envías directamente START a broadcast"
-    doBlackout = false;
-    whiteType = BROADCAST;
-    whiteNS = NS_ZERO;
+    // ── ESTADO 2: ElementCycle último → BroadcastPassive ──
+    // NO apagar el último elemento; enviar START broadcast + Ambiente 9
+    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, START_CMD));
+    delay(D);
+    send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, 0x01));
+    delay(D);
+    send_frame(frameMaker_SEND_PATTERN_NUM(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, 0x09));
+    delay(D);
     relayStep = -1;
     passiveModeActive = true;
     passiveIsMashed = false;
-    doAmbient9 = true;
+    ::communicatorActiveNS = NS_ZERO;
   }
 
-  // Ejecución
-  if (doBlackout) {
-    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, blackType, blackNS, BLACKOUT));
-    delay(CONSEC_DELAY);
-  }
-
-  send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, whiteType, whiteNS, START_CMD));
-  delay(CONSEC_DELAY);
-
-  bool sendOne = (whiteType == BROADCAST);
-  if (!sendOne) {
-    uint8_t wCfg[2];
-    if (RelayStateManager::getModeConfigForNS(whiteNS, wCfg)) {
-      if (getModeFlag(wCfg, HAS_RELAY)) sendOne = true;
-    }
-  }
-  if (sendOne) {
-    send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, whiteType, whiteNS, 0x01));
-    delay(CONSEC_DELAY);
-  }
-
-  if (doAmbient9) {
-    // Forzar el pasivo (Ambiente 9)
-    send_frame(frameMaker_SEND_PATTERN_NUM(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, 0x09));
-    delay(CONSEC_DELAY);
-  }
-
-  ::communicatorActiveNS = whiteNS;
   colorHandler.setCurrentFile("Comunicador");
   colorHandler.setPatternBotonera(currentModeIndex, ledManager);
 }
