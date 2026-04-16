@@ -688,6 +688,18 @@ void PulsadoresHandler::handleColorLogic(byte buttonColor,
                                          ButtonEventType event,
                                          const ButtonContext &ctx) {
 
+  // ── COMUNICADOR: Detección de "Pasivo Machacado" ──
+  // Si estamos en Comunicador + BroadcastPassive intacto y el usuario
+  // pulsa un color, debemos reenviar START broadcast una sola vez
+  // ANTES de mandar el color, para que los elementos salgan del Ambiente 9.
+  if (ctx.currentFile == "Comunicador" && passiveModeActive && !passiveIsMashed
+      && event == BUTTON_PRESSED && buttonColor != RELAY) {
+    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, START_CMD));
+    delay(100);
+    passiveIsMashed = true;
+    // Continúa la ejecución normal para que el color se envíe abajo
+  }
+
   // 3.8 Passive (Solo Blue)
   if (ctx.hasPassive && buttonColor != BLUE)
     return;
@@ -887,17 +899,8 @@ void PulsadoresHandler::applyAdvancedPalettePulse(const ButtonContext &ctx) {
     colorHandler.color_mix_handler(c1, c2, &output);
   }
 
-  // Lógica especial para modo "Pasivo Machacado" del Comunicador
-  if (ctx.currentFile == "Comunicador" && passiveModeActive && !passiveIsMashed && output != BLACK) {
-    // La primera vez que mandamos un color en pasivo, re-activamos con START
-    // Force el envío para sobrescribir el ambiente pasivo (Ambiente 9)
-    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, START_CMD));
-    delay(150);
-    send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, output));
-    currentSent = output;
-    passiveIsMashed = true;
-    return;
-  }
+  // Nota: La detección de "Pasivo Machacado" del Comunicador se realiza
+  // en handleColorLogic() antes de llegar aquí. No duplicar lógica.
 
   if (output != currentSent) {
     send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, ctx.targetType,
