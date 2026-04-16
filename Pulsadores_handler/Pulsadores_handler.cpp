@@ -36,7 +36,6 @@ byte relay_state = false;
 std::vector<uint8_t> idsSPIFFS;
 int relayStep = -1;
 TARGETNS communicatorActiveNS = NS_ZERO;
-bool communicatorPendingBroadcastStart = false;
 
 // Inicialización de estáticos de clase
 bool PulsadoresHandler::s_responseModeEnabled = false;
@@ -554,53 +553,6 @@ void PulsadoresHandler::handleCognitiveMenu(int i, int j,
   }
 }
 
-// 4.2 Ruta Respuesta
-// void PulsadoresHandler::handleResponseRoute(byte buttonColor) {
-//     int ledIdx = colorToLedIdx(buttonColor);
-//     if (ledIdx < 0 || !isButtonEnabled(ledIdx)) return;
-
-//     static const uint8_t kMap[9] = { 5, 9, 4, 8, 3, 7, 2, 6, 1 };
-//     uint8_t response = (ledIdx < 9) ? kMap[ledIdx] : 0;
-//     if (response > 0) {
-//         send_frame(frameMaker_SEND_RESPONSE(DEFAULT_BOTONERA,
-//         s_respTargetType, getOwnNS(), response));
-//     }
-// }
-
-// void PulsadoresHandler::handleResponseRoute(byte buttonColor)
-// {
-//     // 1) Mapear color lógico → índice de LED [0..8]
-//     const int ledIdx = colorToLedIdx(buttonColor);
-//     if (ledIdx < 0) return;
-
-//     // 2) Respetar la máscara de botones activos del mapeo
-//     if (!PulsadoresHandler::isButtonEnabled(static_cast<uint8_t>(ledIdx))) {
-//         return;
-//     }
-
-//     // 3) Convertir índice de LED → ID de botón (1..9) según tu layout físico
-//     auto ledIdxToButtonId = [](uint8_t idx) -> uint8_t {
-//         static const uint8_t kMap[9] = { 5, 9, 4, 8, 3, 7, 2, 6, 1 };
-//         return (idx < 9) ? kMap[idx] : 0;
-//     };
-
-//     const uint8_t response = ledIdxToButtonId(static_cast<uint8_t>(ledIdx));
-//     if (response == 0) return; // índice fuera de rango o sin mapeo válido
-
-//     // 4) Recuperar destino de respuesta configurado con
-//     setResponseRoute(...) const uint8_t targetType =
-//     PulsadoresHandler::getResponseTargetType(); const TARGETNS targetNS  =
-//     PulsadoresHandler::getResponseTargetNS();
-
-//     // 5) Enviar F_SEND_RESPONSE hacia la consola/dispositivo que nos
-//     configuró send_frame(frameMaker_SEND_RESPONSE(
-//         DEFAULT_BOTONERA, // origen: botonera
-//         targetType,       // destino lógico (DC, DD, etc.)
-//         targetNS,         // NS del destino (o 00:00:00:00:00 para consola)
-//         response          // ID de botón 1..9
-//     ));
-// }
-
 void PulsadoresHandler::handleResponseRoute(byte buttonColor) {
   const int ledIdx = colorToLedIdx(buttonColor);
   if (ledIdx < 0)
@@ -947,132 +899,97 @@ void PulsadoresHandler::handleComunicadorRelayCycle() {
   const unsigned CONSEC_DELAY = 100;
   const unsigned FIRST_ON_DELAY = 3000;
 
-  auto isZero = [](const TARGETNS &n) {
-    return memcmp(&n, &NS_ZERO, sizeof(TARGETNS)) == 0;
-  };
-  auto eqNS = [](const TARGETNS &a, const TARGETNS &b) {
-    return memcmp(&a, &b, sizeof(TARGETNS)) == 0;
-  };
+  auto isZero = [](const TARGETNS &n) { return memcmp(&n, &NS_ZERO, sizeof(TARGETNS)) == 0; };
+  auto eqNS = [](const TARGETNS &a, const TARGETNS &b) { return memcmp(&a, &b, sizeof(TARGETNS)) == 0; };
   auto cmpNS = [&](const TARGETNS &a, const TARGETNS &b) {
-    if (a.mac01 != b.mac01)
-      return a.mac01 < b.mac01;
-    if (a.mac02 != b.mac02)
-      return a.mac02 < b.mac02;
-    if (a.mac03 != b.mac03)
-      return a.mac03 < b.mac03;
-    if (a.mac04 != b.mac04)
-      return a.mac04 < b.mac04;
+    if (a.mac01 != b.mac01) return a.mac01 < b.mac01;
+    if (a.mac02 != b.mac02) return a.mac02 < b.mac02;
+    if (a.mac03 != b.mac03) return a.mac03 < b.mac03;
+    if (a.mac04 != b.mac04) return a.mac04 < b.mac04;
     return a.mac05 < b.mac05;
   };
 
   std::vector<TARGETNS> nsList;
   nsList.reserve(elementFiles.size());
   for (const String &f : elementFiles) {
-    if (f == "Ambientes" || f == "Fichas" || f == "Comunicador" ||
-        f == "Apagar")
-      continue;
+    if (f == "Ambientes" || f == "Fichas" || f == "Comunicador" || f == "Apagar") continue;
     TARGETNS ns = getNSFromFile(f);
-    if (!isZero(ns))
-      nsList.push_back(ns);
+    if (!isZero(ns)) nsList.push_back(ns);
   }
   std::sort(nsList.begin(), nsList.end(), cmpNS);
 
-  // Re-sincroniza relayStep con el NS activo actual (si aplica)
-  if (!nsList.empty() && !_isNSZero(communicatorActiveNS)) {
+  // Sincronización del relayStep con el NS activo
+  if (!nsList.empty() && !_isNSZero(::communicatorActiveNS)) {
     for (size_t k = 0; k < nsList.size(); ++k) {
-      if (eqNS(nsList[k], communicatorActiveNS)) {
+      if (eqNS(nsList[k], ::communicatorActiveNS)) {
         relayStep = (int)k;
         break;
       }
     }
   }
-  if (relayStep < -1 || relayStep >= (int)nsList.size())
-    relayStep = -1;
+  if (relayStep < -1 || relayStep >= (int)nsList.size()) relayStep = -1;
 
-  if (communicatorPendingBroadcastStart) {
-    communicatorPendingBroadcastStart = false;
+  if (nsList.empty()) return;
 
-    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, BROADCAST, NS_ZERO,
-                                       START_CMD));
-    delay(CONSEC_DELAY);
+  // Selección de transición
+  uint8_t blackType, whiteType;
+  TARGETNS blackNS, whiteNS;
+  bool isBackToBroadcast = false;
 
-    // Mantengo tu lógica: en broadcast también mandas ON
-    send_frame(
-        frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, 0x01));
-    delay(CONSEC_DELAY);
-
-    ::communicatorActiveNS = NS_ZERO;
-    relayStep = -1;
-
-    colorHandler.setCurrentFile("Comunicador");
-    colorHandler.setPatternBotonera(currentModeIndex, ledManager);
-    return;
-  }
-
-  bool firstKick = false;
-  uint8_t blackType = BROADCAST, whiteType = BROADCAST;
-  TARGETNS blackNS = NS_ZERO, whiteNS = NS_ZERO;
-
-  if (nsList.empty()) {
-    // Nada: Loop en broadcast (mantienes tu comportamiento base)
-    // -> blackType/whiteType ya están en BROADCAST/NS_ZERO
+  if (relayStep == -1) {
+    // De Broadcast a primer elemento
+    blackType = BROADCAST;
+    blackNS = NS_ZERO;
+    whiteType = DEFAULT_DEVICE;
+    whiteNS = nsList[0];
+    relayStep = 0;
+  } else if (relayStep < (int)nsList.size() - 1) {
+    // Siguiente elemento de la lista
+    blackType = DEFAULT_DEVICE;
+    blackNS = nsList[relayStep];
+    relayStep++;
+    whiteType = DEFAULT_DEVICE;
+    whiteNS = nsList[relayStep];
   } else {
-    if (relayStep == -1) {
-      blackType = BROADCAST;
-      whiteType = DEFAULT_DEVICE;
-      whiteNS = nsList[0];
-      relayStep = 0;
-      firstKick = true;
-
-    } else if (relayStep < (int)nsList.size() - 1) {
-      blackType = DEFAULT_DEVICE;
-      blackNS = nsList[relayStep];
-      relayStep++;
-      whiteType = DEFAULT_DEVICE;
-      whiteNS = nsList[relayStep];
-
-    } else {
-      // Antes de regresar (fin de ciclo), enviamos el modo Pasivo (Ambiente 9)
-      send_frame(frameMaker_SEND_PATTERN_NUM(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, 0x09));
-      delay(CONSEC_DELAY);
-
-      send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, BROADCAST, NS_ZERO,
-                                         BLACKOUT));
-      delay(CONSEC_DELAY);
-
-      ::communicatorActiveNS = NS_ZERO;
-      relayStep = -1;
-      communicatorPendingBroadcastStart = true;
-
-      colorHandler.setCurrentFile("Comunicador");
-      colorHandler.setPatternBotonera(currentModeIndex, ledManager);
-      return;
-    }
+    // Del último elemento de vuelta a Broadcast
+    blackType = DEFAULT_DEVICE;
+    blackNS = nsList[relayStep];
+    whiteType = BROADCAST;
+    whiteNS = NS_ZERO;
+    relayStep = -1;
+    isBackToBroadcast = true;
   }
 
-  // Flujo normal (no estamos en el "cierre especial de ciclo")
-  send_frame(
-      frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, blackType, blackNS, BLACKOUT));
-  delay(firstKick ? FIRST_ON_DELAY : CONSEC_DELAY);
-  send_frame(
-      frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, whiteType, whiteNS, START_CMD));
+  // Ejecución de tramas
+  // 1. Apagar anterior
+  send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, blackType, blackNS, BLACKOUT));
   delay(CONSEC_DELAY);
 
+  // 2. Encender nuevo objetivo
+  send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, whiteType, whiteNS, START_CMD));
+  delay(CONSEC_DELAY);
+
+  // 3. Flags opcionales (Relés)
   bool sendOne = (whiteType == BROADCAST);
   if (!sendOne) {
     uint8_t wCfg[2];
     if (RelayStateManager::getModeConfigForNS(whiteNS, wCfg)) {
-      if (getModeFlag(wCfg, HAS_RELAY))
-        sendOne = true;
+      if (getModeFlag(wCfg, HAS_RELAY)) sendOne = true;
     }
   }
   if (sendOne) {
-    send_frame(
-        frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, whiteType, whiteNS, 0x01));
+    send_frame(frameMaker_SEND_FLAG_BYTE(DEFAULT_BOTONERA, whiteType, whiteNS, 0x01));
     delay(CONSEC_DELAY);
   }
 
-  ::communicatorActiveNS = (whiteType == DEFAULT_DEVICE) ? whiteNS : NS_ZERO;
+  // 4. Si volvemos a broadcast, forzar Ambiente 9 (Pasivo)
+  if (isBackToBroadcast) {
+    send_frame(frameMaker_SEND_PATTERN_NUM(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, 0x09));
+    delay(CONSEC_DELAY);
+  }
+
+  // 5. Actualización de estado
+  ::communicatorActiveNS = whiteNS;
   colorHandler.setCurrentFile("Comunicador");
   colorHandler.setPatternBotonera(currentModeIndex, ledManager);
 }
