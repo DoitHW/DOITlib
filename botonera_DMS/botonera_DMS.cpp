@@ -1,4 +1,4 @@
-﻿#include <botonera_DMS/botonera_DMS.h>
+#include <botonera_DMS/botonera_DMS.h>
 #include <Colors_DMS/Color_DMS.h>
 #include <defines_DMS/defines_DMS.h>
 #include <Element_DMS/Element_DMS.h>
@@ -1264,6 +1264,32 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
             break;
         }
 
+        case F_SEND_RESPONSE: {
+            if (LEF.data.empty()) break;
+            
+            // Filtro de target: solo aceptar si es para nosotros (DB) o Broadcast
+            if (LEF.targetType != DEFAULT_BOTONERA && LEF.targetType != BROADCAST) {
+                #ifdef DEBUG
+                DEBUG__________printf("F_SEND_RESPONSE ignorado: TargetType=0x%02X\n", LEF.targetType);
+                #endif
+                break;
+            }
+
+            uint8_t responseType = LEF.data[0];
+            if (responseType == WIN) {
+                const uint8_t res  = static_cast<uint8_t>(rand() % kWinFailVariants);
+                const uint8_t lang = static_cast<uint8_t>(currentLanguage);
+                const uint8_t file = static_cast<uint8_t>(lang * kLangStride + res + 1u);
+                doitPlayer.play_file(WIN_RESP_BANK, file);
+            } else if (responseType == FAIL) {
+                const uint8_t res  = static_cast<uint8_t>(rand() % kWinFailVariants);
+                const uint8_t lang = static_cast<uint8_t>(currentLanguage);
+                const uint8_t file = static_cast<uint8_t>(lang * kLangStride + res + 1u);
+                doitPlayer.play_file(FAIL_RESP_BANK, file);
+            }
+            break;
+        }
+
         case F_SEND_FILE_NUM: {
             DEBUG__________ln("Recibido un play sound");
             if (LEF.data.size() >= 2) {
@@ -1293,12 +1319,26 @@ void BOTONERA_::printFrameInfo(LAST_ENTRY_FRAME_T LEF) {
                 deactivateCognitiveMode();
 
             } else if (receivedCommand == WIN_CMD) {
+                // Solo aceptar si es para nosotros (DB) o Broadcast
+                if (LEF.targetType != DEFAULT_BOTONERA && LEF.targetType != BROADCAST) {
+                    #ifdef DEBUG
+                    DEBUG__________printf("WIN_CMD ignorado: TargetType=0x%02X (no es DB ni Broadcast)\n", LEF.targetType);
+                    #endif
+                    break;
+                }
                 const uint8_t res  = static_cast<uint8_t>(rand() % kWinFailVariants);
                 const uint8_t lang = static_cast<uint8_t>(currentLanguage);
                 const uint8_t file = static_cast<uint8_t>(lang * kLangStride + res + 1u);
                 doitPlayer.play_file(WIN_RESP_BANK, file);
 
             } else if (receivedCommand == FAIL_CMD) {
+                // Solo aceptar si es para nosotros (DB) o Broadcast
+                if (LEF.targetType != DEFAULT_BOTONERA && LEF.targetType != BROADCAST) {
+                    #ifdef DEBUG
+                    DEBUG__________printf("FAIL_CMD ignorado: TargetType=0x%02X\n", LEF.targetType);
+                    #endif
+                    break;
+                }
                 const uint8_t res  = static_cast<uint8_t>(rand() % kWinFailVariants);
                 const uint8_t lang = static_cast<uint8_t>(currentLanguage);
                 const uint8_t file = static_cast<uint8_t>(lang * kLangStride + res + 1u);
