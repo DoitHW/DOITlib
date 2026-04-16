@@ -737,47 +737,48 @@ void handleEncoder() noexcept
                         isLongPress      = false;
                         return;
                     }
-                    else if (currentFile == "Comunicador") {
-                        // Resetea el ciclo del relé y el foco del comunicador
-                        relayStep = -1;
-                        idsSPIFFS.clear();
+                        else if (currentFile == "Comunicador") {
+                            // Resetea el ciclo del relé y el foco del comunicador
+                            relayStep = -1;
+                            passiveModeActive = false;
+                            passiveIsMashed = false;
+                            idsSPIFFS.clear();
 
-                        // Ahora el comunicador apunta a BROADCAST por defecto
-                        uint8_t communicatorTargetType = BROADCAST;   // 0xFF
-                        communicatorActiveNS   = NS_ZERO;     // {0,0,0,0,0}
+                            // Ahora el comunicador apunta a BROADCAST por defecto
+                            uint8_t communicatorTargetType = BROADCAST;   // 0xFF
+                            communicatorActiveNS   = NS_ZERO;     // {0,0,0,0,0}
 
-                        // Intención: encender si no estaba seleccionado; apagar si lo estaba
-                        const bool turningOn = (currentIndex < (int)selectedStates.size())
-                                            ? !static_cast<bool>(selectedStates[currentIndex])
-                                            : true;
+                            // Intención: encender si no estaba seleccionado; apagar si lo estaba
+                            const bool turningOn = (currentIndex < (int)selectedStates.size())
+                                                ? !static_cast<bool>(selectedStates[currentIndex])
+                                                : true;
 
-                        auto isSelectableElement = [&](const String& name) {
-                            // Igual que antes: no aplicar a Ambientes / Fichas / Apagar
-                            return !(name == "Ambientes" || name == "Fichas" || name == "Apagar");
-                        };
+                            auto isSelectableElement = [&](const String& name) {
+                                // Igual que antes: no aplicar a Ambientes / Fichas / Apagar
+                                return !(name == "Ambientes" || name == "Fichas" || name == "Apagar");
+                            };
 
-                        // Marca selección masiva en la UI
-                        for (size_t i = 0; i < elementFiles.size(); ++i) {
-                            selectedStates[i] = isSelectableElement(elementFiles[i]) ? (turningOn ? 1 : 0) : 0;
+                            // Marca selección masiva en la UI
+                            for (size_t i = 0; i < elementFiles.size(); ++i) {
+                                selectedStates[i] = isSelectableElement(elementFiles[i]) ? (turningOn ? 1 : 0) : 0;
+                            }
+
+                            // Enviar START/BLACKOUT en broadcast con el nuevo formato (targetType + NS_ZERO)
+                            if (turningOn) {
+                                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, START_CMD));
+                                delay(30);
+                                send_frame(frameMaker_SEND_FLAG_BYTE (DEFAULT_BOTONERA, BROADCAST, NS_ZERO, 0x01));
+                                delay(50);
+                            } else {
+                                send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, BLACKOUT));
+                                showMessageWithLoading(getTranslation("APAGANDO_ELEMENTOS"), 4000);
+                            }
+
+                            drawCurrentElement();
+                            buttonPressStart = 0;
+                            isLongPress      = false;
+                            return;
                         }
-
-                        // Enviar START/BLACKOUT en broadcast con el nuevo formato (targetType + NS_ZERO)
-                        if (turningOn) {
-                            send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, START_CMD));
-                            delay(30);
-                            send_frame(frameMaker_SEND_FLAG_BYTE (DEFAULT_BOTONERA, BROADCAST, NS_ZERO, 0x01));
-                            delay(50);
-                            send_frame(frameMaker_SEND_PATTERN_NUM(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, 0x09));
-                        } else {
-                            send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, BLACKOUT));
-                            showMessageWithLoading(getTranslation("APAGANDO_ELEMENTOS"), 4000);
-                        }
-
-                        drawCurrentElement();
-                        buttonPressStart = 0;
-                        isLongPress      = false;
-                        return;
-                    }
                     else {
                         // Cargar la caché de modos ANTES de entrar a la pantalla (OPTIMIZACIÓN)
                         loadModesCache(currentFile);

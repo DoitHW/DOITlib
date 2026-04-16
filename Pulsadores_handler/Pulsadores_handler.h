@@ -17,6 +17,8 @@ extern byte relay_state;
 extern bool ambienteActivo;
 extern std::vector<uint8_t> idsSPIFFS;
 extern int  relayStep;
+extern bool passiveModeActive;
+extern bool passiveIsMashed;
 extern std::vector<TARGETNS> nsSPIFFS;
 extern uint8_t  communicatorTargetType;
 extern TARGETNS communicatorActiveNS;
