@@ -887,17 +887,19 @@ void PulsadoresHandler::applyAdvancedPalettePulse(const ButtonContext &ctx) {
     colorHandler.color_mix_handler(c1, c2, &output);
   }
 
-  if (output != currentSent) {
-    // Lógica especial para modo "Pasivo Machacado" del Comunicador
-    if (ctx.currentFile == "Comunicador" && passiveModeActive && !passiveIsMashed) {
-      if (ctx.targetType == BROADCAST) {
-        // La primera vez que mandamos un color en pasivo, re-activamos con START
-        send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, START_CMD));
-        delay(100);
-        passiveIsMashed = true;
-      }
-    }
+  // Lógica especial para modo "Pasivo Machacado" del Comunicador
+  if (ctx.currentFile == "Comunicador" && passiveModeActive && !passiveIsMashed && output != BLACK) {
+    // La primera vez que mandamos un color en pasivo, re-activamos con START
+    // Force el envío para sobrescribir el ambiente pasivo (Ambiente 9)
+    send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, START_CMD));
+    delay(150);
+    send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, output));
+    currentSent = output;
+    passiveIsMashed = true;
+    return;
+  }
 
+  if (output != currentSent) {
     send_frame(frameMaker_SEND_COLOR(DEFAULT_BOTONERA, ctx.targetType,
                                      ctx.targetNS, output));
     currentSent = output;
