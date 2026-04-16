@@ -1032,6 +1032,10 @@ void PulsadoresHandler::handleComunicadorRelayCycle() {
       whiteNS = nsList[relayStep];
 
     } else {
+      // Antes de regresar (fin de ciclo), enviamos el modo Pasivo (Ambiente 9)
+      send_frame(frameMaker_SEND_PATTERN_NUM(DEFAULT_BOTONERA, BROADCAST, NS_ZERO, 0x09));
+      delay(CONSEC_DELAY);
+
       send_frame(frameMaker_SEND_COMMAND(DEFAULT_BOTONERA, BROADCAST, NS_ZERO,
                                          BLACKOUT));
       delay(CONSEC_DELAY);
