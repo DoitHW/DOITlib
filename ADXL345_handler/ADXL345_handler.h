@@ -20,9 +20,9 @@ public:
     //bool isInitialized() const;       // Verificar si está inicializado
     //void setThreshold(float newThreshold);  // Configurar un nuevo umbral
     void end();
-    void readInclinations();
+    void readInclinations(bool isBinary, TARGETNS ns);
     SENSOR_DOUBLE_T createSensorDoubleValue(long finalValueX, long finalValueY);
-    void sendSensorValueDouble(const SENSOR_DOUBLE_T &sensorValue);
+    void sendSensorValueDouble(const SENSOR_DOUBLE_T &sensorValue, TARGETNS ns);
     void enableActivityInterrupt(uint16_t threshold_mg, bool enX, bool enY, bool enZ);
     void clearInterrupts();
     bool isInitialized() const { return initialized; }
